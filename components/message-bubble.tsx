@@ -188,18 +188,43 @@ function ReasoningSection({
   defaultExpanded = false,
   colors,
 }: ReasoningSectionProps) {
-  const [expanded, setExpanded] = useState(defaultExpanded);
+  const [expanded, setExpanded] = useState(defaultExpanded || isStreaming);
+  const [startTime] = useState(() => Date.now());
+  const [elapsedLabel, setElapsedLabel] = useState("");
 
+  // Auto-expand when streaming starts with reasoning
   useEffect(() => {
-    if (defaultExpanded && reasoning.trim().length > 0) {
+    if (isStreaming && reasoning.trim().length > 0) {
       setExpanded(true);
     }
-  }, [defaultExpanded, reasoning]);
+  }, [isStreaming, reasoning]);
+
+  // Track elapsed time while streaming
+  useEffect(() => {
+    if (!isStreaming) {
+      const elapsed = Math.round((Date.now() - startTime) / 1000);
+      if (elapsed > 0) {
+        setElapsedLabel(`${elapsed}s`);
+      }
+      return;
+    }
+
+    const interval = setInterval(() => {
+      const elapsed = Math.round((Date.now() - startTime) / 1000);
+      setElapsedLabel(`${elapsed}s`);
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [isStreaming, startTime]);
 
   const handleToggle = useCallback(() => {
     triggerLightImpact();
     setExpanded((current) => !current);
   }, []);
+
+  const titleText = isStreaming
+    ? `Thinking${elapsedLabel ? ` (${elapsedLabel})` : "..."}`
+    : `Thought${elapsedLabel ? ` for ${elapsedLabel}` : ""}`;
 
   return (
     <View
@@ -219,20 +244,25 @@ function ReasoningSection({
         ]}
       >
         <View style={styles.reasoningTitleRow}>
-          <Text style={[styles.reasoningTitle, { color: colors.muted }]}>Thinking...</Text>
+          <MaterialIcons
+            name="lightbulb-outline"
+            size={15}
+            color={isStreaming ? colors.primary : colors.muted}
+            style={{ marginRight: 6 }}
+          />
+          <Text style={[styles.reasoningTitle, { color: isStreaming ? colors.primary : colors.muted }]}>
+            {titleText}
+          </Text>
           {isStreaming ? (
             <View style={[styles.reasoningLiveDot, { backgroundColor: colors.primary }]} />
           ) : null}
         </View>
 
         <View style={styles.reasoningRightRow}>
-          <Text style={[styles.reasoningToggleText, { color: colors.primary }]}>
-            {expanded ? "Hide" : "Show"}
-          </Text>
           <MaterialIcons
-            name={expanded ? "keyboard-arrow-down" : "keyboard-arrow-right"}
-            size={18}
-            color={colors.primary}
+            name={expanded ? "keyboard-arrow-up" : "keyboard-arrow-down"}
+            size={20}
+            color={colors.muted}
           />
         </View>
       </Pressable>
@@ -536,7 +566,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
         ) : (
           <MarkdownRenderer content={message.content} isStreaming={message.isStreaming} />
         )
-      ) : !isUser && message.isStreaming && !message.reasoning ? (
+      ) : !isUser && message.isStreaming ? (
         <MarkdownRenderer content="" isStreaming />
       ) : null}
     </>

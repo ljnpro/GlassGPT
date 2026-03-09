@@ -40,3 +40,5 @@
 - [x] CRITICAL: Complete rewrite via GPT-5.4 HIGH reasoning to fix all issues
 - [x] Optimize UI to be more polished and Apple-native feeling
 - [x] CRITICAL BUG: Second message fails with "Invalid value: 'input_text'" - Responses API message history format wrong
+- [x] BUG: LaTeX/math formula rendering completely broken
+- [x] BUG: GPT reasoning/thinking process not displayed in chat messages
