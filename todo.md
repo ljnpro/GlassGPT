@@ -35,3 +35,7 @@
 - [x] Fix: Reasoning effort label not fully visible in top bar
 - [x] Fix: Header layout - remove left spacer, better balance
 - [x] Improve: Perfect iOS 26 Liquid Glass adaptation on all components
+- [x] CRITICAL: Chat not working - messages not sending/receiving despite verified API key
+- [x] CRITICAL: Liquid Glass not rendering on iOS 26 iPhone 17 Pro
+- [x] CRITICAL: Complete rewrite via GPT-5.4 HIGH reasoning to fix all issues
+- [x] Optimize UI to be more polished and Apple-native feeling

@@ -9,6 +9,7 @@ import React, {
 } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { v4 as uuidv4 } from "uuid";
+
 import {
   AppSettings,
   Conversation,
@@ -23,7 +24,11 @@ import {
   normalizeModelId,
   normalizeReasoningEffort,
 } from "./types";
-import { generateTitle, streamChatCompletion, StreamCompletionResult } from "./openai-service";
+import {
+  StreamCompletionResult,
+  generateTitle,
+  streamChatCompletion,
+} from "./openai-service";
 import { deleteApiKey, getApiKey, saveApiKey } from "./secure-storage";
 
 const CONVERSATIONS_KEY = "liquid_glass_conversations";
@@ -216,15 +221,17 @@ function normalizeImages(value: unknown): ImageAttachment[] | undefined {
         return null;
       }
 
-      const img: ImageAttachment = {
+      const normalized: ImageAttachment = {
         uri: record.uri,
       };
-      if (typeof record.base64 === "string") img.base64 = record.base64;
-      if (typeof record.width === "number") img.width = record.width;
-      if (typeof record.height === "number") img.height = record.height;
-      if (typeof record.mimeType === "string") img.mimeType = record.mimeType;
-      if (typeof record.fileName === "string") img.fileName = record.fileName;
-      return img;
+
+      if (typeof record.base64 === "string") normalized.base64 = record.base64;
+      if (typeof record.width === "number") normalized.width = record.width;
+      if (typeof record.height === "number") normalized.height = record.height;
+      if (typeof record.mimeType === "string") normalized.mimeType = record.mimeType;
+      if (typeof record.fileName === "string") normalized.fileName = record.fileName;
+
+      return normalized;
     })
     .filter((image): image is ImageAttachment => image !== null);
 
@@ -428,6 +435,7 @@ function chatReducer(state: ChatState, action: ChatAction): ChatState {
         state.currentModel,
         state.currentEffort
       );
+
       const conversations = sortConversations([
         normalizedConversation,
         ...state.conversations.filter((conversation) => conversation.id !== normalizedConversation.id),
@@ -437,31 +445,56 @@ function chatReducer(state: ChatState, action: ChatAction): ChatState {
         ...state,
         conversations,
         activeConversationId: normalizedConversation.id,
+        currentModel: normalizedConversation.model,
+        currentEffort: normalizedConversation.effort,
       };
     }
 
-    case "SET_ACTIVE_CONVERSATION":
+    case "SET_ACTIVE_CONVERSATION": {
+      if (!action.id) {
+        return {
+          ...state,
+          activeConversationId: null,
+          currentModel: state.settings.defaultModel,
+          currentEffort: state.settings.defaultEffort,
+        };
+      }
+
+      const conversation =
+        state.conversations.find((item) => item.id === action.id) ?? null;
+
+      if (!conversation) {
+        return {
+          ...state,
+          activeConversationId: action.id,
+        };
+      }
+
       return {
         ...state,
         activeConversationId: action.id,
+        currentModel: conversation.model,
+        currentEffort: conversation.effort,
       };
+    }
 
     case "DELETE_CONVERSATION": {
       const nextConversations = state.conversations.filter(
         (conversation) => conversation.id !== action.id
       );
+      const deletingActive = state.activeConversationId === action.id;
 
       return {
         ...state,
         conversations: nextConversations,
-        activeConversationId:
-          state.activeConversationId === action.id ? null : state.activeConversationId,
+        activeConversationId: deletingActive ? null : state.activeConversationId,
+        currentModel: deletingActive ? state.settings.defaultModel : state.currentModel,
+        currentEffort: deletingActive ? state.settings.defaultEffort : state.currentEffort,
         streamingConversationId:
           state.streamingConversationId === action.id ? null : state.streamingConversationId,
         streamingMessageId:
           state.streamingConversationId === action.id ? null : state.streamingMessageId,
-        isSending:
-          state.streamingConversationId === action.id ? false : state.isSending,
+        isSending: state.streamingConversationId === action.id ? false : state.isSending,
       };
     }
 
@@ -693,13 +726,15 @@ function chatReducer(state: ChatState, action: ChatAction): ChatState {
           ? state.settings.apiKey
           : action.settings.apiKey.trim();
 
-      const nextModel = normalizeModelId(
-        action.settings.defaultModel ?? state.currentModel
+      const nextDefaultModel = normalizeModelId(
+        action.settings.defaultModel ?? state.settings.defaultModel
       );
-      const nextEffort = normalizeReasoningEffort(
-        nextModel,
-        action.settings.defaultEffort ?? state.currentEffort
+      const nextDefaultEffort = normalizeReasoningEffort(
+        nextDefaultModel,
+        action.settings.defaultEffort ?? state.settings.defaultEffort
       );
+
+      const shouldSyncDraftSelection = state.activeConversationId === null;
 
       return {
         ...state,
@@ -707,11 +742,11 @@ function chatReducer(state: ChatState, action: ChatAction): ChatState {
           ...state.settings,
           ...action.settings,
           apiKey: nextApiKey,
-          defaultModel: nextModel,
-          defaultEffort: nextEffort,
+          defaultModel: nextDefaultModel,
+          defaultEffort: nextDefaultEffort,
         },
-        currentModel: nextModel,
-        currentEffort: nextEffort,
+        currentModel: shouldSyncDraftSelection ? nextDefaultModel : state.currentModel,
+        currentEffort: shouldSyncDraftSelection ? nextDefaultEffort : state.currentEffort,
       };
     }
 
@@ -720,6 +755,8 @@ function chatReducer(state: ChatState, action: ChatAction): ChatState {
         ...state,
         conversations: [],
         activeConversationId: null,
+        currentModel: state.settings.defaultModel,
+        currentEffort: state.settings.defaultEffort,
         isSending: false,
         streamingConversationId: null,
         streamingMessageId: null,
@@ -869,15 +906,20 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
     }
 
     const persistedSettings = {
-      defaultModel: state.currentModel,
-      defaultEffort: state.currentEffort,
+      defaultModel: state.settings.defaultModel,
+      defaultEffort: state.settings.defaultEffort,
       theme: state.settings.theme,
     };
 
     void AsyncStorage.setItem(SETTINGS_KEY, JSON.stringify(persistedSettings)).catch((error) => {
       console.error("Failed to persist settings:", error);
     });
-  }, [state.currentModel, state.currentEffort, state.settings.theme, state.isLoaded]);
+  }, [
+    state.settings.defaultEffort,
+    state.settings.defaultModel,
+    state.settings.theme,
+    state.isLoaded,
+  ]);
 
   useEffect(() => {
     if (!state.isLoaded) {
@@ -923,11 +965,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
       return buildDraftConversation(state.currentModel, state.currentEffort);
     }
 
-    return {
-      ...rawActiveConversation,
-      model: state.currentModel,
-      effort: state.currentEffort,
-    };
+    return rawActiveConversation;
   }, [rawActiveConversation, state.currentEffort, state.currentModel]);
 
   const setApiKey = useCallback(async (apiKey: string) => {
@@ -1040,18 +1078,16 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
     controller.abort();
   }, []);
 
-  const deleteConversation = useCallback(
-    (id: string) => {
-      const controller = controllersRef.current.get(id);
-      if (controller) {
-        controller.abort();
-        controllersRef.current.delete(id);
-      }
+  const deleteConversation = useCallback((id: string) => {
+    const controller = controllersRef.current.get(id);
 
-      dispatch({ type: "DELETE_CONVERSATION", id });
-    },
-    []
-  );
+    if (controller) {
+      controller.abort();
+      controllersRef.current.delete(id);
+    }
+
+    dispatch({ type: "DELETE_CONVERSATION", id });
+  }, []);
 
   const sendMessage = useCallback(
     async (params: SendMessageParams) => {
@@ -1084,14 +1120,15 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
         dispatch({ type: "SET_ACTIVE_CONVERSATION", id: conversationId });
       }
 
+      const targetConversationId = conversationId;
       const previousConversation =
-        stateRef.current.conversations.find((conversation) => conversation.id === conversationId) ??
+        stateRef.current.conversations.find((conversation) => conversation.id === targetConversationId) ??
         null;
       const hadNoMessages = !previousConversation || previousConversation.messages.length === 0;
 
       dispatch({
         type: "UPDATE_CONVERSATION_MODEL",
-        conversationId,
+        conversationId: targetConversationId,
         model,
         effort,
       });
@@ -1120,43 +1157,40 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
 
       dispatch({
         type: "ADD_MESSAGE",
-        conversationId,
+        conversationId: targetConversationId,
         message: userMessage,
       });
 
       dispatch({
         type: "ADD_MESSAGE",
-        conversationId,
+        conversationId: targetConversationId,
         message: assistantMessage,
       });
 
       dispatch({
         type: "SET_STREAMING",
         isSending: true,
-        conversationId,
+        conversationId: targetConversationId,
         messageId: assistantMessageId,
         error: null,
       });
 
-      const oldController = controllersRef.current.get(conversationId);
+      const oldController = controllersRef.current.get(targetConversationId);
       if (oldController) {
         oldController.abort();
       }
 
       const abortController = new AbortController();
-      controllersRef.current.set(conversationId, abortController);
+      controllersRef.current.set(targetConversationId, abortController);
 
-      const historyMessages = [
-        ...(previousConversation?.messages ?? []),
-        userMessage,
-      ];
+      const historyMessages = [...(previousConversation?.messages ?? []), userMessage];
 
       if (hadNoMessages) {
         const fallbackTitle = createFallbackTitle(text, images);
         if (fallbackTitle !== "New Chat") {
           dispatch({
             type: "UPDATE_CONVERSATION_TITLE",
-            conversationId,
+            conversationId: targetConversationId,
             title: fallbackTitle,
           });
         }
@@ -1167,14 +1201,12 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
               if (title && title !== "New Chat") {
                 dispatch({
                   type: "UPDATE_CONVERSATION_TITLE",
-                  conversationId: conversationId!,
+                  conversationId: targetConversationId,
                   title,
                 });
               }
             })
-            .catch(() => {
-              return;
-            });
+            .catch(() => undefined);
         }
       }
 
@@ -1186,7 +1218,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
         }
 
         finalized = true;
-        controllersRef.current.delete(conversationId!);
+        controllersRef.current.delete(targetConversationId);
 
         const updates: Partial<Message> = {
           isStreaming: false,
@@ -1206,7 +1238,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
 
         dispatch({
           type: "UPDATE_MESSAGE",
-          conversationId: conversationId!,
+          conversationId: targetConversationId,
           messageId: assistantMessageId,
           updates,
         });
@@ -1226,17 +1258,18 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
         }
 
         finalized = true;
-        controllersRef.current.delete(conversationId!);
+        controllersRef.current.delete(targetConversationId);
 
         const latestConversation =
-          stateRef.current.conversations.find((conversation) => conversation.id === conversationId) ??
-          null;
+          stateRef.current.conversations.find(
+            (conversation) => conversation.id === targetConversationId
+          ) ?? null;
         const latestAssistantMessage =
           latestConversation?.messages.find((message) => message.id === assistantMessageId) ?? null;
 
         dispatch({
           type: "UPDATE_MESSAGE",
-          conversationId: conversationId!,
+          conversationId: targetConversationId,
           messageId: assistantMessageId,
           updates: {
             content: buildErrorMessage(latestAssistantMessage?.content ?? "", errorMessage),
@@ -1256,46 +1289,54 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
         });
       };
 
-      try {
-        await streamChatCompletion(
-          apiKey,
-          historyMessages,
-          model,
-          effort,
-          {
-            onToken: (fullText) => {
-              updateMessage(conversationId!, assistantMessageId, {
-                content: fullText,
-                isStreaming: true,
-                model,
-                effort,
-              });
+      const runStream = async () => {
+        try {
+          const result = await streamChatCompletion(
+            apiKey,
+            historyMessages,
+            model,
+            effort,
+            {
+              onToken: (fullText) => {
+                updateMessage(targetConversationId, assistantMessageId, {
+                  content: fullText,
+                  isStreaming: true,
+                  model,
+                  effort,
+                });
+              },
+              onReasoning: (fullReasoning) => {
+                updateMessage(targetConversationId, assistantMessageId, {
+                  reasoning: fullReasoning,
+                  isStreaming: true,
+                });
+              },
+              onDone: (resultFromCallback) => {
+                finalizeSuccess(resultFromCallback);
+              },
+              onError: (errorMessage) => {
+                finalizeError(errorMessage);
+              },
             },
-            onReasoning: (fullReasoning) => {
-              updateMessage(conversationId!, assistantMessageId, {
-                reasoning: fullReasoning,
-                isStreaming: true,
-              });
-            },
-            onDone: (result) => {
-              finalizeSuccess(result);
-            },
-            onError: (errorMessage) => {
-              finalizeError(errorMessage);
-            },
-          },
-          abortController.signal
-        );
-      } catch (error) {
-        const message =
-          error instanceof Error && error.message.trim().length > 0
-            ? error.message.trim()
-            : "Unknown error";
-        finalizeError(message);
-      }
+            abortController.signal
+          );
+
+          if (!finalized) {
+            finalizeSuccess(result);
+          }
+        } catch (error) {
+          const message =
+            error instanceof Error && error.message.trim().length > 0
+              ? error.message.trim()
+              : "Unknown error";
+          finalizeError(message);
+        }
+      };
+
+      void runStream();
 
       return {
-        conversationId,
+        conversationId: targetConversationId,
         assistantMessageId,
       };
     },
