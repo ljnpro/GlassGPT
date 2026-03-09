@@ -45,3 +45,4 @@
 - [x] BUG: LaTeX formulas still showing as raw text - markdown parser not detecting \\[...\\] and \\(...\\) delimiters
 - [x] BUG: LaTeX rendering uses WebView which doesn't work in Expo Go - need pure RN solution without WebView
 - [x] BUG: LaTeX formula font size is absurdly large - need to scale down to match body text size
+- [x] BUG: LaTeX formula still way too large even with fontSize=9/10 - patched to use direct MathJax engine with ex-to-px conversion
