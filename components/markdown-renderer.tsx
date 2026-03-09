@@ -174,6 +174,8 @@ function isBlockStarter(lines: string[], index: number): boolean {
   return (
     CODE_FENCE_REGEX.test(line) ||
     trimmed.startsWith('$$') ||
+    trimmed === '\\[' ||
+    trimmed.startsWith('\\[') ||
     HEADING_REGEX.test(line) ||
     BLOCKQUOTE_REGEX.test(line) ||
     UNORDERED_LIST_REGEX.test(line) ||
@@ -250,6 +252,50 @@ function parseMarkdown(content: string): MarkdownBlock[] {
         if (closingLine !== '$$') {
           latexLines.push(closingLine.replace(/\$\$\s*$/, ''));
         }
+        index += 1;
+      }
+
+      blocks.push({
+        type: 'latex',
+        text: latexLines.join('\n').trim(),
+      });
+      continue;
+    }
+
+    // Handle \[...\] block LaTeX (standard LaTeX display math)
+    if (trimmed === '\\[' || trimmed.startsWith('\\[')) {
+      const latexLines: string[] = [];
+      // Check if \[ and \] are on the same line: \[ ... \]
+      const sameLineMatch = trimmed.match(/^\\\[([\s\S]*?)\\\]$/);
+      if (sameLineMatch) {
+        blocks.push({
+          type: 'latex',
+          text: sameLineMatch[1].trim(),
+        });
+        index += 1;
+        continue;
+      }
+
+      // \[ is on its own line or starts the content
+      const afterOpener = trimmed.slice(2).trim();
+      if (afterOpener) {
+        latexLines.push(afterOpener);
+      }
+
+      index += 1;
+
+      while (index < lines.length) {
+        const lineTrimmed = lines[index].trim();
+        if (lineTrimmed === '\\]' || lineTrimmed.endsWith('\\]')) {
+          // Check if there's content before the closing \]
+          const beforeCloser = lineTrimmed.replace(/\\\]\s*$/, '').trim();
+          if (beforeCloser) {
+            latexLines.push(beforeCloser);
+          }
+          index += 1;
+          break;
+        }
+        latexLines.push(lines[index]);
         index += 1;
       }
 
@@ -382,7 +428,7 @@ function parseMarkdown(content: string): MarkdownBlock[] {
 function findNextInlineSpecialCharacter(text: string, start: number): number {
   for (let index = start; index < text.length; index += 1) {
     const char = text[index];
-    if (char === '[' || char === '`' || char === '$' || char === '*') {
+    if (char === '[' || char === '`' || char === '$' || char === '*' || char === '\\') {
       return index;
     }
   }
@@ -425,6 +471,17 @@ function parseInlineMarkdown(text: string): InlineSegment[] {
         text: latexMatch[1],
       });
       index += latexMatch[0].length;
+      continue;
+    }
+
+    // Handle \(...\) inline LaTeX
+    const inlineLatexBackslash = slice.match(/^\\\(([\s\S]*?)\\\)/);
+    if (inlineLatexBackslash) {
+      segments.push({
+        type: 'latex',
+        text: inlineLatexBackslash[1].trim(),
+      });
+      index += inlineLatexBackslash[0].length;
       continue;
     }
 

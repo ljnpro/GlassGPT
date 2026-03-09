@@ -42,3 +42,4 @@
 - [x] CRITICAL BUG: Second message fails with "Invalid value: 'input_text'" - Responses API message history format wrong
 - [x] BUG: LaTeX/math formula rendering completely broken
 - [x] BUG: GPT reasoning/thinking process not displayed in chat messages
+- [x] BUG: LaTeX formulas still showing as raw text - markdown parser not detecting \\[...\\] and \\(...\\) delimiters
