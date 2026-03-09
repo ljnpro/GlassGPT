@@ -39,3 +39,4 @@
 - [x] CRITICAL: Liquid Glass not rendering on iOS 26 iPhone 17 Pro
 - [x] CRITICAL: Complete rewrite via GPT-5.4 HIGH reasoning to fix all issues
 - [x] Optimize UI to be more polished and Apple-native feeling
+- [x] CRITICAL BUG: Second message fails with "Invalid value: 'input_text'" - Responses API message history format wrong

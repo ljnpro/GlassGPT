@@ -37,6 +37,10 @@ type ResponsesInputItem =
       text: string;
     }
   | {
+      type: "output_text";
+      text: string;
+    }
+  | {
       type: "input_image";
       image_url: string;
     };
@@ -128,10 +132,12 @@ function buildResponsesInput(messages: Message[]): ResponsesInputMessage[] {
     const content: ResponsesInputItem[] = [];
 
     if (message.content.trim().length > 0) {
+      // Use "output_text" for assistant messages, "input_text" for user/system
+      const textType = message.role === "assistant" ? "output_text" : "input_text";
       content.push({
-        type: "input_text",
+        type: textType,
         text: message.content,
-      });
+      } as ResponsesInputItem);
     }
 
     if (message.role === "user" && message.images?.length) {
