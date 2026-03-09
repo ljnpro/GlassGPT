@@ -9,6 +9,7 @@ import {
   Text,
   View,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import * as Haptics from "expo-haptics";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
@@ -25,6 +26,7 @@ import { ImageAttachment, Message, MODELS } from "@/lib/types";
 export default function ChatScreen() {
   const colors = useColors();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const {
     state,
     activeConversation,
@@ -294,7 +296,7 @@ export default function ChatScreen() {
 
         <KeyboardAvoidingView
           behavior={Platform.OS === "ios" ? "padding" : undefined}
-          keyboardVerticalOffset={0}
+          keyboardVerticalOffset={Platform.OS === "ios" ? Math.max(insets.bottom, 10) + 58 : 0}
           style={styles.flex}
         >
           <View style={styles.flex}>

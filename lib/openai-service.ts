@@ -580,66 +580,90 @@ export async function streamChatCompletion(
       return result;
     }
 
+    // Attempt streaming via ReadableStream. React Native production builds
+    // may not support response.body / getReader(), so we wrap in try-catch
+    // and fall back to reading the full response text.
     const body = response.body;
+    let useStreamReader = false;
 
-    if (!body || typeof body.getReader !== "function") {
-      handleNonStreamingPayload(await response.text());
-      return result;
-    }
+    if (body && typeof body.getReader === "function") {
+      try {
+        const reader = body.getReader();
+        useStreamReader = true;
+        const decoder = new TextDecoder("utf-8");
+        let buffer = "";
 
-    const reader = body.getReader();
-    const decoder = new TextDecoder("utf-8");
-    let buffer = "";
+        while (true) {
+          const { done, value } = await reader.read();
 
-    while (true) {
-      const { done, value } = await reader.read();
+          if (done) {
+            break;
+          }
 
-      if (done) {
-        break;
-      }
+          buffer += decoder.decode(value, { stream: true }).replace(/\r\n/g, "\n");
 
-      buffer += decoder.decode(value, { stream: true }).replace(/\r\n/g, "\n");
+          let separatorIndex = buffer.indexOf("\n\n");
+          while (separatorIndex !== -1) {
+            const rawBlock = buffer.slice(0, separatorIndex);
+            buffer = buffer.slice(separatorIndex + 2);
 
-      let separatorIndex = buffer.indexOf("\n\n");
-      while (separatorIndex !== -1) {
-        const rawBlock = buffer.slice(0, separatorIndex);
-        buffer = buffer.slice(separatorIndex + 2);
+            const parsedBlock = parseSseBlock(rawBlock);
+            if (parsedBlock) {
+              const shouldStop = handleSsePayload(parsedBlock);
 
-        const parsedBlock = parseSseBlock(rawBlock);
-        if (parsedBlock) {
-          const shouldStop = handleSsePayload(parsedBlock);
-
-          if (shouldStop) {
-            try {
-              await reader.cancel();
-            } catch {
-              // Ignore cancellation errors.
+              if (shouldStop) {
+                try {
+                  await reader.cancel();
+                } catch {
+                  // Ignore cancellation errors.
+                }
+                return result;
+              }
             }
-            return result;
+
+            separatorIndex = buffer.indexOf("\n\n");
           }
         }
 
-        separatorIndex = buffer.indexOf("\n\n");
-      }
-    }
+        const trailingBlock = parseSseBlock(buffer.trim());
+        if (trailingBlock) {
+          handleSsePayload(trailingBlock);
+        }
 
-    const trailingBlock = parseSseBlock(buffer.trim());
-    if (trailingBlock) {
-      handleSsePayload(trailingBlock);
-    }
+        if (!didFinish && !didError) {
+          if (!result.outputText && buffer.trim().startsWith("{")) {
+            try {
+              const parsed = JSON.parse(buffer.trim()) as Record<string, unknown>;
+              result.outputText = extractResponseText(parsed);
+              result.usage = extractUsage(parsed);
+            } catch {
+              // Ignore trailing parse failures.
+            }
+          }
 
-    if (!didFinish && !didError) {
-      if (!result.outputText && buffer.trim().startsWith("{")) {
-        try {
-          const parsed = JSON.parse(buffer.trim()) as Record<string, unknown>;
-          result.outputText = extractResponseText(parsed);
-          result.usage = extractUsage(parsed);
-        } catch {
-          // Ignore trailing parse failures.
+          complete();
+        }
+
+        return result;
+      } catch (streamError) {
+        // ReadableStream failed at runtime (common in RN production builds).
+        // Fall through to text-based parsing below.
+        if ((streamError as { name?: string })?.name === "AbortError") {
+          throw streamError;
         }
       }
+    }
 
-      complete();
+    // Fallback: read the entire response as text and parse SSE blocks.
+    if (!useStreamReader || (!didFinish && !didError)) {
+      try {
+        const fullText = await response.text();
+        handleNonStreamingPayload(fullText);
+      } catch (textError) {
+        if (!didFinish && !didError) {
+          fail(normalizeError(textError));
+        }
+      }
     }
 
     return result;
