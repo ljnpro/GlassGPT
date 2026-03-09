@@ -44,3 +44,4 @@
 - [x] BUG: GPT reasoning/thinking process not displayed in chat messages
 - [x] BUG: LaTeX formulas still showing as raw text - markdown parser not detecting \\[...\\] and \\(...\\) delimiters
 - [x] BUG: LaTeX rendering uses WebView which doesn't work in Expo Go - need pure RN solution without WebView
+- [x] BUG: LaTeX formula font size is absurdly large - need to scale down to match body text size
