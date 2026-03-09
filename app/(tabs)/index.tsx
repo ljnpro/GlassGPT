@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -12,61 +12,64 @@ import {
 import { useRouter } from "expo-router";
 import * as Haptics from "expo-haptics";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
-import { ScreenContainer } from "@/components/screen-container";
+
 import { ChatInput } from "@/components/chat-input";
 import { GlassCard } from "@/components/glass-card";
 import { MessageBubble } from "@/components/message-bubble";
 import { ModelSelector } from "@/components/model-selector";
+import { ScreenContainer } from "@/components/screen-container";
 import { useColors } from "@/hooks/use-colors";
 import { useChatStore } from "@/lib/chat-store";
-import { generateTitle, streamChatCompletion } from "@/lib/openai-service";
 import { ImageAttachment, Message, MODELS } from "@/lib/types";
-import { v4 as uuidv4 } from "uuid";
 
 export default function ChatScreen() {
   const colors = useColors();
   const router = useRouter();
   const {
     state,
-    dispatch,
     activeConversation,
-    createNewConversation,
     setActiveConversation,
     currentModel,
     currentEffort,
     setCurrentModel,
     setCurrentEffort,
+    sendMessage,
+    stopStreaming,
   } = useChatStore();
 
   const listRef = useRef<FlatList<Message>>(null);
-  const abortRef = useRef<AbortController | null>(null);
-  const latestStateRef = useRef(state);
-  const stopRequestedRef = useRef(false);
-  const latestAssistantTextRef = useRef("");
-  const latestAssistantReasoningRef = useRef("");
-  const [isStreaming, setIsStreaming] = useState(false);
-
-  latestStateRef.current = state;
-
-  useEffect(() => {
-    return () => {
-      abortRef.current?.abort();
-    };
-  }, []);
-
-  useEffect(() => {
-    if (activeConversation?.id && activeConversation.messages.length > 0) {
-      requestAnimationFrame(() => {
-        listRef.current?.scrollToOffset({ offset: 0, animated: false });
-      });
-    }
-  }, [activeConversation?.id, activeConversation?.messages.length]);
 
   const messages = activeConversation?.messages ?? [];
   const reversedMessages = useMemo(() => [...messages].reverse(), [messages]);
   const hasApiKey = state.settings.apiKey.trim().length > 0;
   const isLoaded = state.isLoaded;
+  const isStreaming = state.isSending;
   const currentModelConfig = MODELS.find((item) => item.id === currentModel) ?? MODELS[0];
+  const activeConversationTitle =
+    activeConversation && activeConversation.id !== "" ? activeConversation.title : "New Chat";
+
+  const lastVisibleFingerprint = useMemo(() => {
+    const lastMessage = messages[messages.length - 1];
+    if (!lastMessage) {
+      return "empty";
+    }
+
+    return `${lastMessage.id}:${lastMessage.content.length}:${lastMessage.reasoning?.length ?? 0}:${
+      lastMessage.isStreaming ? "1" : "0"
+    }`;
+  }, [messages]);
+
+  useEffect(() => {
+    if (messages.length === 0) {
+      return;
+    }
+
+    const frame = requestAnimationFrame(() => {
+      listRef.current?.scrollToOffset({ offset: 0, animated: true });
+    });
+
+    return () => cancelAnimationFrame(frame);
+  }, [lastVisibleFingerprint, messages.length]);
 
   const handleNewChat = useCallback(() => {
     if (isStreaming) {
@@ -78,7 +81,7 @@ export default function ChatScreen() {
     }
 
     setActiveConversation(null);
-  }, [currentEffort, currentModel, dispatch, isStreaming, setActiveConversation]);
+  }, [isStreaming, setActiveConversation]);
 
   const handleOpenSettings = useCallback(() => {
     router.navigate("/(tabs)/settings");
@@ -87,189 +90,32 @@ export default function ChatScreen() {
   const handleSend = useCallback(
     async (text: string, images?: ImageAttachment[]) => {
       const trimmed = text.trim();
-      const apiKey = latestStateRef.current.settings.apiKey.trim();
 
       if (!trimmed && (!images || images.length === 0)) {
         return;
       }
 
-      if (!apiKey) {
+      if (!state.settings.apiKey.trim()) {
         router.navigate("/(tabs)/settings");
         return;
       }
 
-      const modelAtSend = currentModel;
-      const effortAtSend = currentEffort;
-
-      let conversationId = activeConversation?.id ?? null;
-      if (!conversationId) {
-        conversationId = createNewConversation(modelAtSend, effortAtSend);
-      }
-
-      const existingConversation =
-        latestStateRef.current.conversations.find((item) => item.id === conversationId) ?? null;
-      const existingMessages = existingConversation?.messages ?? [];
-      const shouldGenerateTitle = existingMessages.length === 0;
-
-      const userMessage: Message = {
-        id: uuidv4(),
-        role: "user",
-        content: trimmed,
-        images,
-        createdAt: Date.now(),
-      };
-
-      dispatch({
-        type: "ADD_USER_MESSAGE",
-        conversationId,
-        content: trimmed,
-        images,
-      });
-
-      const assistantMessageId = uuidv4();
-      dispatch({
-        type: "ADD_ASSISTANT_MESSAGE",
-        conversationId,
-        messageId: assistantMessageId,
-      });
-
-      requestAnimationFrame(() => {
-        listRef.current?.scrollToOffset({ offset: 0, animated: true });
-      });
-
-      stopRequestedRef.current = false;
-      latestAssistantTextRef.current = "";
-      latestAssistantReasoningRef.current = "";
-      setIsStreaming(true);
-
-      const abortController = new AbortController();
-      abortRef.current = abortController;
-
-      const requestMessages: Message[] = [...existingMessages, userMessage];
-
-      if (shouldGenerateTitle && trimmed.length > 0) {
-        void (async () => {
-          const title = await generateTitle(apiKey, trimmed);
-          dispatch({
-            type: "UPDATE_CONVERSATION_TITLE",
-            conversationId: conversationId!,
-            title: title || "New Chat",
-          });
-        })();
-      }
-
       try {
-        await streamChatCompletion(
-          apiKey,
-          requestMessages,
-          modelAtSend,
-          effortAtSend,
-          {
-            onToken: (fullText) => {
-              latestAssistantTextRef.current = fullText;
-              dispatch({
-                type: "UPDATE_ASSISTANT_MESSAGE",
-                conversationId: conversationId!,
-                messageId: assistantMessageId,
-                content: fullText,
-                isStreaming: true,
-              });
-            },
-            onReasoning: (fullReasoning) => {
-              latestAssistantReasoningRef.current = fullReasoning;
-              dispatch({
-                type: "UPDATE_ASSISTANT_MESSAGE",
-                conversationId: conversationId!,
-                messageId: assistantMessageId,
-                content: "",
-                reasoning: fullReasoning,
-                isStreaming: true,
-              });
-            },
-            onDone: () => {
-              if (
-                stopRequestedRef.current &&
-                latestAssistantTextRef.current.trim().length === 0 &&
-                latestAssistantReasoningRef.current.trim().length === 0
-              ) {
-                dispatch({
-                  type: "UPDATE_ASSISTANT_MESSAGE",
-                  conversationId: conversationId!,
-                  messageId: assistantMessageId,
-                  content: "Response stopped.",
-                  isStreaming: false,
-                });
-              }
-
-              dispatch({
-                type: "FINISH_ASSISTANT_MESSAGE",
-                conversationId: conversationId!,
-                messageId: assistantMessageId,
-                model: modelAtSend,
-                effort: effortAtSend,
-              });
-
-              if (Platform.OS !== "web") {
-                void Haptics.selectionAsync();
-              }
-
-              abortRef.current = null;
-              stopRequestedRef.current = false;
-              latestAssistantTextRef.current = "";
-              latestAssistantReasoningRef.current = "";
-              setIsStreaming(false);
-            },
-            onError: (error) => {
-              dispatch({
-                type: "UPDATE_ASSISTANT_MESSAGE",
-                conversationId: conversationId!,
-                messageId: assistantMessageId,
-                content: `Something went wrong.\n\n${error}`,
-                isStreaming: false,
-              });
-              dispatch({
-                type: "FINISH_ASSISTANT_MESSAGE",
-                conversationId: conversationId!,
-                messageId: assistantMessageId,
-                model: modelAtSend,
-                effort: effortAtSend,
-              });
-
-              if (Platform.OS !== "web") {
-                void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-              }
-
-              abortRef.current = null;
-              stopRequestedRef.current = false;
-              latestAssistantTextRef.current = "";
-              latestAssistantReasoningRef.current = "";
-              setIsStreaming(false);
-            },
-          },
-          abortController.signal
-        );
-      } catch {
-        abortRef.current = null;
-        stopRequestedRef.current = false;
-        latestAssistantTextRef.current = "";
-        latestAssistantReasoningRef.current = "";
-        setIsStreaming(false);
+        await sendMessage({
+          text: trimmed,
+          images,
+          conversationId: state.activeConversationId,
+        });
+      } catch (error) {
+        console.error("Failed to send message:", error);
       }
     },
-    [
-      activeConversation?.id,
-      createNewConversation,
-      currentEffort,
-      currentModel,
-      dispatch,
-      router,
-    ]
+    [router, sendMessage, state.activeConversationId, state.settings.apiKey]
   );
 
   const handleStop = useCallback(() => {
-    stopRequestedRef.current = true;
-    abortRef.current?.abort();
-  }, []);
+    stopStreaming();
+  }, [stopStreaming]);
 
   const renderMessage = useCallback(({ item }: { item: Message }) => {
     return <MessageBubble message={item} />;
@@ -301,13 +147,13 @@ export default function ChatScreen() {
           </View>
 
           <Text style={[styles.welcomeTitle, { color: colors.foreground }]}>
-            {hasApiKey ? "Start a new conversation" : "Add your API key to begin"}
+            {hasApiKey ? "Start a beautiful new conversation" : "Add your API key to begin"}
           </Text>
 
           <Text style={[styles.welcomeSubtitle, { color: colors.muted }]}>
             {hasApiKey
-              ? "Ask anything, add images, or explore more detailed reasoning with your selected model."
-              : "Open Settings to save your OpenAI API key. Your chats stay local to this app."}
+              ? "Ask anything, attach images, and watch responses stream live with a native iOS feel."
+              : "Open Settings to save your OpenAI API key securely on this device and start chatting."}
           </Text>
 
           <View style={styles.badgeRow}>
@@ -347,7 +193,7 @@ export default function ChatScreen() {
                 styles.primaryButton,
                 {
                   backgroundColor: colors.primary,
-                  opacity: pressed ? 0.88 : 1,
+                  opacity: pressed ? 0.9 : 1,
                 },
               ]}
             >
@@ -356,7 +202,7 @@ export default function ChatScreen() {
             </Pressable>
           ) : (
             <Text style={[styles.welcomeFootnote, { color: colors.muted }]}>
-              Messages will stream in real time.
+              Responses will stream in real time.
             </Text>
           )}
         </GlassCard>
@@ -377,7 +223,7 @@ export default function ChatScreen() {
 
   return (
     <ScreenContainer>
-      <View style={[styles.screen, { backgroundColor: colors.background }]}>
+      <View style={[styles.screen, { backgroundColor: "transparent" }]}>
         <View style={styles.headerContainer}>
           <GlassCard
             style={[
@@ -388,15 +234,18 @@ export default function ChatScreen() {
               },
             ]}
           >
-            <View style={styles.headerRow}>
-              <View style={styles.headerLeft}>
-                <ModelSelector
-                  model={currentModel}
-                  effort={currentEffort}
-                  onModelChange={setCurrentModel}
-                  onEffortChange={setCurrentEffort}
-                />
+            <View style={styles.headerTopRow}>
+              <View style={styles.headerTextBlock}>
+                <Text style={[styles.headerTitle, { color: colors.foreground }]}>
+                  {messages.length > 0 ? activeConversationTitle : "Liquid Glass Chat"}
+                </Text>
+                <Text style={[styles.headerSubtitle, { color: colors.muted }]}>
+                  {hasApiKey
+                    ? "Private chats with your own OpenAI key"
+                    : "Add an API key in Settings to start"}
+                </Text>
               </View>
+
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel="New Chat"
@@ -406,7 +255,7 @@ export default function ChatScreen() {
                   styles.newChatButton,
                   {
                     backgroundColor: `${colors.primary}14`,
-                    opacity: pressed ? 0.82 : isStreaming ? 0.45 : 1,
+                    opacity: pressed ? 0.88 : isStreaming ? 0.5 : 1,
                   },
                 ]}
               >
@@ -414,7 +263,33 @@ export default function ChatScreen() {
                 <Text style={[styles.newChatButtonText, { color: colors.primary }]}>New Chat</Text>
               </Pressable>
             </View>
+
+            <View style={styles.selectorRow}>
+              <ModelSelector
+                model={currentModel}
+                effort={currentEffort}
+                onModelChange={setCurrentModel}
+                onEffortChange={setCurrentEffort}
+              />
+            </View>
           </GlassCard>
+
+          {state.lastError ? (
+            <GlassCard
+              style={[
+                styles.errorCard,
+                {
+                  borderColor: `${colors.error}2F`,
+                  borderWidth: StyleSheet.hairlineWidth,
+                },
+              ]}
+            >
+              <MaterialIcons name="error-outline" size={18} color={colors.error} />
+              <Text style={[styles.errorText, { color: colors.error }]} numberOfLines={3}>
+                {state.lastError}
+              </Text>
+            </GlassCard>
+          ) : null}
         </View>
 
         <KeyboardAvoidingView
@@ -464,21 +339,35 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 8,
     paddingBottom: 10,
+    gap: 10,
   },
   headerCard: {
     borderRadius: 24,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
   },
-  headerRow: {
-    alignItems: "center",
+  headerTopRow: {
+    alignItems: "flex-start",
     flexDirection: "row",
     justifyContent: "space-between",
+    gap: 12,
   },
-  headerLeft: {
+  headerTextBlock: {
     flex: 1,
+    paddingRight: 4,
+  },
+  headerTitle: {
+    fontSize: 22,
+    fontWeight: "800",
+    letterSpacing: -0.45,
+  },
+  headerSubtitle: {
+    fontSize: 13,
+    marginTop: 4,
+  },
+  selectorRow: {
+    marginTop: 14,
     alignItems: "flex-start",
-    justifyContent: "center",
   },
   newChatButton: {
     alignItems: "center",
@@ -492,6 +381,20 @@ const styles = StyleSheet.create({
   newChatButtonText: {
     fontSize: 13,
     fontWeight: "700",
+  },
+  errorCard: {
+    borderRadius: 18,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  errorText: {
+    flex: 1,
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: "600",
   },
   messagesContent: {
     paddingBottom: 8,

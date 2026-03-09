@@ -31,6 +31,21 @@ interface SseBlock {
   data: string;
 }
 
+type ResponsesInputItem =
+  | {
+      type: "input_text";
+      text: string;
+    }
+  | {
+      type: "input_image";
+      image_url: string;
+    };
+
+type ResponsesInputMessage = {
+  role: "user" | "assistant" | "system";
+  content: ResponsesInputItem[];
+};
+
 function normalizeUsage(value: unknown): ResponseUsage | undefined {
   if (!value || typeof value !== "object") {
     return undefined;
@@ -106,36 +121,38 @@ function imageToInputUrl(image: ImageAttachment): string {
   return image.uri;
 }
 
-function buildResponsesInput(messages: Message[]): Array<Record<string, unknown>> {
-  const result: Array<Record<string, unknown>> = [];
+function buildResponsesInput(messages: Message[]): ResponsesInputMessage[] {
+  const result: ResponsesInputMessage[] = [];
+
   for (const message of messages) {
-    if (message.role === "user" && message.images && message.images.length > 0) {
-      const content: Array<Record<string, unknown>> = [];
+    const content: ResponsesInputItem[] = [];
 
-      if (message.content.trim().length > 0) {
-        content.push({
-          type: "input_text",
-          text: message.content,
-        });
-      }
+    if (message.content.trim().length > 0) {
+      content.push({
+        type: "input_text",
+        text: message.content,
+      });
+    }
 
+    if (message.role === "user" && message.images?.length) {
       for (const image of message.images) {
         content.push({
           type: "input_image",
           image_url: imageToInputUrl(image),
         });
       }
-
-      if (content.length > 0) {
-        result.push({ role: "user", content });
-      }
-    } else if (message.content.trim().length > 0) {
-      result.push({
-        role: message.role as string,
-        content: message.content,
-      });
     }
+
+    if (content.length === 0) {
+      continue;
+    }
+
+    result.push({
+      role: message.role,
+      content,
+    });
   }
+
   return result;
 }
 
@@ -145,7 +162,7 @@ function parseSseBlock(block: string): SseBlock | null {
   const dataLines: string[] = [];
 
   for (const rawLine of lines) {
-    const line = rawLine.trimEnd();
+    const line = rawLine.replace(/\r$/, "");
 
     if (!line || line.startsWith(":")) {
       continue;
@@ -178,28 +195,34 @@ function extractResponseText(payload: unknown): string {
 
   const record = payload as Record<string, unknown>;
 
-  if (typeof record.output_text === "string") {
+  if (typeof record.output_text === "string" && record.output_text.length > 0) {
     return record.output_text;
   }
 
-  if (!Array.isArray(record.output)) {
+  const response =
+    record.response && typeof record.response === "object"
+      ? (record.response as Record<string, unknown>)
+      : record;
+
+  if (typeof response.output_text === "string" && response.output_text.length > 0) {
+    return response.output_text;
+  }
+
+  if (!Array.isArray(response.output)) {
     return "";
   }
 
   const parts: string[] = [];
 
-  for (const outputItem of record.output) {
+  for (const outputItem of response.output) {
     if (!outputItem || typeof outputItem !== "object") {
       continue;
     }
 
     const outputRecord = outputItem as Record<string, unknown>;
+    const contentParts = Array.isArray(outputRecord.content) ? outputRecord.content : [];
 
-    if (!Array.isArray(outputRecord.content)) {
-      continue;
-    }
-
-    for (const contentPart of outputRecord.content) {
+    for (const contentPart of contentParts) {
       if (!contentPart || typeof contentPart !== "object") {
         continue;
       }
@@ -207,13 +230,71 @@ function extractResponseText(payload: unknown): string {
       const contentRecord = contentPart as Record<string, unknown>;
       const type = typeof contentRecord.type === "string" ? contentRecord.type : "";
 
-      if ((type === "output_text" || type === "text") && typeof contentRecord.text === "string") {
+      if (
+        (type === "output_text" || type === "text" || type === "input_text") &&
+        typeof contentRecord.text === "string"
+      ) {
         parts.push(contentRecord.text);
       }
     }
   }
 
   return parts.join("");
+}
+
+function extractErrorMessage(payload: unknown): string {
+  if (!payload || typeof payload !== "object") {
+    return "Unknown API error";
+  }
+
+  const record = payload as Record<string, unknown>;
+  const nestedError =
+    record.error && typeof record.error === "object"
+      ? (record.error as Record<string, unknown>)
+      : undefined;
+
+  const response =
+    record.response && typeof record.response === "object"
+      ? (record.response as Record<string, unknown>)
+      : undefined;
+
+  const responseError =
+    response?.error && typeof response.error === "object"
+      ? (response.error as Record<string, unknown>)
+      : undefined;
+
+  if (typeof nestedError?.message === "string" && nestedError.message.trim().length > 0) {
+    return nestedError.message.trim();
+  }
+
+  if (typeof responseError?.message === "string" && responseError.message.trim().length > 0) {
+    return responseError.message.trim();
+  }
+
+  if (typeof record.message === "string" && record.message.trim().length > 0) {
+    return record.message.trim();
+  }
+
+  return "Unknown API error";
+}
+
+function extractUsage(payload: unknown): ResponseUsage | undefined {
+  if (!payload || typeof payload !== "object") {
+    return undefined;
+  }
+
+  const record = payload as Record<string, unknown>;
+
+  if (record.usage) {
+    return normalizeUsage(record.usage);
+  }
+
+  if (record.response && typeof record.response === "object") {
+    const response = record.response as Record<string, unknown>;
+    return normalizeUsage(response.usage);
+  }
+
+  return undefined;
 }
 
 async function readErrorMessageFromResponse(response: Response): Promise<string> {
@@ -226,18 +307,7 @@ async function readErrorMessageFromResponse(response: Response): Promise<string>
 
     try {
       const parsed = JSON.parse(rawText) as Record<string, unknown>;
-      const errorObject =
-        parsed.error && typeof parsed.error === "object"
-          ? (parsed.error as Record<string, unknown>)
-          : undefined;
-
-      if (typeof errorObject?.message === "string" && errorObject.message.trim().length > 0) {
-        return errorObject.message.trim();
-      }
-
-      if (typeof parsed.message === "string" && parsed.message.trim().length > 0) {
-        return parsed.message.trim();
-      }
+      return extractErrorMessage(parsed);
     } catch {
       if (rawText.trim().length > 0) {
         return rawText.trim();
@@ -267,6 +337,18 @@ function sanitizeGeneratedTitle(title: string): string {
   return `${singleLine.slice(0, 57).trim()}…`;
 }
 
+function appendUniqueDelta(current: string, delta: string): string {
+  if (!delta) {
+    return current;
+  }
+
+  if (current.endsWith(delta)) {
+    return current;
+  }
+
+  return `${current}${delta}`;
+}
+
 export async function streamChatCompletion(
   apiKey: string,
   messages: Message[],
@@ -276,6 +358,7 @@ export async function streamChatCompletion(
   abortSignal?: AbortSignal
 ): Promise<StreamCompletionResult> {
   const normalizedEffort = normalizeReasoningEffort(model, effort);
+
   const requestBody: Record<string, unknown> = {
     model,
     input: buildResponsesInput(messages),
@@ -311,6 +394,82 @@ export async function streamChatCompletion(
     callbacks.onError(message);
   };
 
+  const handleParsedEvent = (payload: Record<string, unknown>, eventName: string): boolean => {
+    if (eventName === "done") {
+      complete();
+      return true;
+    }
+
+    if (
+      eventName === "response.output_text.delta" ||
+      eventName === "response.refusal.delta" ||
+      eventName === "response.output_text.done"
+    ) {
+      const delta =
+        typeof payload.delta === "string"
+          ? payload.delta
+          : typeof payload.text === "string"
+            ? payload.text
+            : "";
+
+      if (delta) {
+        result.outputText = appendUniqueDelta(result.outputText, delta);
+        callbacks.onToken(result.outputText);
+      }
+
+      return false;
+    }
+
+    if (
+      eventName.startsWith("response.reasoning") ||
+      eventName.startsWith("response.reasoning_summary_text")
+    ) {
+      const delta =
+        typeof payload.delta === "string"
+          ? payload.delta
+          : typeof payload.text === "string"
+            ? payload.text
+            : "";
+
+      if (delta) {
+        result.reasoning = appendUniqueDelta(result.reasoning, delta);
+        callbacks.onReasoning?.(result.reasoning);
+      }
+
+      return false;
+    }
+
+    if (eventName === "response.completed") {
+      const completedResponse =
+        payload.response && typeof payload.response === "object"
+          ? (payload.response as Record<string, unknown>)
+          : payload;
+
+      result.responseId =
+        typeof completedResponse.id === "string" ? completedResponse.id : undefined;
+      result.usage = normalizeUsage(completedResponse.usage);
+
+      if (!result.outputText) {
+        result.outputText = extractResponseText(completedResponse);
+      }
+
+      complete();
+      return true;
+    }
+
+    if (
+      eventName === "response.error" ||
+      eventName === "response.failed" ||
+      eventName === "response.incomplete" ||
+      eventName === "error"
+    ) {
+      fail(extractErrorMessage(payload));
+      return true;
+    }
+
+    return false;
+  };
+
   const handleSsePayload = (block: SseBlock): boolean => {
     const rawData = block.data;
 
@@ -333,61 +492,49 @@ export async function streamChatCompletion(
     const eventName =
       block.event || (typeof parsed.type === "string" ? parsed.type : "");
 
-    if (eventName === "response.output_text.delta" || eventName === "response.refusal.delta") {
-      if (typeof parsed.delta === "string") {
-        result.outputText += parsed.delta;
-        callbacks.onToken(result.outputText);
-      }
-      return false;
-    }
+    return handleParsedEvent(parsed, eventName);
+  };
 
-    if (
-      eventName.startsWith("response.reasoning") ||
-      eventName.startsWith("response.reasoning_summary_text")
-    ) {
-      if (typeof parsed.delta === "string") {
-        result.reasoning += parsed.delta;
-        callbacks.onReasoning?.(result.reasoning);
-      }
-      return false;
-    }
+  const handleNonStreamingPayload = (rawText: string) => {
+    const trimmed = rawText.trim();
 
-    if (eventName === "response.completed") {
-      const completedResponse =
-        parsed.response && typeof parsed.response === "object"
-          ? (parsed.response as Record<string, unknown>)
-          : parsed;
-
-      result.responseId =
-        typeof completedResponse.id === "string" ? completedResponse.id : undefined;
-      result.usage = normalizeUsage(completedResponse.usage);
-
-      if (!result.outputText) {
-        result.outputText = extractResponseText(completedResponse);
-      }
-
+    if (!trimmed) {
       complete();
-      return true;
+      return;
     }
 
-    if (eventName === "response.error" || eventName === "error") {
-      const errorObject =
-        parsed.error && typeof parsed.error === "object"
-          ? (parsed.error as Record<string, unknown>)
-          : undefined;
-
-      const message =
-        (typeof errorObject?.message === "string" && errorObject.message.trim().length > 0
-          ? errorObject.message.trim()
-          : typeof parsed.message === "string" && parsed.message.trim().length > 0
-            ? parsed.message.trim()
-            : "Unknown API error");
-
-      fail(message);
-      return true;
+    if (trimmed.startsWith("{")) {
+      try {
+        const parsed = JSON.parse(trimmed) as Record<string, unknown>;
+        result.outputText = extractResponseText(parsed);
+        result.reasoning =
+          typeof parsed.reasoning === "string" ? parsed.reasoning : result.reasoning;
+        result.usage = extractUsage(parsed);
+        complete();
+        return;
+      } catch {
+        // Fall through to SSE parsing.
+      }
     }
 
-    return false;
+    const normalizedText = rawText.replace(/\r\n/g, "\n");
+    const blocks = normalizedText.split("\n\n");
+
+    for (const rawBlock of blocks) {
+      const parsedBlock = parseSseBlock(rawBlock);
+      if (!parsedBlock) {
+        continue;
+      }
+
+      const shouldStop = handleSsePayload(parsedBlock);
+      if (shouldStop) {
+        return;
+      }
+    }
+
+    if (!didFinish && !didError) {
+      complete();
+    }
   };
 
   try {
@@ -410,26 +557,7 @@ export async function streamChatCompletion(
     const body = response.body;
 
     if (!body || typeof body.getReader !== "function") {
-      const rawText = await response.text();
-      const normalizedText = rawText.replace(/\r\n/g, "\n");
-      const blocks = normalizedText.split("\n\n");
-
-      for (const rawBlock of blocks) {
-        const parsedBlock = parseSseBlock(rawBlock);
-        if (!parsedBlock) {
-          continue;
-        }
-
-        const shouldStop = handleSsePayload(parsedBlock);
-        if (shouldStop) {
-          break;
-        }
-      }
-
-      if (!didFinish && !didError) {
-        complete();
-      }
-
+      handleNonStreamingPayload(await response.text());
       return result;
     }
 
@@ -454,11 +582,12 @@ export async function streamChatCompletion(
         const parsedBlock = parseSseBlock(rawBlock);
         if (parsedBlock) {
           const shouldStop = handleSsePayload(parsedBlock);
+
           if (shouldStop) {
             try {
               await reader.cancel();
             } catch {
-              return result;
+              // Ignore cancellation errors.
             }
             return result;
           }
@@ -474,6 +603,16 @@ export async function streamChatCompletion(
     }
 
     if (!didFinish && !didError) {
+      if (!result.outputText && buffer.trim().startsWith("{")) {
+        try {
+          const parsed = JSON.parse(buffer.trim()) as Record<string, unknown>;
+          result.outputText = extractResponseText(parsed);
+          result.usage = extractUsage(parsed);
+        } catch {
+          // Ignore trailing parse failures.
+        }
+      }
+
       complete();
     }
 
@@ -544,12 +683,22 @@ export async function generateTitle(apiKey: string, firstMessage: string): Promi
         input: [
           {
             role: "system",
-            content:
-              "Generate a very short conversation title in 2 to 6 words. Return only the title, with no quotes or punctuation decoration.",
+            content: [
+              {
+                type: "input_text",
+                text:
+                  "Generate a very short conversation title in 2 to 6 words. Return only the title, with no quotes or punctuation decoration.",
+              },
+            ],
           },
           {
             role: "user",
-            content: trimmedMessage,
+            content: [
+              {
+                type: "input_text",
+                text: trimmedMessage,
+              },
+            ],
           },
         ],
         reasoning: {

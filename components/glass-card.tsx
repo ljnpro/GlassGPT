@@ -8,7 +8,12 @@ import {
   type ViewStyle,
 } from "react-native";
 import { BlurView } from "expo-blur";
-import { GlassView as ExpoGlassView } from "expo-glass-effect";
+import {
+  GlassView,
+  isGlassEffectAPIAvailable,
+  isLiquidGlassAvailable,
+} from "expo-glass-effect";
+
 import { useColors } from "@/hooks/use-colors";
 
 type BlurTint = "light" | "dark" | "default";
@@ -29,41 +34,55 @@ function getIOSMajorVersion(version: string | number): number {
     return version;
   }
 
-  const normalized = String(version).split(".")[0];
-  const parsed = Number.parseInt(normalized, 10);
-
+  const parsed = Number.parseInt(String(version).split(".")[0] ?? "0", 10);
   return Number.isNaN(parsed) ? 0 : parsed;
 }
 
-function buildRadiusStyle(flattenedStyle?: ViewStyle): ViewStyle {
+function buildRadiusStyle(style?: ViewStyle): ViewStyle {
   const radiusStyle: ViewStyle = {
-    borderRadius:
-      typeof flattenedStyle?.borderRadius === "number"
-        ? flattenedStyle.borderRadius
-        : DEFAULT_RADIUS,
-    borderTopLeftRadius:
-      typeof flattenedStyle?.borderTopLeftRadius === "number"
-        ? flattenedStyle.borderTopLeftRadius
-        : undefined,
-    borderTopRightRadius:
-      typeof flattenedStyle?.borderTopRightRadius === "number"
-        ? flattenedStyle.borderTopRightRadius
-        : undefined,
-    borderBottomLeftRadius:
-      typeof flattenedStyle?.borderBottomLeftRadius === "number"
-        ? flattenedStyle.borderBottomLeftRadius
-        : undefined,
-    borderBottomRightRadius:
-      typeof flattenedStyle?.borderBottomRightRadius === "number"
-        ? flattenedStyle.borderBottomRightRadius
-        : undefined,
+    borderRadius: typeof style?.borderRadius === "number" ? style.borderRadius : DEFAULT_RADIUS,
   };
+
+  if (typeof style?.borderTopLeftRadius === "number") {
+    radiusStyle.borderTopLeftRadius = style.borderTopLeftRadius;
+  }
+  if (typeof style?.borderTopRightRadius === "number") {
+    radiusStyle.borderTopRightRadius = style.borderTopRightRadius;
+  }
+  if (typeof style?.borderBottomLeftRadius === "number") {
+    radiusStyle.borderBottomLeftRadius = style.borderBottomLeftRadius;
+  }
+  if (typeof style?.borderBottomRightRadius === "number") {
+    radiusStyle.borderBottomRightRadius = style.borderBottomRightRadius;
+  }
 
   if (Platform.OS === "ios") {
     radiusStyle.borderCurve = "continuous";
   }
 
   return radiusStyle;
+}
+
+function sanitizeStyle(flattenedStyle?: ViewStyle): ViewStyle {
+  if (!flattenedStyle) {
+    return {};
+  }
+
+  const nextStyle = { ...flattenedStyle };
+  delete nextStyle.backgroundColor;
+  delete nextStyle.opacity;
+  delete nextStyle.overflow;
+
+  return nextStyle;
+}
+
+function canUseNativeLiquidGlass(): boolean {
+  return (
+    Platform.OS === "ios" &&
+    getIOSMajorVersion(Platform.Version) >= 26 &&
+    isLiquidGlassAvailable() &&
+    isGlassEffectAPIAvailable()
+  );
 }
 
 export function GlassCard({
@@ -76,65 +95,76 @@ export function GlassCard({
 }: GlassCardProps) {
   const colors = useColors();
   const isDark = colors.background.toLowerCase() === "#000000";
-  const flattenedStyle = StyleSheet.flatten(style) as ViewStyle | undefined;
+
+  const flattenedStyle = (StyleSheet.flatten(style) ?? {}) as ViewStyle;
+  const sanitizedStyle = sanitizeStyle(flattenedStyle);
   const radiusStyle = buildRadiusStyle(flattenedStyle);
   const resolvedTint: BlurTint = tint ?? (isDark ? "dark" : "light");
-  const canUseGlass = Platform.OS === "ios" && getIOSMajorVersion(Platform.Version) >= 26;
+  const useNativeGlass = canUseNativeLiquidGlass();
 
-  const borderColor = isDark ? "rgba(255,255,255,0.12)" : "rgba(60,60,67,0.14)";
+  const resolvedBorderWidth =
+    typeof flattenedStyle.borderWidth === "number"
+      ? flattenedStyle.borderWidth
+      : StyleSheet.hairlineWidth;
+
+  const resolvedBorderColor =
+    typeof flattenedStyle.borderColor === "string"
+      ? flattenedStyle.borderColor
+      : isDark
+        ? "rgba(255,255,255,0.10)"
+        : "rgba(60,60,67,0.14)";
+
   const shadowStyle: ViewStyle = {
     shadowColor: "#000000",
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: isDark ? 0.3 : 0.08,
+    shadowOffset: { width: 0, height: isDark ? 10 : 12 },
+    shadowOpacity: isDark ? 0.28 : 0.08,
     shadowRadius: isDark ? 20 : 24,
     elevation: 10,
   };
 
-  const glassOverlayColor = isDark ? "rgba(255,255,255,0.025)" : "rgba(255,255,255,0.18)";
-  const blurOverlayColor = isDark ? "rgba(255,255,255,0.02)" : "rgba(255,255,255,0.24)";
   const fallbackBackgroundColor = isDark
-    ? "rgba(28,28,30,0.72)"
-    : "rgba(255,255,255,0.74)";
+    ? "rgba(28,28,30,0.78)"
+    : "rgba(255,255,255,0.78)";
+  const blurOverlayColor = isDark ? "rgba(255,255,255,0.018)" : "rgba(255,255,255,0.16)";
+  const nativeOverlayColor = isDark ? "rgba(28,28,30,0.14)" : "rgba(255,255,255,0.06)";
 
   const nativeWindProps = className ? { className } : {};
 
-  if (canUseGlass) {
-    try {
-      return (
-        <NativeContainer
-          {...nativeWindProps}
-          {...rest}
+  if (useNativeGlass) {
+    return (
+      <NativeContainer
+        {...nativeWindProps}
+        {...rest}
+        style={[
+          styles.base,
+          shadowStyle,
+          sanitizedStyle,
+          radiusStyle,
+          {
+            backgroundColor: "transparent",
+            borderColor: resolvedBorderColor,
+            borderWidth: resolvedBorderWidth,
+            overflow: "visible",
+          },
+        ]}
+      >
+        <GlassView
+          glassEffectStyle="regular"
+          style={[StyleSheet.absoluteFillObject, radiusStyle]}
+        />
+        <View
+          pointerEvents="none"
           style={[
-            styles.container,
+            StyleSheet.absoluteFillObject,
             radiusStyle,
-            shadowStyle,
             {
-              borderColor,
-              backgroundColor: fallbackBackgroundColor,
+              backgroundColor: nativeOverlayColor,
             },
-            style,
           ]}
-        >
-          <ExpoGlassView
-            pointerEvents="none"
-            style={[StyleSheet.absoluteFill, radiusStyle]}
-            glassEffectStyle="regular"
-          />
-          <View
-            pointerEvents="none"
-            style={[
-              StyleSheet.absoluteFill,
-              radiusStyle,
-              styles.overlay,
-              { backgroundColor: glassOverlayColor },
-            ]}
-          />
-          {children}
-        </NativeContainer>
-      );
-    } catch {
-      // Fallback handled below.
-    }
+        />
+        {children}
+      </NativeContainer>
+    );
   }
 
   if (Platform.OS !== "web") {
@@ -143,21 +173,23 @@ export function GlassCard({
         {...nativeWindProps}
         {...rest}
         style={[
-          styles.container,
-          radiusStyle,
+          styles.base,
           shadowStyle,
+          sanitizedStyle,
+          radiusStyle,
           {
-            borderColor,
             backgroundColor: fallbackBackgroundColor,
+            borderColor: resolvedBorderColor,
+            borderWidth: resolvedBorderWidth,
+            overflow: "hidden",
           },
-          style,
         ]}
       >
         <BlurView
           pointerEvents="none"
           intensity={intensity}
           tint={resolvedTint}
-          style={[StyleSheet.absoluteFill, radiusStyle]}
+          style={StyleSheet.absoluteFillObject}
           {...(Platform.OS === "android"
             ? { experimentalBlurMethod: "dimezisBlurView" as const }
             : {})}
@@ -165,10 +197,10 @@ export function GlassCard({
         <View
           pointerEvents="none"
           style={[
-            StyleSheet.absoluteFill,
-            radiusStyle,
-            styles.overlay,
-            { backgroundColor: blurOverlayColor },
+            StyleSheet.absoluteFillObject,
+            {
+              backgroundColor: blurOverlayColor,
+            },
           ]}
         />
         {children}
@@ -181,15 +213,17 @@ export function GlassCard({
       {...nativeWindProps}
       {...rest}
       style={[
-        styles.container,
-        radiusStyle,
+        styles.base,
         shadowStyle,
-        {
-          borderColor,
-          backgroundColor: fallbackBackgroundColor,
-        },
+        sanitizedStyle,
+        radiusStyle,
         styles.webGlass,
-        style,
+        {
+          backgroundColor: fallbackBackgroundColor,
+          borderColor: resolvedBorderColor,
+          borderWidth: resolvedBorderWidth,
+          overflow: "hidden",
+        },
       ]}
     >
       {children}
@@ -198,14 +232,9 @@ export function GlassCard({
 }
 
 const styles = StyleSheet.create({
-  container: {
+  base: {
     position: "relative",
-    overflow: "hidden",
     borderRadius: DEFAULT_RADIUS,
-    borderWidth: StyleSheet.hairlineWidth,
-  },
-  overlay: {
-    opacity: 1,
   },
   webGlass: {
     backdropFilter: "blur(28px) saturate(180%)",

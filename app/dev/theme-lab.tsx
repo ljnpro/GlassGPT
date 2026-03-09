@@ -27,7 +27,7 @@ function ColorSwatch({ name, value }: { name: PaletteName; value: string }) {
 export default function ThemeLabScreen() {
   const [pressCount, setPressCount] = useState(0);
   const [lastAction, setLastAction] = useState<string>("None yet");
-  const { colorScheme, setColorScheme } = useThemeContext();
+  const { resolvedColorScheme: colorScheme, setTheme } = useThemeContext();
   const colors = useColors();
 
   const swatches = useMemo(
@@ -76,7 +76,7 @@ export default function ThemeLabScreen() {
                   },
                 ]}
                 onPress={() => {
-                  setColorScheme(scheme);
+                  setTheme(scheme);
                   setLastAction(`Applied ${scheme} globally`);
                 }}
               >

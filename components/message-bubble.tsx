@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   FlatList,
   Modal,
@@ -11,15 +11,17 @@ import {
   type ListRenderItemInfo,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
-} from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Image } from 'expo-image';
-import * as Clipboard from 'expo-clipboard';
-import * as Haptics from 'expo-haptics';
-import MaterialIcons from '@expo/vector-icons/MaterialIcons';
-import { useColors } from '@/hooks/use-colors';
-import { ImageAttachment, Message, ModelId, ReasoningEffort } from '@/lib/types';
-import { MarkdownRenderer } from './markdown-renderer';
+} from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { Image } from "expo-image";
+import * as Clipboard from "expo-clipboard";
+import * as Haptics from "expo-haptics";
+import MaterialIcons from "@expo/vector-icons/MaterialIcons";
+
+import { useColors } from "@/hooks/use-colors";
+import { ImageAttachment, Message, ModelId, ReasoningEffort } from "@/lib/types";
+import { GlassCard } from "./glass-card";
+import { MarkdownRenderer } from "./markdown-renderer";
 
 interface MessageBubbleProps {
   message: Message;
@@ -58,29 +60,29 @@ interface ReasoningSectionProps {
 }
 
 const MODEL_LABELS: Record<ModelId, string> = {
-  'gpt-5.4': 'GPT-5.4',
-  'gpt-5.4-pro': 'GPT-5.4 Pro',
+  "gpt-5.4": "GPT-5.4",
+  "gpt-5.4-pro": "GPT-5.4 Pro",
 };
 
 const EFFORT_LABELS: Record<ReasoningEffort, string> = {
-  none: 'None',
-  low: 'Low',
-  medium: 'Medium',
-  high: 'High',
-  xhigh: 'xHigh',
+  none: "None",
+  low: "Low",
+  medium: "Medium",
+  high: "High",
+  xhigh: "xHigh",
 };
 
 function withOpacity(color: string, opacity: number): string {
   const normalizedOpacity = Math.max(0, Math.min(1, opacity));
 
-  if (color.startsWith('#')) {
+  if (color.startsWith("#")) {
     let hex = color.slice(1);
 
     if (hex.length === 3) {
       hex = hex
-        .split('')
+        .split("")
         .map((char) => char + char)
-        .join('');
+        .join("");
     }
 
     if (hex.length === 6) {
@@ -91,32 +93,35 @@ function withOpacity(color: string, opacity: number): string {
     }
   }
 
-  if (color.startsWith('rgb(')) {
-    return color.replace('rgb(', 'rgba(').replace(')', `, ${normalizedOpacity})`);
+  if (color.startsWith("rgb(")) {
+    return color.replace("rgb(", "rgba(").replace(")", `, ${normalizedOpacity})`);
   }
 
-  if (color.startsWith('rgba(')) {
-    return color.replace(/rgba\(([^,]+),([^,]+),([^,]+),[^)]+\)/, `rgba($1,$2,$3,${normalizedOpacity})`);
+  if (color.startsWith("rgba(")) {
+    return color.replace(
+      /rgba\(([^,]+),([^,]+),([^,]+),[^)]+\)/,
+      `rgba($1,$2,$3,${normalizedOpacity})`
+    );
   }
 
   return color;
 }
 
 function triggerLightImpact(): void {
-  if (Platform.OS !== 'web') {
+  if (Platform.OS !== "web") {
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => undefined);
   }
 }
 
 function triggerSuccessFeedback(): void {
-  if (Platform.OS !== 'web') {
+  if (Platform.OS !== "web") {
     void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => undefined);
   }
 }
 
 function getAttachmentUri(attachment: ImageAttachment): string {
   if (attachment.base64) {
-    return `data:${attachment.mimeType || 'image/jpeg'};base64,${attachment.base64}`;
+    return `data:${attachment.mimeType || "image/jpeg"};base64,${attachment.base64}`;
   }
   return attachment.uri;
 }
@@ -206,7 +211,13 @@ function ReasoningSection({
         },
       ]}
     >
-      <Pressable onPress={handleToggle} style={({ pressed }) => [styles.reasoningHeader, pressed && styles.pressed]}>
+      <Pressable
+        onPress={handleToggle}
+        style={({ pressed }) => [
+          styles.reasoningHeader,
+          pressed && styles.pressedScale,
+        ]}
+      >
         <View style={styles.reasoningTitleRow}>
           <Text style={[styles.reasoningTitle, { color: colors.muted }]}>Thinking...</Text>
           {isStreaming ? (
@@ -216,10 +227,10 @@ function ReasoningSection({
 
         <View style={styles.reasoningRightRow}>
           <Text style={[styles.reasoningToggleText, { color: colors.primary }]}>
-            {expanded ? 'Hide' : 'Show'}
+            {expanded ? "Hide" : "Show"}
           </Text>
           <MaterialIcons
-            name={expanded ? 'keyboard-arrow-down' : 'keyboard-arrow-right'}
+            name={expanded ? "keyboard-arrow-down" : "keyboard-arrow-right"}
             size={18}
             color={colors.primary}
           />
@@ -247,7 +258,10 @@ function AttachmentGrid({ attachments, onPressImage }: AttachmentGridProps) {
         <View style={isSingle ? styles.singleAttachmentCell : styles.multiAttachmentCell}>
           <Pressable
             onPress={() => onPressImage(index)}
-            style={({ pressed }) => [styles.attachmentPressable, pressed && styles.pressed]}
+            style={({ pressed }) => [
+              styles.attachmentPressable,
+              pressed && styles.pressedScale,
+            ]}
           >
             <Image
               source={{ uri: getAttachmentUri(item) }}
@@ -373,7 +387,7 @@ function ImageViewerModal({
               styles.viewerCounterChip,
               {
                 backgroundColor: withOpacity(colors.surface, 0.18),
-                borderColor: withOpacity('#FFFFFF', 0.12),
+                borderColor: withOpacity("#FFFFFF", 0.12),
               },
             ]}
           >
@@ -388,7 +402,7 @@ function ImageViewerModal({
               styles.viewerCloseButton,
               {
                 backgroundColor: withOpacity(colors.surface, pressed ? 0.28 : 0.18),
-                borderColor: withOpacity('#FFFFFF', 0.12),
+                borderColor: withOpacity("#FFFFFF", 0.12),
               },
             ]}
           >
@@ -427,12 +441,11 @@ export function MessageBubble({ message }: MessageBubbleProps) {
   const [viewerIndex, setViewerIndex] = useState(0);
   const copiedTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const isUser = message.role === 'user';
+  const isUser = message.role === "user";
   const hasText = message.content.trim().length > 0;
   const attachments = message.images ?? [];
   const hasAttachments = attachments.length > 0;
   const canCopy = hasText;
-  const showMeta = !isUser && Boolean(message.model || message.effort);
   const shouldAutoExpandReasoning = Boolean(message.isStreaming && !message.content.trim());
 
   useEffect(() => {
@@ -443,19 +456,29 @@ export function MessageBubble({ message }: MessageBubbleProps) {
     };
   }, []);
 
-  const bubbleStyle = useMemo(
+  const userBubbleStyle = useMemo(
     () => [
       styles.bubble,
-      isUser ? styles.userBubble : styles.assistantBubble,
-      isUser ? styles.userShadow : styles.assistantShadow,
+      styles.userBubble,
+      styles.userShadow,
       {
-        backgroundColor: isUser ? colors.primary : withOpacity(colors.surface, Platform.OS === 'ios' ? 0.94 : 1),
-        borderColor: isUser
-          ? withOpacity('#FFFFFF', 0.12)
-          : withOpacity(colors.border, Platform.OS === 'ios' ? 0.65 : 0.92),
+        backgroundColor: colors.primary,
+        borderColor: withOpacity("#FFFFFF", 0.12),
       },
     ],
-    [colors.border, colors.primary, colors.surface, isUser]
+    [colors.primary]
+  );
+
+  const assistantBubbleStyle = useMemo(
+    () => [
+      styles.bubble,
+      styles.assistantBubble,
+      styles.assistantShadow,
+      {
+        borderColor: withOpacity(colors.border, 0.72),
+      },
+    ],
+    [colors.border]
   );
 
   const handleCopyMessage = useCallback(async () => {
@@ -490,6 +513,35 @@ export function MessageBubble({ message }: MessageBubbleProps) {
     setViewerVisible(false);
   }, []);
 
+  const bubbleContent = (
+    <>
+      {!isUser ? (
+        <AssistantMetaBadges model={message.model} effort={message.effort} colors={colors} />
+      ) : null}
+
+      {hasAttachments ? <AttachmentGrid attachments={attachments} onPressImage={handleImagePress} /> : null}
+
+      {!isUser && message.reasoning ? (
+        <ReasoningSection
+          reasoning={message.reasoning}
+          isStreaming={message.isStreaming}
+          defaultExpanded={shouldAutoExpandReasoning}
+          colors={colors}
+        />
+      ) : null}
+
+      {hasText ? (
+        isUser ? (
+          <Text style={styles.userText}>{message.content}</Text>
+        ) : (
+          <MarkdownRenderer content={message.content} isStreaming={message.isStreaming} />
+        )
+      ) : !isUser && message.isStreaming && !message.reasoning ? (
+        <MarkdownRenderer content="" isStreaming />
+      ) : null}
+    </>
+  );
+
   return (
     <>
       <View style={[styles.row, isUser ? styles.userRow : styles.assistantRow]}>
@@ -497,34 +549,15 @@ export function MessageBubble({ message }: MessageBubbleProps) {
           <Pressable
             onLongPress={canCopy ? handleCopyMessage : undefined}
             delayLongPress={220}
-            style={({ pressed }) => [styles.bubblePressable, pressed && styles.pressed]}
+            style={({ pressed }) => [styles.bubblePressable, pressed && styles.pressedScale]}
           >
-            <View style={bubbleStyle}>
-              {!isUser ? (
-                <AssistantMetaBadges model={message.model} effort={message.effort} colors={colors} />
-              ) : null}
-
-              {hasAttachments ? <AttachmentGrid attachments={attachments} onPressImage={handleImagePress} /> : null}
-
-              {!isUser && message.reasoning ? (
-                <ReasoningSection
-                  reasoning={message.reasoning}
-                  isStreaming={message.isStreaming}
-                  defaultExpanded={shouldAutoExpandReasoning}
-                  colors={colors}
-                />
-              ) : null}
-
-              {hasText ? (
-                isUser ? (
-                  <Text style={styles.userText}>{message.content}</Text>
-                ) : (
-                  <MarkdownRenderer content={message.content} isStreaming={message.isStreaming} />
-                )
-              ) : !isUser && message.isStreaming && !message.reasoning ? (
-                <MarkdownRenderer content="" isStreaming />
-              ) : null}
-            </View>
+            {isUser ? (
+              <View style={userBubbleStyle}>{bubbleContent}</View>
+            ) : (
+              <GlassCard style={assistantBubbleStyle} intensity={42}>
+                {bubbleContent}
+              </GlassCard>
+            )}
           </Pressable>
 
           {copiedVisible ? (
@@ -561,68 +594,68 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   userRow: {
-    alignItems: 'flex-end',
+    alignItems: "flex-end",
   },
   assistantRow: {
-    alignItems: 'flex-start',
+    alignItems: "flex-start",
   },
   contentWrapper: {
-    maxWidth: '100%',
+    maxWidth: "100%",
   },
   userContentWrapper: {
-    maxWidth: '84%',
-    alignItems: 'flex-end',
+    maxWidth: "84%",
+    alignItems: "flex-end",
   },
   assistantContentWrapper: {
-    maxWidth: '90%',
-    alignItems: 'flex-start',
+    maxWidth: "90%",
+    alignItems: "flex-start",
   },
   bubblePressable: {
-    maxWidth: '100%',
-    alignSelf: 'stretch',
+    maxWidth: "100%",
+    alignSelf: "stretch",
   },
   bubble: {
     borderRadius: 20,
     borderWidth: StyleSheet.hairlineWidth,
-    overflow: 'hidden',
     padding: 8,
     gap: 8,
   },
   userBubble: {
     borderBottomRightRadius: 6,
     minWidth: 60,
+    overflow: "hidden",
   },
   assistantBubble: {
     borderBottomLeftRadius: 6,
     minWidth: 68,
   },
   userShadow: {
-    shadowColor: '#000000',
+    shadowColor: "#000000",
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.12,
     shadowRadius: 16,
     elevation: 2,
   },
   assistantShadow: {
-    shadowColor: '#000000',
+    shadowColor: "#000000",
     shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.08,
     shadowRadius: 20,
     elevation: 2,
   },
-  pressed: {
-    opacity: 0.94,
+  pressedScale: {
+    transform: [{ scale: 0.992 }],
   },
   userText: {
-    color: '#FFFFFF',
+    color: "#FFFFFF",
     fontSize: 16,
     lineHeight: 22,
     paddingHorizontal: 4,
     paddingVertical: 2,
   },
   metaRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    flexDirection: "row",
+    flexWrap: "wrap",
     paddingHorizontal: 2,
   },
   metaBadge: {
@@ -635,50 +668,50 @@ const styles = StyleSheet.create({
   },
   metaBadgeText: {
     fontSize: 11,
-    fontWeight: '700',
+    fontWeight: "700",
   },
   attachmentListContent: {
     paddingBottom: 0,
   },
   attachmentColumnWrapper: {
-    justifyContent: 'space-between',
+    justifyContent: "space-between",
   },
   singleAttachmentCell: {
-    width: '100%',
+    width: "100%",
   },
   multiAttachmentCell: {
-    width: '48.7%',
+    width: "48.7%",
     marginBottom: 8,
   },
   attachmentPressable: {
     borderRadius: 14,
-    overflow: 'hidden',
+    overflow: "hidden",
   },
   attachmentImage: {
-    width: '100%',
+    width: "100%",
     borderRadius: 14,
-    backgroundColor: 'rgba(127,127,127,0.12)',
+    backgroundColor: "rgba(127,127,127,0.12)",
   },
   reasoningContainer: {
     borderRadius: 16,
     borderWidth: StyleSheet.hairlineWidth,
-    overflow: 'hidden',
+    overflow: "hidden",
   },
   reasoningHeader: {
     paddingHorizontal: 12,
     paddingVertical: 10,
     minHeight: 44,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
   },
   reasoningTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
   },
   reasoningTitle: {
     fontSize: 13,
-    fontWeight: '700',
+    fontWeight: "700",
   },
   reasoningLiveDot: {
     width: 7,
@@ -687,12 +720,12 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
   reasoningRightRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
   },
   reasoningToggleText: {
     fontSize: 13,
-    fontWeight: '600',
+    fontWeight: "600",
     marginRight: 2,
   },
   reasoningBody: {
@@ -708,29 +741,29 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
   },
   copiedPillUser: {
-    alignSelf: 'flex-end',
+    alignSelf: "flex-end",
   },
   copiedPillAssistant: {
-    alignSelf: 'flex-start',
+    alignSelf: "flex-start",
   },
   copiedPillText: {
     fontSize: 12,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   viewerRoot: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.96)',
+    backgroundColor: "rgba(0,0,0,0.96)",
   },
   viewerHeader: {
-    position: 'absolute',
+    position: "absolute",
     top: 0,
     left: 0,
     right: 0,
     zIndex: 10,
     paddingHorizontal: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
   },
   viewerCounterChip: {
     borderRadius: 999,
@@ -739,33 +772,33 @@ const styles = StyleSheet.create({
     paddingVertical: 7,
   },
   viewerCounterText: {
-    color: '#FFFFFF',
+    color: "#FFFFFF",
     fontSize: 13,
-    fontWeight: '700',
+    fontWeight: "700",
   },
   viewerCloseButton: {
     width: 38,
     height: 38,
     borderRadius: 19,
     borderWidth: StyleSheet.hairlineWidth,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   viewerList: {
     flex: 1,
   },
   viewerPage: {
     flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     paddingHorizontal: 12,
   },
   viewerImageFrame: {
-    width: '100%',
-    height: '100%',
+    width: "100%",
+    height: "100%",
   },
   viewerImage: {
-    width: '100%',
-    height: '100%',
+    width: "100%",
+    height: "100%",
   },
 });

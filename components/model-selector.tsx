@@ -11,6 +11,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
+
 import { useColors } from "@/hooks/use-colors";
 import { useChatStore } from "@/lib/chat-store";
 import { MODELS, type ModelConfig, type ModelId, type ReasoningEffort } from "@/lib/types";
@@ -44,7 +45,12 @@ const MODEL_FOOTERS: Record<ModelId, string> = {
     "Best when you want maximum depth, stronger analysis, and more deliberate reasoning.",
 };
 
-export function ModelSelector({ model, effort }: ModelSelectorProps) {
+export function ModelSelector({
+  model,
+  effort,
+  onModelChange,
+  onEffortChange,
+}: ModelSelectorProps) {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const {
@@ -57,8 +63,10 @@ export function ModelSelector({ model, effort }: ModelSelectorProps) {
   const [visible, setVisible] = useState(false);
 
   const isDark = colors.background.toLowerCase() === "#000000";
-  const selectedModel = storeCurrentModel ?? model ?? "gpt-5.4-pro";
-  const selectedEffort = storeCurrentEffort ?? effort ?? "xhigh";
+  const selectedModel = model ?? storeCurrentModel;
+  const selectedEffort = effort ?? storeCurrentEffort;
+  const applyModelChange = onModelChange ?? setCurrentModel;
+  const applyEffortChange = onEffortChange ?? setCurrentEffort;
 
   const selectedModelConfig = useMemo<ModelConfig>(() => {
     return MODELS.find((item) => item.id === selectedModel) ?? MODELS[0];
@@ -100,24 +108,24 @@ export function ModelSelector({ model, effort }: ModelSelectorProps) {
       await playSelectionHaptic();
 
       const nextConfig = MODELS.find((item) => item.id === nextModel) ?? MODELS[0];
-      setCurrentModel(nextModel);
+      applyModelChange(nextModel);
 
       if (!nextConfig.reasoningEfforts.includes(selectedEffort)) {
-        setCurrentEffort(nextConfig.defaultEffort);
+        applyEffortChange(nextConfig.defaultEffort);
       }
 
       closeModal();
     },
-    [closeModal, playSelectionHaptic, selectedEffort, setCurrentEffort, setCurrentModel]
+    [applyEffortChange, applyModelChange, closeModal, playSelectionHaptic, selectedEffort]
   );
 
   const handleSelectEffort = useCallback(
     async (nextEffort: ReasoningEffort) => {
       await playSelectionHaptic();
-      setCurrentEffort(nextEffort);
+      applyEffortChange(nextEffort);
       closeModal();
     },
-    [closeModal, playSelectionHaptic, setCurrentEffort]
+    [applyEffortChange, closeModal, playSelectionHaptic]
   );
 
   const renderModelItem: ListRenderItem<ModelConfig> = useCallback(
@@ -134,7 +142,7 @@ export function ModelSelector({ model, effort }: ModelSelectorProps) {
             {
               backgroundColor: isSelected ? selectedRowBackgroundColor : colors.surface,
               borderColor: isSelected ? colors.primary : colors.border,
-              opacity: pressed ? 0.86 : 1,
+              opacity: pressed ? 0.92 : 1,
             },
           ]}
         >
@@ -147,17 +155,9 @@ export function ModelSelector({ model, effort }: ModelSelectorProps) {
             </View>
             <View style={styles.modelTrailing}>
               {isSelected ? (
-                <IconSymbol
-                  name="checkmark.circle.fill"
-                  size={22}
-                  color={colors.primary}
-                />
+                <IconSymbol name="checkmark.circle.fill" size={22} color={colors.primary} />
               ) : (
-                <IconSymbol
-                  name="chevron.down"
-                  size={22}
-                  color="transparent"
-                />
+                <IconSymbol name="chevron.right" size={18} color={colors.muted} />
               )}
             </View>
           </View>
@@ -190,7 +190,7 @@ export function ModelSelector({ model, effort }: ModelSelectorProps) {
             {
               backgroundColor: isSelected ? colors.primary : colors.surface,
               borderColor: isSelected ? colors.primary : colors.border,
-              opacity: pressed ? 0.84 : 1,
+              opacity: pressed ? 0.9 : 1,
             },
           ]}
         >
@@ -205,7 +205,14 @@ export function ModelSelector({ model, effort }: ModelSelectorProps) {
         </Pressable>
       );
     },
-    [colors.border, colors.foreground, colors.primary, colors.surface, handleSelectEffort, selectedEffort]
+    [
+      colors.border,
+      colors.foreground,
+      colors.primary,
+      colors.surface,
+      handleSelectEffort,
+      selectedEffort,
+    ]
   );
 
   return (
@@ -219,7 +226,7 @@ export function ModelSelector({ model, effort }: ModelSelectorProps) {
           {
             backgroundColor: triggerBackgroundColor,
             borderColor: triggerBorderColor,
-            opacity: pressed ? 0.82 : 1,
+            opacity: pressed ? 0.92 : 1,
           },
         ]}
       >
@@ -237,11 +244,7 @@ export function ModelSelector({ model, effort }: ModelSelectorProps) {
               {EFFORT_LABELS[selectedEffort]}
             </Text>
           </View>
-          <IconSymbol
-            name="chevron.down"
-            size={18}
-            color={colors.muted}
-          />
+          <IconSymbol name="chevron.down" size={18} color={colors.muted} />
         </View>
       </Pressable>
 
@@ -254,7 +257,7 @@ export function ModelSelector({ model, effort }: ModelSelectorProps) {
         onRequestClose={closeModal}
       >
         <Pressable style={styles.backdrop} onPress={closeModal}>
-          <View style={[styles.modalContainer, { paddingTop: insets.top + 56 }]}>
+          <View style={[styles.modalContainer, { paddingTop: insets.top + 48 }]}>
             <Pressable
               onPress={(event) => {
                 event.stopPropagation();
@@ -271,6 +274,19 @@ export function ModelSelector({ model, effort }: ModelSelectorProps) {
                   },
                 ]}
               >
+                <View style={styles.dragHandleWrap}>
+                  <View
+                    style={[
+                      styles.dragHandle,
+                      {
+                        backgroundColor: isDark
+                          ? "rgba(255,255,255,0.18)"
+                          : "rgba(60,60,67,0.18)",
+                      },
+                    ]}
+                  />
+                </View>
+
                 <View style={styles.headerRow}>
                   <View style={styles.headerTextColumn}>
                     <Text style={[styles.headerTitle, { color: colors.foreground }]}>
@@ -287,15 +303,11 @@ export function ModelSelector({ model, effort }: ModelSelectorProps) {
                       styles.closeButton,
                       {
                         backgroundColor: helperBackgroundColor,
-                        opacity: pressed ? 0.76 : 1,
+                        opacity: pressed ? 0.84 : 1,
                       },
                     ]}
                   >
-                    <IconSymbol
-                      name="xmark.circle.fill"
-                      size={20}
-                      color={colors.muted}
-                    />
+                    <IconSymbol name="xmark.circle.fill" size={20} color={colors.muted} />
                   </Pressable>
                 </View>
 
@@ -309,7 +321,13 @@ export function ModelSelector({ model, effort }: ModelSelectorProps) {
                   ItemSeparatorComponent={() => <View style={styles.modelSeparator} />}
                 />
 
-                <Text style={[styles.sectionLabel, styles.effortSectionLabel, { color: colors.muted }]}>
+                <Text
+                  style={[
+                    styles.sectionLabel,
+                    styles.effortSectionLabel,
+                    { color: colors.muted },
+                  ]}
+                >
                   REASONING EFFORT
                 </Text>
 
@@ -395,6 +413,15 @@ const styles = StyleSheet.create({
     borderRadius: 28,
     borderWidth: StyleSheet.hairlineWidth,
     padding: 18,
+  },
+  dragHandleWrap: {
+    alignItems: "center",
+    marginBottom: 10,
+  },
+  dragHandle: {
+    width: 38,
+    height: 5,
+    borderRadius: 999,
   },
   headerRow: {
     flexDirection: "row",

@@ -2,10 +2,15 @@ import React from "react";
 import { Platform, StyleSheet, View } from "react-native";
 import { Tabs } from "expo-router";
 import { BlurView } from "expo-blur";
-import { GlassView } from "expo-glass-effect";
+import {
+  GlassView,
+  isGlassEffectAPIAvailable,
+  isLiquidGlassAvailable,
+} from "expo-glass-effect";
 import { SymbolView } from "expo-symbols";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+
 import { useColors } from "@/hooks/use-colors";
 
 function TabIcon({
@@ -26,13 +31,22 @@ function TabIcon({
   return <MaterialIcons color={color} name={materialName} size={size} />;
 }
 
+function supportsNativeTabGlass(): boolean {
+  return (
+    Platform.OS === "ios" &&
+    typeof Platform.Version === "number" &&
+    Platform.Version >= 26 &&
+    isLiquidGlassAvailable() &&
+    isGlassEffectAPIAvailable()
+  );
+}
+
 function TabBarBackground() {
   const colors = useColors();
   const isDark = colors.background.toLowerCase() === "#000000";
-  const supportsNativeGlass =
-    Platform.OS === "ios" && typeof Platform.Version === "number" && Platform.Version >= 26;
+  const useNativeGlass = supportsNativeTabGlass();
 
-  if (supportsNativeGlass) {
+  if (useNativeGlass) {
     return (
       <View style={StyleSheet.absoluteFill}>
         <GlassView glassEffectStyle="regular" style={StyleSheet.absoluteFill} />
@@ -40,10 +54,10 @@ function TabBarBackground() {
           pointerEvents="none"
           style={[
             StyleSheet.absoluteFill,
-            styles.backgroundOverlay,
+            styles.overlay,
             {
-              borderTopColor: colors.border,
-              backgroundColor: isDark ? "rgba(22,22,24,0.18)" : "rgba(255,255,255,0.18)",
+              borderTopColor: isDark ? "rgba(255,255,255,0.08)" : "rgba(60,60,67,0.12)",
+              backgroundColor: isDark ? "rgba(28,28,30,0.10)" : "rgba(255,255,255,0.04)",
             },
           ]}
         />
@@ -64,7 +78,7 @@ function TabBarBackground() {
           pointerEvents="none"
           style={[
             StyleSheet.absoluteFill,
-            styles.backgroundOverlay,
+            styles.overlay,
             {
               borderTopColor: colors.border,
               backgroundColor: isDark ? "rgba(22,22,24,0.62)" : "rgba(255,255,255,0.72)",
@@ -75,13 +89,17 @@ function TabBarBackground() {
     );
   }
 
-  const webGlassStyle: View["props"]["style"] = {
-    backgroundColor: isDark ? "rgba(22,22,24,0.72)" : "rgba(255,255,255,0.78)",
-    borderTopColor: colors.border,
-  };
-
   return (
-    <View style={[StyleSheet.absoluteFill, styles.backgroundOverlay, webGlassStyle]}>
+    <View
+      style={[
+        StyleSheet.absoluteFill,
+        styles.overlay,
+        {
+          backgroundColor: isDark ? "rgba(22,22,24,0.72)" : "rgba(255,255,255,0.78)",
+          borderTopColor: colors.border,
+        },
+      ]}
+    >
       <View
         style={{
           ...StyleSheet.absoluteFillObject,
@@ -180,7 +198,7 @@ export default function TabLayout() {
 }
 
 const styles = StyleSheet.create({
-  backgroundOverlay: {
+  overlay: {
     borderTopWidth: StyleSheet.hairlineWidth,
   },
 });
