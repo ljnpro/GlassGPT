@@ -46,3 +46,5 @@
 - [x] BUG: LaTeX rendering uses WebView which doesn't work in Expo Go - need pure RN solution without WebView
 - [x] BUG: LaTeX formula font size is absurdly large - need to scale down to match body text size
 - [x] BUG: LaTeX formula still way too large even with fontSize=9/10 - patched to use direct MathJax engine with ex-to-px conversion
+- [x] BUG: iOS keyboard covers the input field when typing
+- [x] BUG: Messages cannot be sent in iOS production build (works in preview/Expo Go)

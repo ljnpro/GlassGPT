@@ -1,3 +1,7 @@
+// Polyfills – must be imported before anything that uses crypto or streams
+import "react-native-get-random-values";
+import "@/lib/polyfills";
+
 import "@/global.css";
 import "@/lib/_core/nativewind-pressable";
 import "react-native-reanimated";
