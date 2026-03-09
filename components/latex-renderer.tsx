@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { Platform, StyleSheet, Text, View } from 'react-native';
+import { Platform, ScrollView, StyleSheet, View } from 'react-native';
 import { MathJaxSvg } from 'react-native-mathjax-html-to-svg';
 import { useColors } from '@/hooks/use-colors';
 
@@ -20,15 +20,9 @@ interface ThemeColors {
   error: string;
 }
 
-const MONOSPACE_FONT = Platform.select({
-  ios: 'Menlo',
-  android: 'monospace',
-  default: 'monospace',
-});
-
 /**
  * Wrap the raw LaTeX content in appropriate delimiters for MathJax.
- * MathJaxSvg expects TeX wrapped in $$ (display) or \\( \\) (inline).
+ * MathJaxSvg expects TeX wrapped in $$ (display) or \( \) (inline).
  */
 function wrapLatex(content: string, inline: boolean): string {
   const trimmed = content.trim();
@@ -49,6 +43,19 @@ function wrapLatex(content: string, inline: boolean): string {
   return `$$${trimmed}$$`;
 }
 
+/**
+ * fontSize prop in MathJaxSvg is divided by 2 internally, then used as a
+ * multiplier for the SVG ex-based dimensions. The SVG output from MathJax
+ * uses "ex" units (e.g., width="8.7ex"), and the library multiplies these
+ * by the internal fontSize value. Since 1ex ≈ 8-10px on mobile, we need
+ * a small multiplier to keep formulas at readable size.
+ *
+ * fontSize=9 → internal 4.5 → E=mc² becomes ~39px wide, ~10px tall (good)
+ * fontSize=10 → internal 5 → E=mc² becomes ~43px wide, ~11px tall (good)
+ */
+const INLINE_FONT_SIZE = 9;
+const BLOCK_FONT_SIZE = 10;
+
 export function LaTeXRenderer({ content, inline = false }: LaTeXRendererProps) {
   const colors = useColors() as ThemeColors;
 
@@ -58,17 +65,38 @@ export function LaTeXRenderer({ content, inline = false }: LaTeXRendererProps) {
     return null;
   }
 
+  if (inline) {
+    return (
+      <View style={styles.inlineContainer}>
+        <MathJaxSvg
+          fontSize={INLINE_FONT_SIZE}
+          color={colors.foreground}
+          fontCache
+          style={styles.inlineMathJax}
+        >
+          {wrappedContent}
+        </MathJaxSvg>
+      </View>
+    );
+  }
+
+  // Block-level formulas: wrap in a horizontal ScrollView for overflow
   return (
-    <View style={inline ? styles.inlineContainer : styles.blockContainer}>
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      contentContainerStyle={styles.blockScrollContent}
+      style={styles.blockScroll}
+    >
       <MathJaxSvg
-        fontSize={inline ? 15 : 17}
+        fontSize={BLOCK_FONT_SIZE}
         color={colors.foreground}
         fontCache
-        style={inline ? styles.inlineMathJax : styles.blockMathJax}
+        style={styles.blockMathJax}
       >
         {wrappedContent}
       </MathJaxSvg>
-    </View>
+    </ScrollView>
   );
 }
 
@@ -79,18 +107,21 @@ const styles = StyleSheet.create({
     marginHorizontal: 1,
     marginBottom: 0,
   },
-  blockContainer: {
-    width: '100%',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginVertical: 4,
-    paddingHorizontal: 4,
-  },
   inlineMathJax: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     alignItems: 'center',
     flexShrink: 1,
+  },
+  blockScroll: {
+    width: '100%',
+    marginVertical: 4,
+  },
+  blockScrollContent: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 4,
+    minWidth: '100%',
   },
   blockMathJax: {
     flexDirection: 'row',
@@ -98,23 +129,5 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 1,
-  },
-  fallbackInlineText: {
-    fontFamily: MONOSPACE_FONT,
-    fontSize: 14,
-    lineHeight: 18,
-    fontStyle: 'italic',
-  },
-  fallbackBlockContainer: {
-    width: '100%',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 6,
-  },
-  fallbackBlockText: {
-    fontFamily: MONOSPACE_FONT,
-    fontSize: 16,
-    lineHeight: 22,
-    textAlign: 'center',
   },
 });
