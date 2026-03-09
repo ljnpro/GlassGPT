@@ -1,268 +1,455 @@
-import React, { useCallback, useRef, useState, useEffect } from 'react';
-import { View, Text, FlatList, StyleSheet, Platform, Pressable, KeyboardAvoidingView } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import * as Haptics from 'expo-haptics';
-import MaterialIcons from '@expo/vector-icons/MaterialIcons';
-import { useColors } from '@/hooks/use-colors';
-import { useChatStore } from '@/lib/chat-store';
-import { streamChatCompletion, generateTitle } from '@/lib/openai-service';
-import { Message, ImageAttachment, ModelId, ReasoningEffort } from '@/lib/types';
-import { MessageBubble } from '@/components/message-bubble';
-import { ChatInput } from '@/components/chat-input';
-import { ModelSelector } from '@/components/model-selector';
-import { GlassCard } from '@/components/glass-card';
-import { v4 as uuidv4 } from 'uuid';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  ActivityIndicator,
+  FlatList,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
+import { useRouter } from "expo-router";
+import * as Haptics from "expo-haptics";
+import MaterialIcons from "@expo/vector-icons/MaterialIcons";
+import { ScreenContainer } from "@/components/screen-container";
+import { ChatInput } from "@/components/chat-input";
+import { GlassCard } from "@/components/glass-card";
+import { MessageBubble } from "@/components/message-bubble";
+import { ModelSelector } from "@/components/model-selector";
+import { useColors } from "@/hooks/use-colors";
+import { useChatStore } from "@/lib/chat-store";
+import { generateTitle, streamChatCompletion } from "@/lib/openai-service";
+import { ImageAttachment, Message, MODELS } from "@/lib/types";
+import { v4 as uuidv4 } from "uuid";
 
 export default function ChatScreen() {
   const colors = useColors();
-  const insets = useSafeAreaInsets();
-  const { state, dispatch, activeConversation, createNewConversation } = useChatStore();
-  const flatListRef = useRef<FlatList>(null);
+  const router = useRouter();
+  const {
+    state,
+    dispatch,
+    activeConversation,
+    createNewConversation,
+    setActiveConversation,
+    currentModel,
+    currentEffort,
+    setCurrentModel,
+    setCurrentEffort,
+  } = useChatStore();
+
+  const listRef = useRef<FlatList<Message>>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const latestStateRef = useRef(state);
+  const stopRequestedRef = useRef(false);
+  const latestAssistantTextRef = useRef("");
+  const latestAssistantReasoningRef = useRef("");
   const [isStreaming, setIsStreaming] = useState(false);
 
-  // Current model/effort from active conversation or defaults
-  const currentModel = activeConversation?.model ?? state.settings.defaultModel;
-  const currentEffort = activeConversation?.effort ?? state.settings.defaultEffort;
+  latestStateRef.current = state;
 
-  const handleModelChange = useCallback(
-    (model: ModelId) => {
-      if (activeConversation) {
-        dispatch({
-          type: 'UPDATE_CONVERSATION_MODEL',
-          conversationId: activeConversation.id,
-          model,
-          effort: currentEffort,
-        });
-      }
-    },
-    [activeConversation, currentEffort, dispatch]
-  );
+  useEffect(() => {
+    return () => {
+      abortRef.current?.abort();
+    };
+  }, []);
 
-  const handleEffortChange = useCallback(
-    (effort: ReasoningEffort) => {
-      if (activeConversation) {
-        dispatch({
-          type: 'UPDATE_CONVERSATION_MODEL',
-          conversationId: activeConversation.id,
-          model: currentModel,
-          effort,
-        });
-      }
-    },
-    [activeConversation, currentModel, dispatch]
-  );
+  useEffect(() => {
+    if (activeConversation?.id && activeConversation.messages.length > 0) {
+      requestAnimationFrame(() => {
+        listRef.current?.scrollToOffset({ offset: 0, animated: false });
+      });
+    }
+  }, [activeConversation?.id, activeConversation?.messages.length]);
+
+  const messages = activeConversation?.messages ?? [];
+  const reversedMessages = useMemo(() => [...messages].reverse(), [messages]);
+  const hasApiKey = state.settings.apiKey.trim().length > 0;
+  const isLoaded = state.isLoaded;
+  const currentModelConfig = MODELS.find((item) => item.id === currentModel) ?? MODELS[0];
 
   const handleNewChat = useCallback(() => {
-    if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    createNewConversation();
-  }, [createNewConversation]);
+    if (isStreaming) {
+      return;
+    }
+
+    if (Platform.OS !== "web") {
+      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    }
+
+    setActiveConversation(null);
+  }, [currentEffort, currentModel, dispatch, isStreaming, setActiveConversation]);
+
+  const handleOpenSettings = useCallback(() => {
+    router.navigate("/(tabs)/settings");
+  }, [router]);
 
   const handleSend = useCallback(
     async (text: string, images?: ImageAttachment[]) => {
-      const apiKey = state.settings.apiKey;
-      if (!apiKey) return;
+      const trimmed = text.trim();
+      const apiKey = latestStateRef.current.settings.apiKey.trim();
 
-      let convId = activeConversation?.id;
-      if (!convId) {
-        convId = createNewConversation(currentModel, currentEffort);
+      if (!trimmed && (!images || images.length === 0)) {
+        return;
       }
 
-      // Add user message
+      if (!apiKey) {
+        router.navigate("/(tabs)/settings");
+        return;
+      }
+
+      const modelAtSend = currentModel;
+      const effortAtSend = currentEffort;
+
+      let conversationId = activeConversation?.id ?? null;
+      if (!conversationId) {
+        conversationId = createNewConversation(modelAtSend, effortAtSend);
+      }
+
+      const existingConversation =
+        latestStateRef.current.conversations.find((item) => item.id === conversationId) ?? null;
+      const existingMessages = existingConversation?.messages ?? [];
+      const shouldGenerateTitle = existingMessages.length === 0;
+
+      const userMessage: Message = {
+        id: uuidv4(),
+        role: "user",
+        content: trimmed,
+        images,
+        createdAt: Date.now(),
+      };
+
       dispatch({
-        type: 'ADD_USER_MESSAGE',
-        conversationId: convId,
-        content: text,
+        type: "ADD_USER_MESSAGE",
+        conversationId,
+        content: trimmed,
         images,
       });
 
-      // Create assistant message placeholder
-      const assistantMsgId = uuidv4();
+      const assistantMessageId = uuidv4();
       dispatch({
-        type: 'ADD_ASSISTANT_MESSAGE',
-        conversationId: convId,
-        messageId: assistantMsgId,
+        type: "ADD_ASSISTANT_MESSAGE",
+        conversationId,
+        messageId: assistantMessageId,
       });
 
+      requestAnimationFrame(() => {
+        listRef.current?.scrollToOffset({ offset: 0, animated: true });
+      });
+
+      stopRequestedRef.current = false;
+      latestAssistantTextRef.current = "";
+      latestAssistantReasoningRef.current = "";
       setIsStreaming(true);
+
       const abortController = new AbortController();
       abortRef.current = abortController;
 
-      // Build messages for API
-      const conv = state.conversations.find((c) => c.id === convId);
-      const allMessages: Message[] = [
-        ...(conv?.messages || []),
-        {
-          id: uuidv4(),
-          role: 'user' as const,
-          content: text,
-          images,
-          createdAt: Date.now(),
-        },
-      ];
+      const requestMessages: Message[] = [...existingMessages, userMessage];
+
+      if (shouldGenerateTitle && trimmed.length > 0) {
+        void (async () => {
+          const title = await generateTitle(apiKey, trimmed);
+          dispatch({
+            type: "UPDATE_CONVERSATION_TITLE",
+            conversationId: conversationId!,
+            title: title || "New Chat",
+          });
+        })();
+      }
 
       try {
         await streamChatCompletion(
           apiKey,
-          allMessages,
-          currentModel,
-          currentEffort,
+          requestMessages,
+          modelAtSend,
+          effortAtSend,
           {
             onToken: (fullText) => {
+              latestAssistantTextRef.current = fullText;
               dispatch({
-                type: 'UPDATE_ASSISTANT_MESSAGE',
-                conversationId: convId!,
-                messageId: assistantMsgId,
+                type: "UPDATE_ASSISTANT_MESSAGE",
+                conversationId: conversationId!,
+                messageId: assistantMessageId,
                 content: fullText,
                 isStreaming: true,
               });
             },
             onReasoning: (fullReasoning) => {
+              latestAssistantReasoningRef.current = fullReasoning;
               dispatch({
-                type: 'UPDATE_ASSISTANT_MESSAGE',
-                conversationId: convId!,
-                messageId: assistantMsgId,
-                content: '',
+                type: "UPDATE_ASSISTANT_MESSAGE",
+                conversationId: conversationId!,
+                messageId: assistantMessageId,
+                content: "",
                 reasoning: fullReasoning,
                 isStreaming: true,
               });
             },
             onDone: () => {
+              if (
+                stopRequestedRef.current &&
+                latestAssistantTextRef.current.trim().length === 0 &&
+                latestAssistantReasoningRef.current.trim().length === 0
+              ) {
+                dispatch({
+                  type: "UPDATE_ASSISTANT_MESSAGE",
+                  conversationId: conversationId!,
+                  messageId: assistantMessageId,
+                  content: "Response stopped.",
+                  isStreaming: false,
+                });
+              }
+
               dispatch({
-                type: 'FINISH_ASSISTANT_MESSAGE',
-                conversationId: convId!,
-                messageId: assistantMsgId,
-                model: currentModel,
-                effort: currentEffort,
+                type: "FINISH_ASSISTANT_MESSAGE",
+                conversationId: conversationId!,
+                messageId: assistantMessageId,
+                model: modelAtSend,
+                effort: effortAtSend,
               });
-              setIsStreaming(false);
+
+              if (Platform.OS !== "web") {
+                void Haptics.selectionAsync();
+              }
+
               abortRef.current = null;
+              stopRequestedRef.current = false;
+              latestAssistantTextRef.current = "";
+              latestAssistantReasoningRef.current = "";
+              setIsStreaming(false);
             },
             onError: (error) => {
               dispatch({
-                type: 'UPDATE_ASSISTANT_MESSAGE',
-                conversationId: convId!,
-                messageId: assistantMsgId,
-                content: `⚠️ Error: ${error}`,
+                type: "UPDATE_ASSISTANT_MESSAGE",
+                conversationId: conversationId!,
+                messageId: assistantMessageId,
+                content: `Something went wrong.\n\n${error}`,
                 isStreaming: false,
               });
               dispatch({
-                type: 'FINISH_ASSISTANT_MESSAGE',
-                conversationId: convId!,
-                messageId: assistantMsgId,
+                type: "FINISH_ASSISTANT_MESSAGE",
+                conversationId: conversationId!,
+                messageId: assistantMessageId,
+                model: modelAtSend,
+                effort: effortAtSend,
               });
-              setIsStreaming(false);
+
+              if (Platform.OS !== "web") {
+                void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+              }
+
               abortRef.current = null;
+              stopRequestedRef.current = false;
+              latestAssistantTextRef.current = "";
+              latestAssistantReasoningRef.current = "";
+              setIsStreaming(false);
             },
           },
           abortController.signal
         );
-      } catch (err: any) {
-        setIsStreaming(false);
+      } catch {
         abortRef.current = null;
-      }
-
-      // Generate title if first message
-      if (conv?.messages.length === 0 || !conv) {
-        const title = await generateTitle(apiKey, text);
-        dispatch({ type: 'UPDATE_CONVERSATION_TITLE', conversationId: convId!, title });
+        stopRequestedRef.current = false;
+        latestAssistantTextRef.current = "";
+        latestAssistantReasoningRef.current = "";
+        setIsStreaming(false);
       }
     },
-    [state, activeConversation, currentModel, currentEffort, dispatch, createNewConversation]
+    [
+      activeConversation?.id,
+      createNewConversation,
+      currentEffort,
+      currentModel,
+      dispatch,
+      router,
+    ]
   );
 
   const handleStop = useCallback(() => {
+    stopRequestedRef.current = true;
     abortRef.current?.abort();
-    setIsStreaming(false);
   }, []);
 
-  const messages = activeConversation?.messages || [];
-  const hasApiKey = !!state.settings.apiKey;
+  const renderMessage = useCallback(({ item }: { item: Message }) => {
+    return <MessageBubble message={item} />;
+  }, []);
 
-  const renderMessage = useCallback(
-    ({ item }: { item: Message }) => <MessageBubble message={item} />,
-    []
-  );
-
-  // Empty state
-  const EmptyState = useCallback(
-    () => (
-      <View style={styles.emptyContainer}>
-        <View style={styles.emptyContent}>
-          <GlassCard style={styles.emptyCard}>
-            <MaterialIcons name="auto-awesome" size={48} color={colors.primary} />
-            <Text style={[styles.emptyTitle, { color: colors.foreground }]}>
-              {hasApiKey ? 'Start a conversation' : 'Welcome to Liquid Glass Chat'}
-            </Text>
-            <Text style={[styles.emptySubtitle, { color: colors.muted }]}>
-              {hasApiKey
-                ? `Using ${currentModel === 'gpt-5.4-pro' ? 'GPT-5.4 Pro' : 'GPT-5.4'} with ${currentEffort} reasoning`
-                : 'Go to Settings to add your OpenAI API key to get started'}
-            </Text>
-          </GlassCard>
+  const renderWelcome = useMemo(() => {
+    if (!isLoaded) {
+      return (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text style={[styles.loadingText, { color: colors.muted }]}>Loading your chats…</Text>
         </View>
-      </View>
-    ),
-    [hasApiKey, currentModel, currentEffort, colors]
-  );
+      );
+    }
 
-  return (
-    <View style={[styles.screen, { backgroundColor: colors.background }]}>
-      {/* Top Bar */}
-      <View style={[styles.topBar, { paddingTop: insets.top + 4, borderBottomColor: colors.border }]}>
-        <GlassCard style={styles.topBarGlass}>
-          <View style={styles.topBarContent}>
-            <ModelSelector
-              model={currentModel}
-              effort={currentEffort}
-              onModelChange={handleModelChange}
-              onEffortChange={handleEffortChange}
-            />
-            <Pressable
-              onPress={handleNewChat}
-              style={({ pressed }) => [styles.newChatBtn, { opacity: pressed ? 0.6 : 1 }]}
-            >
-              <MaterialIcons name="edit" size={22} color={colors.primary} />
-            </Pressable>
+    return (
+      <View style={styles.welcomeContainer}>
+        <GlassCard
+          style={[
+            styles.welcomeCard,
+            {
+              borderColor: colors.border,
+              borderWidth: StyleSheet.hairlineWidth,
+            },
+          ]}
+        >
+          <View style={[styles.welcomeIconWrap, { backgroundColor: `${colors.primary}14` }]}>
+            <MaterialIcons name="auto-awesome" size={28} color={colors.primary} />
           </View>
+
+          <Text style={[styles.welcomeTitle, { color: colors.foreground }]}>
+            {hasApiKey ? "Start a new conversation" : "Add your API key to begin"}
+          </Text>
+
+          <Text style={[styles.welcomeSubtitle, { color: colors.muted }]}>
+            {hasApiKey
+              ? "Ask anything, add images, or explore more detailed reasoning with your selected model."
+              : "Open Settings to save your OpenAI API key. Your chats stay local to this app."}
+          </Text>
+
+          <View style={styles.badgeRow}>
+            <View
+              style={[
+                styles.infoBadge,
+                {
+                  backgroundColor: `${colors.primary}14`,
+                  borderColor: `${colors.primary}22`,
+                },
+              ]}
+            >
+              <Text style={[styles.infoBadgeText, { color: colors.primary }]}>
+                {currentModelConfig.label}
+              </Text>
+            </View>
+            <View
+              style={[
+                styles.infoBadge,
+                {
+                  backgroundColor: colors.surface,
+                  borderColor: colors.border,
+                },
+              ]}
+            >
+              <Text style={[styles.infoBadgeText, { color: colors.foreground }]}>
+                {currentEffort}
+              </Text>
+            </View>
+          </View>
+
+          {!hasApiKey ? (
+            <Pressable
+              accessibilityRole="button"
+              onPress={handleOpenSettings}
+              style={({ pressed }) => [
+                styles.primaryButton,
+                {
+                  backgroundColor: colors.primary,
+                  opacity: pressed ? 0.88 : 1,
+                },
+              ]}
+            >
+              <MaterialIcons name="settings" size={18} color="#FFFFFF" />
+              <Text style={styles.primaryButtonText}>Open Settings</Text>
+            </Pressable>
+          ) : (
+            <Text style={[styles.welcomeFootnote, { color: colors.muted }]}>
+              Messages will stream in real time.
+            </Text>
+          )}
         </GlassCard>
       </View>
+    );
+  }, [
+    colors.border,
+    colors.foreground,
+    colors.muted,
+    colors.primary,
+    colors.surface,
+    currentEffort,
+    currentModelConfig.label,
+    handleOpenSettings,
+    hasApiKey,
+    isLoaded,
+  ]);
 
-      {/* Messages */}
-      <KeyboardAvoidingView
-        style={styles.flex1}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={0}
-      >
-        <FlatList
-          ref={flatListRef}
-          data={messages}
-          renderItem={renderMessage}
-          keyExtractor={(item) => item.id}
-          contentContainerStyle={[
-            styles.messageList,
-            messages.length === 0 && styles.emptyList,
-          ]}
-          ListEmptyComponent={EmptyState}
-          onContentSizeChange={() => {
-            if (messages.length > 0) {
-              flatListRef.current?.scrollToEnd({ animated: true });
-            }
-          }}
-          showsVerticalScrollIndicator={false}
-          keyboardDismissMode="interactive"
-          keyboardShouldPersistTaps="handled"
-        />
+  return (
+    <ScreenContainer>
+      <View style={[styles.screen, { backgroundColor: colors.background }]}>
+        <View style={styles.headerContainer}>
+          <GlassCard
+            style={[
+              styles.headerCard,
+              {
+                borderColor: colors.border,
+                borderWidth: StyleSheet.hairlineWidth,
+              },
+            ]}
+          >
+            <View style={styles.headerRow}>
+              <View style={styles.headerLeft}>
+                <ModelSelector
+                  model={currentModel}
+                  effort={currentEffort}
+                  onModelChange={setCurrentModel}
+                  onEffortChange={setCurrentEffort}
+                />
+              </View>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="New Chat"
+                disabled={isStreaming}
+                onPress={handleNewChat}
+                style={({ pressed }) => [
+                  styles.newChatButton,
+                  {
+                    backgroundColor: `${colors.primary}14`,
+                    opacity: pressed ? 0.82 : isStreaming ? 0.45 : 1,
+                  },
+                ]}
+              >
+                <MaterialIcons name="edit" size={16} color={colors.primary} />
+                <Text style={[styles.newChatButtonText, { color: colors.primary }]}>New Chat</Text>
+              </Pressable>
+            </View>
+          </GlassCard>
+        </View>
 
-        {/* Input */}
-        <ChatInput
-          onSend={handleSend}
-          onStop={handleStop}
-          isStreaming={isStreaming}
-          disabled={!hasApiKey}
-        />
-      </KeyboardAvoidingView>
-    </View>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : undefined}
+          keyboardVerticalOffset={0}
+          style={styles.flex}
+        >
+          <View style={styles.flex}>
+            {messages.length > 0 ? (
+              <FlatList
+                ref={listRef}
+                data={reversedMessages}
+                inverted
+                keyExtractor={(item) => item.id}
+                renderItem={renderMessage}
+                style={styles.flex}
+                contentContainerStyle={styles.messagesContent}
+                keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
+                keyboardShouldPersistTaps="handled"
+                showsVerticalScrollIndicator={false}
+              />
+            ) : (
+              renderWelcome
+            )}
+          </View>
+
+          <ChatInput
+            disabled={!hasApiKey || !isLoaded}
+            isStreaming={isStreaming}
+            onSend={handleSend}
+            onStop={handleStop}
+          />
+        </KeyboardAvoidingView>
+      </View>
+    </ScreenContainer>
   );
 }
 
@@ -270,60 +457,126 @@ const styles = StyleSheet.create({
   screen: {
     flex: 1,
   },
-  flex1: {
+  flex: {
     flex: 1,
   },
-  topBar: {
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    zIndex: 10,
-  },
-  topBarGlass: {
-    borderRadius: 0,
+  headerContainer: {
     paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 10,
+  },
+  headerCard: {
+    borderRadius: 24,
+    paddingHorizontal: 12,
     paddingVertical: 10,
   },
-  topBarContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+  headerRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "space-between",
   },
-  newChatBtn: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    alignItems: 'center',
-    justifyContent: 'center',
+  headerLeft: {
+    flex: 1,
+    alignItems: "flex-start",
+    justifyContent: "center",
   },
-  messageList: {
-    paddingTop: 16,
+  newChatButton: {
+    alignItems: "center",
+    borderRadius: 18,
+    flexDirection: "row",
+    gap: 6,
+    height: 36,
+    justifyContent: "center",
+    width: 112,
+  },
+  newChatButtonText: {
+    fontSize: 13,
+    fontWeight: "700",
+  },
+  messagesContent: {
     paddingBottom: 8,
+    paddingTop: 12,
   },
-  emptyList: {
+  loadingContainer: {
+    alignItems: "center",
     flex: 1,
+    justifyContent: "center",
+    paddingHorizontal: 24,
   },
-  emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 32,
-  },
-  emptyContent: {
-    width: '100%',
-    maxWidth: 320,
-  },
-  emptyCard: {
-    padding: 32,
-    alignItems: 'center',
-    gap: 12,
-  },
-  emptyTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    textAlign: 'center',
-  },
-  emptySubtitle: {
+  loadingText: {
     fontSize: 14,
-    textAlign: 'center',
-    lineHeight: 20,
+    marginTop: 12,
+  },
+  welcomeContainer: {
+    alignItems: "center",
+    flex: 1,
+    justifyContent: "center",
+    paddingHorizontal: 20,
+  },
+  welcomeCard: {
+    alignItems: "center",
+    borderRadius: 28,
+    maxWidth: 420,
+    paddingHorizontal: 24,
+    paddingVertical: 28,
+    width: "100%",
+  },
+  welcomeIconWrap: {
+    alignItems: "center",
+    borderRadius: 22,
+    height: 44,
+    justifyContent: "center",
+    marginBottom: 14,
+    width: 44,
+  },
+  welcomeTitle: {
+    fontSize: 24,
+    fontWeight: "800",
+    letterSpacing: -0.4,
+    textAlign: "center",
+  },
+  welcomeSubtitle: {
+    fontSize: 15,
+    lineHeight: 22,
+    marginTop: 10,
+    maxWidth: 320,
+    textAlign: "center",
+  },
+  badgeRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+    justifyContent: "center",
+    marginTop: 18,
+  },
+  infoBadge: {
+    borderRadius: 999,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  infoBadgeText: {
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  primaryButton: {
+    alignItems: "center",
+    borderRadius: 999,
+    flexDirection: "row",
+    gap: 8,
+    justifyContent: "center",
+    marginTop: 20,
+    paddingHorizontal: 18,
+    paddingVertical: 12,
+  },
+  primaryButtonText: {
+    color: "#FFFFFF",
+    fontSize: 15,
+    fontWeight: "700",
+  },
+  welcomeFootnote: {
+    fontSize: 13,
+    marginTop: 18,
+    textAlign: "center",
   },
 });

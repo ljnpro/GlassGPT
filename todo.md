@@ -25,3 +25,13 @@
 - [x] Add haptic feedback on key interactions
 - [x] Generate app logo
 - [x] Final testing and polish
+- [x] Fix: Model selector not working (cannot switch models)
+- [x] Fix: Reasoning effort selector not working (cannot switch effort)
+- [x] Fix: API key input not working in Settings
+- [x] Fix: Significantly improve UI design - premium iOS 26 Liquid Glass aesthetic
+- [x] Fix: Ensure all interactive elements are functional end-to-end
+- [x] Fix: Improve overall visual polish and layout
+- [x] Fix: Model name "GPT-..." truncated in top bar - show full name
+- [x] Fix: Reasoning effort label not fully visible in top bar
+- [x] Fix: Header layout - remove left spacer, better balance
+- [x] Improve: Perfect iOS 26 Liquid Glass adaptation on all components

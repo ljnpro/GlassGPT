@@ -1,12 +1,24 @@
-import React, { useState, useRef, useCallback } from 'react';
-import { View, TextInput, Text, Pressable, StyleSheet, Platform, KeyboardAvoidingView } from 'react-native';
-import { Image } from 'expo-image';
-import * as ImagePicker from 'expo-image-picker';
-import * as Haptics from 'expo-haptics';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useColors } from '@/hooks/use-colors';
-import { ImageAttachment } from '@/lib/types';
-import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+import React, { useCallback, useMemo, useRef, useState } from "react";
+import {
+  Alert,
+  FlatList,
+  Platform,
+  Pressable,
+  StyleSheet,
+  TextInput,
+  View,
+  type ListRenderItem,
+  type NativeSyntheticEvent,
+  type TextInputContentSizeChangeEventData,
+} from "react-native";
+import { Image } from "expo-image";
+import * as ImagePicker from "expo-image-picker";
+import * as Haptics from "expo-haptics";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useColors } from "@/hooks/use-colors";
+import { GlassCard } from "./glass-card";
+import { IconSymbol } from "@/components/ui/icon-symbol";
+import { type ImageAttachment } from "@/lib/types";
 
 interface ChatInputProps {
   onSend: (text: string, images?: ImageAttachment[]) => void;
@@ -15,195 +27,412 @@ interface ChatInputProps {
   disabled?: boolean;
 }
 
-export function ChatInput({ onSend, onStop, isStreaming, disabled }: ChatInputProps) {
+const MAX_ATTACHMENTS = 8;
+const TEXT_LINE_HEIGHT = 22;
+const MIN_INPUT_HEIGHT = 22;
+const MAX_INPUT_HEIGHT = TEXT_LINE_HEIGHT * 6;
+
+export function ChatInput({
+  onSend,
+  onStop,
+  isStreaming = false,
+  disabled = false,
+}: ChatInputProps) {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const [text, setText] = useState('');
-  const [images, setImages] = useState<ImageAttachment[]>([]);
   const inputRef = useRef<TextInput>(null);
 
-  const handlePickImage = useCallback(async () => {
-    try {
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ['images'],
-        allowsMultipleSelection: true,
-        quality: 0.8,
-        base64: true,
-      });
+  const [text, setText] = useState("");
+  const [attachments, setAttachments] = useState<ImageAttachment[]>([]);
+  const [inputHeight, setInputHeight] = useState(MIN_INPUT_HEIGHT);
+  const [isPickingImage, setIsPickingImage] = useState(false);
 
-      if (!result.canceled && result.assets) {
-        const newImages: ImageAttachment[] = result.assets.map((asset) => ({
-          uri: asset.uri,
-          base64: asset.base64 || undefined,
-          width: asset.width,
-          height: asset.height,
-          mimeType: asset.mimeType || 'image/jpeg',
-        }));
-        setImages((prev) => [...prev, ...newImages]);
-        if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      }
-    } catch (err) {
-      console.error('Image picker error:', err);
+  const isDark = colors.background.toLowerCase() === "#000000";
+  const trimmedText = text.trim();
+
+  const canPickImages = !disabled && !isStreaming && !isPickingImage;
+  const canSend = !disabled && !isStreaming && (trimmedText.length > 0 || attachments.length > 0);
+  const composerInputHeight = useMemo(() => {
+    return Math.max(MIN_INPUT_HEIGHT, Math.min(MAX_INPUT_HEIGHT, inputHeight));
+  }, [inputHeight]);
+
+  const bottomPadding = Platform.OS === "web" ? 14 : Math.max(insets.bottom, 12);
+  const secondaryButtonBackground = isDark
+    ? "rgba(255,255,255,0.08)"
+    : "rgba(120,120,128,0.12)";
+  const previewRemoveBackground = isDark
+    ? "rgba(28,28,30,0.92)"
+    : "rgba(255,255,255,0.92)";
+  const thumbnailBorderColor = isDark
+    ? "rgba(255,255,255,0.10)"
+    : "rgba(60,60,67,0.10)";
+  const disabledSendBackground = isDark
+    ? "rgba(118,118,128,0.20)"
+    : "rgba(120,120,128,0.22)";
+
+  const playLightHaptic = useCallback(async () => {
+    if (Platform.OS !== "web") {
+      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }
   }, []);
 
-  const handleRemoveImage = useCallback((idx: number) => {
-    setImages((prev) => prev.filter((_, i) => i !== idx));
-    if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  const playMediumHaptic = useCallback(async () => {
+    if (Platform.OS !== "web") {
+      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    }
   }, []);
 
-  const handleSend = useCallback(() => {
-    const trimmed = text.trim();
-    if (!trimmed && images.length === 0) return;
-    if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    onSend(trimmed, images.length > 0 ? images : undefined);
-    setText('');
-    setImages([]);
-  }, [text, images, onSend]);
+  const handleContentSizeChange = useCallback(
+    (event: NativeSyntheticEvent<TextInputContentSizeChangeEventData>) => {
+      const nextHeight = Math.max(
+        MIN_INPUT_HEIGHT,
+        Math.min(MAX_INPUT_HEIGHT, Math.ceil(event.nativeEvent.contentSize.height))
+      );
 
-  const handleStop = useCallback(() => {
-    if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      if (Math.abs(nextHeight - inputHeight) > 1) {
+        setInputHeight(nextHeight);
+      }
+    },
+    [inputHeight]
+  );
+
+  const handlePickImage = useCallback(async () => {
+    if (!canPickImages) {
+      return;
+    }
+
+    const remainingSlots = MAX_ATTACHMENTS - attachments.length;
+
+    if (remainingSlots <= 0) {
+      Alert.alert(
+        "Attachment limit reached",
+        `You can attach up to ${MAX_ATTACHMENTS} images to one message.`
+      );
+      return;
+    }
+
+    try {
+      setIsPickingImage(true);
+
+      if (Platform.OS !== "web") {
+        const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+        if (!permission.granted) {
+          Alert.alert(
+            "Photos access required",
+            "Allow photo library access to attach images to your message."
+          );
+          return;
+        }
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ["images"],
+        allowsMultipleSelection: remainingSlots > 1,
+        selectionLimit: remainingSlots,
+        quality: 0.9,
+        base64: true,
+      });
+
+      if (result.canceled || !result.assets?.length) {
+        return;
+      }
+
+      const nextAttachments: ImageAttachment[] = result.assets.map((asset) => ({
+        uri: asset.uri,
+        base64: asset.base64 ?? undefined,
+        width: asset.width,
+        height: asset.height,
+        mimeType: asset.mimeType ?? "image/jpeg",
+      }));
+
+      setAttachments((current) => [...current, ...nextAttachments].slice(0, MAX_ATTACHMENTS));
+      await playLightHaptic();
+
+      requestAnimationFrame(() => {
+        inputRef.current?.focus();
+      });
+    } catch (error) {
+      console.error("Failed to pick an image:", error);
+      Alert.alert("Unable to attach image", "Please try again.");
+    } finally {
+      setIsPickingImage(false);
+    }
+  }, [attachments.length, canPickImages, playLightHaptic]);
+
+  const handleRemoveAttachment = useCallback(
+    async (index: number) => {
+      setAttachments((current) => current.filter((_, currentIndex) => currentIndex !== index));
+      await playLightHaptic();
+    },
+    [playLightHaptic]
+  );
+
+  const handleSend = useCallback(async () => {
+    if (!canSend) {
+      return;
+    }
+
+    await playLightHaptic();
+    onSend(trimmedText, attachments.length > 0 ? attachments : undefined);
+
+    setText("");
+    setAttachments([]);
+    setInputHeight(MIN_INPUT_HEIGHT);
+
+    requestAnimationFrame(() => {
+      inputRef.current?.focus();
+    });
+  }, [attachments, canSend, onSend, playLightHaptic, trimmedText]);
+
+  const handleStop = useCallback(async () => {
+    await playMediumHaptic();
     onStop?.();
-  }, [onStop]);
+  }, [onStop, playMediumHaptic]);
 
-  const canSend = (text.trim().length > 0 || images.length > 0) && !isStreaming && !disabled;
-
-  const bottomPadding = Platform.OS === 'web' ? 16 : Math.max(insets.bottom, 12);
-
-  return (
-    <View style={[styles.container, { backgroundColor: colors.background, borderTopColor: colors.border, paddingBottom: bottomPadding }]}>
-      {/* Image previews */}
-      {images.length > 0 && (
-        <View style={styles.imagePreviewRow}>
-          {images.map((img, idx) => (
-            <View key={idx} style={styles.imagePreviewWrapper}>
-              <Image source={{ uri: img.uri }} style={styles.imagePreview} contentFit="cover" />
-              <Pressable
-                onPress={() => handleRemoveImage(idx)}
-                style={({ pressed }) => [styles.removeImageBtn, { backgroundColor: colors.error, opacity: pressed ? 0.7 : 1 }]}
-              >
-                <Text style={{ color: '#FFF', fontSize: 12, fontWeight: '700' }}>✕</Text>
-              </Pressable>
-            </View>
-          ))}
-        </View>
-      )}
-
-      {/* Input row */}
-      <View style={[styles.inputRow, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-        {/* Image picker button */}
-        <Pressable
-          onPress={handlePickImage}
-          disabled={isStreaming || disabled}
-          style={({ pressed }) => [styles.iconBtn, { opacity: pressed ? 0.5 : isStreaming ? 0.3 : 1 }]}
-        >
-          <MaterialIcons name="add-photo-alternate" size={24} color={colors.primary} />
-        </Pressable>
-
-        {/* Text input */}
-        <TextInput
-          ref={inputRef}
-          style={[styles.textInput, { color: colors.foreground }]}
-          placeholder="Message..."
-          placeholderTextColor={colors.muted}
-          value={text}
-          onChangeText={setText}
-          multiline
-          maxLength={32000}
-          editable={!isStreaming && !disabled}
-          returnKeyType="default"
-          blurOnSubmit={false}
-        />
-
-        {/* Send or Stop button */}
-        {isStreaming ? (
-          <Pressable
-            onPress={handleStop}
-            style={({ pressed }) => [styles.sendBtn, { backgroundColor: colors.error, opacity: pressed ? 0.8 : 1 }]}
-          >
-            <MaterialIcons name="stop" size={20} color="#FFFFFF" />
-          </Pressable>
-        ) : (
-          <Pressable
-            onPress={handleSend}
-            disabled={!canSend}
-            style={({ pressed }) => [
-              styles.sendBtn,
+  const renderAttachment: ListRenderItem<ImageAttachment> = useCallback(
+    ({ item, index }) => {
+      return (
+        <View style={styles.thumbnailShell}>
+          <View
+            style={[
+              styles.thumbnailFrame,
               {
-                backgroundColor: canSend ? colors.primary : colors.border,
-                opacity: pressed && canSend ? 0.8 : 1,
+                borderColor: thumbnailBorderColor,
+                backgroundColor: colors.surface,
               },
             ]}
           >
-            <MaterialIcons name="arrow-upward" size={20} color="#FFFFFF" />
+            <Image
+              source={{ uri: item.uri }}
+              style={styles.thumbnailImage}
+              contentFit="cover"
+              transition={120}
+            />
+          </View>
+
+          <Pressable
+            onPress={() => {
+              void handleRemoveAttachment(index);
+            }}
+            hitSlop={8}
+            style={({ pressed }) => [
+              styles.removeAttachmentButton,
+              {
+                backgroundColor: previewRemoveBackground,
+                opacity: pressed ? 0.8 : 1,
+              },
+            ]}
+          >
+            <IconSymbol
+              name="xmark.circle.fill"
+              size={18}
+              color={colors.error}
+            />
           </Pressable>
-        )}
-      </View>
+        </View>
+      );
+    },
+    [colors.error, colors.surface, handleRemoveAttachment, previewRemoveBackground, thumbnailBorderColor]
+  );
+
+  return (
+    <View style={[styles.outer, { paddingBottom: bottomPadding }]}>
+      {attachments.length > 0 ? (
+        <GlassCard style={styles.previewCard}>
+          <FlatList
+            data={attachments}
+            horizontal
+            keyExtractor={(item, index) => `${item.uri}-${index}`}
+            renderItem={renderAttachment}
+            showsHorizontalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            contentContainerStyle={styles.previewListContent}
+            ItemSeparatorComponent={() => <View style={styles.thumbnailSeparator} />}
+          />
+        </GlassCard>
+      ) : null}
+
+      <GlassCard style={styles.composerCard}>
+        <View style={styles.composerRow}>
+          <Pressable
+            onPress={() => {
+              void handlePickImage();
+            }}
+            disabled={!canPickImages}
+            style={({ pressed }) => [
+              styles.secondaryButton,
+              {
+                backgroundColor: secondaryButtonBackground,
+                opacity: pressed ? 0.78 : canPickImages ? 1 : 0.45,
+              },
+            ]}
+          >
+            <IconSymbol
+              name="photo"
+              size={20}
+              color={canPickImages ? colors.primary : colors.muted}
+            />
+          </Pressable>
+
+          <View style={styles.inputColumn}>
+            <TextInput
+              ref={inputRef}
+              value={text}
+              onChangeText={setText}
+              onContentSizeChange={handleContentSizeChange}
+              style={[
+                styles.input,
+                {
+                  color: colors.foreground,
+                  height: composerInputHeight,
+                },
+              ]}
+              placeholder={disabled ? "Add your OpenAI API key in Settings" : "Message"}
+              placeholderTextColor={colors.muted}
+              multiline
+              maxLength={32000}
+              editable={!disabled && !isStreaming}
+              scrollEnabled={composerInputHeight >= MAX_INPUT_HEIGHT}
+              autoCorrect
+              blurOnSubmit={false}
+              returnKeyType="default"
+              textAlignVertical="top"
+              keyboardAppearance={isDark ? "dark" : "light"}
+            />
+          </View>
+
+          {isStreaming ? (
+            <Pressable
+              onPress={() => {
+                void handleStop();
+              }}
+              style={({ pressed }) => [
+                styles.sendButton,
+                {
+                  backgroundColor: colors.error,
+                  opacity: pressed ? 0.84 : 1,
+                },
+              ]}
+            >
+              <IconSymbol
+                name="stop.fill"
+                size={16}
+                color="#FFFFFF"
+              />
+            </Pressable>
+          ) : (
+            <Pressable
+              onPress={() => {
+                void handleSend();
+              }}
+              disabled={!canSend}
+              style={({ pressed }) => [
+                styles.sendButton,
+                {
+                  backgroundColor: canSend ? colors.primary : disabledSendBackground,
+                  opacity: pressed ? 0.84 : canSend ? 1 : 0.9,
+                },
+              ]}
+            >
+              <IconSymbol
+                name="paperplane.fill"
+                size={18}
+                color={canSend ? "#FFFFFF" : "rgba(255,255,255,0.82)"}
+              />
+            </Pressable>
+          )}
+        </View>
+      </GlassCard>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    borderTopWidth: StyleSheet.hairlineWidth,
+  outer: {
     paddingHorizontal: 12,
     paddingTop: 8,
   },
-  imagePreviewRow: {
-    flexDirection: 'row',
-    gap: 8,
+  previewCard: {
+    borderRadius: 20,
+    paddingVertical: 10,
+    paddingHorizontal: 10,
     marginBottom: 8,
-    paddingHorizontal: 4,
   },
-  imagePreviewWrapper: {
-    position: 'relative',
+  previewListContent: {
+    paddingRight: 2,
   },
-  imagePreview: {
-    width: 64,
-    height: 64,
-    borderRadius: 10,
+  thumbnailSeparator: {
+    width: 10,
   },
-  removeImageBtn: {
-    position: 'absolute',
-    top: -4,
-    right: -4,
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
+  thumbnailShell: {
+    position: "relative",
   },
-  inputRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    borderRadius: 24,
-    borderWidth: 1,
-    paddingHorizontal: 6,
-    paddingVertical: 4,
-    minHeight: 44,
-    gap: 4,
+  thumbnailFrame: {
+    width: 72,
+    height: 72,
+    borderRadius: 16,
+    borderWidth: StyleSheet.hairlineWidth,
+    overflow: "hidden",
   },
-  iconBtn: {
+  thumbnailImage: {
+    width: "100%",
+    height: "100%",
+  },
+  removeAttachmentButton: {
+    position: "absolute",
+    top: -6,
+    right: -6,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#000000",
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.18,
+    shadowRadius: 6,
+    elevation: 4,
+  },
+  composerCard: {
+    borderRadius: 28,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+  },
+  composerRow: {
+    flexDirection: "row",
+    alignItems: "flex-end",
+    gap: 8,
+  },
+  secondaryButton: {
     width: 36,
     height: 36,
     borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 2,
   },
-  textInput: {
+  inputColumn: {
     flex: 1,
-    fontSize: 16,
-    lineHeight: 22,
-    maxHeight: 120,
-    paddingVertical: 8,
-    paddingHorizontal: 4,
+    minHeight: 36,
+    justifyContent: "center",
+    paddingTop: 2,
   },
-  sendBtn: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 1,
+  input: {
+    fontSize: 17,
+    lineHeight: TEXT_LINE_HEIGHT,
+    paddingTop: 6,
+    paddingBottom: 6,
+    paddingHorizontal: 2,
+    minHeight: MIN_INPUT_HEIGHT,
+    maxHeight: MAX_INPUT_HEIGHT,
+  },
+  sendButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 2,
   },
 });

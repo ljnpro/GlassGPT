@@ -1,33 +1,136 @@
+import React from "react";
+import { Platform, StyleSheet, View } from "react-native";
 import { Tabs } from "expo-router";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Platform } from "react-native";
+import { BlurView } from "expo-blur";
+import { GlassView } from "expo-glass-effect";
+import { SymbolView } from "expo-symbols";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/use-colors";
+
+function TabIcon({
+  color,
+  materialName,
+  size,
+  symbolName,
+}: {
+  color: string;
+  materialName: React.ComponentProps<typeof MaterialIcons>["name"];
+  size: number;
+  symbolName: string;
+}) {
+  if (Platform.OS === "ios") {
+    return <SymbolView name={symbolName as never} size={size} tintColor={color} />;
+  }
+
+  return <MaterialIcons color={color} name={materialName} size={size} />;
+}
+
+function TabBarBackground() {
+  const colors = useColors();
+  const isDark = colors.background.toLowerCase() === "#000000";
+  const supportsNativeGlass =
+    Platform.OS === "ios" && typeof Platform.Version === "number" && Platform.Version >= 26;
+
+  if (supportsNativeGlass) {
+    return (
+      <View style={StyleSheet.absoluteFill}>
+        <GlassView glassEffectStyle="regular" style={StyleSheet.absoluteFill} />
+        <View
+          pointerEvents="none"
+          style={[
+            StyleSheet.absoluteFill,
+            styles.backgroundOverlay,
+            {
+              borderTopColor: colors.border,
+              backgroundColor: isDark ? "rgba(22,22,24,0.18)" : "rgba(255,255,255,0.18)",
+            },
+          ]}
+        />
+      </View>
+    );
+  }
+
+  if (Platform.OS !== "web") {
+    return (
+      <View style={StyleSheet.absoluteFill}>
+        <BlurView
+          intensity={90}
+          tint={isDark ? "dark" : "light"}
+          style={StyleSheet.absoluteFill}
+          experimentalBlurMethod={Platform.OS === "android" ? "dimezisBlurView" : undefined}
+        />
+        <View
+          pointerEvents="none"
+          style={[
+            StyleSheet.absoluteFill,
+            styles.backgroundOverlay,
+            {
+              borderTopColor: colors.border,
+              backgroundColor: isDark ? "rgba(22,22,24,0.62)" : "rgba(255,255,255,0.72)",
+            },
+          ]}
+        />
+      </View>
+    );
+  }
+
+  const webGlassStyle: View["props"]["style"] = {
+    backgroundColor: isDark ? "rgba(22,22,24,0.72)" : "rgba(255,255,255,0.78)",
+    borderTopColor: colors.border,
+  };
+
+  return (
+    <View style={[StyleSheet.absoluteFill, styles.backgroundOverlay, webGlassStyle]}>
+      <View
+        style={{
+          ...StyleSheet.absoluteFillObject,
+          backdropFilter: "blur(24px) saturate(180%)",
+          WebkitBackdropFilter: "blur(24px) saturate(180%)",
+        } as never}
+      />
+    </View>
+  );
+}
 
 export default function TabLayout() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const bottomPadding = Platform.OS === "web" ? 12 : Math.max(insets.bottom, 8);
-  const tabBarHeight = 56 + bottomPadding;
+  const bottomPadding = Platform.OS === "web" ? 12 : Math.max(insets.bottom, 10);
+  const tabBarHeight = 58 + bottomPadding;
 
   return (
     <Tabs
       screenOptions={{
+        animation: "fade",
+        headerShown: false,
+        sceneStyle: {
+          backgroundColor: colors.background,
+        },
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.muted,
-        headerShown: false,
-        tabBarStyle: {
-          paddingTop: 8,
-          paddingBottom: bottomPadding,
-          height: tabBarHeight,
-          backgroundColor: colors.background,
-          borderTopColor: colors.border,
-          borderTopWidth: 0.5,
-        },
+        tabBarHideOnKeyboard: true,
         tabBarLabelStyle: {
           fontSize: 11,
-          fontWeight: "600",
+          fontWeight: "700",
+          marginTop: 0,
         },
+        tabBarIconStyle: {
+          marginTop: 2,
+        },
+        tabBarStyle: {
+          backgroundColor: "transparent",
+          borderTopWidth: 0,
+          elevation: 0,
+          height: tabBarHeight,
+          paddingBottom: bottomPadding,
+          paddingTop: 8,
+          shadowOpacity: 0,
+        },
+        tabBarItemStyle: {
+          paddingVertical: 2,
+        },
+        tabBarBackground: () => <TabBarBackground />,
       }}
     >
       <Tabs.Screen
@@ -35,7 +138,12 @@ export default function TabLayout() {
         options={{
           title: "Chat",
           tabBarIcon: ({ color, size }) => (
-            <MaterialIcons name="chat-bubble" size={size ?? 24} color={color} />
+            <TabIcon
+              color={color}
+              materialName="home"
+              size={size}
+              symbolName="house.fill"
+            />
           ),
         }}
       />
@@ -44,7 +152,12 @@ export default function TabLayout() {
         options={{
           title: "History",
           tabBarIcon: ({ color, size }) => (
-            <MaterialIcons name="history" size={size ?? 24} color={color} />
+            <TabIcon
+              color={color}
+              materialName="schedule"
+              size={size}
+              symbolName="clock.fill"
+            />
           ),
         }}
       />
@@ -53,10 +166,21 @@ export default function TabLayout() {
         options={{
           title: "Settings",
           tabBarIcon: ({ color, size }) => (
-            <MaterialIcons name="settings" size={size ?? 24} color={color} />
+            <TabIcon
+              color={color}
+              materialName="settings"
+              size={size}
+              symbolName="gearshape.fill"
+            />
           ),
         }}
       />
     </Tabs>
   );
 }
+
+const styles = StyleSheet.create({
+  backgroundOverlay: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+  },
+});
