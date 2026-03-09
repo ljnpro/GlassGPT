@@ -1,0 +1,27 @@
+# Project TODO
+
+- [x] Set up iOS-style color theme (light/dark) matching design.md
+- [x] Install dependencies: expo-glass-effect, expo-blur, expo-image-picker, expo-clipboard, expo-secure-store, react-native-markdown-display, katex
+- [x] Create data models: Conversation, Message, Settings types
+- [x] Build ChatStore with AsyncStorage persistence (conversations, messages, settings)
+- [x] Build API service for OpenAI chat completions with streaming support
+- [x] Build secure API key storage (SecureStore + web fallback)
+- [x] Create Liquid Glass wrapper component (GlassView → BlurView → solid fallback)
+- [x] Build Chat screen with message list (FlatList)
+- [x] Build message bubbles (user/assistant) with glass effect on assistant
+- [x] Build top bar with model selector dropdown and reasoning effort selector
+- [x] Build input bar with send button, image picker, stop generation
+- [x] Build image attachment preview in input area
+- [x] Implement streaming response display with typing animation
+- [x] Implement thinking/reasoning collapsible section
+- [x] Build Markdown renderer for assistant messages
+- [x] Build LaTeX/math formula rendering (inline and block)
+- [x] Build code block rendering with syntax highlighting and copy button
+- [x] Build inline image display in messages
+- [x] Build Conversation List screen with search and swipe-to-delete
+- [x] Build Settings screen with API key input, defaults, theme toggle
+- [x] Build new chat functionality
+- [x] Build conversation title auto-generation
+- [x] Add haptic feedback on key interactions
+- [x] Generate app logo
+- [x] Final testing and polish
