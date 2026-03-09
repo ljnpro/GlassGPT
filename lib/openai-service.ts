@@ -343,12 +343,8 @@ function sanitizeGeneratedTitle(title: string): string {
   return `${singleLine.slice(0, 57).trim()}…`;
 }
 
-function appendUniqueDelta(current: string, delta: string): string {
+function appendDelta(current: string, delta: string): string {
   if (!delta) {
-    return current;
-  }
-
-  if (current.endsWith(delta)) {
     return current;
   }
 
@@ -365,10 +361,21 @@ export async function streamChatCompletion(
 ): Promise<StreamCompletionResult> {
   const normalizedEffort = normalizeReasoningEffort(model, effort);
 
+  // Build reasoning config: always include summary for models with reasoning
+  const reasoningConfig: Record<string, unknown> = {
+    effort: normalizedEffort,
+  };
+
+  // Opt in to reasoning summaries so the API streams reasoning_summary_text events.
+  // "auto" selects the most detailed summarizer available for the model.
+  if (normalizedEffort !== "none") {
+    reasoningConfig.summary = "auto";
+  }
+
   const requestBody: Record<string, unknown> = {
     model,
     input: buildResponsesInput(messages),
-    reasoning: { effort: normalizedEffort },
+    reasoning: reasoningConfig,
     stream: true,
     max_output_tokens: DEFAULT_MAX_OUTPUT_TOKENS,
   };
@@ -419,7 +426,7 @@ export async function streamChatCompletion(
             : "";
 
       if (delta) {
-        result.outputText = appendUniqueDelta(result.outputText, delta);
+        result.outputText = appendDelta(result.outputText, delta);
         callbacks.onToken(result.outputText);
       }
 
@@ -438,7 +445,7 @@ export async function streamChatCompletion(
             : "";
 
       if (delta) {
-        result.reasoning = appendUniqueDelta(result.reasoning, delta);
+        result.reasoning = appendDelta(result.reasoning, delta);
         callbacks.onReasoning?.(result.reasoning);
       }
 
@@ -457,6 +464,19 @@ export async function streamChatCompletion(
 
       if (!result.outputText) {
         result.outputText = extractResponseText(completedResponse);
+      }
+
+      // Extract reasoning summary from completed response if not captured during streaming
+      if (!result.reasoning && Array.isArray(completedResponse.output)) {
+        for (const outputItem of completedResponse.output as Record<string, unknown>[]) {
+          if (!outputItem || outputItem.type !== "reasoning") continue;
+          const summaryArr = Array.isArray(outputItem.summary) ? outputItem.summary : [];
+          for (const summaryItem of summaryArr as Record<string, unknown>[]) {
+            if (summaryItem?.type === "summary_text" && typeof summaryItem.text === "string") {
+              result.reasoning = appendDelta(result.reasoning, summaryItem.text);
+            }
+          }
+        }
       }
 
       complete();
