@@ -1,185 +1,504 @@
-import React, { useState, useCallback, useMemo } from 'react';
-import { View, Text, FlatList, TextInput, StyleSheet, Platform, Pressable, Alert } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import * as Haptics from 'expo-haptics';
-import MaterialIcons from '@expo/vector-icons/MaterialIcons';
-import { useColors } from '@/hooks/use-colors';
-import { useChatStore } from '@/lib/chat-store';
-import { Conversation } from '@/lib/types';
-import { GlassCard } from '@/components/glass-card';
-import { useRouter } from 'expo-router';
+import React, { useCallback, useMemo, useRef, useState } from "react";
+import {
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  GestureResponderEvent,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
+import { useRouter } from "expo-router";
+import * as Haptics from "expo-haptics";
+import MaterialIcons from "@expo/vector-icons/MaterialIcons";
+import { ScreenContainer } from "@/components/screen-container";
+import { GlassCard } from "@/components/glass-card";
+import { useColors } from "@/hooks/use-colors";
+import { useChatStore } from "@/lib/chat-store";
+import { Conversation, MODELS } from "@/lib/types";
 
-function formatTime(ts: number): string {
-  const now = Date.now();
-  const diff = now - ts;
-  const mins = Math.floor(diff / 60000);
-  if (mins < 1) return 'Just now';
-  if (mins < 60) return `${mins}m ago`;
-  const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  if (days < 7) return `${days}d ago`;
-  return new Date(ts).toLocaleDateString();
+type Colors = ReturnType<typeof useColors>;
+
+function getModelLabel(modelId: Conversation["model"]): string {
+  return MODELS.find((item) => item.id === modelId)?.label ?? modelId;
+}
+
+function formatConversationDate(timestamp: number): string {
+  const date = new Date(timestamp);
+  const now = new Date();
+
+  const isSameDay =
+    date.getFullYear() === now.getFullYear() &&
+    date.getMonth() === now.getMonth() &&
+    date.getDate() === now.getDate();
+
+  if (isSameDay) {
+    return date.toLocaleTimeString([], {
+      hour: "numeric",
+      minute: "2-digit",
+    });
+  }
+
+  const yesterday = new Date();
+  yesterday.setDate(now.getDate() - 1);
+
+  const isYesterday =
+    date.getFullYear() === yesterday.getFullYear() &&
+    date.getMonth() === yesterday.getMonth() &&
+    date.getDate() === yesterday.getDate();
+
+  if (isYesterday) {
+    return "Yesterday";
+  }
+
+  const isSameYear = date.getFullYear() === now.getFullYear();
+
+  return date.toLocaleDateString([], {
+    month: "short",
+    day: "numeric",
+    ...(isSameYear ? null : { year: "numeric" }),
+  });
+}
+
+function getConversationPreview(conversation: Conversation): string {
+  for (let index = conversation.messages.length - 1; index >= 0; index -= 1) {
+    const message = conversation.messages[index];
+
+    if (message.content.trim().length > 0) {
+      return message.content.replace(/\s+/g, " ").trim();
+    }
+
+    if (message.images && message.images.length > 0) {
+      return message.images.length > 1 ? `${message.images.length} photos` : "Photo";
+    }
+
+    if (message.isStreaming) {
+      return "Streaming response…";
+    }
+  }
+
+  return "No messages yet";
+}
+
+function getSearchText(conversation: Conversation): string {
+  const messagesText = conversation.messages
+    .map((message) => {
+      const imageText = message.images && message.images.length > 0 ? " photo" : "";
+      return `${message.content}${imageText}`;
+    })
+    .join(" ");
+
+  return `${conversation.title} ${messagesText}`.toLowerCase();
+}
+
+function ConversationRow({
+  colors,
+  conversation,
+  isActive,
+  onDelete,
+  onSelect,
+}: {
+  colors: Colors;
+  conversation: Conversation;
+  isActive: boolean;
+  onDelete: (conversation: Conversation) => void;
+  onSelect: (conversation: Conversation) => void;
+}) {
+  const suppressNextPressRef = useRef(false);
+  const preview = getConversationPreview(conversation);
+
+  const handlePress = useCallback(() => {
+    if (suppressNextPressRef.current) {
+      suppressNextPressRef.current = false;
+      return;
+    }
+
+    onSelect(conversation);
+  }, [conversation, onSelect]);
+
+  const handleLongPress = useCallback(() => {
+    suppressNextPressRef.current = true;
+    onDelete(conversation);
+  }, [conversation, onDelete]);
+
+  const handleDeletePress = useCallback(
+    (event: GestureResponderEvent) => {
+      event.stopPropagation();
+      onDelete(conversation);
+    },
+    [conversation, onDelete]
+  );
+
+  return (
+    <Pressable
+      delayLongPress={220}
+      onLongPress={handleLongPress}
+      onPress={handlePress}
+      style={({ pressed }) => [
+        {
+          opacity: pressed ? 0.94 : 1,
+        },
+      ]}
+    >
+      <GlassCard
+        style={[
+          styles.rowCard,
+          {
+            borderColor: isActive ? `${colors.primary}66` : colors.border,
+            borderWidth: StyleSheet.hairlineWidth,
+          },
+        ]}
+      >
+        <View style={styles.rowHeader}>
+          <View style={styles.rowHeaderText}>
+            <Text
+              numberOfLines={1}
+              style={[
+                styles.rowTitle,
+                {
+                  color: colors.foreground,
+                },
+              ]}
+            >
+              {conversation.title || "New Chat"}
+            </Text>
+            <Text
+              numberOfLines={2}
+              style={[
+                styles.rowPreview,
+                {
+                  color: colors.muted,
+                },
+              ]}
+            >
+              {preview}
+            </Text>
+          </View>
+
+          <View style={styles.rowHeaderActions}>
+            <Text
+              style={[
+                styles.rowDate,
+                {
+                  color: colors.muted,
+                },
+              ]}
+            >
+              {formatConversationDate(conversation.updatedAt)}
+            </Text>
+
+            <Pressable
+              accessibilityLabel={`Delete ${conversation.title || "conversation"}`}
+              accessibilityRole="button"
+              onPress={handleDeletePress}
+              style={({ pressed }) => [
+                styles.deleteButton,
+                {
+                  backgroundColor: `${colors.error}12`,
+                  opacity: pressed ? 0.78 : 1,
+                },
+              ]}
+            >
+              <MaterialIcons name="delete-outline" size={16} color={colors.error} />
+            </Pressable>
+          </View>
+        </View>
+
+        <View style={styles.rowFooter}>
+          <View
+            style={[
+              styles.modelBadge,
+              {
+                backgroundColor: `${colors.primary}12`,
+                borderColor: `${colors.primary}22`,
+              },
+            ]}
+          >
+            <Text
+              style={[
+                styles.modelBadgeText,
+                {
+                  color: colors.primary,
+                },
+              ]}
+            >
+              {getModelLabel(conversation.model)} · {conversation.effort}
+            </Text>
+          </View>
+
+          <View style={styles.rowMeta}>
+            <Text
+              style={[
+                styles.rowMetaText,
+                {
+                  color: colors.muted,
+                },
+              ]}
+            >
+              {conversation.messages.length} messages
+            </Text>
+            <MaterialIcons name="chevron-right" size={18} color={colors.muted} />
+          </View>
+        </View>
+      </GlassCard>
+    </Pressable>
+  );
 }
 
 export default function ConversationsScreen() {
   const colors = useColors();
-  const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { state, setActiveConversation, deleteConversation, createNewConversation } = useChatStore();
-  const [searchQuery, setSearchQuery] = useState('');
+  const {
+    state,
+    dispatch,
+    currentEffort,
+    currentModel,
+    deleteConversation,
+    setActiveConversation,
+  } = useChatStore();
+
+  const [searchQuery, setSearchQuery] = useState("");
+
+  const sortedConversations = useMemo(() => {
+    return [...state.conversations].sort((left, right) => right.updatedAt - left.updatedAt);
+  }, [state.conversations]);
 
   const filteredConversations = useMemo(() => {
-    if (!searchQuery.trim()) return state.conversations;
-    const q = searchQuery.toLowerCase();
-    return state.conversations.filter(
-      (c) =>
-        c.title.toLowerCase().includes(q) ||
-        c.messages.some((m) => m.content.toLowerCase().includes(q))
-    );
-  }, [state.conversations, searchQuery]);
+    const normalized = searchQuery.trim().toLowerCase();
 
-  const handleSelect = useCallback(
-    (conv: Conversation) => {
-      if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      setActiveConversation(conv.id);
-      router.navigate('/(tabs)');
+    if (!normalized) {
+      return sortedConversations;
+    }
+
+    return sortedConversations.filter((conversation) =>
+      getSearchText(conversation).includes(normalized)
+    );
+  }, [searchQuery, sortedConversations]);
+
+  const handleSelectConversation = useCallback(
+    (conversation: Conversation) => {
+      if (Platform.OS !== "web") {
+        void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      }
+
+      setActiveConversation(conversation.id);
+      router.navigate("/(tabs)");
     },
-    [setActiveConversation, router]
+    [router, setActiveConversation]
   );
 
-  const handleDelete = useCallback(
-    (conv: Conversation) => {
-      if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-      if (Platform.OS === 'web') {
-        if (confirm('Delete this conversation?')) {
-          deleteConversation(conv.id);
+  const handleDeleteConversation = useCallback(
+    (conversation: Conversation) => {
+      const performDelete = () => {
+        deleteConversation(conversation.id);
+
+        if (Platform.OS !== "web") {
+          void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         }
-      } else {
-        Alert.alert('Delete Conversation', `Delete "${conv.title}"?`, [
-          { text: 'Cancel', style: 'cancel' },
-          {
-            text: 'Delete',
-            style: 'destructive',
-            onPress: () => deleteConversation(conv.id),
-          },
-        ]);
+      };
+
+      if (Platform.OS !== "web") {
+        void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       }
+
+      if (Platform.OS === "web") {
+        const confirmFn = (
+          globalThis as typeof globalThis & {
+            confirm?: (message?: string) => boolean;
+          }
+        ).confirm;
+
+        if (confirmFn?.(`Delete "${conversation.title || "this conversation"}"?`)) {
+          performDelete();
+        }
+
+        return;
+      }
+
+      Alert.alert("Delete Conversation", `Delete "${conversation.title || "this conversation"}"?`, [
+        {
+          text: "Cancel",
+          style: "cancel",
+        },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: performDelete,
+        },
+      ]);
     },
     [deleteConversation]
   );
 
   const handleNewChat = useCallback(() => {
-    if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    createNewConversation();
-    router.navigate('/(tabs)');
-  }, [createNewConversation, router]);
+    if (Platform.OS !== "web") {
+      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    }
 
-  const getLastMessage = (conv: Conversation): string => {
-    if (conv.messages.length === 0) return 'No messages yet';
-    const last = conv.messages[conv.messages.length - 1];
-    const preview = last.content.slice(0, 80);
-    return preview + (last.content.length > 80 ? '...' : '');
-  };
+    setActiveConversation(null);
+    router.navigate("/(tabs)");
+  }, [currentEffort, currentModel, dispatch, router, setActiveConversation]);
 
-  const renderItem = useCallback(
-    ({ item }: { item: Conversation }) => (
-      <Pressable
-        onPress={() => handleSelect(item)}
-        onLongPress={() => handleDelete(item)}
-        style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1 }]}
-      >
-        <GlassCard style={styles.convCard}>
-          <View style={styles.convHeader}>
-            <Text style={[styles.convTitle, { color: colors.foreground }]} numberOfLines={1}>
-              {item.title}
-            </Text>
-            <Text style={[styles.convTime, { color: colors.muted }]}>{formatTime(item.updatedAt)}</Text>
-          </View>
-          <Text style={[styles.convPreview, { color: colors.muted }]} numberOfLines={2}>
-            {getLastMessage(item)}
-          </Text>
-          <View style={styles.convFooter}>
-            <View style={[styles.modelBadge, { backgroundColor: colors.primary + '15' }]}>
-              <Text style={[styles.modelBadgeText, { color: colors.primary }]}>
-                {item.model === 'gpt-5.4-pro' ? 'Pro' : '5.4'} · {item.effort}
-              </Text>
-            </View>
-            <Text style={[styles.msgCount, { color: colors.muted }]}>
-              {item.messages.length} messages
-            </Text>
-          </View>
-        </GlassCard>
-      </Pressable>
-    ),
-    [colors, handleSelect, handleDelete]
+  const renderConversation = useCallback(
+    ({ item }: { item: Conversation }) => {
+      return (
+        <ConversationRow
+          colors={colors}
+          conversation={item}
+          isActive={state.activeConversationId === item.id}
+          onDelete={handleDeleteConversation}
+          onSelect={handleSelectConversation}
+        />
+      );
+    },
+    [colors, handleDeleteConversation, handleSelectConversation, state.activeConversationId]
   );
 
-  return (
-    <View style={[styles.screen, { backgroundColor: colors.background }]}>
-      {/* Header */}
-      <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
-        <GlassCard style={styles.headerGlass}>
-          <View style={styles.headerRow}>
-            <Text style={[styles.headerTitle, { color: colors.foreground }]}>Chats</Text>
-            <Pressable
-              onPress={handleNewChat}
-              style={({ pressed }) => [styles.newBtn, { backgroundColor: colors.primary, opacity: pressed ? 0.8 : 1 }]}
-            >
-              <MaterialIcons name="add" size={22} color="#FFFFFF" />
-            </Pressable>
-          </View>
-        </GlassCard>
-      </View>
-
-      {/* Search */}
-      <View style={styles.searchContainer}>
-        <View style={[styles.searchBar, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <MaterialIcons name="search" size={20} color={colors.muted} />
-          <TextInput
-            style={[styles.searchInput, { color: colors.foreground }]}
-            placeholder="Search conversations..."
-            placeholderTextColor={colors.muted}
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            returnKeyType="search"
-          />
-          {searchQuery.length > 0 && (
-            <Pressable onPress={() => setSearchQuery('')}>
-              <MaterialIcons name="close" size={18} color={colors.muted} />
-            </Pressable>
-          )}
+  const renderEmptyState = useCallback(() => {
+    if (!state.isLoaded) {
+      return (
+        <View style={styles.emptyState}>
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text style={[styles.emptyTitle, { color: colors.foreground }]}>Loading history…</Text>
         </View>
-      </View>
+      );
+    }
 
-      {/* List */}
-      <FlatList
-        data={filteredConversations}
-        renderItem={renderItem}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={[
-          styles.listContent,
-          filteredConversations.length === 0 && styles.emptyList,
-        ]}
-        ListEmptyComponent={
-          <View style={styles.emptyState}>
-            <MaterialIcons name="chat-bubble-outline" size={56} color={colors.muted} />
-            <Text style={[styles.emptyText, { color: colors.muted }]}>
-              {searchQuery ? 'No conversations found' : 'No conversations yet'}
-            </Text>
-            {!searchQuery && (
+    const isSearching = searchQuery.trim().length > 0;
+
+    return (
+      <View style={styles.emptyState}>
+        <View style={[styles.emptyIconWrap, { backgroundColor: `${colors.primary}12` }]}>
+          <MaterialIcons name="history" size={28} color={colors.primary} />
+        </View>
+        <Text style={[styles.emptyTitle, { color: colors.foreground }]}>
+          {isSearching ? "No matches found" : "No conversations yet"}
+        </Text>
+        <Text style={[styles.emptySubtitle, { color: colors.muted }]}>
+          {isSearching
+            ? "Try a different search term."
+            : "Your recent chats will appear here. Start a new conversation to begin."}
+        </Text>
+        {!isSearching ? (
+          <Pressable
+            accessibilityRole="button"
+            onPress={handleNewChat}
+            style={({ pressed }) => [
+              styles.emptyPrimaryButton,
+              {
+                backgroundColor: colors.primary,
+                opacity: pressed ? 0.88 : 1,
+              },
+            ]}
+          >
+            <MaterialIcons name="add" size={18} color="#FFFFFF" />
+            <Text style={styles.emptyPrimaryButtonText}>New Chat</Text>
+          </Pressable>
+        ) : null}
+      </View>
+    );
+  }, [colors.foreground, colors.muted, colors.primary, handleNewChat, searchQuery, state.isLoaded]);
+
+  return (
+    <ScreenContainer>
+      <View style={[styles.screen, { backgroundColor: colors.background }]}>
+        <View style={styles.topSection}>
+          <GlassCard
+            style={[
+              styles.headerCard,
+              {
+                borderColor: colors.border,
+                borderWidth: StyleSheet.hairlineWidth,
+              },
+            ]}
+          >
+            <View style={styles.headerRow}>
+              <View style={styles.headerTextWrap}>
+                <Text style={[styles.headerTitle, { color: colors.foreground }]}>History</Text>
+                <Text style={[styles.headerSubtitle, { color: colors.muted }]}>
+                  {state.conversations.length} saved conversation
+                  {state.conversations.length === 1 ? "" : "s"}
+                </Text>
+              </View>
+
               <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="New Chat"
                 onPress={handleNewChat}
-                style={({ pressed }) => [styles.startBtn, { backgroundColor: colors.primary, opacity: pressed ? 0.8 : 1 }]}
+                style={({ pressed }) => [
+                  styles.newChatButton,
+                  {
+                    backgroundColor: `${colors.primary}14`,
+                    opacity: pressed ? 0.82 : 1,
+                  },
+                ]}
               >
-                <Text style={styles.startBtnText}>Start a new chat</Text>
+                <MaterialIcons name="add" size={18} color={colors.primary} />
+                <Text style={[styles.newChatButtonText, { color: colors.primary }]}>New Chat</Text>
               </Pressable>
-            )}
-          </View>
-        }
-        showsVerticalScrollIndicator={false}
-      />
-    </View>
+            </View>
+          </GlassCard>
+
+          <GlassCard
+            style={[
+              styles.searchCard,
+              {
+                borderColor: colors.border,
+                borderWidth: StyleSheet.hairlineWidth,
+              },
+            ]}
+          >
+            <View style={[styles.searchBar, { backgroundColor: colors.surface }]}>
+              <MaterialIcons name="search" size={18} color={colors.muted} />
+              <TextInput
+                autoCapitalize="none"
+                autoCorrect={false}
+                clearButtonMode="never"
+                keyboardAppearance={Platform.OS === "ios" ? "default" : undefined}
+                placeholder="Search conversations"
+                placeholderTextColor={colors.muted}
+                returnKeyType="search"
+                style={[styles.searchInput, { color: colors.foreground }]}
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+              />
+              {searchQuery.length > 0 ? (
+                <Pressable
+                  accessibilityLabel="Clear search"
+                  onPress={() => setSearchQuery("")}
+                  style={({ pressed }) => [
+                    styles.searchClearButton,
+                    {
+                      backgroundColor: `${colors.muted}18`,
+                      opacity: pressed ? 0.8 : 1,
+                    },
+                  ]}
+                >
+                  <MaterialIcons name="close" size={14} color={colors.muted} />
+                </Pressable>
+              ) : null}
+            </View>
+          </GlassCard>
+        </View>
+
+        <FlatList
+          contentContainerStyle={[
+            styles.listContent,
+            filteredConversations.length === 0 && styles.listContentEmpty,
+          ]}
+          data={filteredConversations}
+          keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
+          keyboardShouldPersistTaps="handled"
+          keyExtractor={(item) => item.id}
+          ListEmptyComponent={renderEmptyState}
+          renderItem={renderConversation}
+          showsVerticalScrollIndicator={false}
+        />
+      </View>
+    </ScreenContainer>
   );
 }
 
@@ -187,114 +506,183 @@ const styles = StyleSheet.create({
   screen: {
     flex: 1,
   },
-  header: {
-    zIndex: 10,
+  topSection: {
+    gap: 12,
+    paddingBottom: 10,
+    paddingHorizontal: 16,
+    paddingTop: 8,
   },
-  headerGlass: {
-    borderRadius: 0,
-    paddingHorizontal: 20,
-    paddingVertical: 12,
+  headerCard: {
+    borderRadius: 24,
+    paddingHorizontal: 16,
+    paddingVertical: 16,
   },
   headerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+  headerTextWrap: {
+    flex: 1,
+    paddingRight: 12,
   },
   headerTitle: {
-    fontSize: 32,
-    fontWeight: '800',
+    fontSize: 30,
+    fontWeight: "800",
+    letterSpacing: -0.6,
   },
-  newBtn: {
-    width: 36,
-    height: 36,
+  headerSubtitle: {
+    fontSize: 14,
+    marginTop: 4,
+  },
+  newChatButton: {
+    alignItems: "center",
     borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
+    flexDirection: "row",
+    gap: 6,
+    height: 36,
+    justifyContent: "center",
+    paddingHorizontal: 12,
   },
-  searchContainer: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
+  newChatButtonText: {
+    fontSize: 13,
+    fontWeight: "700",
+  },
+  searchCard: {
+    borderRadius: 20,
+    padding: 8,
   },
   searchBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderRadius: 12,
-    borderWidth: 1,
-    paddingHorizontal: 12,
-    height: 40,
-    gap: 8,
+    alignItems: "center",
+    borderRadius: 16,
+    flexDirection: "row",
+    gap: 10,
+    minHeight: 46,
+    paddingHorizontal: 14,
   },
   searchInput: {
     flex: 1,
-    fontSize: 15,
+    fontSize: 16,
+    paddingVertical: 10,
+  },
+  searchClearButton: {
+    alignItems: "center",
+    borderRadius: 11,
+    height: 22,
+    justifyContent: "center",
+    width: 22,
   },
   listContent: {
+    gap: 12,
+    paddingBottom: 28,
     paddingHorizontal: 16,
-    paddingBottom: 100,
+  },
+  listContentEmpty: {
+    flexGrow: 1,
+    justifyContent: "center",
+  },
+  rowCard: {
+    borderRadius: 24,
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+  },
+  rowHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+  rowHeaderText: {
+    flex: 1,
+    paddingRight: 12,
+  },
+  rowTitle: {
+    fontSize: 17,
+    fontWeight: "700",
+    letterSpacing: -0.2,
+  },
+  rowPreview: {
+    fontSize: 14,
+    lineHeight: 20,
+    marginTop: 6,
+  },
+  rowHeaderActions: {
+    alignItems: "flex-end",
     gap: 10,
   },
-  emptyList: {
-    flex: 1,
-  },
-  convCard: {
-    padding: 16,
-    gap: 6,
-  },
-  convHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  convTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    flex: 1,
-    marginRight: 8,
-  },
-  convTime: {
+  rowDate: {
     fontSize: 12,
+    fontWeight: "600",
   },
-  convPreview: {
-    fontSize: 14,
-    lineHeight: 19,
+  deleteButton: {
+    alignItems: "center",
+    borderRadius: 14,
+    height: 28,
+    justifyContent: "center",
+    width: 28,
   },
-  convFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: 4,
+  rowFooter: {
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginTop: 14,
   },
   modelBadge: {
-    borderRadius: 6,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
+    borderRadius: 999,
+    borderWidth: 1,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
   },
   modelBadgeText: {
     fontSize: 11,
-    fontWeight: '600',
+    fontWeight: "700",
   },
-  msgCount: {
-    fontSize: 11,
+  rowMeta: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 2,
+  },
+  rowMetaText: {
+    fontSize: 12,
+    fontWeight: "600",
   },
   emptyState: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 12,
-    paddingTop: 80,
-  },
-  emptyText: {
-    fontSize: 16,
-  },
-  startBtn: {
-    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
     paddingHorizontal: 24,
-    paddingVertical: 10,
-    marginTop: 8,
   },
-  startBtnText: {
-    color: '#FFFFFF',
+  emptyIconWrap: {
+    alignItems: "center",
+    borderRadius: 24,
+    height: 48,
+    justifyContent: "center",
+    marginBottom: 16,
+    width: 48,
+  },
+  emptyTitle: {
+    fontSize: 22,
+    fontWeight: "800",
+    letterSpacing: -0.3,
+    textAlign: "center",
+  },
+  emptySubtitle: {
     fontSize: 15,
-    fontWeight: '600',
+    lineHeight: 22,
+    marginTop: 10,
+    maxWidth: 320,
+    textAlign: "center",
+  },
+  emptyPrimaryButton: {
+    alignItems: "center",
+    borderRadius: 999,
+    flexDirection: "row",
+    gap: 8,
+    justifyContent: "center",
+    marginTop: 20,
+    paddingHorizontal: 18,
+    paddingVertical: 12,
+  },
+  emptyPrimaryButtonText: {
+    color: "#FFFFFF",
+    fontSize: 15,
+    fontWeight: "700",
   },
 });

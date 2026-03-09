@@ -1,158 +1,344 @@
-import React, { useState, useCallback } from 'react';
-import { View, Text, Pressable, Modal, StyleSheet, Platform } from 'react-native';
-import * as Haptics from 'expo-haptics';
-import { useColors } from '@/hooks/use-colors';
-import { GlassCard } from './glass-card';
-import { ModelId, ReasoningEffort, MODELS } from '@/lib/types';
+import React, { useCallback, useMemo, useState } from "react";
+import {
+  FlatList,
+  Modal,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+  type ListRenderItem,
+} from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import * as Haptics from "expo-haptics";
+import { useColors } from "@/hooks/use-colors";
+import { useChatStore } from "@/lib/chat-store";
+import { MODELS, type ModelConfig, type ModelId, type ReasoningEffort } from "@/lib/types";
+import { GlassCard } from "./glass-card";
+import { IconSymbol } from "@/components/ui/icon-symbol";
 
 interface ModelSelectorProps {
-  model: ModelId;
-  effort: ReasoningEffort;
-  onModelChange: (model: ModelId) => void;
-  onEffortChange: (effort: ReasoningEffort) => void;
+  model?: ModelId;
+  effort?: ReasoningEffort;
+  onModelChange?: (model: ModelId) => void;
+  onEffortChange?: (effort: ReasoningEffort) => void;
 }
 
 const EFFORT_LABELS: Record<ReasoningEffort, string> = {
-  none: 'None',
-  low: 'Low',
-  medium: 'Medium',
-  high: 'High',
-  xhigh: 'xHigh',
+  none: "None",
+  low: "Low",
+  medium: "Medium",
+  high: "High",
+  xhigh: "xHigh",
 };
 
-const EFFORT_COLORS: Record<ReasoningEffort, string> = {
-  none: '#8E8E93',
-  low: '#34C759',
-  medium: '#FF9500',
-  high: '#FF3B30',
-  xhigh: '#AF52DE',
+const MODEL_SUBTITLES: Record<ModelId, string> = {
+  "gpt-5.4": "Fast, flexible, and ideal for most everyday conversations.",
+  "gpt-5.4-pro": "Highest capability for deep reasoning, analysis, and polished writing.",
 };
 
-export function ModelSelector({ model, effort, onModelChange, onEffortChange }: ModelSelectorProps) {
+const MODEL_FOOTERS: Record<ModelId, string> = {
+  "gpt-5.4":
+    "Balanced speed and quality. Great for daily use, brainstorming, and general problem solving.",
+  "gpt-5.4-pro":
+    "Best when you want maximum depth, stronger analysis, and more deliberate reasoning.",
+};
+
+export function ModelSelector({ model, effort }: ModelSelectorProps) {
   const colors = useColors();
-  const [showPicker, setShowPicker] = useState(false);
+  const insets = useSafeAreaInsets();
+  const {
+    currentModel: storeCurrentModel,
+    currentEffort: storeCurrentEffort,
+    setCurrentModel,
+    setCurrentEffort,
+  } = useChatStore();
 
-  const currentModel = MODELS.find((m) => m.id === model) || MODELS[1];
+  const [visible, setVisible] = useState(false);
 
-  const handleModelSelect = useCallback(
-    (m: ModelId) => {
-      if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      onModelChange(m);
-      const newModel = MODELS.find((mod) => mod.id === m)!;
-      if (!newModel.reasoningEfforts.includes(effort)) {
-        onEffortChange(newModel.defaultEffort);
+  const isDark = colors.background.toLowerCase() === "#000000";
+  const selectedModel = storeCurrentModel ?? model ?? "gpt-5.4-pro";
+  const selectedEffort = storeCurrentEffort ?? effort ?? "xhigh";
+
+  const selectedModelConfig = useMemo<ModelConfig>(() => {
+    return MODELS.find((item) => item.id === selectedModel) ?? MODELS[0];
+  }, [selectedModel]);
+
+  const triggerBackgroundColor = isDark
+    ? "rgba(255,255,255,0.08)"
+    : "rgba(120,120,128,0.12)";
+  const triggerBorderColor = isDark
+    ? "rgba(255,255,255,0.08)"
+    : "rgba(60,60,67,0.10)";
+  const selectedRowBackgroundColor = isDark
+    ? "rgba(10,132,255,0.18)"
+    : "rgba(0,122,255,0.10)";
+  const helperBackgroundColor = isDark
+    ? "rgba(255,255,255,0.05)"
+    : "rgba(120,120,128,0.10)";
+  const effortBadgeBackgroundColor = isDark
+    ? "rgba(10,132,255,0.18)"
+    : "rgba(0,122,255,0.12)";
+
+  const playSelectionHaptic = useCallback(async () => {
+    if (Platform.OS !== "web") {
+      await Haptics.selectionAsync();
+    }
+  }, []);
+
+  const openModal = useCallback(async () => {
+    await playSelectionHaptic();
+    setVisible(true);
+  }, [playSelectionHaptic]);
+
+  const closeModal = useCallback(() => {
+    setVisible(false);
+  }, []);
+
+  const handleSelectModel = useCallback(
+    async (nextModel: ModelId) => {
+      await playSelectionHaptic();
+
+      const nextConfig = MODELS.find((item) => item.id === nextModel) ?? MODELS[0];
+      setCurrentModel(nextModel);
+
+      if (!nextConfig.reasoningEfforts.includes(selectedEffort)) {
+        setCurrentEffort(nextConfig.defaultEffort);
       }
+
+      closeModal();
     },
-    [effort, onModelChange, onEffortChange]
+    [closeModal, playSelectionHaptic, selectedEffort, setCurrentEffort, setCurrentModel]
   );
 
-  const handleEffortSelect = useCallback(
-    (e: ReasoningEffort) => {
-      if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      onEffortChange(e);
-      setShowPicker(false);
+  const handleSelectEffort = useCallback(
+    async (nextEffort: ReasoningEffort) => {
+      await playSelectionHaptic();
+      setCurrentEffort(nextEffort);
+      closeModal();
     },
-    [onEffortChange]
+    [closeModal, playSelectionHaptic, setCurrentEffort]
+  );
+
+  const renderModelItem: ListRenderItem<ModelConfig> = useCallback(
+    ({ item }) => {
+      const isSelected = item.id === selectedModel;
+
+      return (
+        <Pressable
+          onPress={() => {
+            void handleSelectModel(item.id);
+          }}
+          style={({ pressed }) => [
+            styles.modelRowButton,
+            {
+              backgroundColor: isSelected ? selectedRowBackgroundColor : colors.surface,
+              borderColor: isSelected ? colors.primary : colors.border,
+              opacity: pressed ? 0.86 : 1,
+            },
+          ]}
+        >
+          <View style={styles.modelRowContent}>
+            <View style={styles.modelTextColumn}>
+              <Text style={[styles.modelTitle, { color: colors.foreground }]}>{item.label}</Text>
+              <Text style={[styles.modelSubtitle, { color: colors.muted }]}>
+                {MODEL_SUBTITLES[item.id]}
+              </Text>
+            </View>
+            <View style={styles.modelTrailing}>
+              {isSelected ? (
+                <IconSymbol
+                  name="checkmark.circle.fill"
+                  size={22}
+                  color={colors.primary}
+                />
+              ) : (
+                <IconSymbol
+                  name="chevron.down"
+                  size={22}
+                  color="transparent"
+                />
+              )}
+            </View>
+          </View>
+        </Pressable>
+      );
+    },
+    [
+      colors.border,
+      colors.foreground,
+      colors.muted,
+      colors.primary,
+      colors.surface,
+      handleSelectModel,
+      selectedModel,
+      selectedRowBackgroundColor,
+    ]
+  );
+
+  const renderEffortItem: ListRenderItem<ReasoningEffort> = useCallback(
+    ({ item }) => {
+      const isSelected = item === selectedEffort;
+
+      return (
+        <Pressable
+          onPress={() => {
+            void handleSelectEffort(item);
+          }}
+          style={({ pressed }) => [
+            styles.effortChip,
+            {
+              backgroundColor: isSelected ? colors.primary : colors.surface,
+              borderColor: isSelected ? colors.primary : colors.border,
+              opacity: pressed ? 0.84 : 1,
+            },
+          ]}
+        >
+          <Text
+            style={[
+              styles.effortChipText,
+              { color: isSelected ? "#FFFFFF" : colors.foreground },
+            ]}
+          >
+            {EFFORT_LABELS[item]}
+          </Text>
+        </Pressable>
+      );
+    },
+    [colors.border, colors.foreground, colors.primary, colors.surface, handleSelectEffort, selectedEffort]
   );
 
   return (
     <>
       <Pressable
         onPress={() => {
-          if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-          setShowPicker(true);
+          void openModal();
         }}
         style={({ pressed }) => [
-          styles.selectorButton,
+          styles.trigger,
           {
-            backgroundColor: pressed
-              ? (colors as any).surface || '#f5f5f5'
-              : 'transparent',
+            backgroundColor: triggerBackgroundColor,
+            borderColor: triggerBorderColor,
+            opacity: pressed ? 0.82 : 1,
           },
         ]}
       >
-        <View style={styles.selectorContent}>
-          <Text style={[styles.modelName, { color: colors.foreground }]} numberOfLines={1}>
-            {currentModel.label}
+        <View style={styles.triggerContent}>
+          <Text style={[styles.triggerTitle, { color: colors.foreground }]} numberOfLines={1}>
+            {selectedModelConfig.label}
           </Text>
-          <View style={[styles.effortBadge, { backgroundColor: EFFORT_COLORS[effort] + '20' }]}>
-            <Text style={[styles.effortText, { color: EFFORT_COLORS[effort] }]}>
-              {EFFORT_LABELS[effort]}
+          <View
+            style={[
+              styles.triggerEffortBadge,
+              { backgroundColor: effortBadgeBackgroundColor },
+            ]}
+          >
+            <Text style={[styles.triggerEffortText, { color: colors.primary }]}>
+              {EFFORT_LABELS[selectedEffort]}
             </Text>
           </View>
-          <Text style={{ color: colors.muted, fontSize: 12 }}>▼</Text>
+          <IconSymbol
+            name="chevron.down"
+            size={18}
+            color={colors.muted}
+          />
         </View>
       </Pressable>
 
-      <Modal visible={showPicker} transparent animationType="fade" onRequestClose={() => setShowPicker(false)}>
-        <Pressable style={styles.overlay} onPress={() => setShowPicker(false)}>
-          <View style={styles.pickerContainer}>
-            <Pressable onPress={(e) => e.stopPropagation()}>
-              <GlassCard style={{ ...styles.pickerCard, borderColor: colors.border }}>
-                {/* Model Selection */}
-                <Text style={[styles.sectionTitle, { color: colors.muted }]}>MODEL</Text>
-                <View style={styles.modelRow}>
-                  {MODELS.map((m) => (
-                    <Pressable
-                      key={m.id}
-                      onPress={() => handleModelSelect(m.id)}
-                      style={({ pressed }) => [
-                        styles.modelChip,
-                        {
-                          backgroundColor: model === m.id ? colors.primary : colors.surface,
-                          borderColor: model === m.id ? colors.primary : colors.border,
-                          opacity: pressed ? 0.8 : 1,
-                        },
-                      ]}
-                    >
-                      <Text
-                        style={[
-                          styles.modelChipText,
-                          { color: model === m.id ? '#FFFFFF' : colors.foreground },
-                        ]}
-                      >
-                        {m.label}
-                      </Text>
-                    </Pressable>
-                  ))}
+      <Modal
+        visible={visible}
+        transparent
+        animationType="fade"
+        statusBarTranslucent
+        presentationStyle="overFullScreen"
+        onRequestClose={closeModal}
+      >
+        <Pressable style={styles.backdrop} onPress={closeModal}>
+          <View style={[styles.modalContainer, { paddingTop: insets.top + 56 }]}>
+            <Pressable
+              onPress={(event) => {
+                event.stopPropagation();
+              }}
+              style={styles.cardWrapper}
+            >
+              <GlassCard
+                style={[
+                  styles.modalCard,
+                  {
+                    borderColor: isDark
+                      ? "rgba(255,255,255,0.10)"
+                      : "rgba(60,60,67,0.12)",
+                  },
+                ]}
+              >
+                <View style={styles.headerRow}>
+                  <View style={styles.headerTextColumn}>
+                    <Text style={[styles.headerTitle, { color: colors.foreground }]}>
+                      Model & Reasoning
+                    </Text>
+                    <Text style={[styles.headerSubtitle, { color: colors.muted }]}>
+                      Choose the model and how much effort it should spend thinking.
+                    </Text>
+                  </View>
+
+                  <Pressable
+                    onPress={closeModal}
+                    style={({ pressed }) => [
+                      styles.closeButton,
+                      {
+                        backgroundColor: helperBackgroundColor,
+                        opacity: pressed ? 0.76 : 1,
+                      },
+                    ]}
+                  >
+                    <IconSymbol
+                      name="xmark.circle.fill"
+                      size={20}
+                      color={colors.muted}
+                    />
+                  </Pressable>
                 </View>
 
-                {/* Reasoning Effort */}
-                <Text style={[styles.sectionTitle, { color: colors.muted, marginTop: 20 }]}>
+                <Text style={[styles.sectionLabel, { color: colors.muted }]}>MODEL</Text>
+
+                <FlatList
+                  data={MODELS}
+                  renderItem={renderModelItem}
+                  keyExtractor={(item) => item.id}
+                  scrollEnabled={false}
+                  ItemSeparatorComponent={() => <View style={styles.modelSeparator} />}
+                />
+
+                <Text style={[styles.sectionLabel, styles.effortSectionLabel, { color: colors.muted }]}>
                   REASONING EFFORT
                 </Text>
-                <View style={styles.effortRow}>
-                  {currentModel.reasoningEfforts.map((e) => (
-                    <Pressable
-                      key={e}
-                      onPress={() => handleEffortSelect(e)}
-                      style={({ pressed }) => [
-                        styles.effortChip,
-                        {
-                          backgroundColor: effort === e ? EFFORT_COLORS[e] : colors.surface,
-                          borderColor: effort === e ? EFFORT_COLORS[e] : colors.border,
-                          opacity: pressed ? 0.8 : 1,
-                        },
-                      ]}
-                    >
-                      <Text
-                        style={[
-                          styles.effortChipText,
-                          { color: effort === e ? '#FFFFFF' : colors.foreground },
-                        ]}
-                      >
-                        {EFFORT_LABELS[e]}
-                      </Text>
-                    </Pressable>
-                  ))}
-                </View>
 
-                {/* Description */}
-                <View style={[styles.descriptionBox, { backgroundColor: colors.surface }]}>
-                  <Text style={{ color: colors.muted, fontSize: 13, lineHeight: 18 }}>
-                    {model === 'gpt-5.4-pro'
-                      ? 'GPT-5.4 Pro — Most capable model for complex reasoning, analysis, and creative tasks.'
-                      : 'GPT-5.4 — Fast and efficient for everyday tasks with flexible reasoning levels.'}
+                <FlatList
+                  data={selectedModelConfig.reasoningEfforts}
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  keyExtractor={(item) => item}
+                  renderItem={renderEffortItem}
+                  contentContainerStyle={styles.effortListContent}
+                  ItemSeparatorComponent={() => <View style={styles.effortSeparator} />}
+                />
+
+                <View
+                  style={[
+                    styles.helperCard,
+                    {
+                      backgroundColor: helperBackgroundColor,
+                      borderColor: isDark
+                        ? "rgba(255,255,255,0.06)"
+                        : "rgba(60,60,67,0.08)",
+                    },
+                  ]}
+                >
+                  <Text style={[styles.helperTitle, { color: colors.foreground }]}>
+                    {selectedModelConfig.label}
+                  </Text>
+                  <Text style={[styles.helperText, { color: colors.muted }]}>
+                    {MODEL_FOOTERS[selectedModelConfig.id]}
                   </Text>
                 </View>
               </GlassCard>
@@ -165,84 +351,152 @@ export function ModelSelector({ model, effort, onModelChange, onEffortChange }: 
 }
 
 const styles = StyleSheet.create({
-  selectorButton: {
-    borderRadius: 12,
+  trigger: {
+    minHeight: 40,
+    borderRadius: 20,
+    borderWidth: StyleSheet.hairlineWidth,
     paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingVertical: 7,
+    justifyContent: "center",
   },
-  selectorContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  modelName: {
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  effortBadge: {
-    borderRadius: 6,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-  },
-  effortText: {
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  overlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.4)',
-    justifyContent: 'flex-start',
-    paddingTop: 100,
-    paddingHorizontal: 20,
-  },
-  pickerContainer: {
-    width: '100%',
-    maxWidth: 400,
-    alignSelf: 'center',
-  },
-  pickerCard: {
-    padding: 20,
-    borderWidth: 1,
-  },
-  sectionTitle: {
-    fontSize: 12,
-    fontWeight: '700',
-    letterSpacing: 1,
-    marginBottom: 10,
-  },
-  modelRow: {
-    flexDirection: 'row',
-    gap: 10,
-  },
-  modelChip: {
-    flex: 1,
-    borderRadius: 12,
-    borderWidth: 1,
-    paddingVertical: 12,
-    alignItems: 'center',
-  },
-  modelChipText: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  effortRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+  triggerContent: {
+    flexDirection: "row",
+    alignItems: "center",
     gap: 8,
   },
-  effortChip: {
-    borderRadius: 10,
+  triggerTitle: {
+    fontSize: 15,
+    fontWeight: "700",
+    letterSpacing: -0.2,
+  },
+  triggerEffortBadge: {
+    borderRadius: 999,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  triggerEffortText: {
+    fontSize: 11,
+    fontWeight: "700",
+    letterSpacing: 0.1,
+  },
+  backdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.18)",
+  },
+  modalContainer: {
+    paddingHorizontal: 20,
+  },
+  cardWrapper: {
+    width: "100%",
+    maxWidth: 440,
+    alignSelf: "center",
+  },
+  modalCard: {
+    borderRadius: 28,
+    borderWidth: StyleSheet.hairlineWidth,
+    padding: 18,
+  },
+  headerRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    marginBottom: 18,
+    gap: 12,
+  },
+  headerTextColumn: {
+    flex: 1,
+  },
+  headerTitle: {
+    fontSize: 22,
+    fontWeight: "800",
+    letterSpacing: -0.45,
+  },
+  headerSubtitle: {
+    marginTop: 4,
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  closeButton: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  sectionLabel: {
+    fontSize: 12,
+    fontWeight: "700",
+    letterSpacing: 1.1,
+    marginBottom: 10,
+  },
+  effortSectionLabel: {
+    marginTop: 18,
+  },
+  modelRowButton: {
+    borderRadius: 18,
     borderWidth: 1,
     paddingHorizontal: 14,
-    paddingVertical: 8,
+    paddingVertical: 14,
+  },
+  modelRowContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+  modelTextColumn: {
+    flex: 1,
+  },
+  modelTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+    letterSpacing: -0.2,
+  },
+  modelSubtitle: {
+    marginTop: 4,
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  modelTrailing: {
+    width: 24,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  modelSeparator: {
+    height: 10,
+  },
+  effortListContent: {
+    paddingRight: 4,
+  },
+  effortSeparator: {
+    width: 8,
+  },
+  effortChip: {
+    minHeight: 38,
+    borderRadius: 19,
+    borderWidth: 1,
+    paddingHorizontal: 14,
+    alignItems: "center",
+    justifyContent: "center",
   },
   effortChipText: {
-    fontSize: 13,
-    fontWeight: '600',
+    fontSize: 14,
+    fontWeight: "700",
+    letterSpacing: -0.1,
   },
-  descriptionBox: {
-    borderRadius: 10,
-    padding: 12,
-    marginTop: 16,
+  helperCard: {
+    marginTop: 18,
+    borderRadius: 18,
+    borderWidth: StyleSheet.hairlineWidth,
+    padding: 14,
+  },
+  helperTitle: {
+    fontSize: 14,
+    fontWeight: "700",
+    marginBottom: 4,
+  },
+  helperText: {
+    fontSize: 13,
+    lineHeight: 18,
   },
 });
