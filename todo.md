@@ -48,3 +48,4 @@
 - [x] BUG: LaTeX formula still way too large even with fontSize=9/10 - patched to use direct MathJax engine with ex-to-px conversion
 - [x] BUG: iOS keyboard covers the input field when typing
 - [x] BUG: Messages cannot be sent in iOS production build (works in preview/Expo Go)
+- [x] BUG: iOS build fails due to expo-crypto incompatibility with expo-modules-core - removed expo-crypto
