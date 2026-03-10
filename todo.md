@@ -117,3 +117,4 @@
 - [x] FIX: Initial default is now gpt-5.4 medium
 - [x] BUG: Input bar - safeAreaInset(edge: .bottom, spacing: 0) pins it to bottom
 - [x] BUG: Keyboard gap - removed glassEffect from input bar container, simplified padding
+- [x] FIX: MarkdownContentView build errors - GPT-5.4 high rewrote with fileprivate enums, Sendable, ForEach id path, Int IDs
