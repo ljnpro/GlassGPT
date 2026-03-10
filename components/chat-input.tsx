@@ -13,6 +13,7 @@ import {
 } from "react-native";
 import { Image } from "expo-image";
 import * as ImagePicker from "expo-image-picker";
+import * as ImageManipulator from "expo-image-manipulator";
 import * as Haptics from "expo-haptics";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/use-colors";
@@ -131,20 +132,58 @@ export function ChatInput({
         allowsMultipleSelection: remainingSlots > 1,
         selectionLimit: remainingSlots,
         quality: 0.9,
-        base64: true,
+        // Don't request base64 from picker – we'll get it from ImageManipulator
+        // after converting to JPEG (handles HEIC and other unsupported formats).
+        base64: false,
       });
 
       if (result.canceled || !result.assets?.length) {
         return;
       }
 
-      const nextAttachments: ImageAttachment[] = result.assets.map((asset) => ({
-        uri: asset.uri,
-        base64: asset.base64 ?? undefined,
-        width: asset.width,
-        height: asset.height,
-        mimeType: asset.mimeType ?? "image/jpeg",
-      }));
+      // Convert every picked image to JPEG via ImageManipulator.
+      // This ensures HEIC and other non-standard formats are converted to a
+      // format that OpenAI accepts, and gives us a clean base64 string.
+      const nextAttachments: ImageAttachment[] = await Promise.all(
+        result.assets.map(async (asset) => {
+          try {
+            const manipulated = await ImageManipulator.manipulateAsync(
+              asset.uri,
+              // Resize large images to max 2048px on longest side to save tokens
+              asset.width > 2048 || asset.height > 2048
+                ? [
+                    asset.width >= asset.height
+                      ? { resize: { width: 2048 } }
+                      : { resize: { height: 2048 } },
+                  ]
+                : [],
+              {
+                compress: 0.85,
+                format: ImageManipulator.SaveFormat.JPEG,
+                base64: true,
+              }
+            );
+
+            return {
+              uri: manipulated.uri,
+              base64: manipulated.base64 ?? undefined,
+              width: manipulated.width,
+              height: manipulated.height,
+              mimeType: "image/jpeg" as const,
+            };
+          } catch (manipError) {
+            // Fallback: use original asset if manipulation fails
+            console.warn("Image manipulation failed, using original:", manipError);
+            return {
+              uri: asset.uri,
+              base64: asset.base64 ?? undefined,
+              width: asset.width,
+              height: asset.height,
+              mimeType: (asset.mimeType ?? "image/jpeg") as string,
+            };
+          }
+        })
+      );
 
       setAttachments((current) => [...current, ...nextAttachments].slice(0, MAX_ATTACHMENTS));
       await playLightHaptic();
@@ -401,7 +440,7 @@ const styles = StyleSheet.create({
   },
   composerRow: {
     flexDirection: "row",
-    alignItems: "flex-end",
+    alignItems: "center",
     gap: 8,
   },
   secondaryButton: {
@@ -410,19 +449,17 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     alignItems: "center",
     justifyContent: "center",
-    marginBottom: 2,
   },
   inputColumn: {
     flex: 1,
     minHeight: 36,
     justifyContent: "center",
-    paddingTop: 2,
   },
   input: {
     fontSize: 17,
     lineHeight: TEXT_LINE_HEIGHT,
-    paddingTop: 6,
-    paddingBottom: 6,
+    paddingTop: 0,
+    paddingBottom: 0,
     paddingHorizontal: 2,
     minHeight: MIN_INPUT_HEIGHT,
     maxHeight: MAX_INPUT_HEIGHT,
@@ -433,6 +470,5 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     alignItems: "center",
     justifyContent: "center",
-    marginBottom: 2,
   },
 });

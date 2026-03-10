@@ -120,7 +120,8 @@ export default function TabLayout() {
   return (
     <Tabs
       screenOptions={{
-        animation: "fade",
+        animation: "shift",
+        lazy: false,
         headerShown: false,
         sceneStyle: {
           backgroundColor: colors.background,

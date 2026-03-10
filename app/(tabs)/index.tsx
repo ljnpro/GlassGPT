@@ -227,54 +227,30 @@ export default function ChatScreen() {
     <ScreenContainer>
       <View style={[styles.screen, { backgroundColor: "transparent" }]}>
         <View style={styles.headerContainer}>
-          <GlassCard
-            style={[
-              styles.headerCard,
-              {
-                borderColor: colors.border,
-                borderWidth: StyleSheet.hairlineWidth,
-              },
-            ]}
-          >
-            <View style={styles.headerTopRow}>
-              <View style={styles.headerTextBlock}>
-                <Text style={[styles.headerTitle, { color: colors.foreground }]}>
-                  {messages.length > 0 ? activeConversationTitle : "Liquid Glass Chat"}
-                </Text>
-                <Text style={[styles.headerSubtitle, { color: colors.muted }]}>
-                  {hasApiKey
-                    ? "Private chats with your own OpenAI key"
-                    : "Add an API key in Settings to start"}
-                </Text>
-              </View>
+          <View style={styles.headerRow}>
+            <ModelSelector
+              model={currentModel}
+              effort={currentEffort}
+              onModelChange={setCurrentModel}
+              onEffortChange={setCurrentEffort}
+            />
 
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="New Chat"
-                disabled={isStreaming}
-                onPress={handleNewChat}
-                style={({ pressed }) => [
-                  styles.newChatButton,
-                  {
-                    backgroundColor: `${colors.primary}14`,
-                    opacity: pressed ? 0.88 : isStreaming ? 0.5 : 1,
-                  },
-                ]}
-              >
-                <MaterialIcons name="edit" size={16} color={colors.primary} />
-                <Text style={[styles.newChatButtonText, { color: colors.primary }]}>New Chat</Text>
-              </Pressable>
-            </View>
-
-            <View style={styles.selectorRow}>
-              <ModelSelector
-                model={currentModel}
-                effort={currentEffort}
-                onModelChange={setCurrentModel}
-                onEffortChange={setCurrentEffort}
-              />
-            </View>
-          </GlassCard>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="New Chat"
+              disabled={isStreaming}
+              onPress={handleNewChat}
+              style={({ pressed }) => [
+                styles.newChatIconButton,
+                {
+                  backgroundColor: `${colors.primary}14`,
+                  opacity: pressed ? 0.88 : isStreaming ? 0.5 : 1,
+                },
+              ]}
+            >
+              <MaterialIcons name="edit" size={20} color={colors.primary} />
+            </Pressable>
+          </View>
 
           {state.lastError ? (
             <GlassCard
@@ -343,46 +319,18 @@ const styles = StyleSheet.create({
     paddingBottom: 10,
     gap: 10,
   },
-  headerCard: {
-    borderRadius: 24,
-    paddingHorizontal: 14,
-    paddingVertical: 14,
-  },
-  headerTopRow: {
-    alignItems: "flex-start",
+  headerRow: {
     flexDirection: "row",
+    alignItems: "center",
     justifyContent: "space-between",
     gap: 12,
   },
-  headerTextBlock: {
-    flex: 1,
-    paddingRight: 4,
-  },
-  headerTitle: {
-    fontSize: 22,
-    fontWeight: "800",
-    letterSpacing: -0.45,
-  },
-  headerSubtitle: {
-    fontSize: 13,
-    marginTop: 4,
-  },
-  selectorRow: {
-    marginTop: 14,
-    alignItems: "flex-start",
-  },
-  newChatButton: {
+  newChatIconButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     alignItems: "center",
-    borderRadius: 18,
-    flexDirection: "row",
-    gap: 6,
-    height: 36,
     justifyContent: "center",
-    width: 112,
-  },
-  newChatButtonText: {
-    fontSize: 13,
-    fontWeight: "700",
   },
   errorCard: {
     borderRadius: 18,
