@@ -13,17 +13,10 @@ struct APIMessage: Sendable {
 enum StreamEvent: Sendable {
     case textDelta(String)
     case thinkingDelta(String)
-    case thinkingStarted          // Signals UI to show thinking indicator
-    case thinkingFinished         // Signals UI to collapse thinking
-    case completed(String, String?) // (fullText, fullThinking?) — final safety net
+    case thinkingStarted
+    case thinkingFinished
+    case completed(String, String?)   // (fullText, fullThinking?)
     case error(OpenAIServiceError)
-}
-
-// MARK: - Non-streaming result
-
-struct NonStreamingResult: Sendable {
-    let text: String
-    let thinking: String?
 }
 
 // MARK: - Errors
@@ -33,7 +26,6 @@ enum OpenAIServiceError: Error, Sendable, LocalizedError {
     case invalidURL
     case httpError(Int, String)
     case requestFailed(String)
-    case streamParsingError
     case cancelled
 
     var errorDescription: String? {
@@ -42,16 +34,9 @@ enum OpenAIServiceError: Error, Sendable, LocalizedError {
         case .invalidURL: return "Invalid API URL."
         case .httpError(let code, let msg): return "API error (\(code)): \(msg)"
         case .requestFailed(let msg): return msg
-        case .streamParsingError: return "Failed to parse the streaming response."
         case .cancelled: return "Request was cancelled."
         }
     }
-}
-
-// MARK: - Codable Helpers
-
-private struct DeltaPayload: Decodable, Sendable {
-    let delta: String
 }
 
 // MARK: - OpenAI Service
@@ -60,83 +45,46 @@ private struct DeltaPayload: Decodable, Sendable {
 final class OpenAIService {
 
     private let baseURL = "https://api.openai.com/v1/responses"
-    private let maxStreamRetries = 2
     private var currentTask: Task<Void, Never>?
 
-    // MARK: - Stream Chat (primary entry point)
+    // MARK: - Stream Chat
 
-    /// Streams chat events. If streaming fails before any output is emitted,
-    /// automatically falls back to a non-streaming request so the response is never lost.
+    /// Returns an AsyncStream of StreamEvent. The caller iterates this stream on @MainActor.
+    /// Internally, the network I/O runs in a detached task.
+    /// If streaming fails before producing output, automatically falls back to non-streaming.
     func streamChat(
         apiKey: String,
         messages: [APIMessage],
         model: ModelType,
         reasoningEffort: ReasoningEffort
     ) -> AsyncStream<StreamEvent> {
+        // Cancel any previous stream
         currentTask?.cancel()
+        currentTask = nil
 
-        let capturedBaseURL = baseURL
-        let capturedMaxRetries = maxStreamRetries
-
-        // Capture weak self before entering closures to avoid
-        // "reference to captured var 'self' in concurrently-executing code"
-        weak var weakSelf = self
+        let baseURL = self.baseURL
 
         return AsyncStream { continuation in
-            let task = Task.detached {
-                // --- Attempt streaming first ---
-                let streamSuccess = await Self.attemptStreaming(
-                    baseURL: capturedBaseURL,
+            let task = Task.detached { [baseURL] in
+                await Self.runStream(
+                    baseURL: baseURL,
                     apiKey: apiKey,
                     messages: messages,
                     model: model,
                     reasoningEffort: reasoningEffort,
-                    maxRetries: capturedMaxRetries,
                     continuation: continuation
                 )
-
-                if streamSuccess { return }
-
-                // --- Streaming failed with no output → fallback to non-streaming ---
-                #if DEBUG
-                print("[OpenAIService] Streaming failed, falling back to non-streaming request")
-                #endif
-
-                do {
-                    try Task.checkCancellation()
-                    let result = try await Self.nonStreamingRequest(
-                        baseURL: capturedBaseURL,
-                        apiKey: apiKey,
-                        messages: messages,
-                        model: model,
-                        reasoningEffort: reasoningEffort
-                    )
-
-                    // Emit the full result as a single completed event
-                    if let thinking = result.thinking, !thinking.isEmpty {
-                        continuation.yield(.thinkingStarted)
-                        continuation.yield(.thinkingDelta(thinking))
-                        continuation.yield(.thinkingFinished)
-                    }
-                    continuation.yield(.completed(result.text, result.thinking))
-                    continuation.finish()
-                } catch is CancellationError {
-                    continuation.finish()
-                } catch {
-                    continuation.yield(.error(.requestFailed(error.localizedDescription)))
-                    continuation.finish()
-                }
             }
 
-            Task { @MainActor in
-                weakSelf?.currentTask = task
+            // Store task reference for cancellation.
+            // We use a simple approach: schedule on main actor immediately.
+            let taskRef = task
+            Task { @MainActor [weak self] in
+                self?.currentTask = taskRef
             }
 
             continuation.onTermination = { @Sendable _ in
                 task.cancel()
-                Task { @MainActor in
-                    weakSelf?.currentTask = nil
-                }
             }
         }
     }
@@ -159,15 +107,13 @@ final class OpenAIService {
         request.httpMethod = "POST"
         request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.timeoutInterval = 30
 
         let body: [String: Any] = [
             "model": "gpt-5.4",
             "instructions": "Generate a short, concise title (max 6 words) for the following conversation. Return only the title text, nothing else.",
             "input": [
-                [
-                    "role": "user",
-                    "content": conversationPreview
-                ]
+                ["role": "user", "content": conversationPreview]
             ],
             "stream": false,
             "max_output_tokens": 24
@@ -182,11 +128,13 @@ final class OpenAIService {
             throw OpenAIServiceError.requestFailed("Title generation failed")
         }
 
-        if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-           let outputText = json["output_text"] as? String {
-            return outputText
-                .trimmingCharacters(in: .whitespacesAndNewlines)
-                .trimmingCharacters(in: CharacterSet(charactersIn: "\""))
+        // Extract text from output array
+        if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+            if let text = Self.extractOutputText(from: json) {
+                return text
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                    .trimmingCharacters(in: CharacterSet(charactersIn: "\""))
+            }
         }
 
         return "New Chat"
@@ -209,256 +157,345 @@ final class OpenAIService {
         }
     }
 
-    // MARK: - Streaming Implementation
+    // MARK: - Core Streaming Logic (nonisolated, runs in detached task)
 
-    /// Attempts streaming. Returns `true` if streaming succeeded (emitted output),
-    /// `false` if it failed before emitting any output (caller should fallback).
+    private nonisolated static func runStream(
+        baseURL: String,
+        apiKey: String,
+        messages: [APIMessage],
+        model: ModelType,
+        reasoningEffort: ReasoningEffort,
+        continuation: AsyncStream<StreamEvent>.Continuation
+    ) async {
+        // Try streaming first
+        let streamResult = await attemptStreaming(
+            baseURL: baseURL,
+            apiKey: apiKey,
+            messages: messages,
+            model: model,
+            reasoningEffort: reasoningEffort,
+            continuation: continuation
+        )
+
+        switch streamResult {
+        case .success:
+            // Streaming worked, continuation already finished
+            return
+        case .definiteError:
+            // Error already reported via continuation, already finished
+            return
+        case .noOutput:
+            // Streaming failed without output → try non-streaming fallback
+            break
+        case .cancelled:
+            continuation.finish()
+            return
+        }
+
+        // --- Non-streaming fallback ---
+        #if DEBUG
+        print("[OpenAIService] Streaming produced no output, falling back to non-streaming")
+        #endif
+
+        do {
+            try Task.checkCancellation()
+
+            let (text, thinking) = try await nonStreamingFallback(
+                baseURL: baseURL,
+                apiKey: apiKey,
+                messages: messages,
+                model: model,
+                reasoningEffort: reasoningEffort
+            )
+
+            if let thinking = thinking, !thinking.isEmpty {
+                continuation.yield(.thinkingStarted)
+                continuation.yield(.thinkingDelta(thinking))
+                continuation.yield(.thinkingFinished)
+            }
+            continuation.yield(.completed(text, thinking))
+            continuation.finish()
+
+        } catch is CancellationError {
+            continuation.finish()
+        } catch {
+            continuation.yield(.error(.requestFailed(error.localizedDescription)))
+            continuation.finish()
+        }
+    }
+
+    // MARK: - Stream Result
+
+    private enum StreamResult {
+        case success        // Stream completed with output
+        case definiteError  // Non-retryable error reported
+        case noOutput       // Stream ended without producing output
+        case cancelled      // Task was cancelled
+    }
+
+    // MARK: - Attempt Streaming
+
     private nonisolated static func attemptStreaming(
         baseURL: String,
         apiKey: String,
         messages: [APIMessage],
         model: ModelType,
         reasoningEffort: ReasoningEffort,
-        maxRetries: Int,
         continuation: AsyncStream<StreamEvent>.Continuation
-    ) async -> Bool {
-        var emittedAnyOutput = false
-        var thinkingStartedEmitted = false
+    ) async -> StreamResult {
 
-        for attempt in 0...maxRetries {
-            if attempt > 0 && emittedAnyOutput { break }
+        guard let url = URL(string: baseURL) else {
+            continuation.yield(.error(.invalidURL))
+            continuation.finish()
+            return .definiteError
+        }
 
-            if attempt > 0 {
-                let delay = UInt64(pow(2.0, Double(attempt))) * 500_000_000 // 0.5s, 1s
-                try? await Task.sleep(nanoseconds: delay)
+        // Build request
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.timeoutInterval = 300
+
+        let input = buildInputArray(messages: messages)
+
+        var body: [String: Any] = [
+            "model": model.rawValue,
+            "input": input,
+            "stream": true
+        ]
+
+        // Add reasoning config
+        if reasoningEffort != .none {
+            body["reasoning"] = [
+                "effort": reasoningEffort.rawValue,
+                "summary": "auto"
+            ]
+        }
+
+        do {
+            request.httpBody = try JSONSerialization.data(withJSONObject: body)
+        } catch {
+            continuation.yield(.error(.requestFailed("Failed to encode request")))
+            continuation.finish()
+            return .definiteError
+        }
+
+        #if DEBUG
+        print("[OpenAIService] Sending streaming request to \(baseURL)")
+        print("[OpenAIService] Model: \(model.rawValue), Effort: \(reasoningEffort.rawValue)")
+        #endif
+
+        // Execute request
+        do {
+            try Task.checkCancellation()
+
+            let (bytes, response) = try await URLSession.shared.bytes(for: request)
+
+            guard let httpResponse = response as? HTTPURLResponse else {
+                return .noOutput
             }
 
-            do {
+            #if DEBUG
+            print("[OpenAIService] HTTP status: \(httpResponse.statusCode)")
+            #endif
+
+            // Handle HTTP errors
+            if httpResponse.statusCode >= 400 {
+                var errorBody = ""
+                for try await line in bytes.lines {
+                    errorBody += line
+                    if errorBody.count > 500 { break }
+                }
+
+                // Auth errors are definitive
+                if httpResponse.statusCode == 401 || httpResponse.statusCode == 403 {
+                    continuation.yield(.error(.httpError(httpResponse.statusCode, "Authentication failed. Check your API key.")))
+                    continuation.finish()
+                    return .definiteError
+                }
+
+                // Rate limit
+                if httpResponse.statusCode == 429 {
+                    continuation.yield(.error(.httpError(429, "Rate limited. Please wait and try again.")))
+                    continuation.finish()
+                    return .definiteError
+                }
+
+                // Other 4xx errors
+                if httpResponse.statusCode < 500 {
+                    continuation.yield(.error(.httpError(httpResponse.statusCode, String(errorBody.prefix(500)))))
+                    continuation.finish()
+                    return .definiteError
+                }
+
+                // 5xx → try fallback
+                return .noOutput
+            }
+
+            // --- Parse SSE stream ---
+            var emittedAnyOutput = false
+            var thinkingActive = false
+            var accumulatedText = ""
+            var accumulatedThinking = ""
+            var currentEventType = ""
+            var dataBuffer = ""
+
+            for try await line in bytes.lines {
                 try Task.checkCancellation()
 
-                let request = try buildStreamRequest(
-                    baseURL: baseURL,
-                    apiKey: apiKey,
-                    messages: messages,
-                    model: model,
-                    reasoningEffort: reasoningEffort
-                )
-
-                let (bytes, response) = try await URLSession.shared.bytes(for: request)
-
-                guard let httpResponse = response as? HTTPURLResponse else {
-                    if attempt == maxRetries { return false }
+                // Empty line = end of SSE event block
+                if line.isEmpty {
+                    if !currentEventType.isEmpty && !dataBuffer.isEmpty {
+                        let eventResult = processEvent(
+                            type: currentEventType,
+                            data: dataBuffer,
+                            emittedAnyOutput: &emittedAnyOutput,
+                            thinkingActive: &thinkingActive,
+                            accumulatedText: &accumulatedText,
+                            accumulatedThinking: &accumulatedThinking,
+                            continuation: continuation
+                        )
+                        if eventResult == .finished {
+                            break
+                        }
+                    }
+                    currentEventType = ""
+                    dataBuffer = ""
                     continue
                 }
 
-                // Non-retryable HTTP errors → report immediately
-                if httpResponse.statusCode == 401 || httpResponse.statusCode == 403 {
-                    var errorBody = ""
-                    for try await line in bytes.lines { errorBody += line }
-                    continuation.yield(.error(.httpError(httpResponse.statusCode, "Authentication failed. Check your API key.")))
-                    continuation.finish()
-                    return true // Don't fallback, auth error is definitive
-                }
-
-                if httpResponse.statusCode == 429 {
-                    if attempt < maxRetries { continue }
-                    continuation.yield(.error(.httpError(429, "Rate limited. Please wait and try again.")))
-                    continuation.finish()
-                    return true
-                }
-
-                if httpResponse.statusCode >= 400 {
-                    var errorBody = ""
-                    for try await line in bytes.lines { errorBody += line }
-
-                    // Server errors are retryable
-                    if httpResponse.statusCode >= 500 && attempt < maxRetries { continue }
-
-                    // 4xx client errors → report and don't fallback
-                    if httpResponse.statusCode < 500 {
-                        continuation.yield(.error(.httpError(httpResponse.statusCode, String(errorBody.prefix(500)))))
-                        continuation.finish()
-                        return true
-                    }
-
-                    // Last retry for 5xx → let fallback handle it
-                    return false
-                }
-
-                // --- Parse SSE stream ---
-                var currentEventType = ""
-                var dataBuffer = ""
-                var sawCompleted = false
-                var accumulatedText = ""
-                var accumulatedThinking = ""
-
-                for try await line in bytes.lines {
-                    try Task.checkCancellation()
-
-                    if line.isEmpty {
-                        if !currentEventType.isEmpty && !dataBuffer.isEmpty {
-                            let result = processSSEEvent(
-                                currentEventType,
-                                payload: dataBuffer,
-                                emittedAnyOutput: &emittedAnyOutput,
-                                thinkingStartedEmitted: &thinkingStartedEmitted,
-                                accumulatedText: &accumulatedText,
-                                accumulatedThinking: &accumulatedThinking,
-                                continuation: continuation
-                            )
-                            if result == .finished {
-                                sawCompleted = true
-                                break
-                            }
-                        }
-                        currentEventType = ""
-                        dataBuffer = ""
-                        continue
-                    }
-
-                    if line.hasPrefix("event: ") {
-                        currentEventType = String(line.dropFirst(7))
-                    } else if line.hasPrefix("data: ") {
-                        if !dataBuffer.isEmpty { dataBuffer += "\n" }
-                        dataBuffer += String(line.dropFirst(6))
-                    } else if line == "data:" {
-                        if !dataBuffer.isEmpty { dataBuffer += "\n" }
+                if line.hasPrefix("event: ") {
+                    currentEventType = String(line.dropFirst(7))
+                } else if line.hasPrefix("data: ") {
+                    let payload = String(line.dropFirst(6))
+                    if dataBuffer.isEmpty {
+                        dataBuffer = payload
+                    } else {
+                        dataBuffer += "\n" + payload
                     }
                 }
-
-                // Process any remaining buffered event
-                if !sawCompleted && !currentEventType.isEmpty && !dataBuffer.isEmpty {
-                    let result = processSSEEvent(
-                        currentEventType,
-                        payload: dataBuffer,
-                        emittedAnyOutput: &emittedAnyOutput,
-                        thinkingStartedEmitted: &thinkingStartedEmitted,
-                        accumulatedText: &accumulatedText,
-                        accumulatedThinking: &accumulatedThinking,
-                        continuation: continuation
-                    )
-                    if result == .finished { sawCompleted = true }
-                }
-
-                if sawCompleted || emittedAnyOutput {
-                    // Always emit a completed event with accumulated text as safety net
-                    let thinking: String? = accumulatedThinking.isEmpty ? nil : accumulatedThinking
-                    if thinkingStartedEmitted {
-                        continuation.yield(.thinkingFinished)
-                    }
-                    continuation.yield(.completed(accumulatedText, thinking))
-                    continuation.finish()
-                    return true
-                }
-
-                // Stream ended with no output — retry or fallback
-                if attempt == maxRetries { return false }
-
-            } catch is CancellationError {
-                continuation.finish()
-                return true
-            } catch {
-                if emittedAnyOutput {
-                    // We already emitted some output, finish with what we have
-                    continuation.yield(.completed("", nil))
-                    continuation.finish()
-                    return true
-                }
-                if attempt == maxRetries { return false }
             }
-        }
 
-        return false
+            // Process any remaining buffered event
+            if !currentEventType.isEmpty && !dataBuffer.isEmpty {
+                _ = processEvent(
+                    type: currentEventType,
+                    data: dataBuffer,
+                    emittedAnyOutput: &emittedAnyOutput,
+                    thinkingActive: &thinkingActive,
+                    accumulatedText: &accumulatedText,
+                    accumulatedThinking: &accumulatedThinking,
+                    continuation: continuation
+                )
+            }
+
+            if emittedAnyOutput {
+                // Close thinking if still open
+                if thinkingActive {
+                    continuation.yield(.thinkingFinished)
+                }
+                let thinking: String? = accumulatedThinking.isEmpty ? nil : accumulatedThinking
+                continuation.yield(.completed(accumulatedText, thinking))
+                continuation.finish()
+                return .success
+            }
+
+            // Stream ended with no output
+            return .noOutput
+
+        } catch is CancellationError {
+            return .cancelled
+        } catch {
+            #if DEBUG
+            print("[OpenAIService] Stream error: \(error.localizedDescription)")
+            #endif
+            return .noOutput
+        }
     }
 
-    // MARK: - SSE Event Processing
+    // MARK: - Process Single SSE Event
 
-    private enum SSEResult {
+    private enum EventResult {
         case continued
         case finished
     }
 
-    private nonisolated static func processSSEEvent(
-        _ eventType: String,
-        payload: String,
+    private nonisolated static func processEvent(
+        type: String,
+        data: String,
         emittedAnyOutput: inout Bool,
-        thinkingStartedEmitted: inout Bool,
+        thinkingActive: inout Bool,
         accumulatedText: inout String,
         accumulatedThinking: inout String,
         continuation: AsyncStream<StreamEvent>.Continuation
-    ) -> SSEResult {
-        // Terminal sentinel
-        if payload.trimmingCharacters(in: .whitespacesAndNewlines) == "[DONE]" {
-            return .finished
-        }
+    ) -> EventResult {
 
-        switch eventType {
+        guard let jsonData = data.data(using: .utf8) else { return .continued }
+
+        switch type {
 
         // --- Text output deltas ---
         case "response.output_text.delta":
-            guard let data = payload.data(using: .utf8),
-                  let parsed = try? JSONDecoder().decode(DeltaPayload.self, from: data) else {
-                return .continued
+            if let json = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any],
+               let delta = json["delta"] as? String {
+                emittedAnyOutput = true
+                accumulatedText += delta
+                continuation.yield(.textDelta(delta))
             }
-            emittedAnyOutput = true
-            accumulatedText += parsed.delta
-            continuation.yield(.textDelta(parsed.delta))
             return .continued
 
-        // --- Text output done (full text) ---
+        // --- Text output complete ---
         case "response.output_text.done":
-            // This contains the full text; we use it as a safety check
-            if let data = payload.data(using: .utf8),
-               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+            if let json = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any],
                let fullText = json["text"] as? String {
-                // If our accumulated text is shorter, use the full text
+                // Use full text if our accumulated version is shorter (safety net)
                 if fullText.count > accumulatedText.count {
                     accumulatedText = fullText
                 }
+                emittedAnyOutput = true
             }
-            emittedAnyOutput = true
             return .continued
 
         // --- Reasoning/thinking deltas ---
-        case "response.reasoning_summary_text.delta",
-             "response.reasoning.delta":
-            guard let data = payload.data(using: .utf8),
-                  let parsed = try? JSONDecoder().decode(DeltaPayload.self, from: data) else {
-                return .continued
-            }
-            if !thinkingStartedEmitted {
-                thinkingStartedEmitted = true
-                continuation.yield(.thinkingStarted)
-            }
-            emittedAnyOutput = true
-            accumulatedThinking += parsed.delta
-            continuation.yield(.thinkingDelta(parsed.delta))
-            return .continued
-
-        // --- Reasoning summary done ---
-        case "response.reasoning_summary_text.done",
-             "response.reasoning_summary_part.done":
-            return .continued
-
-        // --- Lifecycle events ---
-        case "response.completed":
-            // Extract output_text from the full response object if available
-            if let data = payload.data(using: .utf8),
-               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-               let responseObj = json["response"] as? [String: Any],
-               let outputText = responseObj["output_text"] as? String {
-                if outputText.count > accumulatedText.count {
-                    accumulatedText = outputText
+        case "response.reasoning_summary_text.delta":
+            if let json = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any],
+               let delta = json["delta"] as? String {
+                if !thinkingActive {
+                    thinkingActive = true
+                    continuation.yield(.thinkingStarted)
                 }
                 emittedAnyOutput = true
+                accumulatedThinking += delta
+                continuation.yield(.thinkingDelta(delta))
+            }
+            return .continued
+
+        // --- Reasoning summary complete ---
+        case "response.reasoning_summary_text.done":
+            if thinkingActive {
+                thinkingActive = false
+                continuation.yield(.thinkingFinished)
+            }
+            return .continued
+
+        // --- Response lifecycle ---
+        case "response.completed":
+            // Try to extract output text from the full response object
+            if let json = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any],
+               let responseObj = json["response"] as? [String: Any] {
+                if let text = extractOutputText(from: responseObj) {
+                    if text.count > accumulatedText.count {
+                        accumulatedText = text
+                    }
+                    emittedAnyOutput = true
+                }
             }
             return .finished
 
         case "response.failed":
-            // Try to extract error message
             var errorMsg = "Response generation failed"
-            if let data = payload.data(using: .utf8),
-               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+            if let json = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any],
                let responseObj = json["response"] as? [String: Any],
                let errorObj = responseObj["error"] as? [String: Any],
                let message = errorObj["message"] as? String {
@@ -468,20 +505,18 @@ final class OpenAIService {
             return .finished
 
         case "response.incomplete":
-            // Incomplete but may have partial output — treat as finished
             return .finished
 
         case "error":
-            var errorMsg = payload
-            if let data = payload.data(using: .utf8),
-               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+            var errorMsg = data
+            if let json = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any],
                let message = json["message"] as? String {
                 errorMsg = message
             }
             continuation.yield(.error(.requestFailed(errorMsg)))
             return .finished
 
-        // --- Events we can safely ignore ---
+        // --- Ignorable lifecycle events ---
         case "response.created",
              "response.in_progress",
              "response.queued",
@@ -489,12 +524,13 @@ final class OpenAIService {
              "response.output_item.done",
              "response.content_part.added",
              "response.content_part.done",
-             "response.reasoning_summary_part.added":
+             "response.reasoning_summary_part.added",
+             "response.reasoning_summary_part.done":
             return .continued
 
         default:
             #if DEBUG
-            print("[SSE] Unhandled event: \(eventType), payload prefix: \(String(payload.prefix(80)))")
+            print("[SSE] Unhandled event: \(type)")
             #endif
             return .continued
         }
@@ -502,13 +538,13 @@ final class OpenAIService {
 
     // MARK: - Non-Streaming Fallback
 
-    private nonisolated static func nonStreamingRequest(
+    private nonisolated static func nonStreamingFallback(
         baseURL: String,
         apiKey: String,
         messages: [APIMessage],
         model: ModelType,
         reasoningEffort: ReasoningEffort
-    ) async throws -> NonStreamingResult {
+    ) async throws -> (String, String?) {
         guard let url = URL(string: baseURL) else {
             throw OpenAIServiceError.invalidURL
         }
@@ -528,7 +564,10 @@ final class OpenAIService {
         ]
 
         if reasoningEffort != .none {
-            body["reasoning"] = ["effort": reasoningEffort.apiValue]
+            body["reasoning"] = [
+                "effort": reasoningEffort.rawValue,
+                "summary": "auto"
+            ]
         }
 
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
@@ -545,10 +584,11 @@ final class OpenAIService {
         }
 
         guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-            throw OpenAIServiceError.streamParsingError
+            throw OpenAIServiceError.requestFailed("Failed to parse response")
         }
 
-        let outputText = json["output_text"] as? String ?? ""
+        // Extract text from output array
+        let outputText = extractOutputText(from: json) ?? ""
 
         // Extract reasoning/thinking from output items
         var thinkingText: String?
@@ -565,49 +605,39 @@ final class OpenAIService {
             }
         }
 
-        return NonStreamingResult(text: outputText, thinking: thinkingText)
+        return (outputText, thinkingText)
     }
 
-    // MARK: - Build Stream Request
+    // MARK: - Extract Output Text from Response JSON
 
-    private nonisolated static func buildStreamRequest(
-        baseURL: String,
-        apiKey: String,
-        messages: [APIMessage],
-        model: ModelType,
-        reasoningEffort: ReasoningEffort
-    ) throws -> URLRequest {
-        guard let url = URL(string: baseURL) else {
-            throw OpenAIServiceError.invalidURL
+    /// Extracts the assistant's text from the response JSON.
+    /// The text lives in output[].content[].text for message-type items.
+    private nonisolated static func extractOutputText(from json: [String: Any]) -> String? {
+        // First try the convenience field (may exist in some API versions)
+        if let text = json["output_text"] as? String, !text.isEmpty {
+            return text
         }
 
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.timeoutInterval = 300
+        // Extract from output array
+        guard let output = json["output"] as? [[String: Any]] else { return nil }
 
-        let input = buildInputArray(messages: messages)
-
-        var body: [String: Any] = [
-            "model": model.rawValue,
-            "input": input,
-            "stream": true
-        ]
-
-        if reasoningEffort != .none {
-            body["reasoning"] = ["effort": reasoningEffort.apiValue]
+        var texts: [String] = []
+        for item in output {
+            guard let type = item["type"] as? String, type == "message" else { continue }
+            guard let content = item["content"] as? [[String: Any]] else { continue }
+            for part in content {
+                if let partType = part["type"] as? String, partType == "output_text",
+                   let text = part["text"] as? String {
+                    texts.append(text)
+                }
+            }
         }
 
-        request.httpBody = try JSONSerialization.data(withJSONObject: body)
-        return request
+        return texts.isEmpty ? nil : texts.joined()
     }
 
     // MARK: - Build Input Array
 
-    /// Builds the `input` array for the Responses API.
-    /// Text-only messages use a simple string content.
-    /// Multimodal messages use the content array format.
     private nonisolated static func buildInputArray(messages: [APIMessage]) -> [[String: Any]] {
         var input: [[String: Any]] = []
 
@@ -636,7 +666,7 @@ final class OpenAIService {
                     "content": contentArray
                 ])
             } else if !message.content.isEmpty {
-                // Text-only: use simple string content (preferred by API)
+                // Text-only: simple string content
                 input.append([
                     "role": role,
                     "content": message.content

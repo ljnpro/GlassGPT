@@ -107,3 +107,4 @@
 - [x] FIX: Ensure output never lost - auto fallback to non-streaming if stream fails
 - [x] FIX: Optional chaining on non-optional OpenAIService - moved self?.currentTask into @MainActor Task
 - [x] FIX: 'reference to captured var self in concurrently-executing code' in onTermination closure line 133
+- [x] BUG: GPT not responding - complete rewrite of OpenAIService with verified SSE event parsing from live API test, auto fallback to non-streaming, extractOutputText from output[].content[].text
