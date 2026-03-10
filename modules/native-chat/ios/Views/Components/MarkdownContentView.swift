@@ -445,45 +445,6 @@ private struct RichTextView: View {
     }
 }
 
-// MARK: - Code Block View
-
-private struct CodeBlockView: View {
-    let language: String?
-    let code: String
-
-    private var displayCode: String {
-        code.trimmingCharacters(in: .newlines)
-    }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            if let language, !language.isEmpty {
-                Text(language.uppercased())
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.secondary)
-            }
-
-            ScrollView(.horizontal, showsIndicators: true) {
-                Text(displayCode.isEmpty ? " " : displayCode)
-                    .font(.system(.body, design: .monospaced))
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .textSelection(.enabled)
-            }
-        }
-        .padding(12)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(Color.secondary.opacity(0.08))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .stroke(Color.secondary.opacity(0.12), lineWidth: 1)
-        )
-        .padding(.vertical, 2)
-    }
-}
-
 // MARK: - Block LaTeX View
 
 private struct BlockLaTeXView: View {
