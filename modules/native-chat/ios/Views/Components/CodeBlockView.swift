@@ -1,5 +1,4 @@
 import SwiftUI
-import Highlightr
 
 @MainActor
 struct CodeBlockView: View {
@@ -8,23 +7,6 @@ struct CodeBlockView: View {
 
     @State private var isCopied = false
     @Environment(\.colorScheme) private var colorScheme
-
-    // Shared highlighter instance (created lazily on main actor)
-    @MainActor
-    private static var highlightr: Highlightr? = Highlightr()
-
-    private var highlightedCode: AttributedString {
-        let lang = language?.lowercased() ?? "plaintext"
-        let themeName = colorScheme == .dark ? "atom-one-dark" : "atom-one-light"
-
-        if let h = Self.highlightr {
-            h.setTheme(to: themeName)
-            if let highlighted = h.highlight(code, as: lang, fastRender: true) {
-                return AttributedString(highlighted)
-            }
-        }
-        return AttributedString(code)
-    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -76,5 +58,72 @@ struct CodeBlockView: View {
         .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
         .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 12))
         .padding(.vertical, 4)
+    }
+
+    // MARK: - Native Syntax Highlighting
+
+    private var highlightedCode: AttributedString {
+        var result = AttributedString(code)
+        let isDark = colorScheme == .dark
+
+        // Colors matching popular code themes
+        let keywordColor: Color = isDark ? .init(red: 0.78, green: 0.56, blue: 0.87) : .init(red: 0.61, green: 0.15, blue: 0.69)
+        let stringColor: Color = isDark ? .init(red: 0.59, green: 0.80, blue: 0.53) : .init(red: 0.15, green: 0.55, blue: 0.13)
+        let commentColor: Color = isDark ? .init(red: 0.50, green: 0.55, blue: 0.60) : .init(red: 0.42, green: 0.47, blue: 0.52)
+        let numberColor: Color = isDark ? .init(red: 0.82, green: 0.68, blue: 0.47) : .init(red: 0.75, green: 0.49, blue: 0.07)
+        let typeColor: Color = isDark ? .init(red: 0.90, green: 0.80, blue: 0.55) : .init(red: 0.60, green: 0.40, blue: 0.10)
+        let funcColor: Color = isDark ? .init(red: 0.38, green: 0.73, blue: 0.93) : .init(red: 0.07, green: 0.44, blue: 0.73)
+
+        // Apply highlighting patterns
+        applyPattern(&result, pattern: #"//[^\n]*"#, color: commentColor)
+        applyPattern(&result, pattern: #"/\*[\s\S]*?\*/"#, color: commentColor)
+        applyPattern(&result, pattern: #"#[^\n]*"#, color: commentColor) // Python/shell comments
+        applyPattern(&result, pattern: #""(?:[^"\\]|\\.)*""#, color: stringColor)
+        applyPattern(&result, pattern: #"'(?:[^'\\]|\\.)*'"#, color: stringColor)
+        applyPattern(&result, pattern: #"`(?:[^`\\]|\\.)*`"#, color: stringColor)
+
+        // Keywords (common across languages)
+        let keywords = [
+            "func", "var", "let", "const", "class", "struct", "enum", "protocol", "extension",
+            "import", "return", "if", "else", "for", "while", "do", "switch", "case", "default",
+            "break", "continue", "guard", "self", "Self", "super", "init", "deinit", "throw",
+            "throws", "try", "catch", "async", "await", "public", "private", "internal", "open",
+            "static", "final", "override", "mutating", "nonmutating", "lazy", "weak", "unowned",
+            "true", "false", "nil", "null", "undefined", "void", "some", "any", "where", "in",
+            "is", "as", "new", "delete", "typeof", "instanceof", "export", "from", "type",
+            "interface", "implements", "extends", "abstract", "def", "lambda", "yield", "with",
+            "pass", "raise", "except", "finally", "print", "println", "main", "package",
+            "fn", "pub", "mod", "use", "crate", "impl", "trait", "match", "ref", "mut",
+            "@Observable", "@MainActor", "@State", "@Binding", "@Environment", "@Published",
+            "@objc", "@available", "@discardableResult", "@escaping", "@Sendable"
+        ]
+        let keywordPattern = "\\b(" + keywords.joined(separator: "|") + ")\\b"
+        applyPattern(&result, pattern: keywordPattern, color: keywordColor)
+
+        // Numbers
+        applyPattern(&result, pattern: #"\b\d+(\.\d+)?\b"#, color: numberColor)
+
+        // Type names (capitalized words)
+        applyPattern(&result, pattern: #"\b[A-Z][a-zA-Z0-9]+\b"#, color: typeColor)
+
+        // Function calls
+        applyPattern(&result, pattern: #"\b[a-z_][a-zA-Z0-9_]*(?=\s*\()"#, color: funcColor)
+
+        return result
+    }
+
+    private func applyPattern(_ text: inout AttributedString, pattern: String, color: Color) {
+        guard let regex = try? NSRegularExpression(pattern: pattern, options: []) else { return }
+        let nsString = String(text.characters[...])
+        let nsRange = NSRange(location: 0, length: nsString.utf16.count)
+        let matches = regex.matches(in: nsString, range: nsRange)
+
+        for match in matches {
+            guard let swiftRange = Range(match.range, in: nsString) else { continue }
+            let lower = AttributedString.Index(swiftRange.lowerBound, within: text)
+            let upper = AttributedString.Index(swiftRange.upperBound, within: text)
+            guard let lower, let upper else { continue }
+            text[lower..<upper].foregroundColor = color
+        }
     }
 }

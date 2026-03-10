@@ -20,5 +20,5 @@ Pod::Spec.new do |s|
   s.dependency 'ExpoModulesCore'
   s.dependency 'React-Core'
 
-  s.frameworks     = 'SwiftUI', 'SwiftData', 'Security'
+  s.frameworks     = 'SwiftUI', 'SwiftData', 'Security', 'WebKit'
 end
