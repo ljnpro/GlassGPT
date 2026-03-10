@@ -14,7 +14,7 @@ final class ChatViewModel {
     var isThinking: Bool = false          // True while model is reasoning
     var inputText: String = ""
     var selectedModel: ModelType = .gpt5_4
-    var reasoningEffort: ReasoningEffort = .high
+    var reasoningEffort: ReasoningEffort = .medium
     var currentConversation: Conversation?
     var errorMessage: String?
     var showModelSelector: Bool = false

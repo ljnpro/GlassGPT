@@ -11,7 +11,7 @@ struct ChatView: View {
     var body: some View {
         NavigationStack {
             chatContent
-                .safeAreaInset(edge: .bottom) {
+                .safeAreaInset(edge: .bottom, spacing: 0) {
                     MessageInputBar(
                         text: $viewModel.inputText,
                         isStreaming: viewModel.isStreaming,
@@ -53,7 +53,6 @@ struct ChatView: View {
                 .onChange(of: selectedPhotoItem) { _, newItem in
                     Task {
                         do {
-                            // Normalize to JPEG to avoid MIME type issues
                             guard
                                 let rawData = try await newItem?.loadTransferable(type: Data.self),
                                 let image = UIImage(data: rawData),
@@ -102,6 +101,7 @@ struct ChatView: View {
                     }
                     .padding(.horizontal, 16)
                     .padding(.top, 8)
+                    .padding(.bottom, 4)
                 }
                 .scrollDismissesKeyboard(.interactively)
                 .onAppear { scrollProxy = proxy }
@@ -127,28 +127,34 @@ struct ChatView: View {
     // MARK: - Empty State
 
     private var emptyState: some View {
-        VStack(spacing: 16) {
-            Image(systemName: "bubble.left.and.bubble.right")
-                .font(.system(size: 56))
-                .foregroundStyle(.secondary)
-                .symbolEffect(.breathe)
+        GeometryReader { geometry in
+            VStack(spacing: 16) {
+                Spacer()
 
-            Text("Start a Conversation")
-                .font(.title2.weight(.semibold))
+                Image(systemName: "bubble.left.and.bubble.right")
+                    .font(.system(size: 56))
+                    .foregroundStyle(.secondary)
+                    .symbolEffect(.breathe)
 
-            Text("Type a message below to begin chatting with AI")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
+                Text("Start a Conversation")
+                    .font(.title2.weight(.semibold))
 
-            if !viewModel.hasAPIKey {
-                Label("Add your API key in Settings", systemImage: "key.fill")
-                    .font(.callout)
-                    .foregroundStyle(.orange)
-                    .padding(.top, 8)
+                Text("Type a message below to begin chatting with AI")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+
+                if !viewModel.hasAPIKey {
+                    Label("Add your API key in Settings", systemImage: "key.fill")
+                        .font(.callout)
+                        .foregroundStyle(.orange)
+                        .padding(.top, 8)
+                }
+
+                Spacer()
             }
+            .frame(width: geometry.size.width, height: geometry.size.height)
         }
-        .padding(40)
     }
 
     // MARK: - Streaming Bubble
@@ -156,23 +162,19 @@ struct ChatView: View {
     private var streamingBubble: some View {
         HStack(alignment: .top) {
             VStack(alignment: .leading, spacing: 8) {
-                // Thinking indicator — shown while model is reasoning
                 if viewModel.isThinking {
                     ThinkingIndicator()
                         .transition(.opacity.combined(with: .scale(scale: 0.95)))
                 }
 
-                // Thinking text — shown when there's accumulated thinking content
                 if !viewModel.currentThinkingText.isEmpty {
                     ThinkingView(text: viewModel.currentThinkingText)
                         .transition(.opacity.combined(with: .move(edge: .top)))
                 }
 
-                // Output text
                 if !viewModel.currentStreamingText.isEmpty {
                     MarkdownContentView(text: viewModel.currentStreamingText)
                 } else if !viewModel.isThinking && viewModel.currentThinkingText.isEmpty {
-                    // No thinking, no text yet — show typing dots
                     TypingIndicator()
                 }
             }

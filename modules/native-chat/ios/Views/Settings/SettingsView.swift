@@ -61,7 +61,7 @@ struct SettingsView: View {
                     }
 
                     Picker("Reasoning Effort", selection: $viewModel.defaultEffort) {
-                        ForEach(ReasoningEffort.allCases) { effort in
+                        ForEach(viewModel.availableDefaultEfforts) { effort in
                             Text(effort.displayName).tag(effort)
                         }
                     }

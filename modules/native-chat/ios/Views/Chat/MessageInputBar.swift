@@ -11,7 +11,7 @@ struct MessageInputBar: View {
     @FocusState private var isFocused: Bool
 
     var body: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: 0) {
             // Image preview
             if let imageData = selectedImageData,
                let uiImage = UIImage(data: imageData) {
@@ -32,6 +32,7 @@ struct MessageInputBar: View {
                     Spacer()
                 }
                 .padding(.horizontal, 16)
+                .padding(.top, 8)
             }
 
             // Input row
@@ -77,12 +78,6 @@ struct MessageInputBar: View {
             .padding(.vertical, 8)
         }
         .background(.ultraThinMaterial)
-        .glassEffect(.regular.interactive(), in: UnevenRoundedRectangle(
-            topLeadingRadius: 20,
-            bottomLeadingRadius: 0,
-            bottomTrailingRadius: 0,
-            topTrailingRadius: 20
-        ))
     }
 
     private var canSend: Bool {

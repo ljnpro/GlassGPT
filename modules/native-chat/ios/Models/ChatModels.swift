@@ -29,7 +29,7 @@ enum ModelType: String, CaseIterable, Identifiable, Codable, Sendable {
     /// Default reasoning effort for this model
     var defaultEffort: ReasoningEffort {
         switch self {
-        case .gpt5_4: return .high
+        case .gpt5_4: return .medium
         case .gpt5_4_pro: return .high
         }
     }
