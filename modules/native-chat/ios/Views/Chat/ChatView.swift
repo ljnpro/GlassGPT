@@ -110,6 +110,11 @@ struct ChatView: View {
                         proxy.scrollTo("bottom", anchor: .bottom)
                     }
                 }
+                .onChange(of: viewModel.currentThinkingText) { _, _ in
+                    withAnimation(.easeOut(duration: 0.15)) {
+                        proxy.scrollTo("bottom", anchor: .bottom)
+                    }
+                }
                 .onChange(of: viewModel.messages.count) { _, _ in
                     withAnimation(.easeOut(duration: 0.2)) {
                         proxy.scrollTo("bottom", anchor: .bottom)
@@ -151,13 +156,23 @@ struct ChatView: View {
     private var streamingBubble: some View {
         HStack(alignment: .top) {
             VStack(alignment: .leading, spacing: 8) {
-                if !viewModel.currentThinkingText.isEmpty {
-                    ThinkingView(text: viewModel.currentThinkingText)
+                // Thinking indicator — shown while model is reasoning
+                if viewModel.isThinking {
+                    ThinkingIndicator()
+                        .transition(.opacity.combined(with: .scale(scale: 0.95)))
                 }
 
+                // Thinking text — shown when there's accumulated thinking content
+                if !viewModel.currentThinkingText.isEmpty {
+                    ThinkingView(text: viewModel.currentThinkingText)
+                        .transition(.opacity.combined(with: .move(edge: .top)))
+                }
+
+                // Output text
                 if !viewModel.currentStreamingText.isEmpty {
                     MarkdownContentView(text: viewModel.currentStreamingText)
-                } else if viewModel.currentThinkingText.isEmpty {
+                } else if !viewModel.isThinking && viewModel.currentThinkingText.isEmpty {
+                    // No thinking, no text yet — show typing dots
                     TypingIndicator()
                 }
             }
