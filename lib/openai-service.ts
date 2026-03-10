@@ -484,15 +484,9 @@ export async function streamChatCompletion(
 
     if (
       eventName === "response.output_text.delta" ||
-      eventName === "response.refusal.delta" ||
-      eventName === "response.output_text.done"
+      eventName === "response.refusal.delta"
     ) {
-      const delta =
-        typeof payload.delta === "string"
-          ? payload.delta
-          : typeof payload.text === "string"
-            ? payload.text
-            : "";
+      const delta = typeof payload.delta === "string" ? payload.delta : "";
 
       if (delta) {
         result.outputText = appendDelta(result.outputText, delta);
@@ -502,22 +496,47 @@ export async function streamChatCompletion(
       return false;
     }
 
+    // response.output_text.done contains the FULL accumulated text, NOT a delta.
+    // Only use it as a fallback if we somehow missed all the deltas.
+    if (eventName === "response.output_text.done") {
+      const fullText = typeof payload.text === "string" ? payload.text : "";
+
+      if (fullText && !result.outputText) {
+        result.outputText = fullText;
+        callbacks.onToken(result.outputText);
+      }
+
+      return false;
+    }
+
     if (
-      eventName.startsWith("response.reasoning") ||
-      eventName.startsWith("response.reasoning_summary_text")
+      eventName === "response.reasoning_summary_text.delta"
     ) {
-      const delta =
-        typeof payload.delta === "string"
-          ? payload.delta
-          : typeof payload.text === "string"
-            ? payload.text
-            : "";
+      const delta = typeof payload.delta === "string" ? payload.delta : "";
 
       if (delta) {
         result.reasoning = appendDelta(result.reasoning, delta);
         callbacks.onReasoning?.(result.reasoning);
       }
 
+      return false;
+    }
+
+    // response.reasoning_summary_text.done contains the FULL reasoning text.
+    // Only use as fallback if we missed the deltas.
+    if (eventName === "response.reasoning_summary_text.done") {
+      const fullText = typeof payload.text === "string" ? payload.text : "";
+
+      if (fullText && !result.reasoning) {
+        result.reasoning = fullText;
+        callbacks.onReasoning?.(result.reasoning);
+      }
+
+      return false;
+    }
+
+    // Ignore other reasoning events (e.g., response.reasoning_summary_part.*)
+    if (eventName.startsWith("response.reasoning")) {
       return false;
     }
 

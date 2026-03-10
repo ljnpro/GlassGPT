@@ -120,7 +120,7 @@ export default function TabLayout() {
   return (
     <Tabs
       screenOptions={{
-        animation: "shift",
+        animation: "none",
         lazy: false,
         headerShown: false,
         sceneStyle: {
