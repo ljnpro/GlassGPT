@@ -97,3 +97,11 @@
 - [x] FIX: Verified all Swift files only import system frameworks (SwiftUI, WebKit, etc.)
 - [x] FIX: .glassEffect(.regular.interactive) → .interactive() in ChatView, MessageBubble, MessageInputBar
 - [x] FIX: @MainActor static methods → nonisolated static for buildStreamRequest/handleSSEEvent
+- [x] BUG: GPT not responding at all despite valid API key - debug streaming/API call flow
+- [x] FIX: Reasoning effort - GPT-5.4: none/low/medium/high/xhigh, GPT-5.4-pro: medium/high/xhigh
+- [x] FIX: LaTeX rendering already present (WKWebView + KaTeX)
+- [x] FIX: Image JPEG auto-conversion + base64 upload already present
+- [x] REWRITE: OpenAIService - ChatGPT-native-level streaming with auto fallback to non-streaming
+- [x] REWRITE: ChatViewModel - robust streaming/fallback flow with thinking UI
+- [x] FIX: Thinking/reasoning UI during streaming (ThinkingIndicator + ThinkingView)
+- [x] FIX: Ensure output never lost - auto fallback to non-streaming if stream fails

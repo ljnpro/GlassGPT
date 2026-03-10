@@ -15,6 +15,24 @@ enum ModelType: String, CaseIterable, Identifiable, Codable, Sendable {
         case .gpt5_4_pro: return "GPT-5.4 Pro"
         }
     }
+
+    /// Available reasoning effort levels for this model
+    var availableEfforts: [ReasoningEffort] {
+        switch self {
+        case .gpt5_4:
+            return [.none, .low, .medium, .high, .xhigh]
+        case .gpt5_4_pro:
+            return [.medium, .high, .xhigh]
+        }
+    }
+
+    /// Default reasoning effort for this model
+    var defaultEffort: ReasoningEffort {
+        switch self {
+        case .gpt5_4: return .high
+        case .gpt5_4_pro: return .high
+        }
+    }
 }
 
 // MARK: - Reasoning Effort
@@ -24,11 +42,23 @@ enum ReasoningEffort: String, CaseIterable, Identifiable, Codable, Sendable {
     case low
     case medium
     case high
+    case xhigh
 
     var id: String { rawValue }
 
     var displayName: String {
-        rawValue.capitalized
+        switch self {
+        case .none: return "None"
+        case .low: return "Low"
+        case .medium: return "Medium"
+        case .high: return "High"
+        case .xhigh: return "XHigh"
+        }
+    }
+
+    /// The value sent to the API (xhigh maps to the API string)
+    var apiValue: String {
+        rawValue
     }
 }
 

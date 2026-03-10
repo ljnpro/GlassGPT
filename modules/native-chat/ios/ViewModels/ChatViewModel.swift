@@ -11,6 +11,7 @@ final class ChatViewModel {
     var currentStreamingText: String = ""
     var currentThinkingText: String = ""
     var isStreaming: Bool = false
+    var isThinking: Bool = false          // True while model is reasoning
     var inputText: String = ""
     var selectedModel: ModelType = .gpt5_4
     var reasoningEffort: ReasoningEffort = .high
@@ -27,7 +28,6 @@ final class ChatViewModel {
 
     // Stream invalidation token
     private var activeStreamID = UUID()
-    private var pendingAssistantMessage: Message?
 
     // MARK: - Init
 
@@ -42,6 +42,11 @@ final class ChatViewModel {
         if let savedEffort = UserDefaults.standard.string(forKey: "defaultEffort"),
            let effort = ReasoningEffort(rawValue: savedEffort) {
             reasoningEffort = effort
+        }
+
+        // Ensure effort is valid for the loaded model
+        if !selectedModel.availableEfforts.contains(reasoningEffort) {
+            reasoningEffort = selectedModel.defaultEffort
         }
     }
 
@@ -106,12 +111,13 @@ final class ChatViewModel {
 
         // Start streaming
         isStreaming = true
+        isThinking = false
         currentStreamingText = ""
         currentThinkingText = ""
 
         HapticService.shared.impact(.light)
 
-        // Snapshot messages as Sendable DTOs (no SwiftData objects cross concurrency boundary)
+        // Snapshot messages as Sendable DTOs
         let requestAPIKey = apiKey
         let requestModel = selectedModel
         let requestEffort = reasoningEffort
@@ -138,18 +144,57 @@ final class ChatViewModel {
 
                 switch event {
                 case .textDelta(let delta):
+                    // When text starts arriving, thinking phase is over
+                    if isThinking {
+                        withAnimation(.easeOut(duration: 0.2)) {
+                            isThinking = false
+                        }
+                    }
                     currentStreamingText += delta
 
                 case .thinkingDelta(let delta):
                     currentThinkingText += delta
 
-                case .completed:
+                case .thinkingStarted:
+                    withAnimation(.easeIn(duration: 0.2)) {
+                        isThinking = true
+                    }
+
+                case .thinkingFinished:
+                    withAnimation(.easeOut(duration: 0.2)) {
+                        isThinking = false
+                    }
+
+                case .completed(let fullText, let fullThinking):
+                    // Safety net: use the full text from completed event if we missed deltas
+                    if !fullText.isEmpty && fullText.count > currentStreamingText.count {
+                        currentStreamingText = fullText
+                    }
+                    if let thinking = fullThinking, !thinking.isEmpty,
+                       thinking.count > currentThinkingText.count {
+                        currentThinkingText = thinking
+                    }
                     await finishStreaming()
 
                 case .error(let error):
+                    // If we have partial output, save it before showing error
+                    if !currentStreamingText.isEmpty {
+                        await finishStreaming()
+                    }
                     errorMessage = error.localizedDescription
                     isStreaming = false
+                    isThinking = false
                     HapticService.shared.notify(.error)
+                }
+            }
+
+            // Stream ended without explicit completed event — save what we have
+            if activeStreamID == streamID && isStreaming {
+                if !currentStreamingText.isEmpty {
+                    await finishStreaming()
+                } else {
+                    isStreaming = false
+                    isThinking = false
                 }
             }
         }
@@ -158,25 +203,17 @@ final class ChatViewModel {
     // MARK: - Stop Generation
 
     func stopGeneration(savePartial: Bool = true) {
-        activeStreamID = UUID() // Invalidate current stream
+        activeStreamID = UUID()
         openAIService.cancelStream()
         errorMessage = nil
 
         if savePartial && !currentStreamingText.isEmpty {
             Task { @MainActor in await finishStreaming() }
         } else {
-            // Remove empty pending assistant message on cancel
-            if let pending = pendingAssistantMessage {
-                if let index = messages.firstIndex(where: { $0.id == pending.id }) {
-                    messages.remove(at: index)
-                }
-                modelContext.delete(pending)
-                try? modelContext.save()
-                pendingAssistantMessage = nil
-            }
             currentStreamingText = ""
             currentThinkingText = ""
             isStreaming = false
+            isThinking = false
         }
 
         HapticService.shared.impact(.medium)
@@ -196,6 +233,7 @@ final class ChatViewModel {
         inputText = ""
         errorMessage = nil
         selectedImageData = nil
+        isThinking = false
         HapticService.shared.selection()
     }
 
@@ -210,9 +248,16 @@ final class ChatViewModel {
         messages = conversation.messages.sorted { $0.createdAt < $1.createdAt }
         selectedModel = ModelType(rawValue: conversation.model) ?? .gpt5_4
         reasoningEffort = ReasoningEffort(rawValue: conversation.reasoningEffort) ?? .high
+
+        // Validate effort for loaded model
+        if !selectedModel.availableEfforts.contains(reasoningEffort) {
+            reasoningEffort = selectedModel.defaultEffort
+        }
+
         currentStreamingText = ""
         currentThinkingText = ""
         errorMessage = nil
+        isThinking = false
     }
 
     // MARK: - Private
@@ -220,6 +265,7 @@ final class ChatViewModel {
     private func finishStreaming() async {
         guard !currentStreamingText.isEmpty else {
             isStreaming = false
+            isThinking = false
             return
         }
 
@@ -236,7 +282,6 @@ final class ChatViewModel {
 
         // Save
         try? modelContext.save()
-        pendingAssistantMessage = nil
 
         // Generate title for new conversations
         if currentConversation?.title == "New Chat" && messages.count >= 2 {
@@ -246,6 +291,7 @@ final class ChatViewModel {
         currentStreamingText = ""
         currentThinkingText = ""
         isStreaming = false
+        isThinking = false
 
         HapticService.shared.notify(.success)
     }
