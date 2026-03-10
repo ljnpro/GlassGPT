@@ -58,11 +58,12 @@
 - [x] FEATURE: Timeout detection - 45s stall timeout triggers auto-retry
 - [x] FEATURE: Background message receiving - AppState listener for foreground resume
 - [x] BUG: Image upload fails - OpenAI rejects images as invalid format - fixed with expo-image-manipulator JPEG conversion
-- [ ] FIX: Install missing peer dependency expo-asset (required by expo-audio)
-- [ ] FIX: Downgrade react-native-get-random-values from 2.0.0 to ~1.11.0 (major version mismatch)
-- [ ] FIX: Update 12 outdated packages to match Expo SDK 54 expected versions
+- [x] FIX: Install missing peer dependency expo-asset (required by expo-audio) - resolved with SDK 55 upgrade
+- [x] FIX: Downgrade react-native-get-random-values from 2.0.0 to ~1.11.0 (major version mismatch) - resolved with SDK 55 upgrade
+- [x] FIX: Update 12 outdated packages to match Expo SDK 54 expected versions - resolved with SDK 55 upgrade
 - [x] UPGRADE: Expo SDK 54 → 55 and update all dependencies to latest
 - [x] FIX: Resolve all breaking changes from SDK 55 upgrade (removed newArchEnabled, edgeToEdgeEnabled; added expo-asset/font/image/secure-store/web-browser plugins)
 - [x] BUG: Settings tab still white screens when rapidly switching between tabs - added ErrorBoundary + loading guard + removed animation
 - [x] Update version to v1.1
 - [x] CRITICAL BUG: All responses are being output/displayed twice - response.output_text.done was appending full text on top of deltas
+- [x] CRITICAL BUG: Settings white screen - React hooks called after early return statement, violating hooks rules. Moved all hooks before early return.
