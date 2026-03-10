@@ -87,3 +87,4 @@
 - [x] INTEGRATE: Apply GPT-5.4 High code review fixes (13 critical/high/medium issues patched)
 - [x] FIX: Update eas.json with correct Apple ID and Team ID for App Store submission
 - [x] CRITICAL BUG: iOS app shows white screen - Restructured to use Expo local module (modules/native-chat/) with ExpoAppDelegateSubscriber instead of direct ios/ modification. Files survive expo prebuild.
+- [x] CRITICAL BUG: iOS app STILL shows white screen - ROOT CAUSE: podspec was in module root dir but Expo autolinking only searches subdirectories. Moved NativeChat.podspec to ios/ subdir. Module now fully resolved by autolinking.
