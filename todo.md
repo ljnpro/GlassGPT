@@ -67,3 +67,4 @@
 - [x] Update version to v1.1
 - [x] CRITICAL BUG: All responses are being output/displayed twice - response.output_text.done was appending full text on top of deltas
 - [x] CRITICAL BUG: Settings white screen - React hooks called after early return statement, violating hooks rules. Moved all hooks before early return.
+- [x] FEATURE: Create a support webpage for the app with liquid glass aesthetic, features showcase, FAQ, privacy policy, and contact info
