@@ -156,7 +156,7 @@ export default function TabLayout() {
         name="index"
         options={{
           title: "Chat",
-          tabBarIcon: ({ color, size }) => (
+          tabBarIcon: ({ color, size }: { color: string; size: number }) => (
             <TabIcon
               color={color}
               materialName="home"
@@ -170,7 +170,7 @@ export default function TabLayout() {
         name="conversations"
         options={{
           title: "History",
-          tabBarIcon: ({ color, size }) => (
+          tabBarIcon: ({ color, size }: { color: string; size: number }) => (
             <TabIcon
               color={color}
               materialName="schedule"
@@ -184,7 +184,7 @@ export default function TabLayout() {
         name="settings"
         options={{
           title: "Settings",
-          tabBarIcon: ({ color, size }) => (
+          tabBarIcon: ({ color, size }: { color: string; size: number }) => (
             <TabIcon
               color={color}
               materialName="settings"
