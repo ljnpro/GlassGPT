@@ -78,7 +78,11 @@ final class OpenAIService {
         let capturedBaseURL = baseURL
         let capturedMaxRetries = maxStreamRetries
 
-        return AsyncStream { [weak self] continuation in
+        // Capture weak self before entering closures to avoid
+        // "reference to captured var 'self' in concurrently-executing code"
+        weak var weakSelf = self
+
+        return AsyncStream { continuation in
             let task = Task.detached {
                 // --- Attempt streaming first ---
                 let streamSuccess = await Self.attemptStreaming(
@@ -124,14 +128,14 @@ final class OpenAIService {
                 }
             }
 
-            Task { @MainActor [weak self] in
-                self?.currentTask = task
+            Task { @MainActor in
+                weakSelf?.currentTask = task
             }
 
-            continuation.onTermination = { _ in
+            continuation.onTermination = { @Sendable _ in
                 task.cancel()
-                Task { @MainActor [weak self] in
-                    self?.currentTask = nil
+                Task { @MainActor in
+                    weakSelf?.currentTask = nil
                 }
             }
         }
