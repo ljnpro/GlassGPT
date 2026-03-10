@@ -78,8 +78,8 @@ final class OpenAIService {
         let capturedBaseURL = baseURL
         let capturedMaxRetries = maxStreamRetries
 
-        return AsyncStream { continuation in
-            let task = Task.detached { [weak self] in
+        return AsyncStream { [weak self] continuation in
+            let task = Task.detached {
                 // --- Attempt streaming first ---
                 let streamSuccess = await Self.attemptStreaming(
                     baseURL: capturedBaseURL,
@@ -124,7 +124,9 @@ final class OpenAIService {
                 }
             }
 
-            self?.currentTask = task
+            Task { @MainActor [weak self] in
+                self?.currentTask = task
+            }
 
             continuation.onTermination = { _ in
                 task.cancel()
