@@ -110,3 +110,10 @@
 - [x] BUG: GPT not responding - complete rewrite of OpenAIService with verified SSE event parsing from live API test, auto fallback to non-streaming, extractOutputText from output[].content[].text
 - [x] BUG: First reply duplicated briefly - fixed by clearing streaming state before appending message
 - [x] BUG: LaTeX rendering broken - rewrote parser to support \[...\], \(...\), $$...$$, $...$; fixed KaTeX JS escaping via JSONEncoder; set baseURL for CDN loading
+- [x] BUG: LaTeX block formulas - reduced spacing, block-only WKWebView, inline uses Unicode text
+- [x] BUG: Inline LaTeX now rendered as Unicode text inline with surrounding markdown
+- [x] BUG: Settings default model - replaced @ObservationIgnored @AppStorage with direct UserDefaults
+- [x] BUG: Default model now reads from UserDefaults on ChatViewModel init, default is gpt-5.4 medium
+- [x] FIX: Initial default is now gpt-5.4 medium
+- [x] BUG: Input bar - safeAreaInset(edge: .bottom, spacing: 0) pins it to bottom
+- [x] BUG: Keyboard gap - removed glassEffect from input bar container, simplified padding
