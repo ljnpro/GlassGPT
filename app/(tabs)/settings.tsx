@@ -143,14 +143,6 @@ function SettingsScreenInner() {
   const { theme, resolvedColorScheme } = useThemeContext();
   const { state, dispatch, setApiKey } = useChatStore();
 
-  if (!state.isLoaded) {
-    return (
-      <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
-        <ActivityIndicator size="large" />
-      </View>
-    );
-  }
-
   const [apiKeyInput, setApiKeyInput] = useState("");
   const [showApiKey, setShowApiKey] = useState(false);
   const [isSavingKey, setIsSavingKey] = useState(false);
@@ -617,6 +609,14 @@ function SettingsScreenInner() {
       </View>
     );
   }, [appVersion, colors.muted]);
+
+  if (!state.isLoaded) {
+    return (
+      <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+        <ActivityIndicator size="large" />
+      </View>
+    );
+  }
 
   return (
     <ScreenContainer>
