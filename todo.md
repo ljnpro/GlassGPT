@@ -105,3 +105,4 @@
 - [x] REWRITE: ChatViewModel - robust streaming/fallback flow with thinking UI
 - [x] FIX: Thinking/reasoning UI during streaming (ThinkingIndicator + ThinkingView)
 - [x] FIX: Ensure output never lost - auto fallback to non-streaming if stream fails
+- [x] FIX: Optional chaining on non-optional OpenAIService - moved self?.currentTask into @MainActor Task
