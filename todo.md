@@ -68,3 +68,15 @@
 - [x] CRITICAL BUG: All responses are being output/displayed twice - response.output_text.done was appending full text on top of deltas
 - [x] CRITICAL BUG: Settings white screen - React hooks called after early return statement, violating hooks rules. Moved all hooks before early return.
 - [x] FEATURE: Create a support webpage for the app with liquid glass aesthetic, features showcase, FAQ, privacy policy, and contact info
+- [ ] DEPLOY: Deploy support webpage to GitHub Pages with public URL
+- [x] TASK: Generate App Store screenshots - iPhone 6.7" (1290x2796) and iPad 13" (2048x2732)
+- [x] REWRITE: Consult GPT-5.4 High on full native Swift/SwiftUI architecture
+- [x] REWRITE: Create Xcode project structure and core Swift files
+- [x] REWRITE: Implement data models and SwiftData persistence
+- [x] REWRITE: Implement OpenAI streaming service (URLSession + AsyncSequence)
+- [x] REWRITE: Implement chat UI with real .glassEffect() liquid glass
+- [x] REWRITE: Implement native SwiftUI tab bar, navigation, and liquid glass chrome
+- [x] REWRITE: Implement settings screen with native SwiftUI Form
+- [x] REWRITE: Implement history/conversation list screen
+- [x] REWRITE: Implement Markdown/LaTeX/code rendering in SwiftUI
+- [x] REWRITE: Polish and finalize all screens (GPT-5.4 High review applied 7 patches)
