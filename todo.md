@@ -58,3 +58,8 @@
 - [x] FEATURE: Timeout detection - 45s stall timeout triggers auto-retry
 - [x] FEATURE: Background message receiving - AppState listener for foreground resume
 - [x] BUG: Image upload fails - OpenAI rejects images as invalid format - fixed with expo-image-manipulator JPEG conversion
+- [ ] FIX: Install missing peer dependency expo-asset (required by expo-audio)
+- [ ] FIX: Downgrade react-native-get-random-values from 2.0.0 to ~1.11.0 (major version mismatch)
+- [ ] FIX: Update 12 outdated packages to match Expo SDK 54 expected versions
+- [x] UPGRADE: Expo SDK 54 → 55 and update all dependencies to latest
+- [x] FIX: Resolve all breaking changes from SDK 55 upgrade (removed newArchEnabled, edgeToEdgeEnabled; added expo-asset/font/image/secure-store/web-browser plugins)
