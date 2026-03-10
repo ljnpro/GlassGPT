@@ -1,72 +1,75 @@
 import SwiftUI
+import Foundation
 @preconcurrency import WebKit
+
+fileprivate enum InlineSegment: Sendable {
+    case text(String)
+    case latexInline(String)
+}
+
+fileprivate enum BlockPart: Identifiable, Sendable {
+    case richText(id: Int, segments: [InlineSegment])
+    case latexBlock(id: Int, content: String)
+    case codeBlock(id: Int, language: String?, code: String)
+
+    var id: Int {
+        switch self {
+        case let .richText(id, _):
+            return id
+        case let .latexBlock(id, _):
+            return id
+        case let .codeBlock(id, _, _):
+            return id
+        }
+    }
+}
 
 // MARK: - Markdown Content View
 
 struct MarkdownContentView: View {
     let text: String
 
-    // MARK: - Block-level Part
-
-    /// Block-level parts are rendered in a VStack.
-    /// "richText" parts contain interleaved markdown and inline LaTeX rendered as a single Text view.
-    private enum BlockPart: Identifiable {
-        case richText(id: UUID = UUID(), segments: [InlineSegment])
-        case latexBlock(id: UUID = UUID(), content: String)
-        case codeBlock(id: UUID = UUID(), language: String?, code: String)
-
-        var id: UUID {
-            switch self {
-            case .richText(let id, _): return id
-            case .latexBlock(let id, _): return id
-            case .codeBlock(let id, _, _): return id
-            }
-        }
-    }
-
-    /// Inline segments within a richText block
-    private enum InlineSegment {
-        case text(String)
-        case latexInline(String)
-    }
-
-    // MARK: - Parse Content
-
     private var blockParts: [BlockPart] {
         parseBlocks(text)
     }
 
-    /// First pass: extract code blocks and block-level LaTeX.
-    /// Everything else is grouped into "inline" chunks that may contain inline LaTeX.
     private func parseBlocks(_ input: String) -> [BlockPart] {
         var parts: [BlockPart] = []
         var inlineBuffer = ""
         let chars = Array(input)
         let count = chars.count
         var i = 0
+        var nextID = 0
+
+        func makeID() -> Int {
+            defer { nextID += 1 }
+            return nextID
+        }
 
         func flushInline() {
             if !inlineBuffer.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 let segments = parseInlineSegments(inlineBuffer)
-                parts.append(.richText(segments: segments))
+                parts.append(.richText(id: makeID(), segments: segments))
             }
             inlineBuffer = ""
         }
 
         while i < count {
-            // --- Code block: ```
-            if i + 2 < count && chars[i] == "`" && chars[i+1] == "`" && chars[i+2] == "`" {
+            if i + 2 < count && chars[i] == "`" && chars[i + 1] == "`" && chars[i + 2] == "`" {
                 flushInline()
                 let start = i + 3
                 var langEnd = start
-                while langEnd < count && chars[langEnd] != "\n" { langEnd += 1 }
+                while langEnd < count && chars[langEnd] != "\n" {
+                    langEnd += 1
+                }
+
                 let lang = String(chars[start..<langEnd]).trimmingCharacters(in: .whitespaces)
                 let codeStart = min(langEnd + 1, count)
 
                 var codeEnd = codeStart
                 var found = false
                 while codeEnd + 2 < count {
-                    if chars[codeEnd] == "`" && chars[codeEnd+1] == "`" && chars[codeEnd+2] == "`" {
+                    if chars[codeEnd] == "`" && chars[codeEnd + 1] == "`" && chars[codeEnd + 2] == "`" {
                         found = true
                         break
                     }
@@ -75,9 +78,11 @@ struct MarkdownContentView: View {
 
                 if found {
                     let code = String(chars[codeStart..<codeEnd])
-                    parts.append(.codeBlock(language: lang.isEmpty ? nil : lang, code: code))
+                    parts.append(.codeBlock(id: makeID(), language: lang.isEmpty ? nil : lang, code: code))
                     i = codeEnd + 3
-                    if i < count && chars[i] == "\n" { i += 1 }
+                    if i < count && chars[i] == "\n" {
+                        i += 1
+                    }
                 } else {
                     inlineBuffer += "```"
                     i = start
@@ -85,19 +90,24 @@ struct MarkdownContentView: View {
                 continue
             }
 
-            // --- Block LaTeX: \[...\]
-            if i + 1 < count && chars[i] == "\\" && chars[i+1] == "[" {
+            if i + 1 < count && chars[i] == "\\" && chars[i + 1] == "[" {
                 flushInline()
                 let start = i + 2
                 var end = start
                 var found = false
                 while end + 1 < count {
-                    if chars[end] == "\\" && chars[end+1] == "]" { found = true; break }
+                    if chars[end] == "\\" && chars[end + 1] == "]" {
+                        found = true
+                        break
+                    }
                     end += 1
                 }
+
                 if found {
                     let latex = String(chars[start..<end]).trimmingCharacters(in: .whitespacesAndNewlines)
-                    if !latex.isEmpty { parts.append(.latexBlock(content: latex)) }
+                    if !latex.isEmpty {
+                        parts.append(.latexBlock(id: makeID(), content: latex))
+                    }
                     i = end + 2
                 } else {
                     inlineBuffer.append("\\[")
@@ -106,19 +116,24 @@ struct MarkdownContentView: View {
                 continue
             }
 
-            // --- Block LaTeX: $$...$$
-            if i + 1 < count && chars[i] == "$" && chars[i+1] == "$" {
+            if i + 1 < count && chars[i] == "$" && chars[i + 1] == "$" {
                 flushInline()
                 let start = i + 2
                 var end = start
                 var found = false
                 while end + 1 < count {
-                    if chars[end] == "$" && chars[end+1] == "$" { found = true; break }
+                    if chars[end] == "$" && chars[end + 1] == "$" {
+                        found = true
+                        break
+                    }
                     end += 1
                 }
+
                 if found {
                     let latex = String(chars[start..<end]).trimmingCharacters(in: .whitespacesAndNewlines)
-                    if !latex.isEmpty { parts.append(.latexBlock(content: latex)) }
+                    if !latex.isEmpty {
+                        parts.append(.latexBlock(id: makeID(), content: latex))
+                    }
                     i = end + 2
                 } else {
                     inlineBuffer.append("$$")
@@ -127,7 +142,6 @@ struct MarkdownContentView: View {
                 continue
             }
 
-            // Everything else goes into inline buffer
             inlineBuffer.append(chars[i])
             i += 1
         }
@@ -135,13 +149,12 @@ struct MarkdownContentView: View {
         flushInline()
 
         if parts.isEmpty {
-            return [.richText(segments: [.text(text)])]
+            return [.richText(id: 0, segments: [.text(input)])]
         }
 
         return parts
     }
 
-    /// Second pass: within an inline chunk, split out \(...\) and $...$ as inline LaTeX segments.
     private func parseInlineSegments(_ input: String) -> [InlineSegment] {
         var segments: [InlineSegment] = []
         var textBuffer = ""
@@ -157,16 +170,19 @@ struct MarkdownContentView: View {
         }
 
         while i < count {
-            // --- Inline LaTeX: \(...\)
-            if i + 1 < count && chars[i] == "\\" && chars[i+1] == "(" {
+            if i + 1 < count && chars[i] == "\\" && chars[i + 1] == "(" {
                 flushText()
                 let start = i + 2
                 var end = start
                 var found = false
                 while end + 1 < count {
-                    if chars[end] == "\\" && chars[end+1] == ")" { found = true; break }
+                    if chars[end] == "\\" && chars[end + 1] == ")" {
+                        found = true
+                        break
+                    }
                     end += 1
                 }
+
                 if found {
                     let latex = String(chars[start..<end]).trimmingCharacters(in: .whitespaces)
                     if !latex.isEmpty {
@@ -180,18 +196,18 @@ struct MarkdownContentView: View {
                 continue
             }
 
-            // --- Inline LaTeX: $...$ (single line, not preceded by \)
-            if chars[i] == "$" && (i == 0 || chars[i-1] != "\\") {
+            if chars[i] == "$" && (i == 0 || chars[i - 1] != "\\") {
                 let start = i + 1
                 var end = start
                 var found = false
                 while end < count && chars[end] != "\n" {
-                    if chars[end] == "$" && (end == start || chars[end-1] != "\\") {
+                    if chars[end] == "$" && (end == start || chars[end - 1] != "\\") {
                         found = true
                         break
                     }
                     end += 1
                 }
+
                 if found && end > start {
                     flushText()
                     let latex = String(chars[start..<end]).trimmingCharacters(in: .whitespaces)
@@ -214,41 +230,44 @@ struct MarkdownContentView: View {
         return segments
     }
 
-    // MARK: - Body
-
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
-            ForEach(blockParts) { part in
-                switch part {
-                case .codeBlock(_, let language, let code):
-                    CodeBlockView(language: language, code: code)
-
-                case .latexBlock(_, let content):
-                    BlockLaTeXView(latex: content)
-                        .padding(.vertical, 2)
-
-                case .richText(_, let segments):
-                    RichTextView(segments: segments)
-                }
+            ForEach(blockParts, id: \.id) { part in
+                blockView(for: part)
             }
+        }
+    }
+
+    @ViewBuilder
+    private func blockView(for part: BlockPart) -> some View {
+        switch part {
+        case let .codeBlock(id: id, language: language, code: code):
+            CodeBlockView(language: language, code: code)
+                .id(id)
+
+        case let .latexBlock(id: id, content: content):
+            BlockLaTeXView(latex: content)
+                .padding(.vertical, 2)
+                .id(id)
+
+        case let .richText(id: id, segments: segments):
+            RichTextView(segments: segments)
+                .id(id)
         }
     }
 }
 
-// MARK: - Rich Text View (Markdown + Inline LaTeX as a single Text)
+// MARK: - Rich Text View
 
 private struct RichTextView: View {
-    let segments: [MarkdownContentView.InlineSegment]
+    let segments: [InlineSegment]
 
     var body: some View {
-        // Build a single Text by concatenating markdown and inline LaTeX
-        // Inline LaTeX is converted to italic Unicode representation
         let combinedText = segments.map { segment in
             switch segment {
-            case .text(let str):
+            case let .text(str):
                 return str
-            case .latexInline(let latex):
-                // Convert simple LaTeX to Unicode for inline display
+            case let .latexInline(latex):
                 return latexToUnicode(latex)
             }
         }.joined()
@@ -271,12 +290,9 @@ private struct RichTextView: View {
         }
     }
 
-    /// Convert common LaTeX expressions to Unicode text for inline display.
-    /// This handles Greek letters, superscripts, subscripts, and common math symbols.
     private func latexToUnicode(_ latex: String) -> String {
         var result = latex
 
-        // Greek letters
         let greekMap: [(String, String)] = [
             ("\\alpha", "α"), ("\\beta", "β"), ("\\gamma", "γ"), ("\\delta", "δ"),
             ("\\epsilon", "ε"), ("\\varepsilon", "ε"), ("\\zeta", "ζ"), ("\\eta", "η"),
@@ -288,14 +304,13 @@ private struct RichTextView: View {
             ("\\omega", "ω"),
             ("\\Gamma", "Γ"), ("\\Delta", "Δ"), ("\\Theta", "Θ"), ("\\Lambda", "Λ"),
             ("\\Xi", "Ξ"), ("\\Pi", "Π"), ("\\Sigma", "Σ"), ("\\Upsilon", "Υ"),
-            ("\\Phi", "Φ"), ("\\Psi", "Ψ"), ("\\Omega", "Ω"),
+            ("\\Phi", "Φ"), ("\\Psi", "Ψ"), ("\\Omega", "Ω")
         ]
 
         for (cmd, unicode) in greekMap {
             result = result.replacingOccurrences(of: cmd, with: unicode)
         }
 
-        // Common math symbols
         let symbolMap: [(String, String)] = [
             ("\\infty", "∞"), ("\\partial", "∂"), ("\\nabla", "∇"),
             ("\\times", "×"), ("\\cdot", "·"), ("\\div", "÷"),
@@ -310,57 +325,45 @@ private struct RichTextView: View {
             ("\\sqrt", "√"), ("\\angle", "∠"), ("\\degree", "°"),
             ("\\circ", "∘"), ("\\bullet", "•"),
             ("\\ldots", "…"), ("\\cdots", "⋯"), ("\\vdots", "⋮"),
-            ("\\vec{", ""), // handled separately
-            ("\\overrightarrow{", ""), // handled separately
+            ("\\vec{", ""), ("\\overrightarrow{", "")
         ]
 
-        for (cmd, unicode) in symbolMap {
-            if !cmd.hasSuffix("{") {
-                result = result.replacingOccurrences(of: cmd, with: unicode)
-            }
+        for (cmd, unicode) in symbolMap where !cmd.hasSuffix("{") {
+            result = result.replacingOccurrences(of: cmd, with: unicode)
         }
 
-        // Handle \vec{X} → X⃗
-        let vecPattern = try? NSRegularExpression(pattern: #"\\vec\{([^}]+)\}"#)
-        if let vecPattern = vecPattern {
+        if let vecPattern = try? NSRegularExpression(pattern: #"\\vec\{([^}]+)\}"#) {
             let nsRange = NSRange(result.startIndex..., in: result)
             result = vecPattern.stringByReplacingMatches(in: result, range: nsRange, withTemplate: "$1\u{20D7}")
         }
 
-        // Handle \overrightarrow{X} → X⃗
-        let arrowPattern = try? NSRegularExpression(pattern: #"\\overrightarrow\{([^}]+)\}"#)
-        if let arrowPattern = arrowPattern {
+        if let arrowPattern = try? NSRegularExpression(pattern: #"\\overrightarrow\{([^}]+)\}"#) {
             let nsRange = NSRange(result.startIndex..., in: result)
             result = arrowPattern.stringByReplacingMatches(in: result, range: nsRange, withTemplate: "$1\u{20D7}")
         }
 
-        // Handle \frac{a}{b} → a/b
-        let fracPattern = try? NSRegularExpression(pattern: #"\\frac\{([^}]+)\}\{([^}]+)\}"#)
-        if let fracPattern = fracPattern {
+        if let fracPattern = try? NSRegularExpression(pattern: #"\\frac\{([^}]+)\}\{([^}]+)\}"#) {
             let nsRange = NSRange(result.startIndex..., in: result)
             result = fracPattern.stringByReplacingMatches(in: result, range: nsRange, withTemplate: "$1/$2")
         }
 
-        // Handle simple subscripts: _{x} → subscript
         let subMap: [Character: String] = [
             "0": "₀", "1": "₁", "2": "₂", "3": "₃", "4": "₄",
             "5": "₅", "6": "₆", "7": "₇", "8": "₈", "9": "₉",
             "a": "ₐ", "e": "ₑ", "h": "ₕ", "i": "ᵢ", "j": "ⱼ",
             "k": "ₖ", "l": "ₗ", "m": "ₘ", "n": "ₙ", "o": "ₒ",
             "p": "ₚ", "r": "ᵣ", "s": "ₛ", "t": "ₜ", "u": "ᵤ",
-            "v": "ᵥ", "x": "ₓ",
+            "v": "ᵥ", "x": "ₓ"
         ]
 
         let supMap: [Character: String] = [
             "0": "⁰", "1": "¹", "2": "²", "3": "³", "4": "⁴",
             "5": "⁵", "6": "⁶", "7": "⁷", "8": "⁸", "9": "⁹",
             "n": "ⁿ", "i": "ⁱ",
-            "+": "⁺", "-": "⁻", "(": "⁽", ")": "⁾",
+            "+": "⁺", "-": "⁻", "(": "⁽", ")": "⁾"
         ]
 
-        // Handle ^{...} superscripts
-        let supPattern = try? NSRegularExpression(pattern: #"\^\{([^}]+)\}"#)
-        if let supPattern = supPattern {
+        if let supPattern = try? NSRegularExpression(pattern: #"\^\{([^}]+)\}"#) {
             let nsRange = NSRange(result.startIndex..., in: result)
             let matches = supPattern.matches(in: result, range: nsRange).reversed()
             var mutableResult = result
@@ -375,16 +378,14 @@ private struct RichTextView: View {
             result = mutableResult
         }
 
-        // Handle ^x single char superscript
-        let supSinglePattern = try? NSRegularExpression(pattern: #"\^([0-9a-zA-Z])"#)
-        if let supSinglePattern = supSinglePattern {
+        if let supSinglePattern = try? NSRegularExpression(pattern: #"\^([0-9a-zA-Z])"#) {
             let nsRange = NSRange(result.startIndex..., in: result)
             let matches = supSinglePattern.matches(in: result, range: nsRange).reversed()
             var mutableResult = result
             for match in matches {
                 if let contentRange = Range(match.range(at: 1), in: mutableResult),
-                   let fullRange = Range(match.range, in: mutableResult) {
-                    let ch = mutableResult[contentRange].first!
+                   let fullRange = Range(match.range, in: mutableResult),
+                   let ch = mutableResult[contentRange].first {
                     let converted = supMap[ch] ?? String(ch)
                     mutableResult.replaceSubrange(fullRange, with: converted)
                 }
@@ -392,9 +393,7 @@ private struct RichTextView: View {
             result = mutableResult
         }
 
-        // Handle _{...} subscripts
-        let subPattern = try? NSRegularExpression(pattern: #"_\{([^}]+)\}"#)
-        if let subPattern = subPattern {
+        if let subPattern = try? NSRegularExpression(pattern: #"_\{([^}]+)\}"#) {
             let nsRange = NSRange(result.startIndex..., in: result)
             let matches = subPattern.matches(in: result, range: nsRange).reversed()
             var mutableResult = result
@@ -409,16 +408,14 @@ private struct RichTextView: View {
             result = mutableResult
         }
 
-        // Handle _x single char subscript
-        let subSinglePattern = try? NSRegularExpression(pattern: #"_([0-9a-zA-Z])"#)
-        if let subSinglePattern = subSinglePattern {
+        if let subSinglePattern = try? NSRegularExpression(pattern: #"_([0-9a-zA-Z])"#) {
             let nsRange = NSRange(result.startIndex..., in: result)
             let matches = subSinglePattern.matches(in: result, range: nsRange).reversed()
             var mutableResult = result
             for match in matches {
                 if let contentRange = Range(match.range(at: 1), in: mutableResult),
-                   let fullRange = Range(match.range, in: mutableResult) {
-                    let ch = mutableResult[contentRange].first!
+                   let fullRange = Range(match.range, in: mutableResult),
+                   let ch = mutableResult[contentRange].first {
                     let converted = subMap[ch] ?? String(ch)
                     mutableResult.replaceSubrange(fullRange, with: converted)
                 }
@@ -426,28 +423,21 @@ private struct RichTextView: View {
             result = mutableResult
         }
 
-        // Clean up remaining \text{...} → just the text
-        let textPattern = try? NSRegularExpression(pattern: #"\\text\{([^}]+)\}"#)
-        if let textPattern = textPattern {
+        if let textPattern = try? NSRegularExpression(pattern: #"\\text\{([^}]+)\}"#) {
             let nsRange = NSRange(result.startIndex..., in: result)
             result = textPattern.stringByReplacingMatches(in: result, range: nsRange, withTemplate: "$1")
         }
 
-        // Clean up remaining \mathrm{...}, \mathbf{...}, etc.
-        let mathPattern = try? NSRegularExpression(pattern: #"\\math[a-z]+\{([^}]+)\}"#)
-        if let mathPattern = mathPattern {
+        if let mathPattern = try? NSRegularExpression(pattern: #"\\math[a-zA-Z]+\{([^}]+)\}"#) {
             let nsRange = NSRange(result.startIndex..., in: result)
             result = mathPattern.stringByReplacingMatches(in: result, range: nsRange, withTemplate: "$1")
         }
 
-        // Remove remaining backslash commands that we couldn't convert
-        let cmdPattern = try? NSRegularExpression(pattern: #"\\[a-zA-Z]+"#)
-        if let cmdPattern = cmdPattern {
+        if let cmdPattern = try? NSRegularExpression(pattern: #"\\[a-zA-Z]+"#) {
             let nsRange = NSRange(result.startIndex..., in: result)
             result = cmdPattern.stringByReplacingMatches(in: result, range: nsRange, withTemplate: "")
         }
 
-        // Clean up braces
         result = result.replacingOccurrences(of: "{", with: "")
         result = result.replacingOccurrences(of: "}", with: "")
 
@@ -455,7 +445,46 @@ private struct RichTextView: View {
     }
 }
 
-// MARK: - Block LaTeX View (WKWebView-based with KaTeX, only for display-mode formulas)
+// MARK: - Code Block View
+
+private struct CodeBlockView: View {
+    let language: String?
+    let code: String
+
+    private var displayCode: String {
+        code.trimmingCharacters(in: .newlines)
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            if let language, !language.isEmpty {
+                Text(language.uppercased())
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+            }
+
+            ScrollView(.horizontal, showsIndicators: true) {
+                Text(displayCode.isEmpty ? " " : displayCode)
+                    .font(.system(.body, design: .monospaced))
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .textSelection(.enabled)
+            }
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(Color.secondary.opacity(0.08))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .stroke(Color.secondary.opacity(0.12), lineWidth: 1)
+        )
+        .padding(.vertical, 2)
+    }
+}
+
+// MARK: - Block LaTeX View
 
 private struct BlockLaTeXView: View {
     let latex: String
@@ -507,14 +536,16 @@ private struct BlockLaTeXWebView: UIViewRepresentable {
         guard key != context.coordinator.lastKey else { return }
         context.coordinator.lastKey = key
 
-        // Encode LaTeX as JSON string for safe JS embedding
         let encoder = JSONEncoder()
         let jsonLatex: String
         if let jsonData = try? encoder.encode(latex),
-           let jsonStr = String(data: jsonData, encoding: .utf8) {
-            jsonLatex = jsonStr
+           let jsonString = String(data: jsonData, encoding: .utf8) {
+            jsonLatex = jsonString
         } else {
-            jsonLatex = "\"\(latex.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\""))\""
+            let escaped = latex
+                .replacingOccurrences(of: "\\", with: "\\\\")
+                .replacingOccurrences(of: "\"", with: "\\\"")
+            jsonLatex = "\"\(escaped)\""
         }
 
         let textColor = isDark ? "#e5e5e5" : "#1c1c1e"
@@ -574,8 +605,13 @@ private struct BlockLaTeXWebView: UIViewRepresentable {
         webView.loadHTMLString(html, baseURL: URL(string: "https://cdn.jsdelivr.net"))
     }
 
+    static func dismantleUIView(_ webView: WKWebView, coordinator: Coordinator) {
+        webView.navigationDelegate = nil
+        webView.configuration.userContentController.removeScriptMessageHandler(forName: "sizeCallback")
+    }
+
     @MainActor
-    class Coordinator: NSObject, WKNavigationDelegate, WKScriptMessageHandler {
+    final class Coordinator: NSObject, WKNavigationDelegate, WKScriptMessageHandler, @unchecked Sendable {
         @Binding var height: CGFloat
         var lastKey: String = ""
 
@@ -588,15 +624,16 @@ private struct BlockLaTeXWebView: UIViewRepresentable {
             didReceive message: WKScriptMessage
         ) {
             let newHeight: CGFloat
-            if let h = message.body as? CGFloat {
-                newHeight = max(h, 20)
-            } else if let h = message.body as? Int {
-                newHeight = max(CGFloat(h), 20)
-            } else if let h = message.body as? Double {
-                newHeight = max(CGFloat(h), 20)
+            if let value = message.body as? CGFloat {
+                newHeight = max(value, 20)
+            } else if let value = message.body as? Int {
+                newHeight = max(CGFloat(value), 20)
+            } else if let value = message.body as? Double {
+                newHeight = max(CGFloat(value), 20)
             } else {
                 return
             }
+
             Task { @MainActor in
                 self.height = newHeight
             }
