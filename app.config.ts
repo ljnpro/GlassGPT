@@ -31,7 +31,7 @@ const env = {
 const config: ExpoConfig = {
   name: env.appName,
   slug: env.appSlug,
-  version: "1.1.0",
+  version: "2.0.0",
   orientation: "portrait",
   icon: "./assets/images/icon.png",
   scheme: env.scheme,
@@ -39,9 +39,12 @@ const config: ExpoConfig = {
   ios: {
     supportsTablet: true,
     bundleIdentifier: env.iosBundleId,
+    deploymentTarget: "26.0",
     infoPlist: {
       ITSAppUsesNonExemptEncryption: false,
       UIDesignRequiresCompatibility: false,
+      NSPhotoLibraryUsageDescription:
+        "Allow $(PRODUCT_NAME) to access your photo library so you can attach images to chats.",
     },
   },
   android: {
@@ -107,12 +110,17 @@ const config: ExpoConfig = {
     [
       "expo-build-properties",
       {
+        ios: {
+          deploymentTarget: "26.0",
+        },
         android: {
           buildArchs: ["armeabi-v7a", "arm64-v8a"],
           minSdkVersion: 24,
         },
       },
     ],
+    "./plugins/withNativeChatIOS",
+    "./plugins/withSwiftPackages",
   ],
   experiments: {
     typedRoutes: true,

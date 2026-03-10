@@ -80,3 +80,8 @@
 - [x] REWRITE: Implement history/conversation list screen
 - [x] REWRITE: Implement Markdown/LaTeX/code rendering in SwiftUI
 - [x] REWRITE: Polish and finalize all screens (GPT-5.4 High review applied 7 patches)
+- [x] INTEGRATE: Consult GPT-5.4 High on Expo Module + SwiftUI integration architecture
+- [x] INTEGRATE: Create Expo Module that hosts the entire SwiftUI app as the root view (AppDelegate bootstrap approach)
+- [x] INTEGRATE: Remove React Native UI layer - Swift drives all iOS UI (app/index.tsx returns null)
+- [x] INTEGRATE: Wire up Expo build system to compile Swift code (withSwiftPackages + withNativeChatIOS plugins)
+- [x] INTEGRATE: Apply GPT-5.4 High code review fixes (13 critical/high/medium issues patched)

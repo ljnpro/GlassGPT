@@ -1,0 +1,34 @@
+{
+  "cli": {
+    "version": ">= 16.0.0"
+  },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "ios": {
+        "image": "latest"
+      }
+    },
+    "preview": {
+      "distribution": "internal",
+      "ios": {
+        "image": "latest"
+      }
+    },
+    "production": {
+      "ios": {
+        "image": "latest"
+      }
+    }
+  },
+  "submit": {
+    "production": {
+      "ios": {
+        "appleId": "",
+        "ascAppId": "",
+        "appleTeamId": ""
+      }
+    }
+  }
+}
