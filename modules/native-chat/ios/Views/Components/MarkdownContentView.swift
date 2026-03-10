@@ -247,7 +247,6 @@ struct MarkdownContentView: View {
 
         case let .latexBlock(id: id, content: content):
             BlockLaTeXView(latex: content)
-                .padding(.vertical, 2)
                 .id(id)
 
         case let .richText(id: id, segments: segments):
@@ -450,7 +449,7 @@ private struct RichTextView: View {
 private struct BlockLaTeXView: View {
     let latex: String
 
-    @State private var height: CGFloat = 40
+    @State private var height: CGFloat = 24
     @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
@@ -461,6 +460,7 @@ private struct BlockLaTeXView: View {
         )
         .frame(height: height)
         .frame(maxWidth: .infinity, alignment: .center)
+        .clipped()
     }
 }
 
@@ -527,8 +527,9 @@ private struct BlockLaTeXWebView: UIViewRepresentable {
             display: flex;
             align-items: center;
             justify-content: center;
-            min-height: 24px;
+            min-height: 20px;
             padding: 0;
+            margin: 0;
             -webkit-text-size-adjust: none;
         }
         .katex { font-size: 1em !important; }
@@ -556,7 +557,7 @@ private struct BlockLaTeXWebView: UIViewRepresentable {
                 if (h > 0) {
                     window.webkit.messageHandlers.sizeCallback.postMessage(h);
                 }
-            }, 150);
+            }, 100);
         });
         </script>
         </body>

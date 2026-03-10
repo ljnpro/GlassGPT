@@ -12,56 +12,34 @@ final class SettingsViewModel {
     var isValidating: Bool = false
     var saveConfirmation: Bool = false
 
-    // MARK: - Persisted Settings
+    // MARK: - Persisted Settings (stored properties for @Observable tracking)
 
-    /// We use UserDefaults directly (not @AppStorage) because @AppStorage
-    /// combined with @ObservationIgnored prevents SwiftUI Picker from updating.
     var defaultModel: ModelType {
-        get {
-            if let raw = UserDefaults.standard.string(forKey: "defaultModel"),
-               let model = ModelType(rawValue: raw) {
-                return model
-            }
-            return .gpt5_4
-        }
-        set {
-            UserDefaults.standard.set(newValue.rawValue, forKey: "defaultModel")
+        didSet {
+            UserDefaults.standard.set(defaultModel.rawValue, forKey: "defaultModel")
             // Validate effort for new model
-            if !newValue.availableEfforts.contains(defaultEffort) {
-                defaultEffort = newValue.defaultEffort
+            if !defaultModel.availableEfforts.contains(defaultEffort) {
+                defaultEffort = defaultModel.defaultEffort
             }
         }
     }
 
     var defaultEffort: ReasoningEffort {
-        get {
-            if let raw = UserDefaults.standard.string(forKey: "defaultEffort"),
-               let effort = ReasoningEffort(rawValue: raw) {
-                return effort
-            }
-            return .medium  // Default is medium per user requirement
-        }
-        set {
-            UserDefaults.standard.set(newValue.rawValue, forKey: "defaultEffort")
+        didSet {
+            UserDefaults.standard.set(defaultEffort.rawValue, forKey: "defaultEffort")
         }
     }
 
     var appTheme: AppTheme {
-        get {
-            if let raw = UserDefaults.standard.string(forKey: "appTheme"),
-               let theme = AppTheme(rawValue: raw) {
-                return theme
-            }
-            return .system
-        }
-        set {
-            UserDefaults.standard.set(newValue.rawValue, forKey: "appTheme")
+        didSet {
+            UserDefaults.standard.set(appTheme.rawValue, forKey: "appTheme")
         }
     }
 
     var hapticEnabled: Bool {
-        get { UserDefaults.standard.object(forKey: "hapticEnabled") as? Bool ?? true }
-        set { UserDefaults.standard.set(newValue, forKey: "hapticEnabled") }
+        didSet {
+            UserDefaults.standard.set(hapticEnabled, forKey: "hapticEnabled")
+        }
     }
 
     // MARK: - Available efforts for current default model
@@ -77,6 +55,34 @@ final class SettingsViewModel {
     // MARK: - Init
 
     init() {
+        // Load persisted values from UserDefaults
+        if let raw = UserDefaults.standard.string(forKey: "defaultModel"),
+           let model = ModelType(rawValue: raw) {
+            self.defaultModel = model
+        } else {
+            self.defaultModel = .gpt5_4
+        }
+
+        if let raw = UserDefaults.standard.string(forKey: "defaultEffort"),
+           let effort = ReasoningEffort(rawValue: raw) {
+            self.defaultEffort = effort
+        } else {
+            self.defaultEffort = .medium
+        }
+
+        if let raw = UserDefaults.standard.string(forKey: "appTheme"),
+           let theme = AppTheme(rawValue: raw) {
+            self.appTheme = theme
+        } else {
+            self.appTheme = .system
+        }
+
+        if let val = UserDefaults.standard.object(forKey: "hapticEnabled") as? Bool {
+            self.hapticEnabled = val
+        } else {
+            self.hapticEnabled = true
+        }
+
         apiKey = keychainService.loadAPIKey() ?? ""
     }
 
