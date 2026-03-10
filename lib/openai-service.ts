@@ -11,6 +11,15 @@ const RESPONSES_API_URL = "https://api.openai.com/v1/responses";
 const MODELS_API_URL = "https://api.openai.com/v1/models";
 const DEFAULT_MAX_OUTPUT_TOKENS = 16000;
 
+/** How many times to retry a failed/interrupted stream before giving up. */
+const MAX_STREAM_RETRIES = 3;
+
+/** Seconds of silence (no new SSE data) before we consider the stream stalled. */
+const STREAM_STALL_TIMEOUT_MS = 45_000;
+
+/** Delay between retries – increases with each attempt (backoff). */
+const RETRY_BASE_DELAY_MS = 1_500;
+
 export interface StreamCompletionResult {
   outputText: string;
   reasoning: string;
@@ -49,6 +58,10 @@ type ResponsesInputMessage = {
   role: "user" | "assistant" | "system";
   content: ResponsesInputItem[];
 };
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
 
 function normalizeUsage(value: unknown): ResponseUsage | undefined {
   if (!value || typeof value !== "object") {
@@ -118,7 +131,17 @@ function normalizeError(error: unknown): string {
 
 function imageToInputUrl(image: ImageAttachment): string {
   if (image.base64 && image.base64.length > 0) {
-    const mimeType = image.mimeType || "image/jpeg";
+    // Guard against base64 strings that already include the data URI prefix
+    if (image.base64.startsWith("data:")) {
+      return image.base64;
+    }
+
+    // Ensure MIME type is one that OpenAI accepts
+    const supportedTypes = ["image/jpeg", "image/png", "image/gif", "image/webp"];
+    const mimeType = supportedTypes.includes(image.mimeType || "")
+      ? image.mimeType!
+      : "image/jpeg";
+
     return `data:${mimeType};base64,${image.base64}`;
   }
 
@@ -132,7 +155,6 @@ function buildResponsesInput(messages: Message[]): ResponsesInputMessage[] {
     const content: ResponsesInputItem[] = [];
 
     if (message.content.trim().length > 0) {
-      // Use "output_text" for assistant messages, "input_text" for user/system
       const textType = message.role === "assistant" ? "output_text" : "input_text";
       content.push({
         type: textType,
@@ -351,6 +373,52 @@ function appendDelta(current: string, delta: string): string {
   return `${current}${delta}`;
 }
 
+function isAbortError(error: unknown): boolean {
+  return (error as { name?: string })?.name === "AbortError";
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * Race a promise against a timeout. Resolves to `"timeout"` if the timeout
+ * fires first, otherwise resolves to the promise value.
+ */
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T | "timeout"> {
+  return new Promise<T | "timeout">((resolve, reject) => {
+    let settled = false;
+
+    const timer = setTimeout(() => {
+      if (!settled) {
+        settled = true;
+        resolve("timeout");
+      }
+    }, ms);
+
+    promise.then(
+      (value) => {
+        if (!settled) {
+          settled = true;
+          clearTimeout(timer);
+          resolve(value);
+        }
+      },
+      (error) => {
+        if (!settled) {
+          settled = true;
+          clearTimeout(timer);
+          reject(error);
+        }
+      }
+    );
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Core streaming
+// ---------------------------------------------------------------------------
+
 export async function streamChatCompletion(
   apiKey: string,
   messages: Message[],
@@ -361,13 +429,10 @@ export async function streamChatCompletion(
 ): Promise<StreamCompletionResult> {
   const normalizedEffort = normalizeReasoningEffort(model, effort);
 
-  // Build reasoning config: always include summary for models with reasoning
   const reasoningConfig: Record<string, unknown> = {
     effort: normalizedEffort,
   };
 
-  // Opt in to reasoning summaries so the API streams reasoning_summary_text events.
-  // "auto" selects the most detailed summarizer available for the model.
   if (normalizedEffort !== "none") {
     reasoningConfig.summary = "auto";
   }
@@ -406,6 +471,10 @@ export async function streamChatCompletion(
     result.error = message;
     callbacks.onError(message);
   };
+
+  // -----------------------------------------------------------------------
+  // SSE event handlers
+  // -----------------------------------------------------------------------
 
   const handleParsedEvent = (payload: Record<string, unknown>, eventName: string): boolean => {
     if (eventName === "done") {
@@ -563,38 +632,75 @@ export async function streamChatCompletion(
     }
   };
 
-  try {
-    const response = await fetch(RESPONSES_API_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "text/event-stream",
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify(requestBody),
-      signal: abortSignal,
-    });
+  // -----------------------------------------------------------------------
+  // Attempt a single streaming fetch. Returns:
+  //   "done"      – stream completed normally
+  //   "stalled"   – no data received for STREAM_STALL_TIMEOUT_MS
+  //   "error"     – a recoverable network/stream error occurred
+  //   "fatal"     – a non-recoverable error (abort, 4xx, etc.)
+  // -----------------------------------------------------------------------
 
-    if (!response.ok) {
-      fail(await readErrorMessageFromResponse(response));
-      return result;
+  type AttemptOutcome = "done" | "stalled" | "error" | "fatal";
+
+  const attemptStream = async (): Promise<AttemptOutcome> => {
+    let response: Response;
+
+    try {
+      response = await fetch(RESPONSES_API_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "text/event-stream",
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify(requestBody),
+        signal: abortSignal,
+      });
+    } catch (fetchError) {
+      if (isAbortError(fetchError)) {
+        return "fatal";
+      }
+      // Network error – recoverable
+      return "error";
     }
 
-    // Attempt streaming via ReadableStream. React Native production builds
-    // may not support response.body / getReader(), so we wrap in try-catch
-    // and fall back to reading the full response text.
+    if (!response.ok) {
+      const errorMsg = await readErrorMessageFromResponse(response);
+      // 4xx errors are not recoverable (bad request, auth, rate limit)
+      // 5xx errors are recoverable
+      if (response.status >= 400 && response.status < 500) {
+        fail(errorMsg);
+        return "fatal";
+      }
+      // 5xx – recoverable, but store the error message in case all retries fail
+      result.error = errorMsg;
+      return "error";
+    }
+
+    // --- Try ReadableStream first (true streaming) ---
     const body = response.body;
-    let useStreamReader = false;
 
     if (body && typeof body.getReader === "function") {
       try {
         const reader = body.getReader();
-        useStreamReader = true;
         const decoder = new TextDecoder("utf-8");
         let buffer = "";
 
         while (true) {
-          const { done, value } = await reader.read();
+          // Race reader.read() against a stall timeout
+          const readResult = await withTimeout(reader.read(), STREAM_STALL_TIMEOUT_MS);
+
+          if (readResult === "timeout") {
+            // Stream stalled – cancel reader and signal for retry
+            try {
+              await reader.cancel();
+            } catch {
+              // Ignore
+            }
+            return "stalled";
+          }
+
+          const { done, value } = readResult;
 
           if (done) {
             break;
@@ -617,7 +723,7 @@ export async function streamChatCompletion(
                 } catch {
                   // Ignore cancellation errors.
                 }
-                return result;
+                return "done";
               }
             }
 
@@ -625,6 +731,7 @@ export async function streamChatCompletion(
           }
         }
 
+        // Process any trailing data in the buffer
         const trailingBlock = parseSseBlock(buffer.trim());
         if (trailingBlock) {
           handleSsePayload(trailingBlock);
@@ -644,39 +751,86 @@ export async function streamChatCompletion(
           complete();
         }
 
-        return result;
+        return "done";
       } catch (streamError) {
+        if (isAbortError(streamError)) {
+          return "fatal";
+        }
         // ReadableStream failed at runtime (common in RN production builds).
-        // Fall through to text-based parsing below.
-        if ((streamError as { name?: string })?.name === "AbortError") {
-          throw streamError;
-        }
+        // Fall through to text-based fallback below.
       }
     }
 
-    // Fallback: read the entire response as text and parse SSE blocks.
-    if (!useStreamReader || (!didFinish && !didError)) {
-      try {
-        const fullText = await response.text();
-        handleNonStreamingPayload(fullText);
-      } catch (textError) {
-        if (!didFinish && !didError) {
-          fail(normalizeError(textError));
-        }
+    // --- Fallback: read entire response as text ---
+    // This ensures we ALWAYS get the result even if streaming is not supported.
+    try {
+      const fullText = await response.text();
+      handleNonStreamingPayload(fullText);
+      return "done";
+    } catch (textError) {
+      if (isAbortError(textError)) {
+        return "fatal";
       }
+      if (!didFinish && !didError) {
+        // Network error during text read – recoverable
+        return "error";
+      }
+      return "done";
     }
+  };
 
-    return result;
-  } catch (error) {
-    if ((error as { name?: string })?.name === "AbortError") {
+  // -----------------------------------------------------------------------
+  // Retry loop: attempt streaming with automatic reconnect
+  // -----------------------------------------------------------------------
+
+  for (let attempt = 0; attempt <= MAX_STREAM_RETRIES; attempt++) {
+    // Check if already aborted before starting
+    if (abortSignal?.aborted) {
       complete();
       return result;
     }
 
-    fail(normalizeError(error));
-    return result;
+    const outcome = await attemptStream();
+
+    if (outcome === "done" || outcome === "fatal") {
+      // Either completed successfully or hit a non-recoverable error
+      break;
+    }
+
+    // "stalled" or "error" – we can retry
+    if (attempt < MAX_STREAM_RETRIES) {
+      // If we already have partial content, the user can see it.
+      // Wait with exponential backoff before retrying.
+      const delay = RETRY_BASE_DELAY_MS * Math.pow(2, attempt);
+      await sleep(delay);
+
+      // Reset finish/error flags for the retry attempt
+      // (only if we haven't already gotten a complete result)
+      if (!didFinish) {
+        didError = false;
+        result.error = undefined;
+      }
+    }
   }
+
+  // If after all retries we still have no result and no error, complete with whatever we have.
+  // The principle is: NEVER waste the user's tokens. If we got partial content, deliver it.
+  if (!didFinish && !didError) {
+    if (result.outputText.length > 0) {
+      // We have partial content – deliver it as success
+      complete();
+    } else {
+      // No content at all after all retries
+      fail(result.error || "Connection lost. Please check your network and try again.");
+    }
+  }
+
+  return result;
 }
+
+// ---------------------------------------------------------------------------
+// Non-streaming utilities
+// ---------------------------------------------------------------------------
 
 export async function validateApiKey(
   apiKey: string

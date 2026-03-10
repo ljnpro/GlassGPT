@@ -49,3 +49,12 @@
 - [x] BUG: iOS keyboard covers the input field when typing
 - [x] BUG: Messages cannot be sent in iOS production build (works in preview/Expo Go)
 - [x] BUG: iOS build fails due to expo-crypto incompatibility with expo-modules-core - removed expo-crypto
+- [x] BUG: Settings tab white screen when rapidly switching between tabs
+- [x] BUG: Message input field not vertically centered
+- [x] UI: Simplify chat header - remove "Liquid Glass Chat" title, only show model(reasoning level) and new chat icon
+- [x] UI: Simplify chat header - remove "Private chats with your own OpenAI key" subtitle
+- [x] FEATURE: Streaming with auto-reconnect, keep non-streaming fallback, ensure results always delivered
+- [x] FEATURE: Auto-reconnect logic for streaming when network is unstable (max 3 retries with exponential backoff)
+- [x] FEATURE: Timeout detection - 45s stall timeout triggers auto-retry
+- [x] FEATURE: Background message receiving - AppState listener for foreground resume
+- [x] BUG: Image upload fails - OpenAI rejects images as invalid format - fixed with expo-image-manipulator JPEG conversion

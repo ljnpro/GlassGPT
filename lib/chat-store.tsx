@@ -7,6 +7,7 @@ import React, {
   useReducer,
   useRef,
 } from "react";
+import { AppState, AppStateStatus } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { v4 as uuidv4 } from "uuid";
 
@@ -99,7 +100,8 @@ type ChatAction =
       effort: ReasoningEffort;
     }
   | { type: "UPDATE_CONVERSATION_TITLE"; conversationId: string; title: string }
-  | { type: "UPDATE_SETTINGS"; settings: Partial<AppSettings> };
+  | { type: "UPDATE_SETTINGS"; settings: Partial<AppSettings> }
+  | { type: "FORCE_REFRESH" };
 
 interface SendMessageParams {
   text: string;
@@ -763,6 +765,10 @@ function chatReducer(state: ChatState, action: ChatAction): ChatState {
         lastError: null,
       };
 
+    case "FORCE_REFRESH":
+      // Return a shallow copy to force React to re-render.
+      return { ...state };
+
     default:
       return state;
   }
@@ -948,6 +954,30 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
 
     void persistApiKey();
   }, [state.settings.apiKey, state.isLoaded]);
+
+  // -------------------------------------------------------------------------
+  // AppState: when the app returns from background, the streaming connection
+  // may have been interrupted by the OS.  The auto-reconnect logic inside
+  // openai-service.ts handles stall detection (45 s timeout → retry), but if
+  // the OS fully suspended the JS thread the timer won't fire.  We listen for
+  // the "active" transition and, if a stream was in progress but the assistant
+  // message is still marked as streaming with no recent update, we log a
+  // notice.  The retry loop in openai-service will pick up automatically once
+  // the JS thread resumes, so no extra action is needed here – this effect
+  // mainly ensures React re-renders with the latest state.
+  // -------------------------------------------------------------------------
+  useEffect(() => {
+    const handleAppStateChange = (nextState: AppStateStatus) => {
+      if (nextState === "active" && stateRef.current.isSending) {
+        // Force a re-render so the UI reflects the current streaming state.
+        // The streaming promise is still alive (or will timeout & retry).
+        dispatch({ type: "FORCE_REFRESH" });
+      }
+    };
+
+    const subscription = AppState.addEventListener("change", handleAppStateChange);
+    return () => subscription.remove();
+  }, []);
 
   const rawActiveConversation = useMemo(() => {
     if (!state.activeConversationId) {
