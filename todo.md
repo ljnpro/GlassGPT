@@ -108,3 +108,5 @@
 - [x] FIX: Optional chaining on non-optional OpenAIService - moved self?.currentTask into @MainActor Task
 - [x] FIX: 'reference to captured var self in concurrently-executing code' in onTermination closure line 133
 - [x] BUG: GPT not responding - complete rewrite of OpenAIService with verified SSE event parsing from live API test, auto fallback to non-streaming, extractOutputText from output[].content[].text
+- [x] BUG: First reply duplicated briefly - fixed by clearing streaming state before appending message
+- [x] BUG: LaTeX rendering broken - rewrote parser to support \[...\], \(...\), $$...$$, $...$; fixed KaTeX JS escaping via JSONEncoder; set baseURL for CDN loading

@@ -269,10 +269,21 @@ final class ChatViewModel {
             return
         }
 
+        // Capture text before clearing state
+        let finalText = currentStreamingText
+        let finalThinking = currentThinkingText.isEmpty ? nil : currentThinkingText
+
+        // IMPORTANT: Hide streaming bubble FIRST to prevent visual duplication
+        // (streaming bubble + new message bubble both visible at same time)
+        currentStreamingText = ""
+        currentThinkingText = ""
+        isStreaming = false
+        isThinking = false
+
         let assistantMessage = Message(
             role: .assistant,
-            content: currentStreamingText,
-            thinking: currentThinkingText.isEmpty ? nil : currentThinkingText
+            content: finalText,
+            thinking: finalThinking
         )
 
         assistantMessage.conversation = currentConversation
@@ -287,11 +298,6 @@ final class ChatViewModel {
         if currentConversation?.title == "New Chat" && messages.count >= 2 {
             await generateTitle()
         }
-
-        currentStreamingText = ""
-        currentThinkingText = ""
-        isStreaming = false
-        isThinking = false
 
         HapticService.shared.notify(.success)
     }
