@@ -84,7 +84,7 @@ final class OpenAIService {
                     do {
                         try Task.checkCancellation()
 
-                        let request = try Self.buildStreamRequest(
+                        let request = try OpenAIService.buildStreamRequest(
                             baseURL: capturedBaseURL,
                             apiKey: apiKey,
                             messages: messages,
@@ -132,7 +132,7 @@ final class OpenAIService {
                             if line.isEmpty {
                                 // Empty line = end of SSE event
                                 if !currentEventType.isEmpty && !dataBuffer.isEmpty {
-                                    let finished = Self.handleSSEEvent(
+                                    let finished = OpenAIService.handleSSEEvent(
                                         currentEventType,
                                         payload: dataBuffer,
                                         emittedAnyOutput: &emittedAnyOutput,
@@ -157,7 +157,7 @@ final class OpenAIService {
 
                         // Process any remaining buffered event
                         if !sawCompleted && !currentEventType.isEmpty && !dataBuffer.isEmpty {
-                            let finished = Self.handleSSEEvent(
+                            let finished = OpenAIService.handleSSEEvent(
                                 currentEventType,
                                 payload: dataBuffer,
                                 emittedAnyOutput: &emittedAnyOutput,
@@ -280,9 +280,9 @@ final class OpenAIService {
         }
     }
 
-    // MARK: - Build Request (static, no self capture)
+    // MARK: - Build Request (nonisolated static - safe to call from any context)
 
-    private static func buildStreamRequest(
+    private nonisolated static func buildStreamRequest(
         baseURL: String,
         apiKey: String,
         messages: [APIMessage],
@@ -343,9 +343,9 @@ final class OpenAIService {
         return request
     }
 
-    // MARK: - SSE Event Handler (static)
+    // MARK: - SSE Event Handler (nonisolated static - safe to call from any context)
 
-    private static func handleSSEEvent(
+    private nonisolated static func handleSSEEvent(
         _ eventType: String,
         payload: String,
         emittedAnyOutput: inout Bool,
