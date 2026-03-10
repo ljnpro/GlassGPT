@@ -85,3 +85,4 @@
 - [x] INTEGRATE: Remove React Native UI layer - Swift drives all iOS UI (app/index.tsx returns null)
 - [x] INTEGRATE: Wire up Expo build system to compile Swift code (withSwiftPackages + withNativeChatIOS plugins)
 - [x] INTEGRATE: Apply GPT-5.4 High code review fixes (13 critical/high/medium issues patched)
+- [x] FIX: Update eas.json with correct Apple ID and Team ID for App Store submission
