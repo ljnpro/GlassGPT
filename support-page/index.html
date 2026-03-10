@@ -1,0 +1,958 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Liquid Glass Chat — Support</title>
+  <meta name="description" content="Support page for Liquid Glass Chat — a premium AI chat client for iOS with liquid glass UI, GPT-5.4 Pro, and your own OpenAI API key." />
+  <meta name="theme-color" content="#0a0e1a" />
+  <link rel="icon" type="image/png" href="icon.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    /* ================================================================
+       CSS Reset & Base
+       ================================================================ */
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --bg-deep: #060a14;
+      --bg-surface: #0d1220;
+      --glass-bg: rgba(255, 255, 255, 0.04);
+      --glass-border: rgba(255, 255, 255, 0.08);
+      --glass-highlight: rgba(255, 255, 255, 0.12);
+      --text-primary: #f0f2f5;
+      --text-secondary: rgba(240, 242, 245, 0.6);
+      --text-muted: rgba(240, 242, 245, 0.35);
+      --accent: #007AFF;
+      --accent-glow: rgba(0, 122, 255, 0.25);
+      --accent-soft: rgba(0, 122, 255, 0.12);
+      --gradient-blue: linear-gradient(135deg, #007AFF, #5856D6);
+      --gradient-hero: radial-gradient(ellipse 80% 60% at 50% 0%, rgba(0, 122, 255, 0.15) 0%, transparent 70%);
+      --radius-sm: 12px;
+      --radius-md: 20px;
+      --radius-lg: 28px;
+      --radius-xl: 36px;
+      --font: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    }
+
+    html {
+      scroll-behavior: smooth;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    body {
+      font-family: var(--font);
+      background: var(--bg-deep);
+      color: var(--text-primary);
+      line-height: 1.6;
+      overflow-x: hidden;
+    }
+
+    /* ================================================================
+       Ambient Background
+       ================================================================ */
+    .ambient {
+      position: fixed;
+      inset: 0;
+      z-index: -1;
+      overflow: hidden;
+      pointer-events: none;
+    }
+
+    .ambient-orb {
+      position: absolute;
+      border-radius: 50%;
+      filter: blur(120px);
+      opacity: 0.5;
+      animation: float 20s ease-in-out infinite;
+    }
+
+    .ambient-orb:nth-child(1) {
+      width: 600px; height: 600px;
+      background: rgba(0, 122, 255, 0.12);
+      top: -200px; left: -100px;
+      animation-delay: 0s;
+    }
+
+    .ambient-orb:nth-child(2) {
+      width: 500px; height: 500px;
+      background: rgba(88, 86, 214, 0.1);
+      top: 40%; right: -150px;
+      animation-delay: -7s;
+      animation-duration: 25s;
+    }
+
+    .ambient-orb:nth-child(3) {
+      width: 400px; height: 400px;
+      background: rgba(0, 199, 190, 0.08);
+      bottom: -100px; left: 30%;
+      animation-delay: -14s;
+      animation-duration: 22s;
+    }
+
+    @keyframes float {
+      0%, 100% { transform: translate(0, 0) scale(1); }
+      33% { transform: translate(30px, -20px) scale(1.05); }
+      66% { transform: translate(-20px, 15px) scale(0.95); }
+    }
+
+    /* ================================================================
+       Glass Card
+       ================================================================ */
+    .glass {
+      background: var(--glass-bg);
+      border: 1px solid var(--glass-border);
+      backdrop-filter: blur(40px) saturate(1.4);
+      -webkit-backdrop-filter: blur(40px) saturate(1.4);
+      border-radius: var(--radius-md);
+      transition: border-color 0.3s, box-shadow 0.3s, transform 0.3s;
+    }
+
+    .glass:hover {
+      border-color: var(--glass-highlight);
+      box-shadow: 0 8px 40px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255,255,255,0.06);
+    }
+
+    /* ================================================================
+       Layout
+       ================================================================ */
+    .container {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 0 24px;
+    }
+
+    section {
+      padding: 80px 0;
+    }
+
+    /* ================================================================
+       Navigation
+       ================================================================ */
+    nav {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 100;
+      padding: 0 24px;
+      transition: background 0.3s, backdrop-filter 0.3s;
+    }
+
+    nav.scrolled {
+      background: rgba(6, 10, 20, 0.8);
+      backdrop-filter: blur(30px) saturate(1.5);
+      -webkit-backdrop-filter: blur(30px) saturate(1.5);
+      border-bottom: 1px solid var(--glass-border);
+    }
+
+    .nav-inner {
+      max-width: 960px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 64px;
+    }
+
+    .nav-brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      text-decoration: none;
+      color: var(--text-primary);
+    }
+
+    .nav-brand img {
+      width: 36px;
+      height: 36px;
+      border-radius: 8px;
+    }
+
+    .nav-brand span {
+      font-weight: 600;
+      font-size: 16px;
+      letter-spacing: -0.01em;
+    }
+
+    .nav-links {
+      display: flex;
+      gap: 32px;
+      list-style: none;
+    }
+
+    .nav-links a {
+      color: var(--text-secondary);
+      text-decoration: none;
+      font-size: 14px;
+      font-weight: 500;
+      transition: color 0.2s;
+    }
+
+    .nav-links a:hover {
+      color: var(--text-primary);
+    }
+
+    /* ================================================================
+       Hero
+       ================================================================ */
+    .hero {
+      padding-top: 160px;
+      padding-bottom: 100px;
+      text-align: center;
+      position: relative;
+    }
+
+    .hero::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: var(--gradient-hero);
+      pointer-events: none;
+    }
+
+    .hero-icon {
+      width: 120px;
+      height: 120px;
+      border-radius: 28px;
+      margin: 0 auto 32px;
+      box-shadow:
+        0 0 0 1px rgba(255,255,255,0.08),
+        0 20px 60px rgba(0, 122, 255, 0.2),
+        0 0 120px rgba(0, 122, 255, 0.1);
+      animation: iconGlow 4s ease-in-out infinite alternate;
+    }
+
+    @keyframes iconGlow {
+      0% { box-shadow: 0 0 0 1px rgba(255,255,255,0.08), 0 20px 60px rgba(0, 122, 255, 0.15), 0 0 80px rgba(0, 122, 255, 0.08); }
+      100% { box-shadow: 0 0 0 1px rgba(255,255,255,0.12), 0 20px 80px rgba(0, 122, 255, 0.25), 0 0 120px rgba(0, 122, 255, 0.12); }
+    }
+
+    .hero h1 {
+      font-size: clamp(36px, 6vw, 56px);
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      line-height: 1.1;
+      margin-bottom: 16px;
+      background: linear-gradient(180deg, #ffffff 0%, rgba(255,255,255,0.7) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .hero p {
+      font-size: clamp(16px, 2.5vw, 20px);
+      color: var(--text-secondary);
+      max-width: 560px;
+      margin: 0 auto 40px;
+      line-height: 1.6;
+    }
+
+    .hero-badges {
+      display: flex;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 16px;
+      border-radius: 100px;
+      font-size: 13px;
+      font-weight: 500;
+      background: var(--glass-bg);
+      border: 1px solid var(--glass-border);
+      color: var(--text-secondary);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+    }
+
+    .badge-accent {
+      background: var(--accent-soft);
+      border-color: rgba(0, 122, 255, 0.2);
+      color: #5ac8fa;
+    }
+
+    /* ================================================================
+       Features
+       ================================================================ */
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 20px;
+    }
+
+    .feature-card {
+      padding: 32px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .feature-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.08), transparent);
+    }
+
+    .feature-icon {
+      width: 48px;
+      height: 48px;
+      border-radius: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+      margin-bottom: 20px;
+      background: var(--accent-soft);
+      border: 1px solid rgba(0, 122, 255, 0.15);
+    }
+
+    .feature-card h3 {
+      font-size: 17px;
+      font-weight: 600;
+      margin-bottom: 8px;
+      letter-spacing: -0.01em;
+    }
+
+    .feature-card p {
+      font-size: 14px;
+      color: var(--text-secondary);
+      line-height: 1.6;
+    }
+
+    /* ================================================================
+       Section Headers
+       ================================================================ */
+    .section-header {
+      text-align: center;
+      margin-bottom: 56px;
+    }
+
+    .section-label {
+      display: inline-block;
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--accent);
+      margin-bottom: 12px;
+    }
+
+    .section-header h2 {
+      font-size: clamp(28px, 4vw, 40px);
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      line-height: 1.15;
+      margin-bottom: 12px;
+    }
+
+    .section-header p {
+      font-size: 16px;
+      color: var(--text-secondary);
+      max-width: 520px;
+      margin: 0 auto;
+    }
+
+    /* ================================================================
+       FAQ
+       ================================================================ */
+    .faq-list {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      max-width: 720px;
+      margin: 0 auto;
+    }
+
+    .faq-item {
+      padding: 0;
+      overflow: hidden;
+    }
+
+    .faq-question {
+      width: 100%;
+      background: none;
+      border: none;
+      color: var(--text-primary);
+      font-family: var(--font);
+      font-size: 15px;
+      font-weight: 500;
+      text-align: left;
+      padding: 20px 24px;
+      cursor: pointer;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+      transition: color 0.2s;
+    }
+
+    .faq-question:hover {
+      color: #5ac8fa;
+    }
+
+    .faq-chevron {
+      flex-shrink: 0;
+      width: 20px;
+      height: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: transform 0.3s ease;
+      color: var(--text-muted);
+    }
+
+    .faq-item.open .faq-chevron {
+      transform: rotate(180deg);
+    }
+
+    .faq-answer {
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height 0.35s ease, padding 0.35s ease;
+    }
+
+    .faq-item.open .faq-answer {
+      max-height: 400px;
+    }
+
+    .faq-answer-inner {
+      padding: 0 24px 20px;
+      font-size: 14px;
+      color: var(--text-secondary);
+      line-height: 1.7;
+    }
+
+    .faq-answer-inner a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+
+    .faq-answer-inner a:hover {
+      text-decoration: underline;
+    }
+
+    /* ================================================================
+       Privacy
+       ================================================================ */
+    .privacy-card {
+      padding: 48px;
+      max-width: 720px;
+      margin: 0 auto;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .privacy-card::before {
+      content: '';
+      position: absolute;
+      top: -1px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 200px;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(0, 122, 255, 0.4), transparent);
+    }
+
+    .privacy-icon {
+      font-size: 40px;
+      margin-bottom: 24px;
+    }
+
+    .privacy-card h3 {
+      font-size: 22px;
+      font-weight: 600;
+      margin-bottom: 16px;
+      letter-spacing: -0.01em;
+    }
+
+    .privacy-points {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .privacy-points li {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      font-size: 14px;
+      color: var(--text-secondary);
+      line-height: 1.6;
+    }
+
+    .privacy-check {
+      flex-shrink: 0;
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background: rgba(52, 199, 89, 0.12);
+      border: 1px solid rgba(52, 199, 89, 0.25);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #34C759;
+      font-size: 12px;
+      margin-top: 1px;
+    }
+
+    /* ================================================================
+       Contact / Support
+       ================================================================ */
+    .contact-card {
+      text-align: center;
+      padding: 56px 40px;
+      max-width: 720px;
+      margin: 0 auto;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .contact-card::before {
+      content: '';
+      position: absolute;
+      inset: -1px;
+      border-radius: var(--radius-md);
+      padding: 1px;
+      background: linear-gradient(135deg, rgba(0, 122, 255, 0.2), transparent 50%, rgba(88, 86, 214, 0.2));
+      -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+      mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+      -webkit-mask-composite: xor;
+      mask-composite: exclude;
+      pointer-events: none;
+    }
+
+    .contact-card h3 {
+      font-size: 22px;
+      font-weight: 600;
+      margin-bottom: 12px;
+    }
+
+    .contact-card p {
+      font-size: 14px;
+      color: var(--text-secondary);
+      margin-bottom: 28px;
+      line-height: 1.6;
+    }
+
+    .contact-email {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 14px 28px;
+      border-radius: 100px;
+      background: var(--gradient-blue);
+      color: #fff;
+      font-size: 15px;
+      font-weight: 600;
+      text-decoration: none;
+      transition: transform 0.2s, box-shadow 0.2s;
+      box-shadow: 0 4px 20px var(--accent-glow);
+    }
+
+    .contact-email:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 30px var(--accent-glow);
+    }
+
+    /* ================================================================
+       Footer
+       ================================================================ */
+    footer {
+      padding: 40px 0;
+      border-top: 1px solid var(--glass-border);
+    }
+
+    .footer-inner {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 16px;
+    }
+
+    .footer-brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .footer-brand img {
+      width: 28px;
+      height: 28px;
+      border-radius: 6px;
+    }
+
+    .footer-brand span {
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--text-secondary);
+    }
+
+    .footer-copy {
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+
+    /* ================================================================
+       Responsive
+       ================================================================ */
+    @media (max-width: 640px) {
+      section { padding: 60px 0; }
+      .hero { padding-top: 120px; padding-bottom: 60px; }
+      .hero-icon { width: 88px; height: 88px; border-radius: 22px; }
+      .nav-links { display: none; }
+      .features-grid { grid-template-columns: 1fr; }
+      .privacy-card, .contact-card { padding: 32px 24px; }
+      .section-header { margin-bottom: 40px; }
+    }
+
+    /* ================================================================
+       Scroll Animations
+       ================================================================ */
+    .reveal {
+      opacity: 0;
+      transform: translateY(24px);
+      transition: opacity 0.6s ease, transform 0.6s ease;
+    }
+
+    .reveal.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Ambient Background -->
+  <div class="ambient" aria-hidden="true">
+    <div class="ambient-orb"></div>
+    <div class="ambient-orb"></div>
+    <div class="ambient-orb"></div>
+  </div>
+
+  <!-- Navigation -->
+  <nav id="nav">
+    <div class="nav-inner">
+      <a href="#" class="nav-brand">
+        <img src="icon.png" alt="Liquid Glass Chat" />
+        <span>Liquid Glass Chat</span>
+      </a>
+      <ul class="nav-links">
+        <li><a href="#features">Features</a></li>
+        <li><a href="#faq">FAQ</a></li>
+        <li><a href="#privacy">Privacy</a></li>
+        <li><a href="#support">Support</a></li>
+      </ul>
+    </div>
+  </nav>
+
+  <!-- Hero -->
+  <section class="hero">
+    <div class="container">
+      <img src="icon.png" alt="Liquid Glass Chat icon" class="hero-icon" />
+      <h1>Liquid Glass Chat</h1>
+      <p>A premium AI chat client for iOS, designed with liquid glass aesthetics. Use your own OpenAI API key for private, powerful conversations.</p>
+      <div class="hero-badges">
+        <span class="badge badge-accent">GPT-5.4 Pro</span>
+        <span class="badge">Reasoning Control</span>
+        <span class="badge">Image Understanding</span>
+        <span class="badge">LaTeX Rendering</span>
+        <span class="badge badge-accent">iOS 26 Liquid Glass</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- Features -->
+  <section id="features">
+    <div class="container">
+      <div class="section-header reveal">
+        <span class="section-label">Features</span>
+        <h2>Everything you need in an AI chat client</h2>
+        <p>Built for power users who want full control over their AI experience.</p>
+      </div>
+      <div class="features-grid">
+        <div class="feature-card glass reveal">
+          <div class="feature-icon">🧠</div>
+          <h3>GPT-5.4 &amp; GPT-5.4 Pro</h3>
+          <p>Access the latest OpenAI models with full support for reasoning effort levels — from none to xhigh — giving you precise control over response depth.</p>
+        </div>
+        <div class="feature-card glass reveal">
+          <div class="feature-icon">✨</div>
+          <h3>iOS 26 Liquid Glass</h3>
+          <p>Native liquid glass effects throughout the interface. Frosted panels, translucent bubbles, and depth-aware layering that feels like a first-party Apple app.</p>
+        </div>
+        <div class="feature-card glass reveal">
+          <div class="feature-icon">📷</div>
+          <h3>Multimodal Input</h3>
+          <p>Send images alongside your messages. Supports HEIC, JPEG, PNG, and WebP with automatic format conversion for seamless iPhone integration.</p>
+        </div>
+        <div class="feature-card glass reveal">
+          <div class="feature-icon">📐</div>
+          <h3>LaTeX &amp; Math Rendering</h3>
+          <p>Beautiful inline and block math formula rendering. Supports standard LaTeX delimiters including $$, \[...\], and \(...\) notation.</p>
+        </div>
+        <div class="feature-card glass reveal">
+          <div class="feature-icon">⚡</div>
+          <h3>Real-time Streaming</h3>
+          <p>Responses stream in real-time with automatic reconnection. 45-second stall detection with up to 3 retries ensures you never lose a response.</p>
+        </div>
+        <div class="feature-card glass reveal">
+          <div class="feature-icon">🔐</div>
+          <h3>Your Key, Your Privacy</h3>
+          <p>Your OpenAI API key is stored securely on your device and sent directly to OpenAI. No intermediary servers, no data collection, no tracking.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FAQ -->
+  <section id="faq">
+    <div class="container">
+      <div class="section-header reveal">
+        <span class="section-label">FAQ</span>
+        <h2>Frequently Asked Questions</h2>
+      </div>
+      <div class="faq-list">
+
+        <div class="faq-item glass reveal">
+          <button class="faq-question" aria-expanded="false">
+            <span>How do I get an OpenAI API key?</span>
+            <span class="faq-chevron">
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 4L6 8L10 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </span>
+          </button>
+          <div class="faq-answer">
+            <div class="faq-answer-inner">
+              Visit <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener">platform.openai.com/api-keys</a> to create an API key. You will need an OpenAI account with billing enabled. Once created, paste the key into the Settings tab of the app.
+            </div>
+          </div>
+        </div>
+
+        <div class="faq-item glass reveal">
+          <button class="faq-question" aria-expanded="false">
+            <span>What models are supported?</span>
+            <span class="faq-chevron">
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 4L6 8L10 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </span>
+          </button>
+          <div class="faq-answer">
+            <div class="faq-answer-inner">
+              The app supports GPT-5.4 and GPT-5.4 Pro. GPT-5.4 offers reasoning effort levels from none to xhigh, while GPT-5.4 Pro supports medium, high, and xhigh reasoning. The default is GPT-5.4 Pro with xhigh reasoning for the most thorough responses.
+            </div>
+          </div>
+        </div>
+
+        <div class="faq-item glass reveal">
+          <button class="faq-question" aria-expanded="false">
+            <span>What is "reasoning effort"?</span>
+            <span class="faq-chevron">
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 4L6 8L10 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </span>
+          </button>
+          <div class="faq-answer">
+            <div class="faq-answer-inner">
+              Reasoning effort controls how much "thinking" the model does before responding. Higher effort (like xhigh) produces more thorough, carefully considered answers but uses more tokens. Lower effort (like none or low) gives faster, more concise responses. You can see the model's reasoning process in a collapsible section above each response.
+            </div>
+          </div>
+        </div>
+
+        <div class="faq-item glass reveal">
+          <button class="faq-question" aria-expanded="false">
+            <span>Is my API key stored securely?</span>
+            <span class="faq-chevron">
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 4L6 8L10 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </span>
+          </button>
+          <div class="faq-answer">
+            <div class="faq-answer-inner">
+              Yes. On iOS, your API key is stored using the device's Secure Enclave via Expo SecureStore. It never leaves your device except when sent directly to OpenAI's API. There are no intermediary servers — your requests go straight from your device to OpenAI.
+            </div>
+          </div>
+        </div>
+
+        <div class="faq-item glass reveal">
+          <button class="faq-question" aria-expanded="false">
+            <span>Can I send images to the AI?</span>
+            <span class="faq-chevron">
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 4L6 8L10 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </span>
+          </button>
+          <div class="faq-answer">
+            <div class="faq-answer-inner">
+              Yes. Tap the image button in the input bar to select photos from your library. The app automatically converts iPhone HEIC photos to JPEG format before sending them to OpenAI's multimodal API. You can attach images alongside text messages.
+            </div>
+          </div>
+        </div>
+
+        <div class="faq-item glass reveal">
+          <button class="faq-question" aria-expanded="false">
+            <span>What happens if the connection drops mid-response?</span>
+            <span class="faq-chevron">
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 4L6 8L10 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </span>
+          </button>
+          <div class="faq-answer">
+            <div class="faq-answer-inner">
+              The app has built-in auto-reconnection. If the stream stalls for more than 45 seconds, it automatically retries up to 3 times with exponential backoff. Any partial content received is preserved and delivered to you, so your tokens are never wasted.
+            </div>
+          </div>
+        </div>
+
+        <div class="faq-item glass reveal">
+          <button class="faq-question" aria-expanded="false">
+            <span>Does the app work with iOS 26 Liquid Glass?</span>
+            <span class="faq-chevron">
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 4L6 8L10 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </span>
+          </button>
+          <div class="faq-answer">
+            <div class="faq-answer-inner">
+              Yes. On iOS 26, the app uses native GlassView components for translucent, depth-aware UI elements. On older iOS versions, it gracefully falls back to BlurView effects. The app is designed to feel like a first-party iOS application.
+            </div>
+          </div>
+        </div>
+
+        <div class="faq-item glass reveal">
+          <button class="faq-question" aria-expanded="false">
+            <span>How much does it cost to use?</span>
+            <span class="faq-chevron">
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 4L6 8L10 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </span>
+          </button>
+          <div class="faq-answer">
+            <div class="faq-answer-inner">
+              The app itself is free. You only pay for the tokens you use through your own OpenAI API key. Costs depend on the model and reasoning effort level you choose. Check <a href="https://openai.com/pricing" target="_blank" rel="noopener">OpenAI's pricing page</a> for current rates.
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- Privacy -->
+  <section id="privacy">
+    <div class="container">
+      <div class="section-header reveal">
+        <span class="section-label">Privacy</span>
+        <h2>Your data stays yours</h2>
+        <p>Liquid Glass Chat is designed with privacy as a core principle.</p>
+      </div>
+      <div class="privacy-card glass reveal">
+        <div class="privacy-icon">🛡️</div>
+        <h3>Privacy Policy</h3>
+        <ul class="privacy-points">
+          <li>
+            <span class="privacy-check">✓</span>
+            <span><strong>No data collection.</strong> We do not collect, store, or transmit any of your conversations, messages, or personal information to our servers.</span>
+          </li>
+          <li>
+            <span class="privacy-check">✓</span>
+            <span><strong>Local storage only.</strong> All conversations and settings are stored locally on your device. Your API key is protected using iOS Secure Enclave (SecureStore).</span>
+          </li>
+          <li>
+            <span class="privacy-check">✓</span>
+            <span><strong>Direct API communication.</strong> Your messages are sent directly from your device to OpenAI's API. There are no proxy servers or intermediaries.</span>
+          </li>
+          <li>
+            <span class="privacy-check">✓</span>
+            <span><strong>No analytics or tracking.</strong> The app does not include any analytics SDKs, advertising frameworks, or user tracking mechanisms.</span>
+          </li>
+          <li>
+            <span class="privacy-check">✓</span>
+            <span><strong>No account required.</strong> You do not need to create an account with us. The only credential needed is your own OpenAI API key.</span>
+          </li>
+          <li>
+            <span class="privacy-check">✓</span>
+            <span><strong>OpenAI's policies apply.</strong> Your interactions with OpenAI's API are subject to <a href="https://openai.com/policies/terms-of-use" target="_blank" rel="noopener" style="color: var(--accent);">OpenAI's Terms of Use</a> and <a href="https://openai.com/policies/privacy-policy" target="_blank" rel="noopener" style="color: var(--accent);">Privacy Policy</a>.</span>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- Support / Contact -->
+  <section id="support">
+    <div class="container">
+      <div class="section-header reveal">
+        <span class="section-label">Support</span>
+        <h2>Need help?</h2>
+      </div>
+      <div class="contact-card glass reveal">
+        <h3>Get in Touch</h3>
+        <p>If you encounter any issues, have feature requests, or need assistance setting up the app, we are here to help. Reach out and we will get back to you as soon as possible.</p>
+        <a href="mailto:support@liquidglasschat.app" class="contact-email">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M22 7l-10 7L2 7"/></svg>
+          support@liquidglasschat.app
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer>
+    <div class="container">
+      <div class="footer-inner">
+        <div class="footer-brand">
+          <img src="icon.png" alt="Liquid Glass Chat" />
+          <span>Liquid Glass Chat</span>
+        </div>
+        <span class="footer-copy">Version 1.1 &middot; Designed for iOS 26</span>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Scripts -->
+  <script>
+    // Navbar scroll effect
+    const nav = document.getElementById('nav');
+    window.addEventListener('scroll', () => {
+      nav.classList.toggle('scrolled', window.scrollY > 20);
+    }, { passive: true });
+
+    // FAQ accordion
+    document.querySelectorAll('.faq-question').forEach(button => {
+      button.addEventListener('click', () => {
+        const item = button.closest('.faq-item');
+        const isOpen = item.classList.contains('open');
+
+        // Close all
+        document.querySelectorAll('.faq-item.open').forEach(openItem => {
+          openItem.classList.remove('open');
+          openItem.querySelector('.faq-question').setAttribute('aria-expanded', 'false');
+        });
+
+        // Toggle current
+        if (!isOpen) {
+          item.classList.add('open');
+          button.setAttribute('aria-expanded', 'true');
+        }
+      });
+    });
+
+    // Scroll reveal
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('visible');
+          observer.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+  </script>
+</body>
+</html>
