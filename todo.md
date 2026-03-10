@@ -88,3 +88,10 @@
 - [x] FIX: Update eas.json with correct Apple ID and Team ID for App Store submission
 - [x] CRITICAL BUG: iOS app shows white screen - Restructured to use Expo local module (modules/native-chat/) with ExpoAppDelegateSubscriber instead of direct ios/ modification. Files survive expo prebuild.
 - [x] CRITICAL BUG: iOS app STILL shows white screen - ROOT CAUSE: podspec was in module root dir but Expo autolinking only searches subdirectories. Moved NativeChat.podspec to ios/ subdir. Module now fully resolved by autolinking.
+- [x] FIX: Remove SPM dependencies (Highlightr, MarkdownUI, LaTeXSwiftUI) - CocoaPods target cannot import SPM modules
+- [x] FIX: Replace Highlightr with native Swift syntax highlighting (regex-based)
+- [x] FIX: Replace MarkdownUI with native AttributedString markdown rendering
+- [x] FIX: Replace LaTeXSwiftUI with WKWebView + KaTeX local rendering
+- [x] FIX: Update podspec - added WebKit framework, no SPM deps needed
+- [x] FIX: Removed withSwiftPackages plugin reference from app.config.ts
+- [x] FIX: Verified all Swift files only import system frameworks (SwiftUI, WebKit, etc.)

@@ -119,7 +119,6 @@ const config: ExpoConfig = {
         },
       },
     ],
-    "./plugins/withSwiftPackages",
   ],
   experiments: {
     typedRoutes: true,
