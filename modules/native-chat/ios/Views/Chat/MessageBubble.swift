@@ -88,7 +88,7 @@ struct MessageBubble: View {
             RoundedRectangle(cornerRadius: 20)
                 .fill(.ultraThinMaterial)
         }
-        .glassEffect(.regular.interactive, in: RoundedRectangle(cornerRadius: 20))
+        .glassEffect(.regular.interactive(), in: RoundedRectangle(cornerRadius: 20))
         .contextMenu {
             Button {
                 UIPasteboard.general.string = message.content

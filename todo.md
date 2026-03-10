@@ -95,3 +95,5 @@
 - [x] FIX: Update podspec - added WebKit framework, no SPM deps needed
 - [x] FIX: Removed withSwiftPackages plugin reference from app.config.ts
 - [x] FIX: Verified all Swift files only import system frameworks (SwiftUI, WebKit, etc.)
+- [x] FIX: .glassEffect(.regular.interactive) → .interactive() in ChatView, MessageBubble, MessageInputBar
+- [x] FIX: @MainActor static methods → nonisolated static for buildStreamRequest/handleSSEEvent

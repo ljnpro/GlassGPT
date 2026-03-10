@@ -166,7 +166,7 @@ struct ChatView: View {
                 RoundedRectangle(cornerRadius: 20)
                     .fill(.ultraThinMaterial)
             }
-            .glassEffect(.regular.interactive, in: RoundedRectangle(cornerRadius: 20))
+            .glassEffect(.regular.interactive(), in: RoundedRectangle(cornerRadius: 20))
             .frame(maxWidth: UIScreen.main.bounds.width * 0.85, alignment: .leading)
 
             Spacer(minLength: 40)

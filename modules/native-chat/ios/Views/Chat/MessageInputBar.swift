@@ -77,7 +77,7 @@ struct MessageInputBar: View {
             .padding(.vertical, 8)
         }
         .background(.ultraThinMaterial)
-        .glassEffect(.regular.interactive, in: UnevenRoundedRectangle(
+        .glassEffect(.regular.interactive(), in: UnevenRoundedRectangle(
             topLeadingRadius: 20,
             bottomLeadingRadius: 0,
             bottomTrailingRadius: 0,
