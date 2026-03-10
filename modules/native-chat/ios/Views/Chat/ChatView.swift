@@ -21,7 +21,6 @@ struct ChatView: View {
                         onPickImage: { showPhotoPicker = true }
                     )
                 }
-                .navigationTitle(viewModel.currentConversation?.title ?? "New Chat")
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
                     ToolbarItem(placement: .topBarLeading) {
@@ -31,6 +30,12 @@ struct ChatView: View {
                             Image(systemName: "square.and.pencil")
                         }
                         .buttonStyle(.glass)
+                    }
+
+                    ToolbarItem(placement: .principal) {
+                        Text(viewModel.currentConversation?.title ?? "New Chat")
+                            .font(.headline)
+                            .lineLimit(1)
                     }
 
                     ToolbarItem(placement: .topBarTrailing) {
@@ -127,9 +132,9 @@ struct ChatView: View {
     // MARK: - Empty State
 
     private var emptyState: some View {
-        GeometryReader { geometry in
+        ScrollView {
             VStack(spacing: 16) {
-                Spacer()
+                Spacer(minLength: 120)
 
                 Image(systemName: "bubble.left.and.bubble.right")
                     .font(.system(size: 56))
@@ -151,10 +156,11 @@ struct ChatView: View {
                         .padding(.top, 8)
                 }
 
-                Spacer()
+                Spacer(minLength: 120)
             }
-            .frame(width: geometry.size.width, height: geometry.size.height)
+            .frame(maxWidth: .infinity)
         }
+        .scrollDismissesKeyboard(.interactively)
     }
 
     // MARK: - Streaming Bubble

@@ -119,3 +119,7 @@
 - [x] BUG: Keyboard gap - removed glassEffect from input bar container, simplified padding
 - [x] FIX: MarkdownContentView build errors - GPT-5.4 high rewrote with fileprivate enums, Sendable, ForEach id path, Int IDs
 - [x] FIX: Removed duplicate CodeBlockView from MarkdownContentView.swift (already defined in CodeBlockView.swift)
+- [x] BUG: Settings Chat Default model - rewrote SettingsViewModel with stored properties + didSet for @Observable tracking
+- [x] BUG: Block LaTeX spacing - reduced initial height to 24, removed .padding(.vertical), added margin:0 to CSS body
+- [x] FEATURE: Interactive keyboard dismiss - .scrollDismissesKeyboard(.interactively) on both message list and empty state
+- [x] BUG: Navigation title - changed to .principal placement for always-centered title
