@@ -88,8 +88,12 @@ struct HistoryView: View {
             modelContext.delete(conversation)
         }
 
-        try? modelContext.save()
-        HapticService.shared.impact(.medium)
+        do {
+            try modelContext.save()
+            HapticService.shared.impact(.medium)
+        } catch {
+            print("Failed to delete conversations: \(error.localizedDescription)")
+        }
     }
 
     private func deleteAllConversations() {
@@ -99,7 +103,11 @@ struct HistoryView: View {
             modelContext.delete(conversation)
         }
 
-        try? modelContext.save()
-        HapticService.shared.notify(.warning)
+        do {
+            try modelContext.save()
+            HapticService.shared.notify(.warning)
+        } catch {
+            print("Failed to delete all conversations: \(error.localizedDescription)")
+        }
     }
 }

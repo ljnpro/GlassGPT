@@ -25,7 +25,9 @@ struct SettingsView: View {
 
                     HStack {
                         Button("Validate") {
-                            Task { await viewModel.validateAPIKey() }
+                            Task { @MainActor in
+                                await viewModel.validateAPIKey()
+                            }
                         }
                         .buttonStyle(.glass)
                         .disabled(viewModel.apiKey.isEmpty || viewModel.isValidating)
@@ -83,13 +85,15 @@ struct SettingsView: View {
                     LabeledContent("Platform", value: "iOS 26 · Swift 6")
                     LabeledContent("Engine", value: "SwiftUI · Liquid Glass")
 
-                    Link(destination: URL(string: "https://ljnpro.github.io/liquid-glass-chat-support/")!) {
+                    if let supportURL = URL(string: "https://ljnpro.github.io/liquid-glass-chat-support/") {
+                    Link(destination: supportURL) {
                         HStack {
                             Text("Support Website")
                             Spacer()
                             Image(systemName: "safari")
                                 .foregroundStyle(.secondary)
                         }
+                    }
                     }
                 }
             }

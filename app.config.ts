@@ -119,7 +119,6 @@ const config: ExpoConfig = {
         },
       },
     ],
-    "./plugins/withNativeChatIOS",
     "./plugins/withSwiftPackages",
   ],
   experiments: {
