@@ -27,6 +27,7 @@ final class ChatViewModel {
 
     // Stream invalidation token
     private var activeStreamID = UUID()
+    private var pendingAssistantMessage: Message?
 
     // MARK: - Init
 
@@ -57,6 +58,8 @@ final class ChatViewModel {
     // MARK: - Send Message
 
     func sendMessage() {
+        guard !isStreaming else { return }
+
         let text = inputText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty || selectedImageData != nil else { return }
         guard !apiKey.isEmpty else {
@@ -112,14 +115,16 @@ final class ChatViewModel {
         let requestAPIKey = apiKey
         let requestModel = selectedModel
         let requestEffort = reasoningEffort
-        let requestMessages = messages.map {
-            APIMessage(role: $0.role, content: $0.content, imageData: $0.imageData)
-        }
+        let requestMessages = messages
+            .sorted(by: { $0.createdAt < $1.createdAt })
+            .map {
+                APIMessage(role: $0.role, content: $0.content, imageData: $0.imageData)
+            }
 
         let streamID = UUID()
         activeStreamID = streamID
 
-        Task {
+        Task { @MainActor in
             let stream = openAIService.streamChat(
                 apiKey: requestAPIKey,
                 messages: requestMessages,
@@ -158,8 +163,17 @@ final class ChatViewModel {
         errorMessage = nil
 
         if savePartial && !currentStreamingText.isEmpty {
-            Task { await finishStreaming() }
+            Task { @MainActor in await finishStreaming() }
         } else {
+            // Remove empty pending assistant message on cancel
+            if let pending = pendingAssistantMessage {
+                if let index = messages.firstIndex(where: { $0.id == pending.id }) {
+                    messages.remove(at: index)
+                }
+                modelContext.delete(pending)
+                try? modelContext.save()
+                pendingAssistantMessage = nil
+            }
             currentStreamingText = ""
             currentThinkingText = ""
             isStreaming = false
@@ -222,6 +236,7 @@ final class ChatViewModel {
 
         // Save
         try? modelContext.save()
+        pendingAssistantMessage = nil
 
         // Generate title for new conversations
         if currentConversation?.title == "New Chat" && messages.count >= 2 {

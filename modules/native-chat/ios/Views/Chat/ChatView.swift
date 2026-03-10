@@ -52,15 +52,19 @@ struct ChatView: View {
                 .photosPicker(isPresented: $showPhotoPicker, selection: $selectedPhotoItem, matching: .images)
                 .onChange(of: selectedPhotoItem) { _, newItem in
                     Task {
-                        // Normalize to JPEG to avoid MIME type issues
-                        guard
-                            let rawData = try? await newItem?.loadTransferable(type: Data.self),
-                            let image = UIImage(data: rawData),
-                            let jpegData = image.jpegData(compressionQuality: 0.85)
-                        else {
-                            return
+                        do {
+                            // Normalize to JPEG to avoid MIME type issues
+                            guard
+                                let rawData = try await newItem?.loadTransferable(type: Data.self),
+                                let image = UIImage(data: rawData),
+                                let jpegData = image.jpegData(compressionQuality: 0.85)
+                            else {
+                                return
+                            }
+                            viewModel.selectedImageData = jpegData
+                        } catch {
+                            print("Failed to load photo: \(error.localizedDescription)")
                         }
-                        viewModel.selectedImageData = jpegData
                     }
                 }
         }

@@ -148,7 +148,10 @@ final class OpenAIService {
                             if line.hasPrefix("event: ") {
                                 currentEventType = String(line.dropFirst(7))
                             } else if line.hasPrefix("data: ") {
+                                if !dataBuffer.isEmpty { dataBuffer += "\n" }
                                 dataBuffer += String(line.dropFirst(6))
+                            } else if line == "data:" {
+                                if !dataBuffer.isEmpty { dataBuffer += "\n" }
                             }
                         }
 
@@ -199,8 +202,11 @@ final class OpenAIService {
 
             self.currentTask = task
 
-            continuation.onTermination = { _ in
+            continuation.onTermination = { [weak self] _ in
                 task.cancel()
+                Task { @MainActor in
+                    self?.currentTask = nil
+                }
             }
         }
     }
@@ -345,8 +351,15 @@ final class OpenAIService {
         emittedAnyOutput: inout Bool,
         continuation: AsyncStream<StreamEvent>.Continuation
     ) -> Bool {
+        // Handle terminal sentinel
+        if payload.trimmingCharacters(in: .whitespacesAndNewlines) == "[DONE]" {
+            continuation.yield(.completed)
+            return true
+        }
+
         switch eventType {
-        case "response.output_text.delta":
+        case "response.output_text.delta",
+             "response.output_text_annotation.delta":
             guard let data = payload.data(using: .utf8),
                   let parsed = try? JSONDecoder().decode(DeltaPayload.self, from: data) else {
                 return false
@@ -355,7 +368,8 @@ final class OpenAIService {
             continuation.yield(.textDelta(parsed.delta))
             return false
 
-        case "response.reasoning_summary_text.delta":
+        case "response.reasoning_summary_text.delta",
+             "response.reasoning.delta":
             guard let data = payload.data(using: .utf8),
                   let parsed = try? JSONDecoder().decode(DeltaPayload.self, from: data) else {
                 return false
@@ -373,6 +387,9 @@ final class OpenAIService {
             return true
 
         default:
+            #if DEBUG
+            print("Unhandled SSE event type: \(eventType), payload prefix: \(String(payload.prefix(100)))")
+            #endif
             return false
         }
     }

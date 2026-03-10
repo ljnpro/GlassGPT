@@ -1,3 +1,4 @@
+import Foundation
 import SwiftUI
 
 @Observable
@@ -76,9 +77,16 @@ final class SettingsViewModel {
 
         isValidating = true
 
+        guard let url = URL(string: "https://api.openai.com/v1/models") else {
+            isAPIKeyValid = false
+            isValidating = false
+            return
+        }
+
         do {
-            var request = URLRequest(url: URL(string: "https://api.openai.com/v1/models")!)
+            var request = URLRequest(url: url)
             request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+            request.timeoutInterval = 10
             let (_, response) = try await URLSession.shared.data(for: request)
             let httpResponse = response as? HTTPURLResponse
             isAPIKeyValid = httpResponse?.statusCode == 200
