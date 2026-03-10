@@ -11,6 +11,7 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { ErrorBoundary } from "@/components/error-boundary";
 import * as Haptics from "expo-haptics";
 import Constants from "expo-constants";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
@@ -137,10 +138,18 @@ function SegmentedControl({
   );
 }
 
-export default function SettingsScreen() {
+function SettingsScreenInner() {
   const colors = useColors();
   const { theme, resolvedColorScheme } = useThemeContext();
   const { state, dispatch, setApiKey } = useChatStore();
+
+  if (!state.isLoaded) {
+    return (
+      <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+        <ActivityIndicator size="large" />
+      </View>
+    );
+  }
 
   const [apiKeyInput, setApiKeyInput] = useState("");
   const [showApiKey, setShowApiKey] = useState(false);
@@ -862,3 +871,11 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
 });
+
+export default function SettingsScreen() {
+  return (
+    <ErrorBoundary fallbackMessage="Settings failed to load. Tap Retry to try again.">
+      <SettingsScreenInner />
+    </ErrorBoundary>
+  );
+}

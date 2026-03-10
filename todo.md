@@ -63,3 +63,6 @@
 - [ ] FIX: Update 12 outdated packages to match Expo SDK 54 expected versions
 - [x] UPGRADE: Expo SDK 54 → 55 and update all dependencies to latest
 - [x] FIX: Resolve all breaking changes from SDK 55 upgrade (removed newArchEnabled, edgeToEdgeEnabled; added expo-asset/font/image/secure-store/web-browser plugins)
+- [x] BUG: Settings tab still white screens when rapidly switching between tabs - added ErrorBoundary + loading guard + removed animation
+- [x] Update version to v1.1
+- [x] CRITICAL BUG: All responses are being output/displayed twice - response.output_text.done was appending full text on top of deltas
