@@ -15,6 +15,7 @@ enum StreamEvent: Sendable {
     case thinkingDelta(String)
     case thinkingStarted
     case thinkingFinished
+    case responseCreated(String)      // response_id for recovery
     case completed(String, String?)   // (fullText, fullThinking?)
     case error(OpenAIServiceError)
 }
@@ -182,6 +183,64 @@ final class OpenAIService {
         }
 
         return "New Chat"
+    }
+
+    // MARK: - Fetch Complete Response (Recovery)
+
+    /// Fetch a complete response by its ID. Used to recover content
+    /// after the app was backgrounded/killed during streaming.
+    func fetchResponse(responseId: String, apiKey: String) async throws -> (text: String, thinking: String?) {
+        guard let url = URL(string: "\(baseURL)/\(responseId)") else {
+            throw OpenAIServiceError.invalidURL
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        request.timeoutInterval = 30
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw OpenAIServiceError.requestFailed("Invalid response")
+        }
+
+        if httpResponse.statusCode >= 400 {
+            throw OpenAIServiceError.httpError(httpResponse.statusCode, "Failed to fetch response")
+        }
+
+        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            throw OpenAIServiceError.requestFailed("Failed to parse response")
+        }
+
+        // Check status — if still in_progress or queued, throw so caller can retry
+        let status = json["status"] as? String ?? "unknown"
+        if status == "in_progress" || status == "queued" {
+            throw OpenAIServiceError.requestFailed("__IN_PROGRESS__")
+        }
+
+        if status == "failed" {
+            throw OpenAIServiceError.requestFailed("Response generation failed on server")
+        }
+
+        // Extract output text
+        let text = Self.extractOutputText(from: json) ?? ""
+
+        // Extract reasoning summary
+        var thinking: String? = nil
+        if let output = json["output"] as? [[String: Any]] {
+            for item in output {
+                guard let type = item["type"] as? String, type == "reasoning" else { continue }
+                if let summary = item["summary"] as? [[String: Any]] {
+                    let summaryTexts = summary.compactMap { $0["text"] as? String }
+                    if !summaryTexts.isEmpty {
+                        thinking = summaryTexts.joined()
+                    }
+                }
+            }
+        }
+
+        return (text: text, thinking: thinking)
     }
 
     // MARK: - Validate API Key
@@ -559,8 +618,19 @@ private final class SSEDelegate: NSObject, URLSessionDataDelegate, @unchecked Se
             continuation.yield(.error(.requestFailed(errorMsg)))
             return .finished
 
-        case "response.created",
-             "response.in_progress",
+        case "response.created":
+            // Extract response_id for recovery polling
+            if let json = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any],
+               let responseObj = json["response"] as? [String: Any],
+               let responseId = responseObj["id"] as? String {
+                continuation.yield(.responseCreated(responseId))
+                #if DEBUG
+                print("[SSE] Response created: \(responseId)")
+                #endif
+            }
+            return .continued
+
+        case "response.in_progress",
              "response.queued",
              "response.output_item.added",
              "response.output_item.done",

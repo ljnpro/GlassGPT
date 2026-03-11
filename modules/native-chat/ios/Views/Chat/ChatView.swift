@@ -24,20 +24,19 @@ struct ChatView: View {
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
                     ToolbarItem(placement: .topBarLeading) {
-                        Button {
-                            viewModel.startNewChat()
-                        } label: {
-                            Image(systemName: "square.and.pencil")
-                        }
-                        .buttonStyle(.glass)
-                    }
+                        HStack(spacing: 8) {
+                            Button {
+                                viewModel.startNewChat()
+                            } label: {
+                                Image(systemName: "square.and.pencil")
+                            }
+                            .buttonStyle(.glass)
 
-                    ToolbarItem(placement: .principal) {
-                        Text(viewModel.currentConversation?.title ?? "New Chat")
-                            .font(.headline)
-                            .lineLimit(1)
-                            .truncationMode(.tail)
-                            .frame(maxWidth: 160, alignment: .leading)
+                            Text(viewModel.currentConversation?.title ?? "New Chat")
+                                .font(.headline)
+                                .lineLimit(1)
+                                .truncationMode(.tail)
+                        }
                     }
 
                     ToolbarItem(placement: .topBarTrailing) {
@@ -53,7 +52,7 @@ struct ChatView: View {
                         selectedModel: $viewModel.selectedModel,
                         reasoningEffort: $viewModel.reasoningEffort
                     )
-                    .presentationDetents([.height(320)])
+                    .presentationDetents([.height(300)])
                     .presentationDragIndicator(.visible)
                     .presentationCornerRadius(24)
                 }
@@ -101,6 +100,12 @@ struct ChatView: View {
                         if viewModel.isStreaming {
                             streamingBubble
                                 .id("streaming")
+                        }
+
+                        // Recovery indicator
+                        if viewModel.isRecovering {
+                            recoveryBanner
+                                .id("recovery")
                         }
 
                         // Error message
@@ -207,6 +212,25 @@ struct ChatView: View {
 
             Spacer(minLength: 40)
         }
+    }
+
+    // MARK: - Recovery Banner
+
+    private var recoveryBanner: some View {
+        HStack(spacing: 8) {
+            ProgressView()
+                .controlSize(.small)
+            Text("Recovering interrupted response…")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        .padding(12)
+        .background {
+            RoundedRectangle(cornerRadius: 12)
+                .fill(.ultraThinMaterial)
+        }
+        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 12))
+        .transition(.opacity.combined(with: .move(edge: .bottom)))
     }
 
     // MARK: - Error Banner

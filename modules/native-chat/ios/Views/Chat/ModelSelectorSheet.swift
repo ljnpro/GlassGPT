@@ -35,6 +35,19 @@ struct ModelSelectorSheet: View {
     @Binding var reasoningEffort: ReasoningEffort
     @Environment(\.dismiss) private var dismiss
 
+    /// Map slider value to the available efforts for the current model.
+    private var efforts: [ReasoningEffort] {
+        selectedModel.availableEfforts
+    }
+
+    /// Slider value derived from the current effort index.
+    private var sliderValue: Double {
+        guard let idx = efforts.firstIndex(of: reasoningEffort) else {
+            return Double(efforts.count / 2)
+        }
+        return Double(idx)
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             // Header bar
@@ -47,12 +60,12 @@ struct ModelSelectorSheet: View {
             }
             .padding(.horizontal, 20)
             .padding(.top, 20)
-            .padding(.bottom, 12)
+            .padding(.bottom, 16)
 
             // Content
-            VStack(spacing: 16) {
-                // Model selection
-                VStack(alignment: .leading, spacing: 8) {
+            VStack(spacing: 20) {
+                // Model selection — two equal-width cards
+                VStack(alignment: .leading, spacing: 6) {
                     Text("Model")
                         .font(.subheadline.weight(.medium))
                         .foregroundStyle(.secondary)
@@ -65,20 +78,28 @@ struct ModelSelectorSheet: View {
                     }
                 }
 
-                // Reasoning Effort
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Reasoning Effort")
-                        .font(.subheadline.weight(.medium))
-                        .foregroundStyle(.secondary)
-                        .padding(.horizontal, 4)
+                // Reasoning Effort — Liquid Glass slider
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack {
+                        Text("Reasoning")
+                            .font(.subheadline.weight(.medium))
+                            .foregroundStyle(.secondary)
 
-                    let efforts = selectedModel.availableEfforts
-                    // Use a wrapping layout for effort chips
-                    FlowLayout(spacing: 8) {
-                        ForEach(efforts) { effort in
-                            effortChip(effort)
-                        }
+                        Spacer()
+
+                        Text(reasoningEffort.displayName)
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(.primary)
+                            .contentTransition(.numericText())
+                            .animation(.easeInOut(duration: 0.15), value: reasoningEffort)
                     }
+                    .padding(.horizontal, 4)
+
+                    // Stepped slider with tick marks
+                    EffortSlider(
+                        efforts: efforts,
+                        selected: $reasoningEffort
+                    )
                 }
             }
             .padding(.horizontal, 20)
@@ -128,34 +149,6 @@ struct ModelSelectorSheet: View {
         .foregroundStyle(isSelected ? .primary : .secondary)
     }
 
-    // MARK: - Effort Chip
-
-    private func effortChip(_ effort: ReasoningEffort) -> some View {
-        let isSelected = effort == reasoningEffort
-
-        return Button {
-            if effort != reasoningEffort {
-                reasoningEffort = effort
-                HapticService.shared.selection()
-            }
-        } label: {
-            Text(effort.displayName)
-                .font(.subheadline.weight(.medium))
-                .padding(.horizontal, 16)
-                .padding(.vertical, 10)
-                .background {
-                    RoundedRectangle(cornerRadius: 10)
-                        .fill(isSelected ? Color.accentColor.opacity(0.12) : Color.clear)
-                }
-                .overlay {
-                    RoundedRectangle(cornerRadius: 10)
-                        .strokeBorder(isSelected ? Color.accentColor.opacity(0.4) : Color.primary.opacity(0.1), lineWidth: 1)
-                }
-        }
-        .buttonStyle(.plain)
-        .foregroundStyle(isSelected ? .primary : .secondary)
-    }
-
     // MARK: - Descriptions
 
     private func modelDescription(for model: ModelType) -> String {
@@ -166,64 +159,117 @@ struct ModelSelectorSheet: View {
     }
 }
 
-// MARK: - Flow Layout (for wrapping chips)
+// MARK: - Effort Slider
 
-struct FlowLayout: Layout {
-    var spacing: CGFloat = 8
+/// A custom stepped slider with Liquid Glass styling and labeled tick marks.
+struct EffortSlider: View {
+    let efforts: [ReasoningEffort]
+    @Binding var selected: ReasoningEffort
 
-    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
-        let result = arrange(proposal: proposal, subviews: subviews)
-        return result.size
+    @State private var isDragging = false
+
+    private var stepCount: Int { efforts.count - 1 }
+
+    private var currentIndex: Int {
+        efforts.firstIndex(of: selected) ?? 0
     }
 
-    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
-        let result = arrange(proposal: proposal, subviews: subviews)
-        for (index, position) in result.positions.enumerated() {
-            subviews[index].place(
-                at: CGPoint(x: bounds.minX + position.x, y: bounds.minY + position.y),
-                proposal: ProposedViewSize(result.sizes[index])
-            )
-        }
-    }
+    var body: some View {
+        VStack(spacing: 6) {
+            // Slider track with glass thumb
+            GeometryReader { geo in
+                let trackWidth = geo.size.width
+                let thumbSize: CGFloat = 28
 
-    private struct ArrangeResult {
-        var size: CGSize
-        var positions: [CGPoint]
-        var sizes: [CGSize]
-    }
+                ZStack(alignment: .leading) {
+                    // Track background
+                    Capsule()
+                        .fill(.ultraThinMaterial)
+                        .frame(height: 6)
+                        .overlay {
+                            Capsule()
+                                .strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.5)
+                        }
 
-    private func arrange(proposal: ProposedViewSize, subviews: Subviews) -> ArrangeResult {
-        let maxWidth = proposal.width ?? .infinity
-        var positions: [CGPoint] = []
-        var sizes: [CGSize] = []
-        var x: CGFloat = 0
-        var y: CGFloat = 0
-        var rowHeight: CGFloat = 0
-        var totalHeight: CGFloat = 0
-        var totalWidth: CGFloat = 0
+                    // Active track fill
+                    let fillWidth = stepCount > 0
+                        ? CGFloat(currentIndex) / CGFloat(stepCount) * (trackWidth - thumbSize) + thumbSize / 2
+                        : thumbSize / 2
 
-        for subview in subviews {
-            let size = subview.sizeThatFits(.unspecified)
-            sizes.append(size)
+                    Capsule()
+                        .fill(Color.accentColor.opacity(0.5))
+                        .frame(width: fillWidth, height: 6)
 
-            if x + size.width > maxWidth && x > 0 {
-                // Move to next row
-                x = 0
-                y += rowHeight + spacing
-                rowHeight = 0
+                    // Tick marks
+                    ForEach(0...stepCount, id: \.self) { i in
+                        let xPos = stepCount > 0
+                            ? CGFloat(i) / CGFloat(stepCount) * (trackWidth - thumbSize) + thumbSize / 2
+                            : trackWidth / 2
+
+                        Circle()
+                            .fill(i <= currentIndex ? Color.accentColor : Color.primary.opacity(0.2))
+                            .frame(width: 6, height: 6)
+                            .position(x: xPos, y: geo.size.height / 2)
+                    }
+
+                    // Glass thumb
+                    let thumbX = stepCount > 0
+                        ? CGFloat(currentIndex) / CGFloat(stepCount) * (trackWidth - thumbSize)
+                        : (trackWidth - thumbSize) / 2
+
+                    Circle()
+                        .fill(.ultraThickMaterial)
+                        .frame(width: thumbSize, height: thumbSize)
+                        .glassEffect(.regular.interactive(), in: .circle)
+                        .shadow(color: .black.opacity(0.15), radius: 4, y: 2)
+                        .scaleEffect(isDragging ? 1.15 : 1.0)
+                        .offset(x: thumbX)
+                        .animation(.spring(duration: 0.25), value: currentIndex)
+                        .animation(.spring(duration: 0.2), value: isDragging)
+                }
+                .frame(height: thumbSize)
+                .contentShape(Rectangle())
+                .gesture(
+                    DragGesture(minimumDistance: 0)
+                        .onChanged { value in
+                            isDragging = true
+                            let fraction = (value.location.x - thumbSize / 2) / (trackWidth - thumbSize)
+                            let clamped = min(max(fraction, 0), 1)
+                            let newIndex = Int(round(clamped * Double(stepCount)))
+                            let newEffort = efforts[newIndex]
+                            if newEffort != selected {
+                                selected = newEffort
+                                HapticService.shared.selection()
+                            }
+                        }
+                        .onEnded { _ in
+                            isDragging = false
+                        }
+                )
             }
+            .frame(height: 28)
 
-            positions.append(CGPoint(x: x, y: y))
-            rowHeight = max(rowHeight, size.height)
-            x += size.width + spacing
-            totalWidth = max(totalWidth, x - spacing)
-            totalHeight = y + rowHeight
+            // Labels below the slider
+            HStack {
+                ForEach(Array(efforts.enumerated()), id: \.offset) { index, effort in
+                    Text(effortShortLabel(effort))
+                        .font(.caption2)
+                        .foregroundStyle(effort == selected ? .primary : .secondary)
+                        .fontWeight(effort == selected ? .semibold : .regular)
+                        .frame(maxWidth: .infinity)
+                }
+            }
         }
+    }
 
-        return ArrangeResult(
-            size: CGSize(width: totalWidth, height: totalHeight),
-            positions: positions,
-            sizes: sizes
-        )
+    /// Short labels for the slider ticks.
+    private func effortShortLabel(_ effort: ReasoningEffort) -> String {
+        switch effort {
+        case .none: return "Off"
+        case .low: return "Low"
+        case .medium: return "Med"
+        case .high: return "High"
+        case .xhigh: return "Max"
+        }
     }
 }
