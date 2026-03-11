@@ -36,100 +36,194 @@ struct ModelSelectorSheet: View {
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
-        NavigationStack {
-            Form {
-                Section("Model") {
-                    ForEach(ModelType.allCases) { model in
-                        HStack {
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(model.displayName)
-                                    .font(.body.weight(.medium))
+        VStack(spacing: 0) {
+            // Header bar
+            HStack {
+                Text("Model")
+                    .font(.headline)
+                Spacer()
+                Button("Done") { dismiss() }
+                    .buttonStyle(.glassProminent)
+            }
+            .padding(.horizontal, 20)
+            .padding(.top, 20)
+            .padding(.bottom, 12)
 
-                                Text(modelDescription(for: model))
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
+            // Content
+            VStack(spacing: 16) {
+                // Model selection
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Model")
+                        .font(.subheadline.weight(.medium))
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, 4)
 
-                            Spacer()
-
-                            if model == selectedModel {
-                                Image(systemName: "checkmark.circle.fill")
-                                    .foregroundStyle(.blue)
-                            }
-                        }
-                        .contentShape(Rectangle())
-                        .onTapGesture {
-                            let previousModel = selectedModel
-                            selectedModel = model
-
-                            // If current effort is not available for the new model, reset to default
-                            if !model.availableEfforts.contains(reasoningEffort) {
-                                reasoningEffort = model.defaultEffort
-                            }
-
-                            if model != previousModel {
-                                HapticService.shared.selection()
-                            }
+                    HStack(spacing: 10) {
+                        ForEach(ModelType.allCases) { model in
+                            modelChip(model)
                         }
                     }
                 }
 
-                Section("Reasoning Effort") {
-                    let availableEfforts = selectedModel.availableEfforts
+                // Reasoning Effort
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Reasoning Effort")
+                        .font(.subheadline.weight(.medium))
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, 4)
 
-                    ForEach(availableEfforts) { effort in
-                        HStack {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(effort.displayName)
-                                    .font(.body.weight(.medium))
-
-                                Text(effortDescription(for: effort))
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-
-                            Spacer()
-
-                            if effort == reasoningEffort {
-                                Image(systemName: "checkmark.circle.fill")
-                                    .foregroundStyle(.blue)
-                            }
-                        }
-                        .contentShape(Rectangle())
-                        .onTapGesture {
-                            if effort != reasoningEffort {
-                                reasoningEffort = effort
-                                HapticService.shared.selection()
-                            }
+                    let efforts = selectedModel.availableEfforts
+                    // Use a wrapping layout for effort chips
+                    FlowLayout(spacing: 8) {
+                        ForEach(efforts) { effort in
+                            effortChip(effort)
                         }
                     }
                 }
             }
-            .navigationTitle("Model")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Done") { dismiss() }
-                        .buttonStyle(.glassProminent)
-                }
-            }
+            .padding(.horizontal, 20)
+            .padding(.bottom, 24)
+
+            Spacer(minLength: 0)
         }
     }
+
+    // MARK: - Model Chip
+
+    private func modelChip(_ model: ModelType) -> some View {
+        let isSelected = model == selectedModel
+
+        return Button {
+            let previousModel = selectedModel
+            selectedModel = model
+            if !model.availableEfforts.contains(reasoningEffort) {
+                reasoningEffort = model.defaultEffort
+            }
+            if model != previousModel {
+                HapticService.shared.selection()
+            }
+        } label: {
+            VStack(spacing: 4) {
+                Text(model.displayName)
+                    .font(.subheadline.weight(.semibold))
+
+                Text(modelDescription(for: model))
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 12)
+            .padding(.horizontal, 8)
+            .background {
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(isSelected ? Color.accentColor.opacity(0.12) : Color.clear)
+            }
+            .overlay {
+                RoundedRectangle(cornerRadius: 12)
+                    .strokeBorder(isSelected ? Color.accentColor.opacity(0.4) : Color.primary.opacity(0.1), lineWidth: 1)
+            }
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(isSelected ? .primary : .secondary)
+    }
+
+    // MARK: - Effort Chip
+
+    private func effortChip(_ effort: ReasoningEffort) -> some View {
+        let isSelected = effort == reasoningEffort
+
+        return Button {
+            if effort != reasoningEffort {
+                reasoningEffort = effort
+                HapticService.shared.selection()
+            }
+        } label: {
+            Text(effort.displayName)
+                .font(.subheadline.weight(.medium))
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
+                .background {
+                    RoundedRectangle(cornerRadius: 10)
+                        .fill(isSelected ? Color.accentColor.opacity(0.12) : Color.clear)
+                }
+                .overlay {
+                    RoundedRectangle(cornerRadius: 10)
+                        .strokeBorder(isSelected ? Color.accentColor.opacity(0.4) : Color.primary.opacity(0.1), lineWidth: 1)
+                }
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(isSelected ? .primary : .secondary)
+    }
+
+    // MARK: - Descriptions
 
     private func modelDescription(for model: ModelType) -> String {
         switch model {
-        case .gpt5_4: return "Fast and capable for everyday tasks"
-        case .gpt5_4_pro: return "Most powerful model for complex reasoning"
+        case .gpt5_4: return "Fast and capable"
+        case .gpt5_4_pro: return "Complex reasoning"
+        }
+    }
+}
+
+// MARK: - Flow Layout (for wrapping chips)
+
+struct FlowLayout: Layout {
+    var spacing: CGFloat = 8
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let result = arrange(proposal: proposal, subviews: subviews)
+        return result.size
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        let result = arrange(proposal: proposal, subviews: subviews)
+        for (index, position) in result.positions.enumerated() {
+            subviews[index].place(
+                at: CGPoint(x: bounds.minX + position.x, y: bounds.minY + position.y),
+                proposal: ProposedViewSize(result.sizes[index])
+            )
         }
     }
 
-    private func effortDescription(for effort: ReasoningEffort) -> String {
-        switch effort {
-        case .none: return "No reasoning — fastest responses"
-        case .low: return "Light reasoning — quick analysis"
-        case .medium: return "Balanced reasoning and speed"
-        case .high: return "Deep reasoning — most thorough"
-        case .xhigh: return "Maximum reasoning — longest, most detailed"
+    private struct ArrangeResult {
+        var size: CGSize
+        var positions: [CGPoint]
+        var sizes: [CGSize]
+    }
+
+    private func arrange(proposal: ProposedViewSize, subviews: Subviews) -> ArrangeResult {
+        let maxWidth = proposal.width ?? .infinity
+        var positions: [CGPoint] = []
+        var sizes: [CGSize] = []
+        var x: CGFloat = 0
+        var y: CGFloat = 0
+        var rowHeight: CGFloat = 0
+        var totalHeight: CGFloat = 0
+        var totalWidth: CGFloat = 0
+
+        for subview in subviews {
+            let size = subview.sizeThatFits(.unspecified)
+            sizes.append(size)
+
+            if x + size.width > maxWidth && x > 0 {
+                // Move to next row
+                x = 0
+                y += rowHeight + spacing
+                rowHeight = 0
+            }
+
+            positions.append(CGPoint(x: x, y: y))
+            rowHeight = max(rowHeight, size.height)
+            x += size.width + spacing
+            totalWidth = max(totalWidth, x - spacing)
+            totalHeight = y + rowHeight
         }
+
+        return ArrangeResult(
+            size: CGSize(width: totalWidth, height: totalHeight),
+            positions: positions,
+            sizes: sizes
+        )
     }
 }

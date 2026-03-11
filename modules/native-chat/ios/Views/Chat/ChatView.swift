@@ -36,6 +36,8 @@ struct ChatView: View {
                         Text(viewModel.currentConversation?.title ?? "New Chat")
                             .font(.headline)
                             .lineLimit(1)
+                            .truncationMode(.tail)
+                            .frame(maxWidth: 160, alignment: .leading)
                     }
 
                     ToolbarItem(placement: .topBarTrailing) {
@@ -51,8 +53,9 @@ struct ChatView: View {
                         selectedModel: $viewModel.selectedModel,
                         reasoningEffort: $viewModel.reasoningEffort
                     )
-                    .presentationDetents([.medium])
+                    .presentationDetents([.height(320)])
                     .presentationDragIndicator(.visible)
+                    .presentationCornerRadius(24)
                 }
                 .photosPicker(isPresented: $showPhotoPicker, selection: $selectedPhotoItem, matching: .images)
                 .onChange(of: selectedPhotoItem) { _, newItem in
