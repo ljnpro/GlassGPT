@@ -153,3 +153,4 @@
 - [x] BUG: New chat button inner/outer rounded corners not concentric — fixed icon frame to 20x20 with explicit font size for centered alignment
 - [x] UI: Add minimal "Restoring conversation…" indicator — glass capsule overlay shown during last conversation restore on launch
 - [x] BUG: Tab bar collapses on scroll — changed .tabBarMinimizeBehavior from .onScrollDown to .never
+- [x] BUG: New chat button icon off-center in glass container — removed custom font/frame/offset constraints, restored to default SF Symbol rendering
