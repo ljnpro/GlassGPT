@@ -158,3 +158,5 @@
 - [x] BUG: New chat button glass container oval-shaped — changed icon from square.and.pencil (wide aspect ratio) to plus.bubble (square aspect ratio) so glass container matches trash button style
 - [x] UI: Move model selector to top-left, new chat button to top-right. New chat button matches History delete button exactly (Button with title + systemImage + .buttonStyle(.glass)). Title moved to .principal placement.
 - [x] BUG: ModelBadge not displaying in topBarLeading — removed .principal title that was squeezing ModelBadge, title only shown in History now
+- [x] BUG: Sending message then immediately exiting app - response not correctly generated/recovered on return (responseId may not be saved yet) — fixed by resendOrphanedDrafts()
+- [x] BUG: Sending message then force-quitting app — added resendOrphanedDrafts() that detects empty drafts with no responseId and re-sends the request on next launch. 86 tests passing.
