@@ -11,6 +11,14 @@ final class Message {
     var createdAt: Date
     var conversation: Conversation?
 
+    /// The OpenAI response ID (from response.created event).
+    /// Used to poll for complete response if streaming was interrupted.
+    var responseId: String?
+
+    /// Whether this message has been fully received.
+    /// false = still streaming or interrupted draft.
+    var isComplete: Bool
+
     init(
         id: UUID = UUID(),
         role: MessageRole = .user,
@@ -18,7 +26,9 @@ final class Message {
         thinking: String? = nil,
         imageData: Data? = nil,
         createdAt: Date = .now,
-        conversation: Conversation? = nil
+        conversation: Conversation? = nil,
+        responseId: String? = nil,
+        isComplete: Bool = true
     ) {
         self.id = id
         self.roleRawValue = role.rawValue
@@ -27,6 +37,8 @@ final class Message {
         self.imageData = imageData
         self.createdAt = createdAt
         self.conversation = conversation
+        self.responseId = responseId
+        self.isComplete = isComplete
     }
 
     var role: MessageRole {

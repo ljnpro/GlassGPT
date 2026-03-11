@@ -137,3 +137,10 @@
 - [x] BUG: New Chat title alignment - fixed with .frame(alignment: .leading) on principal toolbar item
 - [x] BUG: Streaming is not real SSE - fixed with URLSessionDataDelegate for real-time chunk delivery
 - [x] BUG: LaTeX block spacing - fixed with .padding(.vertical, -4) on BlockLaTeXView + zero-margin HTML body
+- [x] BUG: Reasoning effort chips - redesigned with Liquid Glass stepped slider, all options in one row
+- [x] BUG: Title alignment - moved title into .topBarLeading HStack alongside New Chat button, always left-aligned
+- [x] FEATURE: Save response_id from SSE stream + poll GET /v1/responses/{id} on app resume to recover complete response
+- [x] BUG: Partial streaming response lost when user kills app mid-stream - draft persistence + response_id recovery
+- [ ] BUG: GPT-5.4 Pro thinking process not visible in UI
+- [ ] VERIFY: GPT-5.4 Pro slider should have 3 stops (Medium, High, XHigh)
+- [ ] FEATURE: Auto-reconnect on network instability during streaming
