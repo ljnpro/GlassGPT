@@ -38,6 +38,7 @@ struct ChatView: View {
                         effort: viewModel.reasoningEffort,
                         onTap: { viewModel.showModelSelector.toggle() }
                     )
+                    .fixedSize(horizontal: true, vertical: false)
                 }
 
                 ToolbarItem(placement: .topBarTrailing) {
@@ -47,6 +48,7 @@ struct ChatView: View {
                     .buttonStyle(.glass)
                 }
             }
+            .toolbarBackgroundVisibility(.hidden, for: .navigationBar)
             .sheet(isPresented: $viewModel.showModelSelector) {
                 ModelSelectorSheet(
                     selectedModel: $viewModel.selectedModel,
