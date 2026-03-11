@@ -69,6 +69,7 @@ final class ChatViewModel {
         Task { @MainActor in
             await restoreLastConversation()
             await recoverIncompleteMessages()
+            await resendOrphanedDrafts()
             await generateTitlesForUntitledConversations()
         }
     }
@@ -741,6 +742,98 @@ final class ChatViewModel {
             #if DEBUG
             print("[Recovery] Cleaned up \(cleanedCount) stale draft(s)")
             #endif
+        }
+    }
+
+    /// Resend requests for orphaned drafts — empty assistant messages with no responseId.
+    /// This happens when the user sends a message and immediately force-quits the app
+    /// before the SSE stream receives the response.created event.
+    private func resendOrphanedDrafts() async {
+        guard !apiKey.isEmpty else { return }
+
+        // Find all incomplete assistant messages with no responseId and no content
+        let descriptor = FetchDescriptor<Message>(
+            predicate: #Predicate<Message> { message in
+                message.isComplete == false && message.responseId == nil
+            }
+        )
+
+        guard let orphanedDrafts = try? modelContext.fetch(descriptor) else { return }
+
+        // Only process assistant drafts that are empty (the ones created right before streaming)
+        let draftsToResend = orphanedDrafts.filter { $0.role == .assistant && $0.content.isEmpty }
+
+        #if DEBUG
+        if !draftsToResend.isEmpty {
+            print("[Recovery] Found \(draftsToResend.count) orphaned draft(s) to resend")
+        }
+        #endif
+
+        for draft in draftsToResend {
+            guard let conversation = draft.conversation else {
+                // No conversation — just delete the orphan
+                modelContext.delete(draft)
+                try? modelContext.save()
+                continue
+            }
+
+            // Find the last user message in this conversation
+            let userMessages = conversation.messages
+                .filter { $0.role == .user }
+                .sorted { $0.createdAt < $1.createdAt }
+
+            guard let lastUserMessage = userMessages.last else {
+                // No user message to resend — delete the orphan
+                modelContext.delete(draft)
+                try? modelContext.save()
+                continue
+            }
+
+            #if DEBUG
+            print("[Recovery] Resending request for orphaned draft in conversation: \(conversation.title)")
+            #endif
+
+            // Load this conversation if it's the current one (or make it current)
+            if currentConversation?.id != conversation.id {
+                loadConversation(conversation)
+            }
+
+            // Remove the empty draft — we'll create a new one via the normal send flow
+            if let idx = conversation.messages.firstIndex(where: { $0.id == draft.id }) {
+                conversation.messages.remove(at: idx)
+            }
+            messages.removeAll { $0.id == draft.id }
+            modelContext.delete(draft)
+            try? modelContext.save()
+
+            // Now re-create a draft and start streaming (same as sendMessage but without user message)
+            let newDraft = Message(
+                role: .assistant,
+                content: "",
+                thinking: nil,
+                isComplete: false
+            )
+            newDraft.conversation = currentConversation
+            currentConversation?.messages.append(newDraft)
+            try? modelContext.save()
+            draftMessage = newDraft
+
+            isStreaming = true
+            isThinking = false
+            currentStreamingText = ""
+            currentThinkingText = ""
+
+            // Use the conversation's saved model/effort
+            let convModel = ModelType(rawValue: conversation.model) ?? .gpt5_4
+            let convEffort = ReasoningEffort(rawValue: conversation.reasoningEffort) ?? .high
+            selectedModel = convModel
+            reasoningEffort = convEffort
+
+            startStreamingRequest()
+
+            // Only resend one at a time — wait for it to complete before processing the next
+            // (the streaming will handle itself asynchronously)
+            return
         }
     }
 
