@@ -123,3 +123,9 @@
 - [x] BUG: Block LaTeX spacing - reduced initial height to 24, removed .padding(.vertical), added margin:0 to CSS body
 - [x] FEATURE: Interactive keyboard dismiss - .scrollDismissesKeyboard(.interactively) on both message list and empty state
 - [x] BUG: Navigation title - changed to .principal placement for always-centered title
+- [x] FEATURE: Bundle KaTeX JS/CSS into app bundle for offline LaTeX rendering (no CDN dependency)
+- [x] FEATURE: Message long-press context menu (copy text, regenerate reply, share)
+- [x] FEATURE: Code block language label and one-click copy button (already existed)
+- [x] BUG: Context menu copy/share options hidden behind bubble - fixed with explicit pure-SwiftUI preview + compositingGroup
+- [x] BUG: Context menu anchors to code block Copy button - fixed with .contentShape(.contextMenuPreview) on outer bubble
+- [x] BUG: Streaming not working - fixed with lightweight StreamingTextView during streaming + simulated streaming in fallback path

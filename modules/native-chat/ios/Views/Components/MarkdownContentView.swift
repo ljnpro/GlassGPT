@@ -497,74 +497,8 @@ private struct BlockLaTeXWebView: UIViewRepresentable {
         guard key != context.coordinator.lastKey else { return }
         context.coordinator.lastKey = key
 
-        let encoder = JSONEncoder()
-        let jsonLatex: String
-        if let jsonData = try? encoder.encode(latex),
-           let jsonString = String(data: jsonData, encoding: .utf8) {
-            jsonLatex = jsonString
-        } else {
-            let escaped = latex
-                .replacingOccurrences(of: "\\", with: "\\\\")
-                .replacingOccurrences(of: "\"", with: "\\\"")
-            jsonLatex = "\"\(escaped)\""
-        }
-
-        let textColor = isDark ? "#e5e5e5" : "#1c1c1e"
-
-        let html = """
-        <!DOCTYPE html>
-        <html>
-        <head>
-        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" crossorigin="anonymous">
-        <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js" crossorigin="anonymous"></script>
-        <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body {
-            background: transparent;
-            color: \(textColor);
-            font-size: 17px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            min-height: 20px;
-            padding: 0;
-            margin: 0;
-            -webkit-text-size-adjust: none;
-        }
-        .katex { font-size: 1em !important; }
-        .katex-display { margin: 0 !important; }
-        #math { display: inline-block; max-width: 100%; overflow-x: auto; }
-        </style>
-        </head>
-        <body>
-        <div id="math"></div>
-        <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            var latexStr = \(jsonLatex);
-            try {
-                katex.render(latexStr, document.getElementById('math'), {
-                    displayMode: true,
-                    throwOnError: false,
-                    trust: true,
-                    strict: false
-                });
-            } catch(e) {
-                document.getElementById('math').textContent = latexStr;
-            }
-            setTimeout(function() {
-                var h = document.body.scrollHeight;
-                if (h > 0) {
-                    window.webkit.messageHandlers.sizeCallback.postMessage(h);
-                }
-            }, 100);
-        });
-        </script>
-        </body>
-        </html>
-        """
-
-        webView.loadHTMLString(html, baseURL: URL(string: "https://cdn.jsdelivr.net"))
+        let result = KaTeXProvider.htmlForLatex(latex, isDark: isDark)
+        webView.loadHTMLString(result.html, baseURL: result.baseURL)
     }
 
     static func dismantleUIView(_ webView: WKWebView, coordinator: Coordinator) {
