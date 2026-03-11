@@ -172,35 +172,27 @@ struct ChatView: View {
     // MARK: - Empty State
 
     private var emptyState: some View {
-        ScrollView {
-            VStack(spacing: 16) {
-                Spacer(minLength: 120)
+        VStack(spacing: 16) {
+            Spacer()
 
-                Image(systemName: "bubble.left.and.bubble.right")
-                    .font(.system(size: 56))
-                    .foregroundStyle(.secondary)
-                    .symbolEffect(.breathe)
+            Image(systemName: "bubble.left.and.bubble.right")
+                .font(.system(size: 56))
+                .foregroundStyle(.secondary)
+                .symbolEffect(.breathe)
 
-                Text("Start a Conversation")
-                    .font(.title2.weight(.semibold))
+            Text("Start a Conversation")
+                .font(.title2.weight(.semibold))
 
-                Text("Type a message below to begin chatting with AI")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-
-                if !viewModel.hasAPIKey {
-                    Label("Add your API key in Settings", systemImage: "key.fill")
-                        .font(.callout)
-                        .foregroundStyle(.orange)
-                        .padding(.top, 8)
-                }
-
-                Spacer(minLength: 120)
+            if !viewModel.hasAPIKey {
+                Label("Add your API key in Settings", systemImage: "key.fill")
+                    .font(.callout)
+                    .foregroundStyle(.orange)
+                    .padding(.top, 8)
             }
-            .frame(maxWidth: .infinity)
+
+            Spacer()
         }
-        .scrollDismissesKeyboard(.interactively)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     // MARK: - Streaming Bubble
