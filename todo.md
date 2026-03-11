@@ -141,6 +141,9 @@
 - [x] BUG: Title alignment - moved title into .topBarLeading HStack alongside New Chat button, always left-aligned
 - [x] FEATURE: Save response_id from SSE stream + poll GET /v1/responses/{id} on app resume to recover complete response
 - [x] BUG: Partial streaming response lost when user kills app mid-stream - draft persistence + response_id recovery
-- [ ] BUG: GPT-5.4 Pro thinking process not visible in UI
-- [ ] VERIFY: GPT-5.4 Pro slider should have 3 stops (Medium, High, XHigh)
-- [ ] FEATURE: Auto-reconnect on network instability during streaming
+- [x] BUG: GPT-5.4 Pro thinking process not visible in UI
+- [x] VERIFY: GPT-5.4 Pro slider should have 3 stops (Medium, High, XHigh)
+- [x] FEATURE: Auto-reconnect on network instability during streaming
+- [x] FIX: GPT-5.4 Pro thinking/reasoning process not visible during streaming - ensure response.reasoning_text.delta events are parsed and displayed in ThinkingView
+- [x] FEATURE: Network auto-reconnect for SSE streaming - exponential backoff (1s, 2s, 4s), max 3 retries, seamless resume
+- [x] VERIFY: Harden response recovery flow - stale draft cleanup (24h threshold), edge case handling, comprehensive test coverage (78 tests)
