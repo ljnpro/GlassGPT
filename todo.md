@@ -160,3 +160,4 @@
 - [x] BUG: ModelBadge not displaying in topBarLeading — removed .principal title that was squeezing ModelBadge, title only shown in History now
 - [x] BUG: Sending message then immediately exiting app - response not correctly generated/recovered on return (responseId may not be saved yet) — fixed by resendOrphanedDrafts()
 - [x] BUG: Sending message then force-quitting app — rewrote resendOrphanedDrafts() to manually set up conversation state (avoids loadConversation race condition), shows thinking indicator + recovery banner, and re-sends the request. 86 tests passing.
+- [x] BUG: ModelBadge in topBarLeading only shows chevron arrow — fixed with .fixedSize(horizontal: true, vertical: false) to prevent iOS 26 toolbar text truncation, combined model+effort into single Text (e.g. "GPT-5.4 Pro Medium"), added .toolbarBackgroundVisibility(.hidden) to prevent double glass background

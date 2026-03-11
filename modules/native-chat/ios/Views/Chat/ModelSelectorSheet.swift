@@ -10,15 +10,9 @@ struct ModelBadge: View {
     var body: some View {
         Button(action: onTap) {
             HStack(spacing: 4) {
-                Text(model.displayName)
+                Text(badgeText)
                     .font(.subheadline.weight(.semibold))
-
-                if effort != .none {
-                    Text("·")
-                        .font(.caption)
-                    Text(effort.displayName)
-                        .font(.caption)
-                }
+                    .lineLimit(1)
 
                 Image(systemName: "chevron.down")
                     .font(.caption2)
@@ -26,9 +20,19 @@ struct ModelBadge: View {
             .foregroundStyle(.primary)
             .padding(.horizontal, 12)
             .padding(.vertical, 6)
-            .glassEffect(.regular, in: .capsule)
+            .fixedSize(horizontal: true, vertical: false)
         }
         .buttonStyle(.plain)
+        .glassEffect(.regular, in: .capsule)
+    }
+
+    /// Combined badge text: "GPT-5.4 Medium" or "GPT-5.4 Pro High"
+    /// When effort is .none, just show the model name: "GPT-5.4"
+    private var badgeText: String {
+        if effort == .none {
+            return model.displayName
+        }
+        return "\(model.displayName) \(effort.displayName)"
     }
 }
 
