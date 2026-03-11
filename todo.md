@@ -129,3 +129,6 @@
 - [x] BUG: Context menu copy/share options hidden behind bubble - fixed with explicit pure-SwiftUI preview + compositingGroup
 - [x] BUG: Context menu anchors to code block Copy button - fixed with .contentShape(.contextMenuPreview) on outer bubble
 - [x] BUG: Streaming not working - fixed with lightweight StreamingTextView during streaming + simulated streaming in fallback path
+- [x] UPDATE: Bump version to v2.0.0 on GitHub Pages support website
+- [x] UPDATE: Add changelog/update log section to support website
+- [x] UPDATE: Change contact email to ljnpro6@gmail.com on support website
