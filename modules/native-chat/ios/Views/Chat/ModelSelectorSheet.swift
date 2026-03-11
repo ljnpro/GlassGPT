@@ -11,20 +11,24 @@ struct ModelBadge: View {
         Button(action: onTap) {
             HStack(spacing: 4) {
                 Text(model.displayName)
-                    .font(.caption.weight(.semibold))
+                    .font(.subheadline.weight(.semibold))
 
                 if effort != .none {
                     Text("·")
+                        .font(.caption)
                     Text(effort.displayName)
-                        .font(.caption2)
+                        .font(.caption)
                 }
 
                 Image(systemName: "chevron.down")
                     .font(.caption2)
             }
             .foregroundStyle(.primary)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
+            .glassEffect(.regular, in: .capsule)
         }
-        .buttonStyle(.glass)
+        .buttonStyle(.plain)
     }
 }
 
