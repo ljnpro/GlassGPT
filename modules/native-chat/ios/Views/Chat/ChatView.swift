@@ -33,26 +33,25 @@ struct ChatView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    HStack(spacing: 8) {
-                        Button("New Chat", systemImage: "plus.bubble") {
-                            viewModel.startNewChat()
-                        }
-                        .buttonStyle(.glass)
-                        .labelStyle(.iconOnly)
-
-                        Text(viewModel.currentConversation?.title ?? "New Chat")
-                            .font(.headline)
-                            .lineLimit(1)
-                            .truncationMode(.tail)
-                    }
-                }
-
-                ToolbarItem(placement: .topBarTrailing) {
                     ModelBadge(
                         model: viewModel.selectedModel,
                         effort: viewModel.reasoningEffort,
                         onTap: { viewModel.showModelSelector.toggle() }
                     )
+                }
+
+                ToolbarItem(placement: .principal) {
+                    Text(viewModel.currentConversation?.title ?? "New Chat")
+                        .font(.headline)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                }
+
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("New Chat", systemImage: "square.and.pencil") {
+                        viewModel.startNewChat()
+                    }
+                    .buttonStyle(.glass)
                 }
             }
             .sheet(isPresented: $viewModel.showModelSelector) {
