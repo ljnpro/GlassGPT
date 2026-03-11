@@ -147,3 +147,5 @@
 - [x] FIX: GPT-5.4 Pro thinking/reasoning process not visible during streaming - ensure response.reasoning_text.delta events are parsed and displayed in ThinkingView
 - [x] FEATURE: Network auto-reconnect for SSE streaming - exponential backoff (1s, 2s, 4s), max 3 retries, seamless resume
 - [x] VERIFY: Harden response recovery flow - stale draft cleanup (24h threshold), edge case handling, comprehensive test coverage (78 tests)
+- [x] CRITICAL BUG: All conversation history lost every time app is relaunched - SwiftData persistence not working — removed in-memory fallback, added delete-and-recreate on schema migration failure
+- [x] UI: Reasoning effort slider should use iOS 26 Liquid Glass native slider style — replaced custom EffortSlider with native SwiftUI Slider (auto Liquid Glass thumb on iOS 26)
