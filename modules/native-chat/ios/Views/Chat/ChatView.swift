@@ -10,69 +10,81 @@ struct ChatView: View {
 
     var body: some View {
         NavigationStack {
-            chatContent
-                .safeAreaInset(edge: .bottom, spacing: 0) {
-                    MessageInputBar(
-                        text: $viewModel.inputText,
-                        isStreaming: viewModel.isStreaming,
-                        selectedImageData: $viewModel.selectedImageData,
-                        onSend: { viewModel.sendMessage() },
-                        onStop: { viewModel.stopGeneration() },
-                        onPickImage: { showPhotoPicker = true }
+            ZStack {
+                chatContent
+
+                // Restoring conversation overlay
+                if viewModel.isRestoringConversation {
+                    restoringOverlay
+                        .transition(.opacity)
+                }
+            }
+            .animation(.easeInOut(duration: 0.25), value: viewModel.isRestoringConversation)
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                MessageInputBar(
+                    text: $viewModel.inputText,
+                    isStreaming: viewModel.isStreaming,
+                    selectedImageData: $viewModel.selectedImageData,
+                    onSend: { viewModel.sendMessage() },
+                    onStop: { viewModel.stopGeneration() },
+                    onPickImage: { showPhotoPicker = true }
+                )
+            }
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    HStack(spacing: 8) {
+                        Button {
+                            viewModel.startNewChat()
+                        } label: {
+                            Image(systemName: "square.and.pencil")
+                                .font(.system(size: 15, weight: .medium))
+                                .frame(width: 20, height: 20)
+                                .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.glass)
+
+                        Text(viewModel.currentConversation?.title ?? "New Chat")
+                            .font(.headline)
+                            .lineLimit(1)
+                            .truncationMode(.tail)
+                    }
+                }
+
+                ToolbarItem(placement: .topBarTrailing) {
+                    ModelBadge(
+                        model: viewModel.selectedModel,
+                        effort: viewModel.reasoningEffort,
+                        onTap: { viewModel.showModelSelector.toggle() }
                     )
                 }
-                .navigationBarTitleDisplayMode(.inline)
-                .toolbar {
-                    ToolbarItem(placement: .topBarLeading) {
-                        HStack(spacing: 8) {
-                            Button {
-                                viewModel.startNewChat()
-                            } label: {
-                                Image(systemName: "square.and.pencil")
-                            }
-                            .buttonStyle(.glass)
-
-                            Text(viewModel.currentConversation?.title ?? "New Chat")
-                                .font(.headline)
-                                .lineLimit(1)
-                                .truncationMode(.tail)
+            }
+            .sheet(isPresented: $viewModel.showModelSelector) {
+                ModelSelectorSheet(
+                    selectedModel: $viewModel.selectedModel,
+                    reasoningEffort: $viewModel.reasoningEffort
+                )
+                .presentationDetents([.height(300)])
+                .presentationDragIndicator(.visible)
+                .presentationCornerRadius(24)
+            }
+            .photosPicker(isPresented: $showPhotoPicker, selection: $selectedPhotoItem, matching: .images)
+            .onChange(of: selectedPhotoItem) { _, newItem in
+                Task {
+                    do {
+                        guard
+                            let rawData = try await newItem?.loadTransferable(type: Data.self),
+                            let image = UIImage(data: rawData),
+                            let jpegData = image.jpegData(compressionQuality: 0.85)
+                        else {
+                            return
                         }
-                    }
-
-                    ToolbarItem(placement: .topBarTrailing) {
-                        ModelBadge(
-                            model: viewModel.selectedModel,
-                            effort: viewModel.reasoningEffort,
-                            onTap: { viewModel.showModelSelector.toggle() }
-                        )
+                        viewModel.selectedImageData = jpegData
+                    } catch {
+                        print("Failed to load photo: \(error.localizedDescription)")
                     }
                 }
-                .sheet(isPresented: $viewModel.showModelSelector) {
-                    ModelSelectorSheet(
-                        selectedModel: $viewModel.selectedModel,
-                        reasoningEffort: $viewModel.reasoningEffort
-                    )
-                    .presentationDetents([.height(300)])
-                    .presentationDragIndicator(.visible)
-                    .presentationCornerRadius(24)
-                }
-                .photosPicker(isPresented: $showPhotoPicker, selection: $selectedPhotoItem, matching: .images)
-                .onChange(of: selectedPhotoItem) { _, newItem in
-                    Task {
-                        do {
-                            guard
-                                let rawData = try await newItem?.loadTransferable(type: Data.self),
-                                let image = UIImage(data: rawData),
-                                let jpegData = image.jpegData(compressionQuality: 0.85)
-                            else {
-                                return
-                            }
-                            viewModel.selectedImageData = jpegData
-                        } catch {
-                            print("Failed to load photo: \(error.localizedDescription)")
-                        }
-                    }
-                }
+            }
         }
     }
 
@@ -80,7 +92,7 @@ struct ChatView: View {
 
     @ViewBuilder
     private var chatContent: some View {
-        if viewModel.messages.isEmpty && !viewModel.isStreaming {
+        if viewModel.messages.isEmpty && !viewModel.isStreaming && !viewModel.isRestoringConversation {
             emptyState
         } else {
             ScrollViewReader { proxy in
@@ -139,6 +151,31 @@ struct ChatView: View {
                     }
                 }
             }
+        }
+    }
+
+    // MARK: - Restoring Overlay
+
+    private var restoringOverlay: some View {
+        VStack(spacing: 12) {
+            Spacer()
+
+            HStack(spacing: 10) {
+                ProgressView()
+                    .controlSize(.small)
+                Text("Restoring conversation…")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+            .padding(.horizontal, 20)
+            .padding(.vertical, 12)
+            .background {
+                Capsule()
+                    .fill(.ultraThinMaterial)
+            }
+            .glassEffect(.regular, in: Capsule())
+
+            Spacer()
         }
     }
 

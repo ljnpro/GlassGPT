@@ -149,3 +149,7 @@
 - [x] VERIFY: Harden response recovery flow - stale draft cleanup (24h threshold), edge case handling, comprehensive test coverage (78 tests)
 - [x] CRITICAL BUG: All conversation history lost every time app is relaunched - SwiftData persistence not working — removed in-memory fallback, added delete-and-recreate on schema migration failure
 - [x] UI: Reasoning effort slider should use iOS 26 Liquid Glass native slider style — replaced custom EffortSlider with native SwiftUI Slider (auto Liquid Glass thumb on iOS 26)
+- [x] BUG: Conversation title stays "New Chat" after app exit — title now generated on background enter + untitled conversations get titles on next launch
+- [x] BUG: New chat button inner/outer rounded corners not concentric — fixed icon frame to 20x20 with explicit font size for centered alignment
+- [x] UI: Add minimal "Restoring conversation…" indicator — glass capsule overlay shown during last conversation restore on launch
+- [x] BUG: Tab bar collapses on scroll — changed .tabBarMinimizeBehavior from .onScrollDown to .never
