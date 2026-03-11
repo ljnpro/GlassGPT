@@ -157,3 +157,4 @@
 - [x] BUG: New chat glass button outer container is oval (wider than tall) — added square frame (22x22) to icon label so glass container matches icon proportions
 - [x] BUG: New chat button glass container oval-shaped — changed icon from square.and.pencil (wide aspect ratio) to plus.bubble (square aspect ratio) so glass container matches trash button style
 - [x] UI: Move model selector to top-left, new chat button to top-right. New chat button matches History delete button exactly (Button with title + systemImage + .buttonStyle(.glass)). Title moved to .principal placement.
+- [x] BUG: ModelBadge not displaying in topBarLeading — removed .principal title that was squeezing ModelBadge, title only shown in History now
