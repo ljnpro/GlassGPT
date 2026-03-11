@@ -34,16 +34,11 @@ struct ChatView: View {
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     HStack(spacing: 8) {
-                        Button {
+                        Button("New Chat", systemImage: "square.and.pencil") {
                             viewModel.startNewChat()
-                        } label: {
-                            Image(systemName: "square.and.pencil")
-                                .font(.system(size: 16))
-                                .frame(width: 34, height: 34)
-                                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-                                .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(.glass)
+                        .labelStyle(.iconOnly)
 
                         Text(viewModel.currentConversation?.title ?? "New Chat")
                             .font(.headline)
