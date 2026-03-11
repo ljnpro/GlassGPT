@@ -38,9 +38,6 @@ struct ChatView: View {
                             viewModel.startNewChat()
                         } label: {
                             Image(systemName: "square.and.pencil")
-                                .font(.system(size: 15, weight: .medium))
-                                .frame(width: 20, height: 20)
-                                .contentShape(Rectangle())
                         }
                         .buttonStyle(.glass)
 
