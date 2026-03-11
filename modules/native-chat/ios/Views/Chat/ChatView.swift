@@ -40,13 +40,6 @@ struct ChatView: View {
                     )
                 }
 
-                ToolbarItem(placement: .principal) {
-                    Text(viewModel.currentConversation?.title ?? "New Chat")
-                        .font(.headline)
-                        .lineLimit(1)
-                        .truncationMode(.tail)
-                }
-
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("New Chat", systemImage: "square.and.pencil") {
                         viewModel.startNewChat()
