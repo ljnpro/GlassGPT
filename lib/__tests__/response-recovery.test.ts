@@ -1017,3 +1017,151 @@ describe('Connection Lost Detection', () => {
     expect(networkErrorCodes.length).toBeGreaterThanOrEqual(5);
   });
 });
+
+// ============================================================
+// Orphaned Draft Resend Tests
+// ============================================================
+
+describe('Orphaned Draft Detection - Force Quit Recovery', () => {
+  interface DraftMessage {
+    id: string;
+    role: 'assistant';
+    content: string;
+    isComplete: boolean;
+    responseId: string | null;
+    createdAt: Date;
+    conversationId: string | null;
+  }
+
+  function isOrphanedDraft(msg: DraftMessage): boolean {
+    return (
+      msg.role === 'assistant' &&
+      !msg.isComplete &&
+      msg.responseId === null &&
+      msg.content === ''
+    );
+  }
+
+  function isStale(msg: DraftMessage, thresholdHours: number = 24): boolean {
+    const threshold = new Date(Date.now() - thresholdHours * 60 * 60 * 1000);
+    return msg.createdAt < threshold;
+  }
+
+  function shouldResend(msg: DraftMessage): boolean {
+    return isOrphanedDraft(msg) && !isStale(msg) && msg.conversationId !== null;
+  }
+
+  it('should identify an orphaned draft (empty, no responseId, not complete)', () => {
+    const draft: DraftMessage = {
+      id: 'draft-1',
+      role: 'assistant',
+      content: '',
+      isComplete: false,
+      responseId: null,
+      createdAt: new Date(),
+      conversationId: 'conv-1',
+    };
+    expect(isOrphanedDraft(draft)).toBe(true);
+  });
+
+  it('should NOT identify a draft with responseId as orphaned', () => {
+    const draft: DraftMessage = {
+      id: 'draft-2',
+      role: 'assistant',
+      content: '',
+      isComplete: false,
+      responseId: 'resp_abc123',
+      createdAt: new Date(),
+      conversationId: 'conv-1',
+    };
+    expect(isOrphanedDraft(draft)).toBe(false);
+  });
+
+  it('should NOT identify a completed message as orphaned', () => {
+    const msg: DraftMessage = {
+      id: 'msg-1',
+      role: 'assistant',
+      content: 'Hello world',
+      isComplete: true,
+      responseId: null,
+      createdAt: new Date(),
+      conversationId: 'conv-1',
+    };
+    expect(isOrphanedDraft(msg)).toBe(false);
+  });
+
+  it('should NOT identify a draft with content as orphaned', () => {
+    const draft: DraftMessage = {
+      id: 'draft-3',
+      role: 'assistant',
+      content: 'Partial response...',
+      isComplete: false,
+      responseId: null,
+      createdAt: new Date(),
+      conversationId: 'conv-1',
+    };
+    expect(isOrphanedDraft(draft)).toBe(false);
+  });
+
+  it('should mark stale orphaned drafts (>24h) as not eligible for resend', () => {
+    const staleDraft: DraftMessage = {
+      id: 'draft-stale',
+      role: 'assistant',
+      content: '',
+      isComplete: false,
+      responseId: null,
+      createdAt: new Date(Date.now() - 25 * 60 * 60 * 1000), // 25 hours ago
+      conversationId: 'conv-1',
+    };
+    expect(isOrphanedDraft(staleDraft)).toBe(true);
+    expect(isStale(staleDraft)).toBe(true);
+    expect(shouldResend(staleDraft)).toBe(false);
+  });
+
+  it('should mark fresh orphaned drafts (<24h) as eligible for resend', () => {
+    const freshDraft: DraftMessage = {
+      id: 'draft-fresh',
+      role: 'assistant',
+      content: '',
+      isComplete: false,
+      responseId: null,
+      createdAt: new Date(Date.now() - 5 * 60 * 1000), // 5 minutes ago
+      conversationId: 'conv-1',
+    };
+    expect(isOrphanedDraft(freshDraft)).toBe(true);
+    expect(isStale(freshDraft)).toBe(false);
+    expect(shouldResend(freshDraft)).toBe(true);
+  });
+
+  it('should NOT resend orphaned drafts with no conversation', () => {
+    const orphanNoCov: DraftMessage = {
+      id: 'draft-no-conv',
+      role: 'assistant',
+      content: '',
+      isComplete: false,
+      responseId: null,
+      createdAt: new Date(),
+      conversationId: null,
+    };
+    expect(shouldResend(orphanNoCov)).toBe(false);
+  });
+
+  it('should correctly filter a mixed set of messages for resend candidates', () => {
+    const messages: DraftMessage[] = [
+      // Orphaned, fresh, has conversation — should resend
+      { id: '1', role: 'assistant', content: '', isComplete: false, responseId: null, createdAt: new Date(), conversationId: 'conv-1' },
+      // Has responseId — should NOT resend (use polling recovery instead)
+      { id: '2', role: 'assistant', content: '', isComplete: false, responseId: 'resp_123', createdAt: new Date(), conversationId: 'conv-1' },
+      // Completed — should NOT resend
+      { id: '3', role: 'assistant', content: 'Done', isComplete: true, responseId: null, createdAt: new Date(), conversationId: 'conv-1' },
+      // Stale — should NOT resend
+      { id: '4', role: 'assistant', content: '', isComplete: false, responseId: null, createdAt: new Date(Date.now() - 48 * 60 * 60 * 1000), conversationId: 'conv-1' },
+      // No conversation — should NOT resend
+      { id: '5', role: 'assistant', content: '', isComplete: false, responseId: null, createdAt: new Date(), conversationId: null },
+    ];
+
+    const resendCandidates = messages.filter(shouldResend);
+    expect(resendCandidates).toHaveLength(1);
+    expect(resendCandidates[0].id).toBe('1');
+  });
+});
