@@ -38,9 +38,12 @@ struct ChatView: View {
                             viewModel.startNewChat()
                         } label: {
                             Image(systemName: "square.and.pencil")
-                                .frame(width: 22, height: 22)
+                                .font(.system(size: 16))
+                                .frame(width: 34, height: 34)
+                                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                                .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
                         }
-                        .buttonStyle(.glass)
+                        .buttonStyle(.plain)
 
                         Text(viewModel.currentConversation?.title ?? "New Chat")
                             .font(.headline)
