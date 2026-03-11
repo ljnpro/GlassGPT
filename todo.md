@@ -132,3 +132,8 @@
 - [x] UPDATE: Bump version to v2.0.0 on GitHub Pages support website
 - [x] UPDATE: Add changelog/update log section to support website
 - [x] UPDATE: Change contact email to ljnpro6@gmail.com on support website
+- [x] BUG: Model selector sheet too tall - fixed with compact chip layout + FlowLayout + .height(320) detent
+- [x] BUG: Auto-generated title too long - fixed with 2-4 word prompt limit + maxWidth(160) + truncationMode(.tail)
+- [x] BUG: New Chat title alignment - fixed with .frame(alignment: .leading) on principal toolbar item
+- [x] BUG: Streaming is not real SSE - fixed with URLSessionDataDelegate for real-time chunk delivery
+- [x] BUG: LaTeX block spacing - fixed with .padding(.vertical, -4) on BlockLaTeXView + zero-margin HTML body

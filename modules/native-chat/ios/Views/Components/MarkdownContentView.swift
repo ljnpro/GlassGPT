@@ -449,7 +449,7 @@ private struct RichTextView: View {
 private struct BlockLaTeXView: View {
     let latex: String
 
-    @State private var height: CGFloat = 24
+    @State private var height: CGFloat = 20
     @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
@@ -461,6 +461,9 @@ private struct BlockLaTeXView: View {
         .frame(height: height)
         .frame(maxWidth: .infinity, alignment: .center)
         .clipped()
+        // Reduce extra vertical spacing between LaTeX block and surrounding text.
+        // The WKWebView already has its own internal padding; we pull it tighter.
+        .padding(.vertical, -4)
     }
 }
 
