@@ -17,6 +17,7 @@ enum StreamEvent: Sendable {
     case thinkingFinished
     case responseCreated(String)      // response_id for recovery
     case completed(String, String?)   // (fullText, fullThinking?)
+    case connectionLost               // Network disconnected mid-stream (eligible for auto-reconnect)
     case error(OpenAIServiceError)
 }
 
@@ -448,17 +449,38 @@ private final class SSEDelegate: NSObject, URLSessionDataDelegate, @unchecked Se
             #if DEBUG
             print("[SSE] Connection error: \(error.localizedDescription)")
             #endif
-            if emittedAnyOutput {
-                // We have partial output, complete it
+
+            let nsError = error as NSError
+            let isNetworkError = [
+                NSURLErrorNetworkConnectionLost,
+                NSURLErrorNotConnectedToInternet,
+                NSURLErrorTimedOut,
+                NSURLErrorDataNotAllowed,
+                NSURLErrorInternationalRoamingOff,
+                NSURLErrorCannotFindHost,
+                NSURLErrorCannotConnectToHost,
+                NSURLErrorSecureConnectionFailed
+            ].contains(nsError.code)
+
+            if isNetworkError {
+                // Emit connectionLost so the ViewModel can attempt auto-reconnect
+                if thinkingActive {
+                    continuation.yield(.thinkingFinished)
+                }
+                continuation.yield(.connectionLost)
+                continuation.finish()
+            } else if emittedAnyOutput {
+                // Non-network error but we have partial output — complete it
                 if thinkingActive {
                     continuation.yield(.thinkingFinished)
                 }
                 let thinking: String? = accumulatedThinking.isEmpty ? nil : accumulatedThinking
                 continuation.yield(.completed(accumulatedText, thinking))
+                continuation.finish()
             } else {
                 continuation.yield(.error(.requestFailed(error.localizedDescription)))
+                continuation.finish()
             }
-            continuation.finish()
             return
         }
 
@@ -577,6 +599,33 @@ private final class SSEDelegate: NSObject, URLSessionDataDelegate, @unchecked Se
             return .continued
 
         case "response.reasoning_summary_text.done":
+            if thinkingActive {
+                thinkingActive = false
+                continuation.yield(.thinkingFinished)
+            }
+            return .continued
+
+        // Real-time reasoning text (full chain-of-thought, available on some models)
+        case "response.reasoning_text.delta":
+            if let json = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any],
+               let delta = json["delta"] as? String {
+                if !thinkingActive {
+                    thinkingActive = true
+                    continuation.yield(.thinkingStarted)
+                }
+                emittedAnyOutput = true
+                accumulatedThinking += delta
+                continuation.yield(.thinkingDelta(delta))
+            }
+            return .continued
+
+        case "response.reasoning_text.done":
+            if let json = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any],
+               let fullText = json["text"] as? String {
+                if fullText.count > accumulatedThinking.count {
+                    accumulatedThinking = fullText
+                }
+            }
             if thinkingActive {
                 thinkingActive = false
                 continuation.yield(.thinkingFinished)
