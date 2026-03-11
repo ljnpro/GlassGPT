@@ -77,7 +77,7 @@ struct MessageInputBar: View {
             .padding(.horizontal, 16)
             .padding(.vertical, 8)
         }
-        .background(.ultraThinMaterial)
+        .background(Color(.systemBackground))
     }
 
     private var canSend: Bool {
