@@ -782,7 +782,7 @@ final class ChatViewModel {
                 .filter { $0.role == .user }
                 .sorted { $0.createdAt < $1.createdAt }
 
-            guard let lastUserMessage = userMessages.last else {
+            guard userMessages.last != nil else {
                 // No user message to resend — delete the orphan
                 modelContext.delete(draft)
                 try? modelContext.save()
@@ -793,20 +793,27 @@ final class ChatViewModel {
             print("[Recovery] Resending request for orphaned draft in conversation: \(conversation.title)")
             #endif
 
-            // Load this conversation if it's the current one (or make it current)
-            if currentConversation?.id != conversation.id {
-                loadConversation(conversation)
+            // Manually set up conversation state WITHOUT calling loadConversation
+            // (loadConversation filters out empty drafts and triggers its own recovery, causing race conditions)
+            currentConversation = conversation
+            messages = conversation.messages
+                .sorted { $0.createdAt < $1.createdAt }
+                .filter { $0.id != draft.id } // Exclude the old empty draft from display
+            selectedModel = ModelType(rawValue: conversation.model) ?? .gpt5_4
+            reasoningEffort = ReasoningEffort(rawValue: conversation.reasoningEffort) ?? .high
+
+            if !selectedModel.availableEfforts.contains(reasoningEffort) {
+                reasoningEffort = selectedModel.defaultEffort
             }
 
-            // Remove the empty draft — we'll create a new one via the normal send flow
+            // Remove the old empty draft from SwiftData
             if let idx = conversation.messages.firstIndex(where: { $0.id == draft.id }) {
                 conversation.messages.remove(at: idx)
             }
-            messages.removeAll { $0.id == draft.id }
             modelContext.delete(draft)
             try? modelContext.save()
 
-            // Now re-create a draft and start streaming (same as sendMessage but without user message)
+            // Create a new draft and add it to both SwiftData and the messages array
             let newDraft = Message(
                 role: .assistant,
                 content: "",
@@ -817,22 +824,22 @@ final class ChatViewModel {
             currentConversation?.messages.append(newDraft)
             try? modelContext.save()
             draftMessage = newDraft
+            // Note: don't add newDraft to messages array — startStreamingRequest will handle display
 
             isStreaming = true
-            isThinking = false
+            isThinking = true  // Show thinking indicator while waiting for first token
+            isRecovering = true
             currentStreamingText = ""
             currentThinkingText = ""
+            errorMessage = nil
 
-            // Use the conversation's saved model/effort
-            let convModel = ModelType(rawValue: conversation.model) ?? .gpt5_4
-            let convEffort = ReasoningEffort(rawValue: conversation.reasoningEffort) ?? .high
-            selectedModel = convModel
-            reasoningEffort = convEffort
+            #if DEBUG
+            print("[Recovery] Starting resend stream for conversation: \(conversation.title), messages count: \(messages.count)")
+            #endif
 
             startStreamingRequest()
 
-            // Only resend one at a time — wait for it to complete before processing the next
-            // (the streaming will handle itself asynchronously)
+            // Only resend one at a time
             return
         }
     }
