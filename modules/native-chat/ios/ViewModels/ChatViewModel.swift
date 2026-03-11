@@ -14,6 +14,7 @@ final class ChatViewModel {
     var isStreaming: Bool = false
     var isThinking: Bool = false
     var isRecovering: Bool = false          // True when polling for a previously interrupted response
+    var isRestoringConversation: Bool = false // True when loading previous conversation on app launch
     var inputText: String = ""
     var selectedModel: ModelType = .gpt5_4
     var reasoningEffort: ReasoningEffort = .medium
@@ -64,9 +65,11 @@ final class ChatViewModel {
         // Listen for app lifecycle to handle background/foreground transitions
         setupLifecycleObservers()
 
-        // On launch, check for any incomplete messages from a previous session
+        // On launch: restore last conversation and check for incomplete messages
         Task { @MainActor in
+            await restoreLastConversation()
             await recoverIncompleteMessages()
+            await generateTitlesForUntitledConversations()
         }
     }
 
@@ -105,6 +108,19 @@ final class ChatViewModel {
                 Task { @MainActor in
                     self?.saveDraftNow()
                     self?.endBackgroundTask()
+                }
+            }
+        }
+
+        // Generate title before app exits if it's still "New Chat"
+        if let conversation = currentConversation,
+           conversation.title == "New Chat",
+           messages.count >= 2 {
+            let bgTask = UIApplication.shared.beginBackgroundTask(withName: "TitleGeneration")
+            Task { @MainActor in
+                await self.generateTitle()
+                if bgTask != .invalid {
+                    UIApplication.shared.endBackgroundTask(bgTask)
                 }
             }
         }
@@ -948,6 +964,89 @@ final class ChatViewModel {
         // Check for incomplete messages in this conversation and recover them
         Task { @MainActor in
             await recoverIncompleteMessagesInCurrentConversation()
+        }
+    }
+
+    // MARK: - Restore Last Conversation
+
+    /// On app launch, restore the most recently updated conversation so the user
+    /// sees their previous chat instead of an empty screen.
+    private func restoreLastConversation() async {
+        isRestoringConversation = true
+
+        var descriptor = FetchDescriptor<Conversation>(
+            sortBy: [SortDescriptor(\Conversation.updatedAt, order: .reverse)]
+        )
+        descriptor.fetchLimit = 1
+
+        if let conversations = try? modelContext.fetch(descriptor),
+           let lastConversation = conversations.first,
+           !lastConversation.messages.isEmpty {
+            currentConversation = lastConversation
+            messages = lastConversation.messages
+                .sorted { $0.createdAt < $1.createdAt }
+                .filter { !($0.role == .assistant && $0.content.isEmpty && !$0.isComplete) }
+            selectedModel = ModelType(rawValue: lastConversation.model) ?? .gpt5_4
+            reasoningEffort = ReasoningEffort(rawValue: lastConversation.reasoningEffort) ?? .high
+
+            if !selectedModel.availableEfforts.contains(reasoningEffort) {
+                reasoningEffort = selectedModel.defaultEffort
+            }
+
+            #if DEBUG
+            print("[Restore] Loaded last conversation: \(lastConversation.title) (\(messages.count) messages)")
+            #endif
+        }
+
+        // Brief delay so the UI has time to render the restoring indicator
+        try? await Task.sleep(nanoseconds: 300_000_000) // 0.3s
+        isRestoringConversation = false
+    }
+
+    /// Generate titles for any conversations that are still "New Chat" but have messages.
+    /// This handles the case where the user exited before title generation completed.
+    private func generateTitlesForUntitledConversations() async {
+        guard !apiKey.isEmpty else { return }
+
+        let descriptor = FetchDescriptor<Conversation>(
+            predicate: #Predicate<Conversation> { conversation in
+                conversation.title == "New Chat"
+            }
+        )
+
+        guard let untitled = try? modelContext.fetch(descriptor) else { return }
+
+        for conversation in untitled {
+            guard conversation.messages.count >= 2 else { continue }
+
+            let preview = conversation.messages
+                .sorted { $0.createdAt < $1.createdAt }
+                .prefix(4)
+                .map { "\($0.roleRawValue): \($0.content.prefix(200))" }
+                .joined(separator: "\n")
+
+            do {
+                let title = try await openAIService.generateTitle(
+                    for: preview,
+                    apiKey: apiKey
+                )
+                conversation.title = title
+                try? modelContext.save()
+
+                // Update the current conversation title in the UI if it matches
+                if conversation.id == currentConversation?.id {
+                    currentConversation?.title = title
+                }
+
+                #if DEBUG
+                print("[Title] Generated title for conversation \(conversation.id): \(title)")
+                #endif
+            } catch {
+                // Non-critical
+                #if DEBUG
+                print("[Title] Failed to generate title: \(error.localizedDescription)")
+                #endif
+            }
         }
     }
 

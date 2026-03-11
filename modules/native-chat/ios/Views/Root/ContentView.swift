@@ -37,7 +37,7 @@ struct ContentView: View {
                 SettingsView()
             }
         }
-        .tabBarMinimizeBehavior(.onScrollDown)
+        .tabBarMinimizeBehavior(.never)
         .onAppear {
             if chatViewModel == nil {
                 chatViewModel = ChatViewModel(modelContext: modelContext)
