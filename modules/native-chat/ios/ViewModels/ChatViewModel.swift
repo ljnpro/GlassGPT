@@ -225,7 +225,11 @@ final class ChatViewModel {
 
     // MARK: - Core Streaming Logic
 
-    private func startStreamingRequest() {
+    // Auto-reconnect constants
+    private static let maxReconnectAttempts = 3
+    private static let reconnectBaseDelay: UInt64 = 1_000_000_000 // 1 second in nanoseconds
+
+    private func startStreamingRequest(reconnectAttempt: Int = 0) {
         let requestAPIKey = apiKey
         let requestModel = selectedModel
         let requestEffort = reasoningEffort
@@ -247,6 +251,8 @@ final class ChatViewModel {
                 model: requestModel,
                 reasoningEffort: requestEffort
             )
+
+            var receivedConnectionLost = false
 
             for await event in stream {
                 guard activeStreamID == streamID else { break }
@@ -298,6 +304,14 @@ final class ChatViewModel {
                     }
                     finalizeDraft()
 
+                case .connectionLost:
+                    receivedConnectionLost = true
+                    // Save current progress immediately
+                    saveDraftNow()
+                    #if DEBUG
+                    print("[VM] Connection lost (attempt \(reconnectAttempt + 1)/\(Self.maxReconnectAttempts))")
+                    #endif
+
                 case .error(let error):
                     if !currentStreamingText.isEmpty {
                         // We have partial content — save it, then try recovery
@@ -313,6 +327,87 @@ final class ChatViewModel {
                     isStreaming = false
                     isThinking = false
                     HapticService.shared.notify(.error)
+                }
+            }
+
+            // Handle auto-reconnect on connection loss
+            if receivedConnectionLost && activeStreamID == streamID {
+                let nextAttempt = reconnectAttempt + 1
+
+                if nextAttempt < Self.maxReconnectAttempts {
+                    // First, check if the server already completed the response
+                    if let draft = draftMessage, let responseId = draft.responseId {
+                        do {
+                            let result = try await openAIService.fetchResponse(responseId: responseId, apiKey: requestAPIKey)
+                            // Server completed! Use the full response.
+                            if !result.text.isEmpty {
+                                currentStreamingText = result.text
+                            }
+                            if let thinking = result.thinking, !thinking.isEmpty {
+                                currentThinkingText = thinking
+                            }
+                            finalizeDraft()
+                            endBackgroundTask()
+                            return
+                        } catch {
+                            let errorMsg = error.localizedDescription
+                            if errorMsg.contains("__IN_PROGRESS__") {
+                                // Server is still generating — reconnect with exponential backoff
+                                let delay = Self.reconnectBaseDelay * UInt64(1 << reconnectAttempt) // 1s, 2s, 4s
+                                #if DEBUG
+                                print("[VM] Reconnecting in \(Double(delay) / 1_000_000_000)s (server still in progress)")
+                                #endif
+                                try? await Task.sleep(nanoseconds: delay)
+
+                                guard activeStreamID == streamID else {
+                                    endBackgroundTask()
+                                    return
+                                }
+
+                                // Switch to polling-based recovery since we already have a responseId
+                                // (re-establishing SSE won't resume the same response)
+                                recoverResponse(messageId: draft.id, responseId: responseId)
+                                endBackgroundTask()
+                                return
+                            }
+                            // Other error — fall through to retry via new stream
+                        }
+                    }
+
+                    // No responseId yet — retry the full request with exponential backoff
+                    let delay = Self.reconnectBaseDelay * UInt64(1 << reconnectAttempt)
+                    #if DEBUG
+                    print("[VM] Reconnecting in \(Double(delay) / 1_000_000_000)s (no responseId, full retry)")
+                    #endif
+                    try? await Task.sleep(nanoseconds: delay)
+
+                    guard activeStreamID == streamID else {
+                        endBackgroundTask()
+                        return
+                    }
+
+                    HapticService.shared.impact(.light)
+                    startStreamingRequest(reconnectAttempt: nextAttempt)
+                    return
+                } else {
+                    // Max retries exhausted — fall through to recovery or error
+                    #if DEBUG
+                    print("[VM] Max reconnect attempts exhausted")
+                    #endif
+                    if let draft = draftMessage, let responseId = draft.responseId {
+                        finalizeDraftAsPartial()
+                        recoverResponse(messageId: draft.id, responseId: responseId)
+                    } else if !currentStreamingText.isEmpty {
+                        finalizeDraftAsPartial()
+                    } else {
+                        removeEmptyDraft()
+                        errorMessage = "Connection lost. Please check your network and try again."
+                        isStreaming = false
+                        isThinking = false
+                        HapticService.shared.notify(.error)
+                    }
+                    endBackgroundTask()
+                    return
                 }
             }
 
@@ -561,6 +656,11 @@ final class ChatViewModel {
     private func recoverIncompleteMessages() async {
         guard !apiKey.isEmpty else { return }
 
+        // First, clean up stale drafts (older than 24 hours)
+        // These are messages from sessions that were interrupted long ago
+        // and whose server-side responses have likely expired.
+        await cleanupStaleDrafts()
+
         let descriptor = FetchDescriptor<Message>(
             predicate: #Predicate<Message> { message in
                 message.isComplete == false && message.responseId != nil
@@ -569,15 +669,62 @@ final class ChatViewModel {
 
         guard let incompleteMessages = try? modelContext.fetch(descriptor) else { return }
 
+        #if DEBUG
+        if !incompleteMessages.isEmpty {
+            print("[Recovery] Found \(incompleteMessages.count) incomplete message(s) to recover")
+        }
+        #endif
+
         for message in incompleteMessages {
             guard let responseId = message.responseId else { continue }
 
             #if DEBUG
-            print("[Recovery] Found incomplete message \(message.id) with responseId \(responseId)")
+            print("[Recovery] Recovering message \(message.id) with responseId \(responseId)")
             #endif
 
             // Recover each one (sequentially to avoid overwhelming the API)
             await recoverSingleMessage(message: message, responseId: responseId)
+        }
+    }
+
+    /// Clean up stale draft messages that are older than 24 hours.
+    /// These are messages from interrupted sessions whose server-side responses
+    /// have likely expired and cannot be recovered.
+    private func cleanupStaleDrafts() async {
+        let staleThreshold = Date().addingTimeInterval(-24 * 60 * 60) // 24 hours ago
+
+        // Fetch all incomplete messages (with or without responseId)
+        let descriptor = FetchDescriptor<Message>(
+            predicate: #Predicate<Message> { message in
+                message.isComplete == false
+            }
+        )
+
+        guard let staleMessages = try? modelContext.fetch(descriptor) else { return }
+
+        var cleanedCount = 0
+        for message in staleMessages {
+            guard message.createdAt < staleThreshold else { continue }
+
+            if message.content.isEmpty && message.responseId == nil {
+                // Empty draft with no responseId — just delete it
+                modelContext.delete(message)
+                cleanedCount += 1
+            } else {
+                // Has content or responseId but is stale — mark as complete
+                message.isComplete = true
+                if message.content.isEmpty {
+                    message.content = "[Response interrupted. Please try again.]"
+                }
+                cleanedCount += 1
+            }
+        }
+
+        if cleanedCount > 0 {
+            try? modelContext.save()
+            #if DEBUG
+            print("[Recovery] Cleaned up \(cleanedCount) stale draft(s)")
+            #endif
         }
     }
 
