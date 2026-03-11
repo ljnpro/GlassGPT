@@ -1,7 +1,28 @@
 import SwiftUI
+import UIKit
 
 struct SettingsView: View {
     @State private var viewModel = SettingsViewModel()
+
+    /// Dynamically reads the device OS name and version.
+    /// Shows "Liquid Glass" suffix only on iOS/iPadOS 26+.
+    private var platformString: String {
+        let device = UIDevice.current
+        let osName: String
+        switch device.userInterfaceIdiom {
+        case .pad:
+            osName = "iPadOS"
+        default:
+            osName = "iOS"
+        }
+        let version = device.systemVersion
+        let majorVersion = Int(version.components(separatedBy: ".").first ?? "0") ?? 0
+        if majorVersion >= 26 {
+            return "\(osName) \(version) · Liquid Glass"
+        } else {
+            return "\(osName) \(version)"
+        }
+    }
 
     var body: some View {
         NavigationStack {
@@ -81,9 +102,9 @@ struct SettingsView: View {
 
                 // MARK: - About
                 Section("About") {
-                    LabeledContent("Version", value: "2.0.0")
-                    LabeledContent("Platform", value: "iOS 26 · Swift 6")
-                    LabeledContent("Engine", value: "SwiftUI · Liquid Glass")
+                    LabeledContent("Version", value: "2.1.0")
+                    LabeledContent("Platform", value: platformString)
+                    LabeledContent("Engine", value: "SwiftUI")
 
                     if let supportURL = URL(string: "https://ljnpro.github.io/liquid-glass-chat-support/") {
                     Link(destination: supportURL) {

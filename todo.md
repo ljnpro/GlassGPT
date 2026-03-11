@@ -167,3 +167,6 @@
 - [x] UI: Center "Start a Conversation" icon and text vertically and horizontally in empty state
 - [x] UI: Remove "Type a message below to begin chatting with AI" subtitle from empty state
 - [x] UI: Bottom input bar area background should be white, buttons and message field keep original colors
+- [x] UI: Update app version to 2.1.0 in Settings
+- [x] UI: Platform dynamically reads device OS version; shows "Liquid Glass" only if iOS/iPadOS 26+
+- [x] UI: Engine displays "SwiftUI" only
