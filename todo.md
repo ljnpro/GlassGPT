@@ -156,3 +156,4 @@
 - [x] BUG: New chat button icon off-center in glass container — removed custom font/frame/offset constraints, restored to default SF Symbol rendering
 - [x] BUG: New chat glass button outer container is oval (wider than tall) — added square frame (22x22) to icon label so glass container matches icon proportions
 - [x] BUG: New chat button glass container oval-shaped — changed icon from square.and.pencil (wide aspect ratio) to plus.bubble (square aspect ratio) so glass container matches trash button style
+- [x] UI: Move model selector to top-left, new chat button to top-right. New chat button matches History delete button exactly (Button with title + systemImage + .buttonStyle(.glass)). Title moved to .principal placement.
