@@ -60,6 +60,17 @@ struct MessageBubble: View {
                         assistantBubble
                     }
                 }
+
+                // Incomplete message indicator
+                if message.role == .assistant && !message.isComplete {
+                    HStack(spacing: 4) {
+                        ProgressView()
+                            .controlSize(.mini)
+                        Text("Recovering…")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                }
             }
             .frame(maxWidth: UIScreen.main.bounds.width * 0.85,
                    alignment: message.role == .user ? .trailing : .leading)

@@ -20,7 +20,7 @@ export const systemRouter = router({
         content: z.string().min(1, "content is required"),
       }),
     )
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input }: { input: { title: string; content: string } }) => {
       const delivered = await notifyOwner(input);
       return {
         success: delivered,
