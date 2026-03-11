@@ -159,4 +159,4 @@
 - [x] UI: Move model selector to top-left, new chat button to top-right. New chat button matches History delete button exactly (Button with title + systemImage + .buttonStyle(.glass)). Title moved to .principal placement.
 - [x] BUG: ModelBadge not displaying in topBarLeading — removed .principal title that was squeezing ModelBadge, title only shown in History now
 - [x] BUG: Sending message then immediately exiting app - response not correctly generated/recovered on return (responseId may not be saved yet) — fixed by resendOrphanedDrafts()
-- [x] BUG: Sending message then force-quitting app — added resendOrphanedDrafts() that detects empty drafts with no responseId and re-sends the request on next launch. 86 tests passing.
+- [x] BUG: Sending message then force-quitting app — rewrote resendOrphanedDrafts() to manually set up conversation state (avoids loadConversation race condition), shows thinking indicator + recovery banner, and re-sends the request. 86 tests passing.
