@@ -237,6 +237,114 @@ final class ChatViewModel {
         HapticService.shared.selection()
     }
 
+    // MARK: - Regenerate Last Response
+
+    func regenerateMessage(_ message: Message) {
+        guard !isStreaming else { return }
+        guard message.role == .assistant else { return }
+        guard !apiKey.isEmpty else {
+            errorMessage = "Please add your OpenAI API key in Settings."
+            return
+        }
+
+        // Remove the assistant message from the array and SwiftData
+        if let index = messages.firstIndex(where: { $0.id == message.id }) {
+            messages.remove(at: index)
+        }
+        if let conversation = currentConversation,
+           let idx = conversation.messages.firstIndex(where: { $0.id == message.id }) {
+            conversation.messages.remove(at: idx)
+        }
+        modelContext.delete(message)
+        try? modelContext.save()
+
+        // Clear state and start streaming
+        errorMessage = nil
+        isStreaming = true
+        isThinking = false
+        currentStreamingText = ""
+        currentThinkingText = ""
+
+        HapticService.shared.impact(.medium)
+
+        // Snapshot messages as Sendable DTOs
+        let requestAPIKey = apiKey
+        let requestModel = selectedModel
+        let requestEffort = reasoningEffort
+        let requestMessages = messages
+            .sorted(by: { $0.createdAt < $1.createdAt })
+            .map {
+                APIMessage(role: $0.role, content: $0.content, imageData: $0.imageData)
+            }
+
+        let streamID = UUID()
+        activeStreamID = streamID
+
+        Task { @MainActor in
+            let stream = openAIService.streamChat(
+                apiKey: requestAPIKey,
+                messages: requestMessages,
+                model: requestModel,
+                reasoningEffort: requestEffort
+            )
+
+            for await event in stream {
+                guard activeStreamID == streamID else { break }
+
+                switch event {
+                case .textDelta(let delta):
+                    if isThinking {
+                        withAnimation(.easeOut(duration: 0.2)) {
+                            isThinking = false
+                        }
+                    }
+                    currentStreamingText += delta
+
+                case .thinkingDelta(let delta):
+                    currentThinkingText += delta
+
+                case .thinkingStarted:
+                    withAnimation(.easeIn(duration: 0.2)) {
+                        isThinking = true
+                    }
+
+                case .thinkingFinished:
+                    withAnimation(.easeOut(duration: 0.2)) {
+                        isThinking = false
+                    }
+
+                case .completed(let fullText, let fullThinking):
+                    if !fullText.isEmpty && fullText.count > currentStreamingText.count {
+                        currentStreamingText = fullText
+                    }
+                    if let thinking = fullThinking, !thinking.isEmpty,
+                       thinking.count > currentThinkingText.count {
+                        currentThinkingText = thinking
+                    }
+                    await finishStreaming()
+
+                case .error(let error):
+                    if !currentStreamingText.isEmpty {
+                        await finishStreaming()
+                    }
+                    errorMessage = error.localizedDescription
+                    isStreaming = false
+                    isThinking = false
+                    HapticService.shared.notify(.error)
+                }
+            }
+
+            if activeStreamID == streamID && isStreaming {
+                if !currentStreamingText.isEmpty {
+                    await finishStreaming()
+                } else {
+                    isStreaming = false
+                    isThinking = false
+                }
+            }
+        }
+    }
+
     // MARK: - Load Conversation
 
     func loadConversation(_ conversation: Conversation) {

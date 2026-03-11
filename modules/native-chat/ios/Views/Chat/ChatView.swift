@@ -85,8 +85,13 @@ struct ChatView: View {
                 ScrollView {
                     LazyVStack(spacing: 16) {
                         ForEach(viewModel.messages) { message in
-                            MessageBubble(message: message)
-                                .id(message.id)
+                            MessageBubble(
+                                message: message,
+                                onRegenerate: message.role == .assistant ? {
+                                    viewModel.regenerateMessage(message)
+                                } : nil
+                            )
+                            .id(message.id)
                         }
 
                         // Streaming message
@@ -179,7 +184,12 @@ struct ChatView: View {
                 }
 
                 if !viewModel.currentStreamingText.isEmpty {
-                    MarkdownContentView(text: viewModel.currentStreamingText)
+                    // Use lightweight StreamingTextView during streaming to
+                    // avoid expensive MarkdownContentView re-parses (WKWebView
+                    // creation for LaTeX, code-block highlighting) on every
+                    // single delta. The full MarkdownContentView is used once
+                    // the message is finalized and saved to the messages array.
+                    StreamingTextView(text: viewModel.currentStreamingText)
                 } else if !viewModel.isThinking && viewModel.currentThinkingText.isEmpty {
                     TypingIndicator()
                 }

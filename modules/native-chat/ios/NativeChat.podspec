@@ -16,6 +16,7 @@ Pod::Spec.new do |s|
   s.swift_version  = '6.0'
 
   s.source_files   = '**/*.{swift,h,m}'
+  s.resources       = 'Resources/**/*'
 
   s.dependency 'ExpoModulesCore'
   s.dependency 'React-Core'

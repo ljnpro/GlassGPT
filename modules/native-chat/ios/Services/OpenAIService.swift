@@ -208,11 +208,29 @@ final class OpenAIService {
                 reasoningEffort: reasoningEffort
             )
 
+            // Emit thinking (if any)
             if let thinking = thinking, !thinking.isEmpty {
                 continuation.yield(.thinkingStarted)
                 continuation.yield(.thinkingDelta(thinking))
                 continuation.yield(.thinkingFinished)
             }
+
+            // Simulate streaming by emitting text in small chunks.
+            // This ensures the user sees gradual text appearance even
+            // when the real SSE stream failed and we fell back.
+            let chunkSize = 8  // characters per chunk
+            let delayNanos: UInt64 = 8_000_000  // ~8ms between chunks
+            var offset = text.startIndex
+
+            while offset < text.endIndex {
+                try Task.checkCancellation()
+                let end = text.index(offset, offsetBy: chunkSize, limitedBy: text.endIndex) ?? text.endIndex
+                let chunk = String(text[offset..<end])
+                continuation.yield(.textDelta(chunk))
+                offset = end
+                try? await Task.sleep(nanoseconds: delayNanos)
+            }
+
             continuation.yield(.completed(text, thinking))
             continuation.finish()
 
