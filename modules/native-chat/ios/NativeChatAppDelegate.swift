@@ -46,22 +46,8 @@ public class NativeChatAppDelegate: ExpoAppDelegateSubscriber {
             return
         }
         
-        // Create SwiftData container
-        let container: ModelContainer
-        do {
-            let schema = Schema([Conversation.self, Message.self])
-            let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
-            container = try ModelContainer(for: schema, configurations: [config])
-        } catch {
-            // Fallback: try without migration
-            do {
-                let schema = Schema([Conversation.self, Message.self])
-                let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
-                container = try ModelContainer(for: schema, configurations: [config])
-            } catch {
-                fatalError("Failed to create SwiftData ModelContainer: \(error)")
-            }
-        }
+        // Create SwiftData container with proper migration handling
+        let container = Self.createPersistentContainer()
         
         let rootView = NativeChatRootView()
             .modelContainer(container)
@@ -80,5 +66,73 @@ public class NativeChatAppDelegate: ExpoAppDelegateSubscriber {
             completion: nil
         )
         window.makeKeyAndVisible()
+    }
+
+    // MARK: - SwiftData Container Creation
+
+    /// Creates a persistent ModelContainer. If schema migration fails (e.g. new
+    /// fields were added), the old store file is deleted and a fresh one is created.
+    /// This ensures the app ALWAYS uses on-disk persistence, never in-memory.
+    private static func createPersistentContainer() -> ModelContainer {
+        let schema = Schema([Conversation.self, Message.self])
+
+        // First attempt: open existing store (lightweight migration handles
+        // additive changes like new optional properties automatically).
+        do {
+            let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
+            let container = try ModelContainer(for: schema, configurations: [config])
+            #if DEBUG
+            print("[SwiftData] Opened persistent store successfully")
+            #endif
+            return container
+        } catch {
+            #if DEBUG
+            print("[SwiftData] Failed to open store: \(error.localizedDescription)")
+            print("[SwiftData] Attempting to delete and recreate store…")
+            #endif
+        }
+
+        // Second attempt: delete the corrupted/incompatible store and recreate.
+        // This loses existing data but is far better than silently using in-memory
+        // storage where ALL data is lost on every relaunch.
+        deleteExistingStore()
+
+        do {
+            let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
+            let container = try ModelContainer(for: schema, configurations: [config])
+            #if DEBUG
+            print("[SwiftData] Created fresh persistent store after cleanup")
+            #endif
+            return container
+        } catch {
+            // This should essentially never happen on a clean slate.
+            fatalError("[SwiftData] Cannot create ModelContainer even after cleanup: \(error)")
+        }
+    }
+
+    /// Removes the default SwiftData SQLite files from the app's Application Support directory.
+    private static func deleteExistingStore() {
+        let fileManager = FileManager.default
+        guard let appSupportURL = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else {
+            return
+        }
+
+        // SwiftData stores its default database as "default.store" in Application Support
+        let storeNames = ["default.store", "default.store-shm", "default.store-wal"]
+        for name in storeNames {
+            let url = appSupportURL.appendingPathComponent(name)
+            if fileManager.fileExists(atPath: url.path) {
+                do {
+                    try fileManager.removeItem(at: url)
+                    #if DEBUG
+                    print("[SwiftData] Deleted \(name)")
+                    #endif
+                } catch {
+                    #if DEBUG
+                    print("[SwiftData] Failed to delete \(name): \(error.localizedDescription)")
+                    #endif
+                }
+            }
+        }
     }
 }
