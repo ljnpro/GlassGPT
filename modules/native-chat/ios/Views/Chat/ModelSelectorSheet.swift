@@ -35,17 +35,27 @@ struct ModelSelectorSheet: View {
     @Binding var reasoningEffort: ReasoningEffort
     @Environment(\.dismiss) private var dismiss
 
-    /// Map slider value to the available efforts for the current model.
+    /// Available efforts for the current model.
     private var efforts: [ReasoningEffort] {
         selectedModel.availableEfforts
     }
 
-    /// Slider value derived from the current effort index.
-    private var sliderValue: Double {
-        guard let idx = efforts.firstIndex(of: reasoningEffort) else {
-            return Double(efforts.count / 2)
-        }
-        return Double(idx)
+    /// Current effort as a slider index value.
+    private var sliderBinding: Binding<Double> {
+        Binding<Double>(
+            get: {
+                Double(efforts.firstIndex(of: reasoningEffort) ?? 0)
+            },
+            set: { newValue in
+                let index = Int(round(newValue))
+                let clampedIndex = min(max(index, 0), efforts.count - 1)
+                let newEffort = efforts[clampedIndex]
+                if newEffort != reasoningEffort {
+                    reasoningEffort = newEffort
+                    HapticService.shared.selection()
+                }
+            }
+        )
     }
 
     var body: some View {
@@ -78,7 +88,7 @@ struct ModelSelectorSheet: View {
                     }
                 }
 
-                // Reasoning Effort — Liquid Glass slider
+                // Reasoning Effort — Native iOS 26 Slider (Liquid Glass)
                 VStack(alignment: .leading, spacing: 10) {
                     HStack {
                         Text("Reasoning")
@@ -95,11 +105,37 @@ struct ModelSelectorSheet: View {
                     }
                     .padding(.horizontal, 4)
 
-                    // Stepped slider with tick marks
-                    EffortSlider(
-                        efforts: efforts,
-                        selected: $reasoningEffort
-                    )
+                    // Native Slider — on iOS 26 this automatically renders
+                    // with Liquid Glass thumb and track styling.
+                    VStack(spacing: 4) {
+                        Slider(
+                            value: sliderBinding,
+                            in: 0...Double(max(efforts.count - 1, 1)),
+                            step: 1
+                        ) {
+                            Text("Reasoning Effort")
+                        } minimumValueLabel: {
+                            Text(effortShortLabel(efforts.first ?? .none))
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        } maximumValueLabel: {
+                            Text(effortShortLabel(efforts.last ?? .xhigh))
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
+                        .tint(.accentColor)
+
+                        // Tick labels below the slider
+                        HStack {
+                            ForEach(Array(efforts.enumerated()), id: \.offset) { _, effort in
+                                Text(effortShortLabel(effort))
+                                    .font(.caption2)
+                                    .foregroundStyle(effort == reasoningEffort ? .primary : .tertiary)
+                                    .fontWeight(effort == reasoningEffort ? .semibold : .regular)
+                                    .frame(maxWidth: .infinity)
+                            }
+                        }
+                    }
                 }
             }
             .padding(.horizontal, 20)
@@ -155,110 +191,6 @@ struct ModelSelectorSheet: View {
         switch model {
         case .gpt5_4: return "Fast and capable"
         case .gpt5_4_pro: return "Complex reasoning"
-        }
-    }
-}
-
-// MARK: - Effort Slider
-
-/// A custom stepped slider with Liquid Glass styling and labeled tick marks.
-struct EffortSlider: View {
-    let efforts: [ReasoningEffort]
-    @Binding var selected: ReasoningEffort
-
-    @State private var isDragging = false
-
-    private var stepCount: Int { efforts.count - 1 }
-
-    private var currentIndex: Int {
-        efforts.firstIndex(of: selected) ?? 0
-    }
-
-    var body: some View {
-        VStack(spacing: 6) {
-            // Slider track with glass thumb
-            GeometryReader { geo in
-                let trackWidth = geo.size.width
-                let thumbSize: CGFloat = 28
-
-                ZStack(alignment: .leading) {
-                    // Track background
-                    Capsule()
-                        .fill(.ultraThinMaterial)
-                        .frame(height: 6)
-                        .overlay {
-                            Capsule()
-                                .strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.5)
-                        }
-
-                    // Active track fill
-                    let fillWidth = stepCount > 0
-                        ? CGFloat(currentIndex) / CGFloat(stepCount) * (trackWidth - thumbSize) + thumbSize / 2
-                        : thumbSize / 2
-
-                    Capsule()
-                        .fill(Color.accentColor.opacity(0.5))
-                        .frame(width: fillWidth, height: 6)
-
-                    // Tick marks
-                    ForEach(0...stepCount, id: \.self) { i in
-                        let xPos = stepCount > 0
-                            ? CGFloat(i) / CGFloat(stepCount) * (trackWidth - thumbSize) + thumbSize / 2
-                            : trackWidth / 2
-
-                        Circle()
-                            .fill(i <= currentIndex ? Color.accentColor : Color.primary.opacity(0.2))
-                            .frame(width: 6, height: 6)
-                            .position(x: xPos, y: geo.size.height / 2)
-                    }
-
-                    // Glass thumb
-                    let thumbX = stepCount > 0
-                        ? CGFloat(currentIndex) / CGFloat(stepCount) * (trackWidth - thumbSize)
-                        : (trackWidth - thumbSize) / 2
-
-                    Circle()
-                        .fill(.ultraThickMaterial)
-                        .frame(width: thumbSize, height: thumbSize)
-                        .glassEffect(.regular.interactive(), in: .circle)
-                        .shadow(color: .black.opacity(0.15), radius: 4, y: 2)
-                        .scaleEffect(isDragging ? 1.15 : 1.0)
-                        .offset(x: thumbX)
-                        .animation(.spring(duration: 0.25), value: currentIndex)
-                        .animation(.spring(duration: 0.2), value: isDragging)
-                }
-                .frame(height: thumbSize)
-                .contentShape(Rectangle())
-                .gesture(
-                    DragGesture(minimumDistance: 0)
-                        .onChanged { value in
-                            isDragging = true
-                            let fraction = (value.location.x - thumbSize / 2) / (trackWidth - thumbSize)
-                            let clamped = min(max(fraction, 0), 1)
-                            let newIndex = Int(round(clamped * Double(stepCount)))
-                            let newEffort = efforts[newIndex]
-                            if newEffort != selected {
-                                selected = newEffort
-                                HapticService.shared.selection()
-                            }
-                        }
-                        .onEnded { _ in
-                            isDragging = false
-                        }
-                )
-            }
-            .frame(height: 28)
-
-            // Labels below the slider
-            HStack {
-                ForEach(Array(efforts.enumerated()), id: \.offset) { index, effort in
-                    Text(effortShortLabel(effort))
-                        .font(.caption2)
-                        .foregroundStyle(effort == selected ? .primary : .secondary)
-                        .fontWeight(effort == selected ? .semibold : .regular)
-                        .frame(maxWidth: .infinity)
-                }
-            }
         }
     }
 
