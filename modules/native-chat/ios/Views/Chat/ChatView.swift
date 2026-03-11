@@ -34,7 +34,7 @@ struct ChatView: View {
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     HStack(spacing: 8) {
-                        Button("New Chat", systemImage: "square.and.pencil") {
+                        Button("New Chat", systemImage: "plus.bubble") {
                             viewModel.startNewChat()
                         }
                         .buttonStyle(.glass)

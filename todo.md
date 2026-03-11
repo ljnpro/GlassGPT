@@ -155,3 +155,4 @@
 - [x] BUG: Tab bar collapses on scroll — changed .tabBarMinimizeBehavior from .onScrollDown to .never
 - [x] BUG: New chat button icon off-center in glass container — removed custom font/frame/offset constraints, restored to default SF Symbol rendering
 - [x] BUG: New chat glass button outer container is oval (wider than tall) — added square frame (22x22) to icon label so glass container matches icon proportions
+- [x] BUG: New chat button glass container oval-shaped — changed icon from square.and.pencil (wide aspect ratio) to plus.bubble (square aspect ratio) so glass container matches trash button style
