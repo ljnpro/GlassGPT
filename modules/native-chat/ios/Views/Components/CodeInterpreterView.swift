@@ -6,7 +6,7 @@ struct CodeInterpreterIndicator: View {
         HStack(spacing: 8) {
             Image(systemName: "terminal")
                 .font(.subheadline.weight(.medium))
-                .foregroundStyle(.purple)
+                .foregroundStyle(.green)
                 .symbolEffect(.pulse, options: .repeating)
 
             Text("Running code…")
@@ -39,7 +39,7 @@ struct CodeInterpreterResultView: View {
                 HStack(spacing: 8) {
                     Image(systemName: "terminal.fill")
                         .font(.caption.weight(.semibold))
-                        .foregroundStyle(.purple)
+                        .foregroundStyle(.green)
 
                     Text("Code Executed")
                         .font(.caption.weight(.semibold))

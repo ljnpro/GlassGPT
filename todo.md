@@ -214,3 +214,14 @@
 - [x] UI: Search timeout — if search indicator stays active too long, auto-dismiss to prevent stuck state
 - [x] UI: Render Markdown in reasoning/thinking text (bold, italic, code, etc.)
 - [x] BUG: Bold markdown (**text**) not rendering in assistant message body — Apple AttributedString fails with Chinese text containing quotes/slashes
+- [x] UI: Change ThinkingView chevron — CANCELLED, current right/down style is good
+- [x] BUG: File attachment still not right-aligned in user messages (needs to match user bubble alignment)
+- [x] UI: Redesign reasoning to card style like CodeInterpreter — no dots, "Reasoning…" when live, "Reasoning Completed" when done, expandable with Manus chevron (right→down)
+- [x] UI: Assign distinct colors — search=blue, reasoning=orange, code=green, file_search=teal
+- [x] BUG: Keyboard cannot be dismissed by tapping on empty chat area (before any messages sent)
+- [x] FEATURE: Add file_search tool support — ToolCallType, StreamEvent, SSE parsing, vector store, UI indicator
+- [x] UI: ThinkingIndicator style should match CodeInterpreterIndicator (capsule + ultraThinMaterial + glassEffect, brain icon, orange color)
+- [x] UI: ThinkingView (reasoning content) must be collapsible during streaming — fixed with external Binding in ChatView
+- [x] BUG: App going to background has probability of triggering "Response interrupted. Please try again." error
+- [x] UI: Ensure tool call states (reasoning/searching/code executing) display correctly after app resumes from background
+- [x] BUG: "Recovering interrupted response..." banner persists after recovery completes — isRecovering not properly reset (fixed with defer + isRecovering=false in all finalize paths)
