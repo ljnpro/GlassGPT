@@ -206,4 +206,4 @@
 - [x] FEATURE: Rewrote ChatViewModel with tool call state management, file upload, document handling
 - [x] FIX: Aligned all type references across files (StreamEvent cases, property names, method signatures)
 - [x] FIX: All recovery paths (reconnect, recoverResponse, recoverSingleMessage) now save tool calls and citations
-- [ ] PUSH: Push feature branch to GitHub using user's PAT
+- [x] PUSH: Pushed feature/tools-and-documents branch to GitHub (ljnpro/GlassGPT)
