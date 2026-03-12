@@ -430,22 +430,169 @@ private struct RichTextView: View {
             }
         }.joined()
 
-        if let attributed = try? AttributedString(
-            markdown: combinedText,
+        let attributed = robustMarkdownParse(combinedText)
+        Text(attributed)
+            .font(.body)
+            .textSelection(.enabled)
+    }
+
+    /// Robust Markdown parser that handles bold/italic even when Apple's
+    /// CommonMark parser fails (e.g. CJK text with punctuation after **).
+    ///
+    /// Strategy: first try Apple's parser. If the result still contains
+    /// literal `**` or `*` markers, fall back to manual regex-based parsing.
+    private func robustMarkdownParse(_ text: String) -> AttributedString {
+        // Try Apple's parser first
+        if let appleResult = try? AttributedString(
+            markdown: text,
             options: .init(
                 allowsExtendedAttributes: true,
                 interpretedSyntax: .inlineOnlyPreservingWhitespace,
                 failurePolicy: .returnPartiallyParsedIfPossible
             )
         ) {
-            Text(attributed)
-                .font(.body)
-                .textSelection(.enabled)
-        } else {
-            Text(combinedText)
-                .font(.body)
-                .textSelection(.enabled)
+            // Check if Apple's parser actually processed the bold markers
+            let plainText = String(appleResult.characters)
+            if !plainText.contains("**") {
+                return appleResult
+            }
         }
+
+        // Fallback: manual parsing for bold and italic
+        return manualMarkdownParse(text)
+    }
+
+    /// Manually parse **bold**, __bold__, *italic*, _italic_, `code`,
+    /// and ***bold italic*** markers into an AttributedString.
+    private func manualMarkdownParse(_ text: String) -> AttributedString {
+        // We'll work with NSMutableAttributedString for easier range manipulation
+        var working = text
+
+        // Collect styled ranges: (range in final string, isBold, isItalic, isCode)
+        struct StyledRange {
+            let range: Range<String.Index>
+            let isBold: Bool
+            let isItalic: Bool
+            let isCode: Bool
+        }
+
+        var result = AttributedString()
+
+        // Process the text character by character, handling markers
+        let chars = Array(working)
+        let count = chars.count
+        var i = 0
+        var currentText = ""
+        var isBold = false
+        var isItalic = false
+        var isCode = false
+
+        func flushCurrent() {
+            if !currentText.isEmpty {
+                var chunk = AttributedString(currentText)
+                if isBold && isItalic {
+                    chunk.font = .body.bold().italic()
+                } else if isBold {
+                    chunk.font = .body.bold()
+                } else if isItalic {
+                    chunk.font = .body.italic()
+                } else if isCode {
+                    chunk.font = .body.monospaced()
+                    chunk.backgroundColor = .secondary.opacity(0.12)
+                } else {
+                    chunk.font = .body
+                }
+                result += chunk
+                currentText = ""
+            }
+        }
+
+        while i < count {
+            // Inline code: `...`
+            if chars[i] == "`" && !isCode {
+                // Find closing backtick
+                var end = i + 1
+                while end < count && chars[end] != "`" { end += 1 }
+                if end < count {
+                    flushCurrent()
+                    let codeContent = String(chars[(i + 1)..<end])
+                    var chunk = AttributedString(codeContent)
+                    chunk.font = .body.monospaced()
+                    chunk.backgroundColor = .secondary.opacity(0.12)
+                    result += chunk
+                    i = end + 1
+                    continue
+                }
+            }
+
+            // Bold+Italic: ***...***
+            if i + 2 < count && chars[i] == "*" && chars[i + 1] == "*" && chars[i + 2] == "*" {
+                // Find closing ***
+                var end = i + 3
+                while end + 2 < count {
+                    if chars[end] == "*" && chars[end + 1] == "*" && chars[end + 2] == "*" { break }
+                    end += 1
+                }
+                if end + 2 < count {
+                    flushCurrent()
+                    let content = String(chars[(i + 3)..<end])
+                    var chunk = AttributedString(content)
+                    chunk.font = .body.bold().italic()
+                    result += chunk
+                    i = end + 3
+                    continue
+                }
+            }
+
+            // Bold: **...** or __...__
+            if i + 1 < count && ((chars[i] == "*" && chars[i + 1] == "*") || (chars[i] == "_" && chars[i + 1] == "_")) {
+                let marker = chars[i]
+                // Find closing marker
+                var end = i + 2
+                while end + 1 < count {
+                    if chars[end] == marker && chars[end + 1] == marker { break }
+                    end += 1
+                }
+                if end + 1 < count {
+                    flushCurrent()
+                    let content = String(chars[(i + 2)..<end])
+                    // Recursively parse the content for nested italic
+                    var chunk = AttributedString(content)
+                    chunk.font = .body.bold()
+                    result += chunk
+                    i = end + 2
+                    continue
+                }
+            }
+
+            // Italic: *...* or _..._  (single marker, not followed by another)
+            if (chars[i] == "*" || chars[i] == "_") {
+                let marker = chars[i]
+                // Make sure it's not ** or __
+                if i + 1 < count && chars[i + 1] != marker {
+                    var end = i + 1
+                    while end < count {
+                        if chars[end] == marker && (end + 1 >= count || chars[end + 1] != marker) { break }
+                        end += 1
+                    }
+                    if end < count {
+                        flushCurrent()
+                        let content = String(chars[(i + 1)..<end])
+                        var chunk = AttributedString(content)
+                        chunk.font = .body.italic()
+                        result += chunk
+                        i = end + 1
+                        continue
+                    }
+                }
+            }
+
+            currentText.append(chars[i])
+            i += 1
+        }
+
+        flushCurrent()
+        return result
     }
 
     private func latexToUnicode(_ latex: String) -> String {

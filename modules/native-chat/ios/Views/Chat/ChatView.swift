@@ -216,20 +216,23 @@ struct ChatView: View {
     private var streamingBubble: some View {
         HStack(alignment: .top) {
             VStack(alignment: .leading, spacing: 8) {
-                // Active tool call indicators
-                ForEach(viewModel.activeToolCalls) { toolCall in
-                    switch toolCall.type {
-                    case .webSearch:
-                        if toolCall.status != .completed {
-                            WebSearchIndicator()
-                                .transition(.opacity.combined(with: .scale(scale: 0.95)))
-                        }
-                    case .codeInterpreter:
-                        if toolCall.status != .completed {
-                            CodeInterpreterIndicator()
-                                .transition(.opacity.combined(with: .scale(scale: 0.95)))
-                        }
-                    }
+                // Active tool call indicators — DEDUPLICATED
+                // Only show ONE web search indicator, regardless of how many web search calls are active
+                let hasActiveWebSearch = viewModel.activeToolCalls.contains {
+                    $0.type == .webSearch && $0.status != .completed
+                }
+                if hasActiveWebSearch {
+                    WebSearchIndicator()
+                        .transition(.opacity.combined(with: .scale(scale: 0.95)))
+                }
+
+                // Only show ONE code interpreter indicator
+                let hasActiveCodeInterpreter = viewModel.activeToolCalls.contains {
+                    $0.type == .codeInterpreter && $0.status != .completed
+                }
+                if hasActiveCodeInterpreter {
+                    CodeInterpreterIndicator()
+                        .transition(.opacity.combined(with: .scale(scale: 0.95)))
                 }
 
                 // Completed code interpreter results (during streaming)
@@ -246,8 +249,9 @@ struct ChatView: View {
                         .transition(.opacity.combined(with: .scale(scale: 0.95)))
                 }
 
+                // Live thinking text — collapsible, starts expanded during streaming
                 if !viewModel.currentThinkingText.isEmpty {
-                    ThinkingView(text: viewModel.currentThinkingText)
+                    ThinkingView(text: viewModel.currentThinkingText, isLive: viewModel.isThinking || viewModel.isStreaming)
                         .transition(.opacity.combined(with: .move(edge: .top)))
                 }
 
