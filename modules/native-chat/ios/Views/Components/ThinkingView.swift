@@ -57,33 +57,32 @@ struct ThinkingView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            // Header — always visible, tappable to toggle
-            Button {
+            // Header — tap entire row to toggle expand/collapse
+            HStack(spacing: 8) {
+                Image(systemName: isLive ? "brain" : "brain.fill")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.orange)
+                    .symbolEffect(.pulse, options: .repeating, isActive: isLive)
+
+                Text(isLive ? "Reasoning…" : "Reasoning Completed")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+
+                Spacer()
+
+                Image(systemName: "chevron.right")
+                    .font(.caption2.weight(.bold))
+                    .foregroundStyle(.tertiary)
+                    .rotationEffect(.degrees(isExpanded ? 90 : 0))
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .contentShape(Rectangle())
+            .onTapGesture {
                 withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
                     setExpanded(!isExpanded)
                 }
-            } label: {
-                HStack(spacing: 8) {
-                    Image(systemName: isLive ? "brain" : "brain.fill")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.orange)
-                        .symbolEffect(.pulse, options: .repeating, isActive: isLive)
-
-                    Text(isLive ? "Reasoning…" : "Reasoning Completed")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.secondary)
-
-                    Spacer()
-
-                    Image(systemName: "chevron.right")
-                        .font(.caption2.weight(.bold))
-                        .foregroundStyle(.tertiary)
-                        .rotationEffect(.degrees(isExpanded ? 90 : 0))
-                }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
             }
-            .buttonStyle(.plain)
 
             // Expandable content — Markdown-rendered thinking text
             if isExpanded {

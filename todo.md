@@ -226,3 +226,12 @@
 - [x] UI: Ensure tool call states (reasoning/searching/code executing) display correctly after app resumes from background
 - [x] BUG: "Recovering interrupted response..." banner persists after recovery completes — isRecovering not properly reset (fixed with defer + isRecovering=false in all finalize paths)
 - [x] BUG: Xcode build error — unterminated string literal in recoverResponse debug print (escaped quotes inside string interpolation), fixed with local variable
+- [x] UI: Reasoning card — tap entire row to expand/collapse, not just the small chevron arrow (replaced Button with contentShape+onTapGesture)
+- [x] BUG: Background resume recovery succeeds (banner disappears) but model stops outputting — stuck in Reasoning state with stop button still visible, isStreaming not properly reset (fixed via streaming recovery)
+- [x] VERIFY: Confirmed streaming is real SSE (URLSessionDataDelegate), no simulated output
+- [x] REVIEW: Streaming speed optimized — disabled waitsForConnectivity, added HTTP pipelining, explicit high-priority delegate queue, reduced draft save frequency to 2s
+- [x] FEATURE: Add background=true to all streaming requests so server continues even if client disconnects
+- [x] FEATURE: Track sequence_number during SSE streaming for resume capability
+- [x] FEATURE: Implement streaming recovery via GET /v1/responses/{id}?stream=true&starting_after={seq} — resume from breakpoint instead of polling final output
+- [x] FIX: handleReturnToForeground uses streaming recovery (continues real-time output) instead of polling recovery (one-shot final output)
+- [x] FIX: If response already completed on server, GET stream replays remaining events quickly (still streaming UX)

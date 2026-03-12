@@ -24,6 +24,7 @@ enum StreamEvent: Sendable {
     case thinkingStarted
     case thinkingFinished
     case responseCreated(String)      // response_id for recovery
+    case sequenceUpdate(Int)          // sequence_number from SSE event (for resume from breakpoint)
     case completed(String, String?)   // (fullText, fullThinking?)
     case connectionLost               // Network disconnected mid-stream (eligible for auto-reconnect)
     case error(OpenAIServiceError)
@@ -188,6 +189,8 @@ final class OpenAIService {
                 "model": model.rawValue,
                 "input": input,
                 "stream": true,
+                "store": true,
+                "background": true,
                 "tools": tools
             ]
 
@@ -216,14 +219,87 @@ final class OpenAIService {
             let config = URLSessionConfiguration.default
             config.requestCachePolicy = .reloadIgnoringLocalCacheData
             config.urlCache = nil
-            config.waitsForConnectivity = true
+            config.waitsForConnectivity = false  // Fail fast on no network; we handle reconnect ourselves
+            config.httpShouldUsePipelining = true
+            config.timeoutIntervalForResource = 600  // 10 min total resource timeout
 
-            let session = URLSession(configuration: config, delegate: delegate, delegateQueue: nil)
+            let delegateQueue = OperationQueue()
+            delegateQueue.name = "com.glassgpt.sse"
+            delegateQueue.maxConcurrentOperationCount = 1
+            delegateQueue.qualityOfService = .userInitiated
+
+            let session = URLSession(configuration: config, delegate: delegate, delegateQueue: delegateQueue)
             delegate.session = session
 
             let task = session.dataTask(with: request)
             delegate.task = task
             task.resume()
+
+            continuation.onTermination = { @Sendable _ in
+                task.cancel()
+                session.invalidateAndCancel()
+            }
+        }
+    }
+
+    // MARK: - Stream Recovery (Resume from breakpoint)
+
+    /// Resume SSE streaming from a specific sequence_number.
+    /// Uses GET /v1/responses/{id}?stream=true&starting_after={seq} to reconnect.
+    /// If startingAfter is nil, replays all events from the beginning.
+    func streamRecovery(
+        responseId: String,
+        startingAfter: Int?,
+        apiKey: String
+    ) -> AsyncStream<StreamEvent> {
+        // Cancel any previous stream
+        cancelStream()
+
+        let baseURL = self.baseURL
+
+        return AsyncStream(bufferingPolicy: .unbounded) { continuation in
+            var urlString = "\(baseURL)/\(responseId)?stream=true"
+            if let seq = startingAfter {
+                urlString += "&starting_after=\(seq)"
+            }
+
+            guard let url = URL(string: urlString) else {
+                continuation.yield(.error(.invalidURL))
+                continuation.finish()
+                return
+            }
+
+            var request = URLRequest(url: url)
+            request.httpMethod = "GET"
+            request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+            request.setValue("text/event-stream", forHTTPHeaderField: "Accept")
+            request.timeoutInterval = 600  // 10 min total
+
+            let delegate = SSEDelegate(continuation: continuation)
+            self.currentDelegate = delegate
+
+            let config = URLSessionConfiguration.default
+            config.requestCachePolicy = .reloadIgnoringLocalCacheData
+            config.urlCache = nil
+            config.waitsForConnectivity = false
+            config.httpShouldUsePipelining = true
+            config.timeoutIntervalForResource = 600
+
+            let delegateQueue = OperationQueue()
+            delegateQueue.name = "com.glassgpt.sse.recovery"
+            delegateQueue.maxConcurrentOperationCount = 1
+            delegateQueue.qualityOfService = .userInitiated
+
+            let session = URLSession(configuration: config, delegate: delegate, delegateQueue: delegateQueue)
+            delegate.session = session
+
+            let task = session.dataTask(with: request)
+            delegate.task = task
+            task.resume()
+
+            #if DEBUG
+            print("[OpenAI] Recovery stream → GET \(responseId)?stream=true&starting_after=\(startingAfter ?? -1)")
+            #endif
 
             continuation.onTermination = { @Sendable _ in
                 task.cancel()
@@ -545,6 +621,7 @@ private final class SSEDelegate: NSObject, URLSessionDataDelegate, @unchecked Se
     private var thinkingActive = false
     private var emittedAnyOutput = false
     private var finished = false
+    private var lastSequenceNumber: Int = 0
 
     // Accumulated tool call data
     private var accumulatedAnnotations: [URLCitation] = []
@@ -750,6 +827,15 @@ private final class SSEDelegate: NSObject, URLSessionDataDelegate, @unchecked Se
 
     private func processEvent(type: String, data: String) -> EventResult {
         guard let jsonData = data.data(using: .utf8) else { return .continued }
+
+        // Track sequence_number from every event for streaming resume capability
+        if let json = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any],
+           let seqNum = json["sequence_number"] as? Int {
+            if seqNum > lastSequenceNumber {
+                lastSequenceNumber = seqNum
+                continuation.yield(.sequenceUpdate(seqNum))
+            }
+        }
 
         switch type {
 
