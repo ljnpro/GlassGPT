@@ -1,13 +1,13 @@
 import Foundation
 
-// MARK: - Sendable DTO for crossing concurrency boundaries
+// MARK: - Sendable DTOO for crossing concurrency boundaries
 
 struct APIMessage: Sendable {
     let role: MessageRole
     let content: String
     let imageData: Data?
     let fileAttachments: [FileAttachment]
-    
+
     init(role: MessageRole, content: String, imageData: Data? = nil, fileAttachments: [FileAttachment] = []) {
         self.role = role
         self.content = content
@@ -23,25 +23,24 @@ enum StreamEvent: Sendable {
     case thinkingDelta(String)
     case thinkingStarted
     case thinkingFinished
-    case responseCreated(String)      // response_id for recovery
-    case sequenceUpdate(Int)          // sequence_number from SSE event (for resume from breakpoint)
-    case completed(String, String?)   // (fullText, fullThinking?)
-    case connectionLost               // Network disconnected mid-stream (eligible for auto-reconnect)
+    case responseCreated(String)
+    case completed(String, String?)
+    case connectionLost
     case error(OpenAIServiceError)
-    
+
     // Tool call events
-    case webSearchStarted(String)     // tool call ID
-    case webSearchSearching(String)   // tool call ID
-    case webSearchCompleted(String)   // tool call ID
-    case codeInterpreterStarted(String)    // tool call ID
-    case codeInterpreterInterpreting(String) // tool call ID
-    case codeInterpreterCodeDelta(String, String) // (tool call ID, code delta)
-    case codeInterpreterCodeDone(String, String)  // (tool call ID, full code)
-    case codeInterpreterCompleted(String)  // tool call ID
-    case fileSearchStarted(String)         // tool call ID
-    case fileSearchSearching(String)       // tool call ID
-    case fileSearchCompleted(String)       // tool call ID
-    
+    case webSearchStarted(String)
+    case webSearchSearching(String)
+    case webSearchCompleted(String)
+    case codeInterpreterStarted(String)
+    case codeInterpreterInterpreting(String)
+    case codeInterpreterCodeDelta(String, String)
+    case codeInterpreterCodeDone(String, String)
+    case codeInterpreterCompleted(String)
+    case fileSearchStarted(String)
+    case fileSearchSearching(String)
+    case fileSearchCompleted(String)
+
     // Annotation events
     case annotationAdded(URLCitation)
 }
@@ -66,19 +65,36 @@ enum OpenAIServiceError: Error, Sendable, LocalizedError {
     }
 }
 
+// MARK: - Polling Fetch Result
+
+struct OpenAIResponseFetchResult {
+    enum Status: String, Sendable {
+        case queued
+        case inProgress = "in_progress"
+        case completed
+        case failed
+        case incomplete
+        case unknown
+    }
+
+    let status: Status
+    let text: String
+    let thinking: String?
+    let annotations: [URLCitation]
+    let toolCalls: [ToolCallInfo]
+    let errorMessage: String?
+}
+
 // MARK: - OpenAI Service
 
 @MainActor
 final class OpenAIService {
 
     private let baseURL = "https://api.openai.com/v1/responses"
-    private let filesURL = "https://api.openai.com/v1/files"
     private var currentDelegate: SSEDelegate?
 
     // MARK: - Upload File
 
-    /// Upload a file to OpenAI for use in Responses API.
-    /// Returns the file ID on success.
     nonisolated func uploadFile(data: Data, filename: String, apiKey: String) async throws -> String {
         guard let url = URL(string: "https://api.openai.com/v1/files") else {
             throw OpenAIServiceError.invalidURL
@@ -93,12 +109,10 @@ final class OpenAIService {
 
         var body = Data()
 
-        // Purpose field
         body.append("--\(boundary)\r\n".data(using: .utf8)!)
         body.append("Content-Disposition: form-data; name=\"purpose\"\r\n\r\n".data(using: .utf8)!)
         body.append("user_data\r\n".data(using: .utf8)!)
 
-        // File field
         body.append("--\(boundary)\r\n".data(using: .utf8)!)
         body.append("Content-Disposition: form-data; name=\"file\"; filename=\"\(filename)\"\r\n".data(using: .utf8)!)
 
@@ -107,9 +121,7 @@ final class OpenAIService {
         body.append(data)
         body.append("\r\n".data(using: .utf8)!)
 
-        // End boundary
         body.append("--\(boundary)--\r\n".data(using: .utf8)!)
-
         request.httpBody = body
 
         let (responseData, response) = try await URLSession.shared.data(for: request)
@@ -123,8 +135,10 @@ final class OpenAIService {
             throw OpenAIServiceError.httpError(httpResponse.statusCode, errorMsg)
         }
 
-        guard let json = try? JSONSerialization.jsonObject(with: responseData) as? [String: Any],
-              let fileId = json["id"] as? String else {
+        guard
+            let json = try? JSONSerialization.jsonObject(with: responseData) as? [String: Any],
+            let fileId = json["id"] as? String
+        else {
             throw OpenAIServiceError.requestFailed("Failed to parse upload response")
         }
 
@@ -144,7 +158,6 @@ final class OpenAIService {
         reasoningEffort: ReasoningEffort,
         vectorStoreIds: [String] = []
     ) -> AsyncStream<StreamEvent> {
-        // Cancel any previous stream
         cancelStream()
 
         let baseURL = self.baseURL
@@ -153,7 +166,6 @@ final class OpenAIService {
             let delegate = SSEDelegate(continuation: continuation)
             self.currentDelegate = delegate
 
-            // Build the request
             guard let url = URL(string: baseURL) else {
                 continuation.yield(.error(.invalidURL))
                 continuation.finish()
@@ -174,15 +186,14 @@ final class OpenAIService {
                 [
                     "type": "code_interpreter",
                     "container": ["type": "auto"]
-                ] as [String: Any]
+                ]
             ]
 
-            // Add file_search tool if vector stores are available
             if !vectorStoreIds.isEmpty {
                 tools.append([
                     "type": "file_search",
                     "vector_store_ids": vectorStoreIds
-                ] as [String: Any])
+                ])
             }
 
             var body: [String: Any] = [
@@ -190,11 +201,9 @@ final class OpenAIService {
                 "input": input,
                 "stream": true,
                 "store": true,
-                "background": true,
                 "tools": tools
             ]
 
-            // Add reasoning config
             if reasoningEffort != .none {
                 body["reasoning"] = [
                     "effort": reasoningEffort.rawValue,
@@ -215,13 +224,12 @@ final class OpenAIService {
             print("[OpenAI] Streaming request → \(model.rawValue), effort: \(reasoningEffort.rawValue), tools: \(toolNames)")
             #endif
 
-            // Use a dedicated URLSession with the delegate for real-time chunk delivery.
             let config = URLSessionConfiguration.default
             config.requestCachePolicy = .reloadIgnoringLocalCacheData
             config.urlCache = nil
-            config.waitsForConnectivity = false  // Fail fast on no network; we handle reconnect ourselves
+            config.waitsForConnectivity = false
             config.httpShouldUsePipelining = true
-            config.timeoutIntervalForResource = 600  // 10 min total resource timeout
+            config.timeoutIntervalForResource = 600
 
             let delegateQueue = OperationQueue()
             delegateQueue.name = "com.glassgpt.sse"
@@ -234,72 +242,6 @@ final class OpenAIService {
             let task = session.dataTask(with: request)
             delegate.task = task
             task.resume()
-
-            continuation.onTermination = { @Sendable _ in
-                task.cancel()
-                session.invalidateAndCancel()
-            }
-        }
-    }
-
-    // MARK: - Stream Recovery (Resume from breakpoint)
-
-    /// Resume SSE streaming from a specific sequence_number.
-    /// Uses GET /v1/responses/{id}?stream=true&starting_after={seq} to reconnect.
-    /// If startingAfter is nil, replays all events from the beginning.
-    func streamRecovery(
-        responseId: String,
-        startingAfter: Int?,
-        apiKey: String
-    ) -> AsyncStream<StreamEvent> {
-        // Cancel any previous stream
-        cancelStream()
-
-        let baseURL = self.baseURL
-
-        return AsyncStream(bufferingPolicy: .unbounded) { continuation in
-            var urlString = "\(baseURL)/\(responseId)?stream=true"
-            if let seq = startingAfter {
-                urlString += "&starting_after=\(seq)"
-            }
-
-            guard let url = URL(string: urlString) else {
-                continuation.yield(.error(.invalidURL))
-                continuation.finish()
-                return
-            }
-
-            var request = URLRequest(url: url)
-            request.httpMethod = "GET"
-            request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
-            request.setValue("text/event-stream", forHTTPHeaderField: "Accept")
-            request.timeoutInterval = 600  // 10 min total
-
-            let delegate = SSEDelegate(continuation: continuation)
-            self.currentDelegate = delegate
-
-            let config = URLSessionConfiguration.default
-            config.requestCachePolicy = .reloadIgnoringLocalCacheData
-            config.urlCache = nil
-            config.waitsForConnectivity = false
-            config.httpShouldUsePipelining = true
-            config.timeoutIntervalForResource = 600
-
-            let delegateQueue = OperationQueue()
-            delegateQueue.name = "com.glassgpt.sse.recovery"
-            delegateQueue.maxConcurrentOperationCount = 1
-            delegateQueue.qualityOfService = .userInitiated
-
-            let session = URLSession(configuration: config, delegate: delegate, delegateQueue: delegateQueue)
-            delegate.session = session
-
-            let task = session.dataTask(with: request)
-            delegate.task = task
-            task.resume()
-
-            #if DEBUG
-            print("[OpenAI] Recovery stream → GET \(responseId)?stream=true&starting_after=\(startingAfter ?? -1)")
-            #endif
 
             continuation.onTermination = { @Sendable _ in
                 task.cancel()
@@ -347,25 +289,24 @@ final class OpenAIService {
             throw OpenAIServiceError.requestFailed("Title generation failed")
         }
 
-        if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
-            if let text = Self.extractOutputText(from: json) {
-                let cleaned = text
-                    .trimmingCharacters(in: .whitespacesAndNewlines)
-                    .trimmingCharacters(in: CharacterSet(charactersIn: "\"'"))
-                let words = cleaned.split(separator: " ")
-                if words.count > 5 {
-                    return words.prefix(5).joined(separator: " ")
-                }
-                return cleaned
+        if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+           let text = Self.extractOutputText(from: json) {
+            let cleaned = text
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+                .trimmingCharacters(in: CharacterSet(charactersIn: "\"'"))
+            let words = cleaned.split(separator: " ")
+            if words.count > 5 {
+                return words.prefix(5).joined(separator: " ")
             }
+            return cleaned
         }
 
         return "New Chat"
     }
 
-    // MARK: - Fetch Complete Response (Recovery)
+    // MARK: - Fetch Complete Response (Polling Recovery)
 
-    func fetchResponse(responseId: String, apiKey: String) async throws -> (text: String, thinking: String?, annotations: [URLCitation], toolCalls: [ToolCallInfo]) {
+    func fetchResponse(responseId: String, apiKey: String) async throws -> OpenAIResponseFetchResult {
         guard let url = URL(string: "\(baseURL)/\(responseId)") else {
             throw OpenAIServiceError.invalidURL
         }
@@ -382,25 +323,19 @@ final class OpenAIService {
         }
 
         if httpResponse.statusCode >= 400 {
-            throw OpenAIServiceError.httpError(httpResponse.statusCode, "Failed to fetch response")
+            let errorMsg = String(data: data, encoding: .utf8) ?? "Failed to fetch response"
+            throw OpenAIServiceError.httpError(httpResponse.statusCode, errorMsg)
         }
 
         guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
             throw OpenAIServiceError.requestFailed("Failed to parse response")
         }
 
-        let status = json["status"] as? String ?? "unknown"
-        if status == "in_progress" || status == "queued" {
-            throw OpenAIServiceError.requestFailed("__IN_PROGRESS__")
-        }
-
-        if status == "failed" {
-            throw OpenAIServiceError.requestFailed("Response generation failed on server")
-        }
-
+        let statusString = json["status"] as? String ?? "unknown"
+        let status = OpenAIResponseFetchResult.Status(rawValue: statusString) ?? .unknown
         let text = Self.extractOutputText(from: json) ?? ""
+        let thinking = Self.extractReasoningText(from: json)
 
-        var thinking: String? = nil
         var annotations: [URLCitation] = []
         var toolCalls: [ToolCallInfo] = []
 
@@ -408,24 +343,17 @@ final class OpenAIService {
             for item in output {
                 let type = item["type"] as? String ?? ""
 
-                // Extract reasoning summary
-                if type == "reasoning" {
-                    if let summary = item["summary"] as? [[String: Any]] {
-                        let summaryTexts = summary.compactMap { $0["text"] as? String }
-                        if !summaryTexts.isEmpty {
-                            thinking = summaryTexts.joined()
-                        }
-                    }
-                }
-
-                // Extract web search calls
                 if type == "web_search_call" {
                     let callId = item["id"] as? String ?? UUID().uuidString
                     var queries: [String]? = nil
+
                     if let action = item["action"] as? [String: Any],
                        let q = action["query"] as? String {
                         queries = [q]
+                    } else if let q = item["query"] as? String {
+                        queries = [q]
                     }
+
                     toolCalls.append(ToolCallInfo(
                         id: callId,
                         type: .webSearch,
@@ -434,11 +362,11 @@ final class OpenAIService {
                     ))
                 }
 
-                // Extract code interpreter calls
                 if type == "code_interpreter_call" {
                     let callId = item["id"] as? String ?? UUID().uuidString
                     let code = item["code"] as? String
                     var results: [String]? = nil
+
                     if let resultArray = item["results"] as? [[String: Any]] {
                         results = resultArray.compactMap { result in
                             if let output = result["output"] as? String {
@@ -447,6 +375,7 @@ final class OpenAIService {
                             return nil
                         }
                     }
+
                     toolCalls.append(ToolCallInfo(
                         id: callId,
                         type: .codeInterpreter,
@@ -456,24 +385,41 @@ final class OpenAIService {
                     ))
                 }
 
-                // Extract annotations from message content
-                if type == "message" {
-                    if let content = item["content"] as? [[String: Any]] {
-                        for part in content {
-                            if let partAnnotations = part["annotations"] as? [[String: Any]] {
-                                for ann in partAnnotations {
-                                    if let annType = ann["type"] as? String, annType == "url_citation",
-                                       let url = ann["url"] as? String,
-                                       let title = ann["title"] as? String {
-                                        let startIdx = ann["start_index"] as? Int ?? 0
-                                        let endIdx = ann["end_index"] as? Int ?? 0
-                                        annotations.append(URLCitation(
-                                            url: url,
-                                            title: title,
-                                            startIndex: startIdx,
-                                            endIndex: endIdx
-                                        ))
-                                    }
+                if type == "file_search_call" {
+                    let callId = item["id"] as? String ?? UUID().uuidString
+                    var queries: [String]? = nil
+
+                    if let q = item["query"] as? String {
+                        queries = [q]
+                    } else if let q = item["queries"] as? [String] {
+                        queries = q
+                    }
+
+                    toolCalls.append(ToolCallInfo(
+                        id: callId,
+                        type: .fileSearch,
+                        status: .completed,
+                        queries: queries
+                    ))
+                }
+
+                if type == "message",
+                   let content = item["content"] as? [[String: Any]] {
+                    for part in content {
+                        if let partAnnotations = part["annotations"] as? [[String: Any]] {
+                            for ann in partAnnotations {
+                                if let annType = ann["type"] as? String,
+                                   annType == "url_citation",
+                                   let url = ann["url"] as? String,
+                                   let title = ann["title"] as? String {
+                                    let startIdx = ann["start_index"] as? Int ?? 0
+                                    let endIdx = ann["end_index"] as? Int ?? 0
+                                    annotations.append(URLCitation(
+                                        url: url,
+                                        title: title,
+                                        startIndex: startIdx,
+                                        endIndex: endIdx
+                                    ))
                                 }
                             }
                         }
@@ -482,7 +428,16 @@ final class OpenAIService {
             }
         }
 
-        return (text: text, thinking: thinking, annotations: annotations, toolCalls: toolCalls)
+        let errorMessage = Self.extractErrorMessage(from: json)
+
+        return OpenAIResponseFetchResult(
+            status: status,
+            text: text,
+            thinking: thinking,
+            annotations: annotations,
+            toolCalls: toolCalls,
+            errorMessage: errorMessage
+        )
     }
 
     // MARK: - Validate API Key
@@ -502,7 +457,7 @@ final class OpenAIService {
         }
     }
 
-    // MARK: - Extract Output Text from Response JSON
+    // MARK: - Extractors
 
     private nonisolated static func extractOutputText(from json: [String: Any]) -> String? {
         if let text = json["output_text"] as? String, !text.isEmpty {
@@ -512,18 +467,65 @@ final class OpenAIService {
         guard let output = json["output"] as? [[String: Any]] else { return nil }
 
         var texts: [String] = []
+
         for item in output {
             guard let type = item["type"] as? String, type == "message" else { continue }
             guard let content = item["content"] as? [[String: Any]] else { continue }
+
             for part in content {
-                if let partType = part["type"] as? String, partType == "output_text",
+                if let partType = part["type"] as? String,
+                   partType == "output_text",
                    let text = part["text"] as? String {
                     texts.append(text)
                 }
             }
         }
 
-        return texts.isEmpty ? nil : texts.joined()
+        let joined = texts.joined()
+        return joined.isEmpty ? nil : joined
+    }
+
+    private nonisolated static func extractReasoningText(from json: [String: Any]) -> String? {
+        var texts: [String] = []
+
+        if let reasoning = json["reasoning"] as? [String: Any] {
+            if let text = reasoning["text"] as? String, !text.isEmpty {
+                texts.append(text)
+            }
+            if let summary = reasoning["summary"] as? [[String: Any]] {
+                texts.append(contentsOf: summary.compactMap { $0["text"] as? String })
+            }
+        }
+
+        if let output = json["output"] as? [[String: Any]] {
+            for item in output {
+                guard let type = item["type"] as? String, type == "reasoning" else { continue }
+
+                if let text = item["text"] as? String, !text.isEmpty {
+                    texts.append(text)
+                }
+
+                if let summary = item["summary"] as? [[String: Any]] {
+                    texts.append(contentsOf: summary.compactMap { $0["text"] as? String })
+                }
+
+                if let content = item["content"] as? [[String: Any]] {
+                    texts.append(contentsOf: content.compactMap { $0["text"] as? String })
+                }
+            }
+        }
+
+        let joined = texts.joined()
+        return joined.isEmpty ? nil : joined
+    }
+
+    private nonisolated static func extractErrorMessage(from json: [String: Any]) -> String? {
+        if let error = json["error"] as? [String: Any],
+           let message = error["message"] as? String,
+           !message.isEmpty {
+            return message
+        }
+        return nil
     }
 
     // MARK: - Build Input Array
@@ -537,7 +539,6 @@ final class OpenAIService {
             var contentArray: [[String: Any]] = []
             var hasMultiContent = false
 
-            // Add text content
             if !message.content.isEmpty {
                 contentArray.append([
                     "type": "input_text",
@@ -545,7 +546,6 @@ final class OpenAIService {
                 ])
             }
 
-            // Add image if present
             if let imageData = message.imageData {
                 hasMultiContent = true
                 let base64 = imageData.base64EncodedString()
@@ -555,7 +555,6 @@ final class OpenAIService {
                 ])
             }
 
-            // Add file attachments as input_file references
             for attachment in message.fileAttachments {
                 if let fileId = attachment.fileId {
                     hasMultiContent = true
@@ -603,30 +602,22 @@ final class OpenAIService {
 
 // MARK: - SSE Delegate
 
-/// A URLSessionDataDelegate that receives data chunks in real-time and parses
-/// SSE events, yielding StreamEvents through an AsyncStream continuation.
 private final class SSEDelegate: NSObject, URLSessionDataDelegate, @unchecked Sendable {
 
     private let continuation: AsyncStream<StreamEvent>.Continuation
     private let lock = NSLock()
 
-    // SSE parser state
     private var lineBuffer = ""
     private var currentEventType = ""
     private var dataBuffer = ""
 
-    // Accumulated content
     private var accumulatedText = ""
     private var accumulatedThinking = ""
     private var thinkingActive = false
     private var emittedAnyOutput = false
     private var finished = false
-    private var lastSequenceNumber: Int = 0
+    private var sawTerminalEvent = false
 
-    // Accumulated tool call data
-    private var accumulatedAnnotations: [URLCitation] = []
-
-    // References for cleanup
     weak var session: URLSession?
     weak var task: URLSessionDataTask?
 
@@ -701,7 +692,6 @@ private final class SSEDelegate: NSObject, URLSessionDataDelegate, @unchecked Se
     func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
         lock.lock()
         let alreadyFinished = finished
-        finished = true
         lock.unlock()
 
         guard !alreadyFinished else { return }
@@ -712,8 +702,20 @@ private final class SSEDelegate: NSObject, URLSessionDataDelegate, @unchecked Se
         }
 
         if !currentEventType.isEmpty && !dataBuffer.isEmpty {
-            _ = processEvent(type: currentEventType, data: dataBuffer)
+            let result = processEvent(type: currentEventType, data: dataBuffer)
+            currentEventType = ""
+            dataBuffer = ""
+            if handleTerminalResult(result) { return }
         }
+
+        lock.lock()
+        let becameFinished = !finished
+        if becameFinished {
+            finished = true
+        }
+        lock.unlock()
+
+        guard becameFinished else { return }
 
         if let error = error as? NSError, error.code == NSURLErrorCancelled {
             continuation.finish()
@@ -737,36 +739,31 @@ private final class SSEDelegate: NSObject, URLSessionDataDelegate, @unchecked Se
                 NSURLErrorSecureConnectionFailed
             ].contains(nsError.code)
 
-            if isNetworkError {
-                if thinkingActive {
-                    continuation.yield(.thinkingFinished)
-                }
+            if thinkingActive {
+                thinkingActive = false
+                continuation.yield(.thinkingFinished)
+            }
+
+            if isNetworkError || emittedAnyOutput {
                 continuation.yield(.connectionLost)
-                continuation.finish()
-            } else if emittedAnyOutput {
-                if thinkingActive {
-                    continuation.yield(.thinkingFinished)
-                }
-                let thinking: String? = accumulatedThinking.isEmpty ? nil : accumulatedThinking
-                continuation.yield(.completed(accumulatedText, thinking))
-                continuation.finish()
             } else {
                 continuation.yield(.error(.requestFailed(error.localizedDescription)))
-                continuation.finish()
             }
+
+            continuation.finish()
+            session.invalidateAndCancel()
             return
         }
 
-        // Normal completion
-        if emittedAnyOutput {
+        if !sawTerminalEvent {
             if thinkingActive {
+                thinkingActive = false
                 continuation.yield(.thinkingFinished)
             }
-            let thinking: String? = accumulatedThinking.isEmpty ? nil : accumulatedThinking
-            continuation.yield(.completed(accumulatedText, thinking))
+            continuation.yield(.connectionLost)
         }
-        continuation.finish()
 
+        continuation.finish()
         session.invalidateAndCancel()
     }
 
@@ -784,24 +781,11 @@ private final class SSEDelegate: NSObject, URLSessionDataDelegate, @unchecked Se
                     let result = processEvent(type: currentEventType, data: dataBuffer)
                     currentEventType = ""
                     dataBuffer = ""
-                    if result == .finished {
-                        lock.lock()
-                        finished = true
-                        lock.unlock()
-
-                        if thinkingActive {
-                            continuation.yield(.thinkingFinished)
-                        }
-                        let thinking: String? = accumulatedThinking.isEmpty ? nil : accumulatedThinking
-                        continuation.yield(.completed(accumulatedText, thinking))
-                        continuation.finish()
-                        task?.cancel()
-                        session?.invalidateAndCancel()
-                        return
-                    }
+                    if handleTerminalResult(result) { return }
+                } else {
+                    currentEventType = ""
+                    dataBuffer = ""
                 }
-                currentEventType = ""
-                dataBuffer = ""
                 continue
             }
 
@@ -822,24 +806,15 @@ private final class SSEDelegate: NSObject, URLSessionDataDelegate, @unchecked Se
 
     private enum EventResult {
         case continued
-        case finished
+        case terminalCompleted
+        case terminalError
     }
 
     private func processEvent(type: String, data: String) -> EventResult {
         guard let jsonData = data.data(using: .utf8) else { return .continued }
 
-        // Track sequence_number from every event for streaming resume capability
-        if let json = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any],
-           let seqNum = json["sequence_number"] as? Int {
-            if seqNum > lastSequenceNumber {
-                lastSequenceNumber = seqNum
-                continuation.yield(.sequenceUpdate(seqNum))
-            }
-        }
-
         switch type {
 
-        // MARK: Text Deltas
         case "response.output_text.delta":
             if let json = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any],
                let delta = json["delta"] as? String {
@@ -851,15 +826,13 @@ private final class SSEDelegate: NSObject, URLSessionDataDelegate, @unchecked Se
 
         case "response.output_text.done":
             if let json = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any],
-               let fullText = json["text"] as? String {
-                if fullText.count > accumulatedText.count {
-                    accumulatedText = fullText
-                }
+               let fullText = json["text"] as? String,
+               !fullText.isEmpty {
                 emittedAnyOutput = true
+                accumulatedText = fullText
             }
             return .continued
 
-        // MARK: Reasoning
         case "response.reasoning_summary_text.delta":
             if let json = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any],
                let delta = json["delta"] as? String {
@@ -874,6 +847,11 @@ private final class SSEDelegate: NSObject, URLSessionDataDelegate, @unchecked Se
             return .continued
 
         case "response.reasoning_summary_text.done":
+            if let json = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any],
+               let fullText = json["text"] as? String,
+               !fullText.isEmpty {
+                accumulatedThinking = fullText
+            }
             if thinkingActive {
                 thinkingActive = false
                 continuation.yield(.thinkingFinished)
@@ -895,10 +873,9 @@ private final class SSEDelegate: NSObject, URLSessionDataDelegate, @unchecked Se
 
         case "response.reasoning_text.done":
             if let json = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any],
-               let fullText = json["text"] as? String {
-                if fullText.count > accumulatedThinking.count {
-                    accumulatedThinking = fullText
-                }
+               let fullText = json["text"] as? String,
+               !fullText.isEmpty {
+                accumulatedThinking = fullText
             }
             if thinkingActive {
                 thinkingActive = false
@@ -906,7 +883,6 @@ private final class SSEDelegate: NSObject, URLSessionDataDelegate, @unchecked Se
             }
             return .continued
 
-        // MARK: Web Search Events
         case "response.web_search_call.in_progress":
             if let json = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any],
                let itemId = json["item_id"] as? String {
@@ -934,7 +910,6 @@ private final class SSEDelegate: NSObject, URLSessionDataDelegate, @unchecked Se
             }
             return .continued
 
-        // MARK: Code Interpreter Events
         case "response.code_interpreter_call.in_progress":
             if let json = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any],
                let itemId = json["item_id"] as? String {
@@ -978,7 +953,6 @@ private final class SSEDelegate: NSObject, URLSessionDataDelegate, @unchecked Se
             }
             return .continued
 
-        // MARK: File Search Events
         case "response.file_search_call.in_progress":
             if let json = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any],
                let itemId = json["item_id"] as? String {
@@ -1006,17 +980,16 @@ private final class SSEDelegate: NSObject, URLSessionDataDelegate, @unchecked Se
             }
             return .continued
 
-        // MARK: Annotations
         case "response.output_text.annotation.added":
             if let json = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any],
                let annotation = json["annotation"] as? [String: Any],
-               let annType = annotation["type"] as? String, annType == "url_citation",
+               let annType = annotation["type"] as? String,
+               annType == "url_citation",
                let url = annotation["url"] as? String,
                let title = annotation["title"] as? String {
                 let startIdx = annotation["start_index"] as? Int ?? 0
                 let endIdx = annotation["end_index"] as? Int ?? 0
                 let citation = URLCitation(url: url, title: title, startIndex: startIdx, endIndex: endIdx)
-                accumulatedAnnotations.append(citation)
                 continuation.yield(.annotationAdded(citation))
                 #if DEBUG
                 print("[SSE] Citation: \(title) → \(url)")
@@ -1024,41 +997,64 @@ private final class SSEDelegate: NSObject, URLSessionDataDelegate, @unchecked Se
             }
             return .continued
 
-        // MARK: Response Lifecycle
         case "response.completed":
+            sawTerminalEvent = true
             if let json = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any],
                let responseObj = json["response"] as? [String: Any] {
-                if let text = Self.extractOutputText(from: responseObj) {
-                    if text.count > accumulatedText.count {
-                        accumulatedText = text
-                    }
-                    emittedAnyOutput = true
+                if let text = Self.extractOutputText(from: responseObj), !text.isEmpty {
+                    accumulatedText = text
                 }
+                if let thinking = Self.extractReasoningText(from: responseObj), !thinking.isEmpty {
+                    accumulatedThinking = thinking
+                }
+                emittedAnyOutput = emittedAnyOutput || !accumulatedText.isEmpty || !accumulatedThinking.isEmpty
             }
-            return .finished
-
-        case "response.failed":
-            var errorMsg = "Response generation failed"
-            if let json = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any],
-               let responseObj = json["response"] as? [String: Any],
-               let errorObj = responseObj["error"] as? [String: Any],
-               let message = errorObj["message"] as? String {
-                errorMsg = message
-            }
-            continuation.yield(.error(.requestFailed(errorMsg)))
-            return .finished
+            return .terminalCompleted
 
         case "response.incomplete":
-            return .finished
+            sawTerminalEvent = true
+            if let json = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any],
+               let responseObj = json["response"] as? [String: Any] {
+                if let text = Self.extractOutputText(from: responseObj), !text.isEmpty {
+                    accumulatedText = text
+                }
+                if let thinking = Self.extractReasoningText(from: responseObj), !thinking.isEmpty {
+                    accumulatedThinking = thinking
+                }
+                emittedAnyOutput = emittedAnyOutput || !accumulatedText.isEmpty || !accumulatedThinking.isEmpty
+            }
+            return .terminalCompleted
+
+        case "response.failed":
+            sawTerminalEvent = true
+            var errorMsg = "Response generation failed"
+
+            if let json = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any],
+               let responseObj = json["response"] as? [String: Any] {
+                if let text = Self.extractOutputText(from: responseObj), !text.isEmpty {
+                    accumulatedText = text
+                }
+                if let thinking = Self.extractReasoningText(from: responseObj), !thinking.isEmpty {
+                    accumulatedThinking = thinking
+                }
+                if let errorObj = responseObj["error"] as? [String: Any],
+                   let message = errorObj["message"] as? String {
+                    errorMsg = message
+                }
+            }
+
+            continuation.yield(.error(.requestFailed(errorMsg)))
+            return .terminalError
 
         case "error":
+            sawTerminalEvent = true
             var errorMsg = data
             if let json = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any],
                let message = json["message"] as? String {
                 errorMsg = message
             }
             continuation.yield(.error(.requestFailed(errorMsg)))
-            return .finished
+            return .terminalError
 
         case "response.created":
             if let json = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any],
@@ -1091,6 +1087,51 @@ private final class SSEDelegate: NSObject, URLSessionDataDelegate, @unchecked Se
 
     // MARK: - Helpers
 
+    private func handleTerminalResult(_ result: EventResult) -> Bool {
+        switch result {
+        case .continued:
+            return false
+
+        case .terminalCompleted:
+            lock.lock()
+            let alreadyFinished = finished
+            finished = true
+            lock.unlock()
+
+            guard !alreadyFinished else { return true }
+
+            if thinkingActive {
+                thinkingActive = false
+                continuation.yield(.thinkingFinished)
+            }
+
+            let thinking: String? = accumulatedThinking.isEmpty ? nil : accumulatedThinking
+            continuation.yield(.completed(accumulatedText, thinking))
+            continuation.finish()
+            task?.cancel()
+            session?.invalidateAndCancel()
+            return true
+
+        case .terminalError:
+            lock.lock()
+            let alreadyFinished = finished
+            finished = true
+            lock.unlock()
+
+            guard !alreadyFinished else { return true }
+
+            if thinkingActive {
+                thinkingActive = false
+                continuation.yield(.thinkingFinished)
+            }
+
+            continuation.finish()
+            task?.cancel()
+            session?.invalidateAndCancel()
+            return true
+        }
+    }
+
     private func yieldErrorAndFinish(_ error: OpenAIServiceError) {
         lock.lock()
         let alreadyFinished = finished
@@ -1110,17 +1151,55 @@ private final class SSEDelegate: NSObject, URLSessionDataDelegate, @unchecked Se
         guard let output = json["output"] as? [[String: Any]] else { return nil }
 
         var texts: [String] = []
+
         for item in output {
             guard let type = item["type"] as? String, type == "message" else { continue }
             guard let content = item["content"] as? [[String: Any]] else { continue }
+
             for part in content {
-                if let partType = part["type"] as? String, partType == "output_text",
+                if let partType = part["type"] as? String,
+                   partType == "output_text",
                    let text = part["text"] as? String {
                     texts.append(text)
                 }
             }
         }
 
-        return texts.isEmpty ? nil : texts.joined()
+        let joined = texts.joined()
+        return joined.isEmpty ? nil : joined
+    }
+
+    private static func extractReasoningText(from json: [String: Any]) -> String? {
+        var texts: [String] = []
+
+        if let reasoning = json["reasoning"] as? [String: Any] {
+            if let text = reasoning["text"] as? String, !text.isEmpty {
+                texts.append(text)
+            }
+            if let summary = reasoning["summary"] as? [[String: Any]] {
+                texts.append(contentsOf: summary.compactMap { $0["text"] as? String })
+            }
+        }
+
+        if let output = json["output"] as? [[String: Any]] {
+            for item in output {
+                guard let type = item["type"] as? String, type == "reasoning" else { continue }
+
+                if let text = item["text"] as? String, !text.isEmpty {
+                    texts.append(text)
+                }
+
+                if let summary = item["summary"] as? [[String: Any]] {
+                    texts.append(contentsOf: summary.compactMap { $0["text"] as? String })
+                }
+
+                if let content = item["content"] as? [[String: Any]] {
+                    texts.append(contentsOf: content.compactMap { $0["text"] as? String })
+                }
+            }
+        }
+
+        let joined = texts.joined()
+        return joined.isEmpty ? nil : joined
     }
 }
