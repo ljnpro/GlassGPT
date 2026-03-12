@@ -207,3 +207,4 @@
 - [x] FIX: Aligned all type references across files (StreamEvent cases, property names, method signatures)
 - [x] FIX: All recovery paths (reconnect, recoverResponse, recoverSingleMessage) now save tool calls and citations
 - [x] PUSH: Pushed feature/tools-and-documents branch to GitHub (ljnpro/GlassGPT)
+- [x] BUG: Build error - fixed argument order: fileSize now precedes fileType in FileAttachment init call
