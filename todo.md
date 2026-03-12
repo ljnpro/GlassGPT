@@ -174,3 +174,4 @@
 - [x] BUG: Markdown headings (## and ###) not rendered — added heading detection in parseBlocks second pass, renders with HeadingView (title/title2/title3 fonts)
 - [x] BUG: Consecutive LaTeX block formulas overlap — removed negative padding, added context-aware spacing (8pt between consecutive LaTeX, -2pt to text), improved height callback with ResizeObserver + multiple timers, increased initial height to 44pt
 - [x] UI: Hide Haptic Feedback toggle on iPad — only show on iPhone (UIDevice.current.userInterfaceIdiom == .phone)
+- [x] RENAME: Changed app display name from "Liquid Glass Chat" to "GlassAI" in app.config.ts
