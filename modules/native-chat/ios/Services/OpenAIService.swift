@@ -37,6 +37,9 @@ enum StreamEvent: Sendable {
     case codeInterpreterCodeDelta(String, String) // (tool call ID, code delta)
     case codeInterpreterCodeDone(String, String)  // (tool call ID, full code)
     case codeInterpreterCompleted(String)  // tool call ID
+    case fileSearchStarted(String)         // tool call ID
+    case fileSearchSearching(String)       // tool call ID
+    case fileSearchCompleted(String)       // tool call ID
     
     // Annotation events
     case annotationAdded(URLCitation)
@@ -137,7 +140,8 @@ final class OpenAIService {
         apiKey: String,
         messages: [APIMessage],
         model: ModelType,
-        reasoningEffort: ReasoningEffort
+        reasoningEffort: ReasoningEffort,
+        vectorStoreIds: [String] = []
     ) -> AsyncStream<StreamEvent> {
         // Cancel any previous stream
         cancelStream()
@@ -164,17 +168,27 @@ final class OpenAIService {
 
             let input = Self.buildInputArray(messages: messages)
 
+            var tools: [[String: Any]] = [
+                ["type": "web_search_preview"],
+                [
+                    "type": "code_interpreter",
+                    "container": ["type": "auto"]
+                ] as [String: Any]
+            ]
+
+            // Add file_search tool if vector stores are available
+            if !vectorStoreIds.isEmpty {
+                tools.append([
+                    "type": "file_search",
+                    "vector_store_ids": vectorStoreIds
+                ] as [String: Any])
+            }
+
             var body: [String: Any] = [
                 "model": model.rawValue,
                 "input": input,
                 "stream": true,
-                "tools": [
-                    ["type": "web_search_preview"],
-                    [
-                        "type": "code_interpreter",
-                        "container": ["type": "auto"]
-                    ] as [String: Any]
-                ]
+                "tools": tools
             ]
 
             // Add reasoning config
@@ -194,7 +208,8 @@ final class OpenAIService {
             }
 
             #if DEBUG
-            print("[OpenAI] Streaming request → \(model.rawValue), effort: \(reasoningEffort.rawValue), tools: [web_search, code_interpreter]")
+            let toolNames = vectorStoreIds.isEmpty ? "[web_search, code_interpreter]" : "[web_search, code_interpreter, file_search]"
+            print("[OpenAI] Streaming request → \(model.rawValue), effort: \(reasoningEffort.rawValue), tools: \(toolNames)")
             #endif
 
             // Use a dedicated URLSession with the delegate for real-time chunk delivery.
@@ -873,6 +888,34 @@ private final class SSEDelegate: NSObject, URLSessionDataDelegate, @unchecked Se
                 continuation.yield(.codeInterpreterCompleted(itemId))
                 #if DEBUG
                 print("[SSE] Code interpreter completed: \(itemId)")
+                #endif
+            }
+            return .continued
+
+        // MARK: File Search Events
+        case "response.file_search_call.in_progress":
+            if let json = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any],
+               let itemId = json["item_id"] as? String {
+                continuation.yield(.fileSearchStarted(itemId))
+                #if DEBUG
+                print("[SSE] File search started: \(itemId)")
+                #endif
+            }
+            return .continued
+
+        case "response.file_search_call.searching":
+            if let json = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any],
+               let itemId = json["item_id"] as? String {
+                continuation.yield(.fileSearchSearching(itemId))
+            }
+            return .continued
+
+        case "response.file_search_call.completed":
+            if let json = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any],
+               let itemId = json["item_id"] as? String {
+                continuation.yield(.fileSearchCompleted(itemId))
+                #if DEBUG
+                print("[SSE] File search completed: \(itemId)")
                 #endif
             }
             return .continued

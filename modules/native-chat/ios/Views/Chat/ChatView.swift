@@ -8,6 +8,7 @@ struct ChatView: View {
     @State private var showPhotoPicker = false
     @State private var selectedPhotoItem: PhotosPickerItem?
     @State private var showDocumentPicker = false
+    @State private var streamingThinkingExpanded: Bool? = true
 
     var body: some View {
         NavigationStack {
@@ -114,6 +115,13 @@ struct ChatView: View {
                             streamingBubble
                                 .id("streaming")
                         }
+                        // Reset thinking expanded state when a new stream starts
+                        EmptyView()
+                            .onChange(of: viewModel.isStreaming) { _, newValue in
+                                if newValue {
+                                    streamingThinkingExpanded = true
+                                }
+                            }
 
                         // Recovery indicator
                         if viewModel.isRecovering {
@@ -209,6 +217,10 @@ struct ChatView: View {
             Spacer()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .contentShape(Rectangle())
+        .onTapGesture {
+            UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+        }
     }
 
     // MARK: - Streaming Bubble
@@ -235,6 +247,15 @@ struct ChatView: View {
                         .transition(.opacity.combined(with: .scale(scale: 0.95)))
                 }
 
+                // Only show ONE file search indicator
+                let hasActiveFileSearch = viewModel.activeToolCalls.contains {
+                    $0.type == .fileSearch && $0.status != .completed
+                }
+                if hasActiveFileSearch {
+                    FileSearchIndicator()
+                        .transition(.opacity.combined(with: .scale(scale: 0.95)))
+                }
+
                 // Completed code interpreter results (during streaming)
                 let completedCodeCalls = viewModel.activeToolCalls.filter {
                     $0.type == .codeInterpreter && $0.status == .completed
@@ -251,8 +272,12 @@ struct ChatView: View {
 
                 // Live thinking text — collapsible, starts expanded during streaming
                 if !viewModel.currentThinkingText.isEmpty {
-                    ThinkingView(text: viewModel.currentThinkingText, isLive: viewModel.isThinking || viewModel.isStreaming)
-                        .transition(.opacity.combined(with: .move(edge: .top)))
+                    ThinkingView(
+                        text: viewModel.currentThinkingText,
+                        isLive: viewModel.isThinking || viewModel.isStreaming,
+                        externalIsExpanded: $streamingThinkingExpanded
+                    )
+                    .transition(.opacity.combined(with: .move(edge: .top)))
                 }
 
                 if !viewModel.currentStreamingText.isEmpty {

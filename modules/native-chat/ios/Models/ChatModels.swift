@@ -99,12 +99,14 @@ enum MessageRole: String, Codable, CaseIterable, Identifiable, Sendable {
 enum ToolCallType: String, Codable, Sendable {
     case webSearch = "web_search"
     case codeInterpreter = "code_interpreter"
+    case fileSearch = "file_search"
 }
 
 enum ToolCallStatus: String, Codable, Sendable {
     case inProgress = "in_progress"
     case searching
     case interpreting
+    case fileSearching = "file_searching"
     case completed
 }
 
