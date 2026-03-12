@@ -225,3 +225,4 @@
 - [x] BUG: App going to background has probability of triggering "Response interrupted. Please try again." error
 - [x] UI: Ensure tool call states (reasoning/searching/code executing) display correctly after app resumes from background
 - [x] BUG: "Recovering interrupted response..." banner persists after recovery completes — isRecovering not properly reset (fixed with defer + isRecovering=false in all finalize paths)
+- [x] BUG: Xcode build error — unterminated string literal in recoverResponse debug print (escaped quotes inside string interpolation), fixed with local variable
