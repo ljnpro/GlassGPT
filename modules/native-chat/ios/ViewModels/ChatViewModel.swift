@@ -23,6 +23,13 @@ final class ChatViewModel {
     var showModelSelector: Bool = false
     var selectedImageData: Data?
 
+    // Tool call state (live during streaming)
+    var activeToolCalls: [ToolCallInfo] = []
+    var liveCitations: [URLCitation] = []
+
+    // File attachments pending send
+    var pendingAttachments: [FileAttachment] = []
+
     // MARK: - Dependencies
 
     private let openAIService = OpenAIService()
@@ -99,13 +106,9 @@ final class ChatViewModel {
     }
 
     private func handleEnterBackground() {
-        // Save current draft immediately when going to background
         if isStreaming {
             saveDraftNow()
-
-            // Request background execution time
             backgroundTaskID = UIApplication.shared.beginBackgroundTask(withName: "StreamCompletion") { [weak self] in
-                // System is about to kill the background task — save what we have
                 Task { @MainActor in
                     self?.saveDraftNow()
                     self?.endBackgroundTask()
@@ -113,7 +116,6 @@ final class ChatViewModel {
             }
         }
 
-        // Generate title before app exits if it's still "New Chat"
         if let conversation = currentConversation,
            conversation.title == "New Chat",
            messages.count >= 2 {
@@ -130,20 +132,15 @@ final class ChatViewModel {
     private func handleReturnToForeground() {
         endBackgroundTask()
 
-        // If we were streaming but the connection died while in background
         if !isStreaming, let draft = draftMessage {
-            // Stream ended while in background
             if !draft.content.isEmpty {
-                // We have partial content — finalize what we have, then try recovery
                 finalizeDraftAsPartial()
             }
-            // Try to recover the full response via polling
             if let responseId = draft.responseId {
                 recoverResponse(messageId: draft.id, responseId: responseId)
             }
         }
 
-        // Also check for any other incomplete messages in the current conversation
         Task { @MainActor in
             await recoverIncompleteMessagesInCurrentConversation()
         }
@@ -166,17 +163,80 @@ final class ChatViewModel {
         !apiKey.isEmpty
     }
 
+    // MARK: - Document Handling
+
+    /// Handle documents picked from the document picker.
+    func handlePickedDocuments(_ urls: [URL]) {
+        for url in urls {
+            do {
+                let metadata = try FileMetadata.from(url: url)
+                let attachment = FileAttachment(
+                    filename: metadata.filename,
+                    fileType: metadata.fileType,
+                    fileSize: metadata.fileSize,
+                    localData: metadata.data,
+                    uploadStatus: .pending
+                )
+                pendingAttachments.append(attachment)
+            } catch {
+                #if DEBUG
+                print("[Documents] Failed to read file \(url.lastPathComponent): \(error)")
+                #endif
+            }
+        }
+    }
+
+    /// Remove a pending attachment.
+    func removePendingAttachment(_ attachment: FileAttachment) {
+        pendingAttachments.removeAll { $0.id == attachment.id }
+    }
+
+    /// Upload pending attachments to OpenAI and return file IDs.
+    private func uploadPendingAttachments() async -> [FileAttachment] {
+        var uploaded: [FileAttachment] = []
+
+        for i in pendingAttachments.indices {
+            pendingAttachments[i].uploadStatus = .uploading
+
+            guard let data = pendingAttachments[i].localData else {
+                pendingAttachments[i].uploadStatus = .failed
+                continue
+            }
+
+            do {
+                let fileId = try await openAIService.uploadFile(
+                    data: data,
+                    filename: pendingAttachments[i].filename,
+                    apiKey: apiKey
+                )
+                pendingAttachments[i].openAIFileId = fileId
+                pendingAttachments[i].uploadStatus = .uploaded
+                uploaded.append(pendingAttachments[i])
+            } catch {
+                pendingAttachments[i].uploadStatus = .failed
+                #if DEBUG
+                print("[Upload] Failed to upload \(pendingAttachments[i].filename): \(error)")
+                #endif
+            }
+        }
+
+        return uploaded
+    }
+
     // MARK: - Send Message
 
     func sendMessage() {
         guard !isStreaming else { return }
 
         let text = inputText.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !text.isEmpty || selectedImageData != nil else { return }
+        guard !text.isEmpty || selectedImageData != nil || !pendingAttachments.isEmpty else { return }
         guard !apiKey.isEmpty else {
             errorMessage = "Please add your OpenAI API key in Settings."
             return
         }
+
+        // Capture attachments before clearing
+        let attachmentsToSend = pendingAttachments
 
         // Create user message
         let userMessage = Message(
@@ -184,6 +244,10 @@ final class ChatViewModel {
             content: text,
             imageData: selectedImageData
         )
+        // Store file attachment metadata on the user message (for display)
+        if !attachmentsToSend.isEmpty {
+            userMessage.fileAttachmentsData = FileAttachment.encode(attachmentsToSend)
+        }
 
         // Create or update conversation
         if currentConversation == nil {
@@ -215,9 +279,7 @@ final class ChatViewModel {
         selectedImageData = nil
         errorMessage = nil
 
-        // Create draft assistant message immediately with isComplete = false.
-        // This ensures that even if the app is killed mid-stream,
-        // the partial response is already in the database and can be recovered.
+        // Create draft assistant message
         let draft = Message(
             role: .assistant,
             content: "",
@@ -234,17 +296,33 @@ final class ChatViewModel {
         isThinking = false
         currentStreamingText = ""
         currentThinkingText = ""
+        activeToolCalls = []
+        liveCitations = []
 
         HapticService.shared.impact(.light)
 
-        startStreamingRequest()
+        // Upload files if needed, then start request
+        if !attachmentsToSend.isEmpty {
+            Task { @MainActor in
+                let uploaded = await uploadPendingAttachments()
+                // Update user message with uploaded file IDs
+                if !uploaded.isEmpty {
+                    userMessage.fileAttachmentsData = FileAttachment.encode(uploaded)
+                    try? modelContext.save()
+                }
+                pendingAttachments = []
+                startStreamingRequest()
+            }
+        } else {
+            pendingAttachments = []
+            startStreamingRequest()
+        }
     }
 
     // MARK: - Core Streaming Logic
 
-    // Auto-reconnect constants
     private static let maxReconnectAttempts = 3
-    private static let reconnectBaseDelay: UInt64 = 1_000_000_000 // 1 second in nanoseconds
+    private static let reconnectBaseDelay: UInt64 = 1_000_000_000
 
     private func startStreamingRequest(reconnectAttempt: Int = 0) {
         let requestAPIKey = apiKey
@@ -255,7 +333,12 @@ final class ChatViewModel {
             .filter { $0.isComplete || $0.role == .user }
             .sorted(by: { $0.createdAt < $1.createdAt })
             .map {
-                APIMessage(role: $0.role, content: $0.content, imageData: $0.imageData)
+                APIMessage(
+                    role: $0.role,
+                    content: $0.content,
+                    imageData: $0.imageData,
+                    fileAttachments: $0.fileAttachments
+                )
             }
 
         let streamID = UUID()
@@ -276,7 +359,6 @@ final class ChatViewModel {
 
                 switch event {
                 case .responseCreated(let responseId):
-                    // Save the response ID immediately for recovery
                     if let draft = draftMessage {
                         draft.responseId = responseId
                         try? modelContext.save()
@@ -292,7 +374,6 @@ final class ChatViewModel {
                         }
                     }
                     currentStreamingText += delta
-                    // Periodically save draft (every ~1 second)
                     saveDraftIfNeeded()
 
                 case .thinkingDelta(let delta):
@@ -308,8 +389,71 @@ final class ChatViewModel {
                     withAnimation(.easeOut(duration: 0.2)) {
                         isThinking = false
                     }
-                    // Save thinking content immediately when thinking finishes
                     saveDraftNow()
+
+                // MARK: Web Search Events
+                case .webSearchStarted(let callId):
+                    withAnimation(.spring(duration: 0.3)) {
+                        activeToolCalls.append(ToolCallInfo(
+                            id: callId, type: .webSearch, status: .inProgress
+                        ))
+                    }
+
+                case .webSearchSearching(let callId):
+                    if let idx = activeToolCalls.firstIndex(where: { $0.id == callId }) {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            activeToolCalls[idx].status = .searching
+                        }
+                    }
+
+                case .webSearchCompleted(let callId):
+                    if let idx = activeToolCalls.firstIndex(where: { $0.id == callId }) {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            activeToolCalls[idx].status = .completed
+                        }
+                    }
+
+                // MARK: Code Interpreter Events
+                case .codeInterpreterStarted(let callId):
+                    withAnimation(.spring(duration: 0.3)) {
+                        activeToolCalls.append(ToolCallInfo(
+                            id: callId, type: .codeInterpreter, status: .inProgress
+                        ))
+                    }
+
+                case .codeInterpreterInterpreting(let callId):
+                    if let idx = activeToolCalls.firstIndex(where: { $0.id == callId }) {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            activeToolCalls[idx].status = .interpreting
+                        }
+                    }
+
+                case .codeInterpreterCodeDelta(let callId, let codeDelta):
+                    if let idx = activeToolCalls.firstIndex(where: { $0.id == callId }) {
+                        let existing = activeToolCalls[idx].code ?? ""
+                        activeToolCalls[idx].code = existing + codeDelta
+                    }
+
+                case .codeInterpreterCodeDone(let callId, let fullCode):
+                    if let idx = activeToolCalls.firstIndex(where: { $0.id == callId }) {
+                        activeToolCalls[idx].code = fullCode
+                    }
+
+                case .codeInterpreterCompleted(let callId):
+                    if let idx = activeToolCalls.firstIndex(where: { $0.id == callId }) {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            activeToolCalls[idx].status = .completed
+                        }
+                    }
+
+                // MARK: Annotation Events
+                case .annotationAdded(let citation):
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        // Deduplicate by URL
+                        if !liveCitations.contains(where: { $0.url == citation.url }) {
+                            liveCitations.append(citation)
+                        }
+                    }
 
                 case .completed(let fullText, let fullThinking):
                     if !fullText.isEmpty && fullText.count > currentStreamingText.count {
@@ -319,11 +463,12 @@ final class ChatViewModel {
                        thinking.count > currentThinkingText.count {
                         currentThinkingText = thinking
                     }
+                    // Persist tool calls and citations on the draft
+                    persistToolCallsAndCitations()
                     finalizeDraft()
 
                 case .connectionLost:
                     receivedConnectionLost = true
-                    // Save current progress immediately
                     saveDraftNow()
                     #if DEBUG
                     print("[VM] Connection lost (attempt \(reconnectAttempt + 1)/\(Self.maxReconnectAttempts))")
@@ -331,9 +476,8 @@ final class ChatViewModel {
 
                 case .error(let error):
                     if !currentStreamingText.isEmpty {
-                        // We have partial content — save it, then try recovery
+                        persistToolCallsAndCitations()
                         finalizeDraftAsPartial()
-                        // Attempt recovery if we have a response ID
                         if let draft = draftMessage, let responseId = draft.responseId {
                             recoverResponse(messageId: draft.id, responseId: responseId)
                         }
@@ -343,6 +487,8 @@ final class ChatViewModel {
                     errorMessage = error.localizedDescription
                     isStreaming = false
                     isThinking = false
+                    activeToolCalls = []
+                    liveCitations = []
                     HapticService.shared.notify(.error)
                 }
             }
@@ -352,25 +498,34 @@ final class ChatViewModel {
                 let nextAttempt = reconnectAttempt + 1
 
                 if nextAttempt < Self.maxReconnectAttempts {
-                    // First, check if the server already completed the response
                     if let draft = draftMessage, let responseId = draft.responseId {
                         do {
                             let result = try await openAIService.fetchResponse(responseId: responseId, apiKey: requestAPIKey)
-                            // Server completed! Use the full response.
                             if !result.text.isEmpty {
                                 currentStreamingText = result.text
                             }
                             if let thinking = result.thinking, !thinking.isEmpty {
                                 currentThinkingText = thinking
                             }
+                            // Merge recovered tool calls and citations into live state
+                            for tc in result.toolCalls {
+                                if !activeToolCalls.contains(where: { $0.id == tc.id }) {
+                                    activeToolCalls.append(tc)
+                                }
+                            }
+                            for cit in result.annotations {
+                                if !liveCitations.contains(where: { $0.url == cit.url && $0.startIndex == cit.startIndex }) {
+                                    liveCitations.append(cit)
+                                }
+                            }
+                            persistToolCallsAndCitations()
                             finalizeDraft()
                             endBackgroundTask()
                             return
                         } catch {
                             let errorMsg = error.localizedDescription
                             if errorMsg.contains("__IN_PROGRESS__") {
-                                // Server is still generating — reconnect with exponential backoff
-                                let delay = Self.reconnectBaseDelay * UInt64(1 << reconnectAttempt) // 1s, 2s, 4s
+                                let delay = Self.reconnectBaseDelay * UInt64(1 << reconnectAttempt)
                                 #if DEBUG
                                 print("[VM] Reconnecting in \(Double(delay) / 1_000_000_000)s (server still in progress)")
                                 #endif
@@ -381,17 +536,13 @@ final class ChatViewModel {
                                     return
                                 }
 
-                                // Switch to polling-based recovery since we already have a responseId
-                                // (re-establishing SSE won't resume the same response)
                                 recoverResponse(messageId: draft.id, responseId: responseId)
                                 endBackgroundTask()
                                 return
                             }
-                            // Other error — fall through to retry via new stream
                         }
                     }
 
-                    // No responseId yet — retry the full request with exponential backoff
                     let delay = Self.reconnectBaseDelay * UInt64(1 << reconnectAttempt)
                     #if DEBUG
                     print("[VM] Reconnecting in \(Double(delay) / 1_000_000_000)s (no responseId, full retry)")
@@ -407,20 +558,23 @@ final class ChatViewModel {
                     startStreamingRequest(reconnectAttempt: nextAttempt)
                     return
                 } else {
-                    // Max retries exhausted — fall through to recovery or error
                     #if DEBUG
                     print("[VM] Max reconnect attempts exhausted")
                     #endif
                     if let draft = draftMessage, let responseId = draft.responseId {
+                        persistToolCallsAndCitations()
                         finalizeDraftAsPartial()
                         recoverResponse(messageId: draft.id, responseId: responseId)
                     } else if !currentStreamingText.isEmpty {
+                        persistToolCallsAndCitations()
                         finalizeDraftAsPartial()
                     } else {
                         removeEmptyDraft()
                         errorMessage = "Connection lost. Please check your network and try again."
                         isStreaming = false
                         isThinking = false
+                        activeToolCalls = []
+                        liveCitations = []
                         HapticService.shared.notify(.error)
                     }
                     endBackgroundTask()
@@ -428,25 +582,27 @@ final class ChatViewModel {
                 }
             }
 
-            // Stream ended without explicit completed event — save what we have
+            // Stream ended without explicit completed event
             if activeStreamID == streamID && isStreaming {
                 if !currentStreamingText.isEmpty {
+                    persistToolCallsAndCitations()
                     finalizeDraftAsPartial()
-                    // Try recovery
                     if let draft = draftMessage, let responseId = draft.responseId {
                         recoverResponse(messageId: draft.id, responseId: responseId)
                     }
                 } else {
-                    // No content at all — try recovery if we have responseId
                     if let draft = draftMessage, let responseId = draft.responseId {
-                        // Keep the draft, start recovery
                         isStreaming = false
                         isThinking = false
+                        activeToolCalls = []
+                        liveCitations = []
                         recoverResponse(messageId: draft.id, responseId: responseId)
                     } else {
                         removeEmptyDraft()
                         isStreaming = false
                         isThinking = false
+                        activeToolCalls = []
+                        liveCitations = []
                     }
                 }
             }
@@ -455,16 +611,33 @@ final class ChatViewModel {
         }
     }
 
+    // MARK: - Tool Call & Citation Persistence
+
+    /// Save active tool calls and live citations to the draft message before finalization.
+    private func persistToolCallsAndCitations() {
+        guard let draft = draftMessage else { return }
+
+        // Save all tool calls (including in-progress ones for history)
+        if !activeToolCalls.isEmpty {
+            draft.toolCallsData = ToolCallInfo.encode(activeToolCalls)
+        }
+
+        // Save citations
+        if !liveCitations.isEmpty {
+            draft.annotationsData = URLCitation.encode(liveCitations)
+        }
+
+        try? modelContext.save()
+    }
+
     // MARK: - Draft Persistence
 
-    /// Save draft to database if enough time has passed since last save (~1 second).
     private func saveDraftIfNeeded() {
         let now = Date()
         guard now.timeIntervalSince(lastDraftSaveTime) >= 1.0 else { return }
         saveDraftNow()
     }
 
-    /// Immediately persist the current streaming content to the draft message.
     private func saveDraftNow() {
         guard let draft = draftMessage else { return }
         draft.content = currentStreamingText
@@ -473,12 +646,13 @@ final class ChatViewModel {
         try? modelContext.save()
     }
 
-    /// Finalize the draft as a complete message.
     private func finalizeDraft() {
         guard !currentStreamingText.isEmpty else {
             removeEmptyDraft()
             isStreaming = false
             isThinking = false
+            activeToolCalls = []
+            liveCitations = []
             return
         }
 
@@ -491,13 +665,13 @@ final class ChatViewModel {
             draft.isComplete = true
             currentConversation?.updatedAt = .now
 
-            // Hide streaming bubble FIRST to prevent visual duplication
             currentStreamingText = ""
             currentThinkingText = ""
             isStreaming = false
             isThinking = false
+            activeToolCalls = []
+            liveCitations = []
 
-            // Add to messages array for display (draft is already in SwiftData)
             if !messages.contains(where: { $0.id == draft.id }) {
                 messages.append(draft)
             }
@@ -509,9 +683,10 @@ final class ChatViewModel {
             currentThinkingText = ""
             isStreaming = false
             isThinking = false
+            activeToolCalls = []
+            liveCitations = []
         }
 
-        // Generate title for new conversations
         if currentConversation?.title == "New Chat" && messages.count >= 2 {
             Task { @MainActor in
                 await generateTitle()
@@ -521,31 +696,27 @@ final class ChatViewModel {
         HapticService.shared.notify(.success)
     }
 
-    /// Finalize the draft as a partial (incomplete) message.
-    /// The content is saved but isComplete remains false so recovery can update it later.
     private func finalizeDraftAsPartial() {
         guard let draft = draftMessage else { return }
 
         draft.content = currentStreamingText
         draft.thinking = currentThinkingText.isEmpty ? nil : currentThinkingText
-        // isComplete stays false — recovery will set it to true
         currentConversation?.updatedAt = .now
 
         currentStreamingText = ""
         currentThinkingText = ""
         isStreaming = false
         isThinking = false
+        activeToolCalls = []
+        liveCitations = []
 
-        // Add to messages array for display
         if !messages.contains(where: { $0.id == draft.id }) {
             messages.append(draft)
         }
 
         try? modelContext.save()
-        // Don't nil out draftMessage yet — recovery might need it
     }
 
-    /// Remove an empty draft message (when streaming failed before producing any content).
     private func removeEmptyDraft() {
         guard let draft = draftMessage else { return }
         if let conversation = currentConversation,
@@ -559,17 +730,10 @@ final class ChatViewModel {
 
     // MARK: - Response Recovery (Polling)
 
-    /// Recover a specific response by polling the OpenAI API.
-    /// This is called when:
-    /// - App returns to foreground after streaming was interrupted
-    /// - App launches and finds incomplete messages from a previous session
-    /// - Stream errors out but we have a response_id
     private func recoverResponse(messageId: UUID, responseId: String) {
         guard !apiKey.isEmpty else { return }
 
-        // Cancel any existing recovery task
         recoveryTask?.cancel()
-
         isRecovering = true
 
         let key = apiKey
@@ -579,7 +743,7 @@ final class ChatViewModel {
 
         recoveryTask = Task { @MainActor in
             var attempts = 0
-            let maxAttempts = 150  // 150 * 2s = 5 minutes max wait
+            let maxAttempts = 150
             var lastError: String?
 
             while !Task.isCancelled && attempts < maxAttempts {
@@ -588,7 +752,6 @@ final class ChatViewModel {
                 do {
                     let result = try await service.fetchResponse(responseId: respId, apiKey: key)
 
-                    // Success! Update the message
                     if let message = self.findMessage(byId: msgId) {
                         if !result.text.isEmpty {
                             message.content = result.text
@@ -596,12 +759,17 @@ final class ChatViewModel {
                         if let thinking = result.thinking, !thinking.isEmpty {
                             message.thinking = thinking
                         }
+                        // Save tool calls and citations from recovery
+                        if !result.toolCalls.isEmpty {
+                            message.toolCallsData = ToolCallInfo.encode(result.toolCalls)
+                        }
+                        if !result.annotations.isEmpty {
+                            message.annotationsData = URLCitation.encode(result.annotations)
+                        }
                         message.isComplete = true
                         try? self.modelContext.save()
 
-                        // Update the displayed messages array
                         if let idx = self.messages.firstIndex(where: { $0.id == msgId }) {
-                            // Force UI refresh
                             self.messages[idx] = message
                         }
 
@@ -613,7 +781,6 @@ final class ChatViewModel {
                     self.isRecovering = false
                     self.draftMessage = nil
 
-                    // Generate title if needed
                     if self.currentConversation?.title == "New Chat" && self.messages.count >= 2 {
                         await self.generateTitle()
                     }
@@ -624,20 +791,18 @@ final class ChatViewModel {
                 } catch {
                     let errorMsg = error.localizedDescription
                     if errorMsg.contains("__IN_PROGRESS__") {
-                        // Response is still being generated — wait and retry
                         #if DEBUG
                         if attempts <= 3 || attempts % 10 == 0 {
                             print("[Recovery] Response still in progress, attempt \(attempts)/\(maxAttempts)")
                         }
                         #endif
-                        try? await Task.sleep(nanoseconds: 2_000_000_000) // 2 seconds
+                        try? await Task.sleep(nanoseconds: 2_000_000_000)
                         continue
                     } else {
                         lastError = errorMsg
                         #if DEBUG
                         print("[Recovery] Error: \(errorMsg), attempt \(attempts)")
                         #endif
-                        // For non-in-progress errors, retry a few times with backoff
                         if attempts < 5 {
                             try? await Task.sleep(nanoseconds: 3_000_000_000)
                             continue
@@ -648,12 +813,9 @@ final class ChatViewModel {
                 }
             }
 
-            // Recovery failed or timed out
             self.isRecovering = false
             self.draftMessage = nil
 
-            // Mark the message as complete even if recovery failed
-            // (so we don't keep trying forever)
             if let message = self.findMessage(byId: msgId) {
                 message.isComplete = true
                 if message.content.isEmpty {
@@ -668,14 +830,9 @@ final class ChatViewModel {
         }
     }
 
-    /// Check all conversations for incomplete messages and recover them.
-    /// Called on app launch.
     private func recoverIncompleteMessages() async {
         guard !apiKey.isEmpty else { return }
 
-        // First, clean up stale drafts (older than 24 hours)
-        // These are messages from sessions that were interrupted long ago
-        // and whose server-side responses have likely expired.
         await cleanupStaleDrafts()
 
         let descriptor = FetchDescriptor<Message>(
@@ -699,18 +856,13 @@ final class ChatViewModel {
             print("[Recovery] Recovering message \(message.id) with responseId \(responseId)")
             #endif
 
-            // Recover each one (sequentially to avoid overwhelming the API)
             await recoverSingleMessage(message: message, responseId: responseId)
         }
     }
 
-    /// Clean up stale draft messages that are older than 24 hours.
-    /// These are messages from interrupted sessions whose server-side responses
-    /// have likely expired and cannot be recovered.
     private func cleanupStaleDrafts() async {
-        let staleThreshold = Date().addingTimeInterval(-24 * 60 * 60) // 24 hours ago
+        let staleThreshold = Date().addingTimeInterval(-24 * 60 * 60)
 
-        // Fetch all incomplete messages (with or without responseId)
         let descriptor = FetchDescriptor<Message>(
             predicate: #Predicate<Message> { message in
                 message.isComplete == false
@@ -724,11 +876,9 @@ final class ChatViewModel {
             guard message.createdAt < staleThreshold else { continue }
 
             if message.content.isEmpty && message.responseId == nil {
-                // Empty draft with no responseId — just delete it
                 modelContext.delete(message)
                 cleanedCount += 1
             } else {
-                // Has content or responseId but is stale — mark as complete
                 message.isComplete = true
                 if message.content.isEmpty {
                     message.content = "[Response interrupted. Please try again.]"
@@ -745,13 +895,9 @@ final class ChatViewModel {
         }
     }
 
-    /// Resend requests for orphaned drafts — empty assistant messages with no responseId.
-    /// This happens when the user sends a message and immediately force-quits the app
-    /// before the SSE stream receives the response.created event.
     private func resendOrphanedDrafts() async {
         guard !apiKey.isEmpty else { return }
 
-        // Find all incomplete assistant messages with no responseId and no content
         let descriptor = FetchDescriptor<Message>(
             predicate: #Predicate<Message> { message in
                 message.isComplete == false && message.responseId == nil
@@ -760,7 +906,6 @@ final class ChatViewModel {
 
         guard let orphanedDrafts = try? modelContext.fetch(descriptor) else { return }
 
-        // Only process assistant drafts that are empty (the ones created right before streaming)
         let draftsToResend = orphanedDrafts.filter { $0.role == .assistant && $0.content.isEmpty }
 
         #if DEBUG
@@ -771,19 +916,16 @@ final class ChatViewModel {
 
         for draft in draftsToResend {
             guard let conversation = draft.conversation else {
-                // No conversation — just delete the orphan
                 modelContext.delete(draft)
                 try? modelContext.save()
                 continue
             }
 
-            // Find the last user message in this conversation
             let userMessages = conversation.messages
                 .filter { $0.role == .user }
                 .sorted { $0.createdAt < $1.createdAt }
 
             guard userMessages.last != nil else {
-                // No user message to resend — delete the orphan
                 modelContext.delete(draft)
                 try? modelContext.save()
                 continue
@@ -793,12 +935,10 @@ final class ChatViewModel {
             print("[Recovery] Resending request for orphaned draft in conversation: \(conversation.title)")
             #endif
 
-            // Manually set up conversation state WITHOUT calling loadConversation
-            // (loadConversation filters out empty drafts and triggers its own recovery, causing race conditions)
             currentConversation = conversation
             messages = conversation.messages
                 .sorted { $0.createdAt < $1.createdAt }
-                .filter { $0.id != draft.id } // Exclude the old empty draft from display
+                .filter { $0.id != draft.id }
             selectedModel = ModelType(rawValue: conversation.model) ?? .gpt5_4
             reasoningEffort = ReasoningEffort(rawValue: conversation.reasoningEffort) ?? .high
 
@@ -806,14 +946,12 @@ final class ChatViewModel {
                 reasoningEffort = selectedModel.defaultEffort
             }
 
-            // Remove the old empty draft from SwiftData
             if let idx = conversation.messages.firstIndex(where: { $0.id == draft.id }) {
                 conversation.messages.remove(at: idx)
             }
             modelContext.delete(draft)
             try? modelContext.save()
 
-            // Create a new draft and add it to both SwiftData and the messages array
             let newDraft = Message(
                 role: .assistant,
                 content: "",
@@ -824,13 +962,14 @@ final class ChatViewModel {
             currentConversation?.messages.append(newDraft)
             try? modelContext.save()
             draftMessage = newDraft
-            // Note: don't add newDraft to messages array — startStreamingRequest will handle display
 
             isStreaming = true
-            isThinking = true  // Show thinking indicator while waiting for first token
+            isThinking = true
             isRecovering = true
             currentStreamingText = ""
             currentThinkingText = ""
+            activeToolCalls = []
+            liveCitations = []
             errorMessage = nil
 
             #if DEBUG
@@ -838,13 +977,10 @@ final class ChatViewModel {
             #endif
 
             startStreamingRequest()
-
-            // Only resend one at a time
             return
         }
     }
 
-    /// Check the current conversation for incomplete messages.
     private func recoverIncompleteMessagesInCurrentConversation() async {
         guard !apiKey.isEmpty else { return }
         guard let conversation = currentConversation else { return }
@@ -859,7 +995,6 @@ final class ChatViewModel {
         }
     }
 
-    /// Recover a single message by polling.
     private func recoverSingleMessage(message: Message, responseId: String) async {
         let key = apiKey
         var attempts = 0
@@ -871,17 +1006,22 @@ final class ChatViewModel {
             do {
                 let result = try await openAIService.fetchResponse(responseId: responseId, apiKey: key)
 
-                // Success
                 if !result.text.isEmpty {
                     message.content = result.text
                 }
                 if let thinking = result.thinking, !thinking.isEmpty {
                     message.thinking = thinking
                 }
+                // Save tool calls and citations from recovery
+                if !result.toolCalls.isEmpty {
+                    message.toolCallsData = ToolCallInfo.encode(result.toolCalls)
+                }
+                if !result.annotations.isEmpty {
+                    message.annotationsData = URLCitation.encode(result.annotations)
+                }
                 message.isComplete = true
                 try? modelContext.save()
 
-                // Update UI if this message is in the current view
                 if let idx = messages.firstIndex(where: { $0.id == message.id }) {
                     messages[idx] = message
                 }
@@ -905,7 +1045,6 @@ final class ChatViewModel {
             }
         }
 
-        // Mark as complete to avoid infinite retry loops
         message.isComplete = true
         if message.content.isEmpty {
             message.content = "[Response interrupted. Please try again.]"
@@ -913,17 +1052,13 @@ final class ChatViewModel {
         try? modelContext.save()
     }
 
-    /// Find a message by ID in the model context.
     private func findMessage(byId id: UUID) -> Message? {
-        // First check the in-memory messages array
         if let msg = messages.first(where: { $0.id == id }) {
             return msg
         }
-        // Then check the draft
         if let draft = draftMessage, draft.id == id {
             return draft
         }
-        // Finally try fetching from SwiftData
         let descriptor = FetchDescriptor<Message>(
             predicate: #Predicate<Message> { $0.id == id }
         )
@@ -939,9 +1074,9 @@ final class ChatViewModel {
         errorMessage = nil
 
         if savePartial && !currentStreamingText.isEmpty {
+            persistToolCallsAndCitations()
             finalizeDraft()
         } else if let draft = draftMessage, !draft.content.isEmpty {
-            // Draft already has content from periodic saves
             draft.isComplete = true
             try? modelContext.save()
             if !messages.contains(where: { $0.id == draft.id }) {
@@ -951,6 +1086,8 @@ final class ChatViewModel {
             currentThinkingText = ""
             isStreaming = false
             isThinking = false
+            activeToolCalls = []
+            liveCitations = []
             draftMessage = nil
         } else {
             removeEmptyDraft()
@@ -958,6 +1095,8 @@ final class ChatViewModel {
             currentThinkingText = ""
             isStreaming = false
             isThinking = false
+            activeToolCalls = []
+            liveCitations = []
         }
 
         isRecovering = false
@@ -969,7 +1108,6 @@ final class ChatViewModel {
 
     func startNewChat() {
         if isStreaming {
-            // Save partial content before switching
             stopGeneration(savePartial: true)
         }
         recoveryTask?.cancel()
@@ -981,9 +1119,12 @@ final class ChatViewModel {
         inputText = ""
         errorMessage = nil
         selectedImageData = nil
+        pendingAttachments = []
         isThinking = false
         isRecovering = false
         draftMessage = nil
+        activeToolCalls = []
+        liveCitations = []
         HapticService.shared.selection()
     }
 
@@ -997,7 +1138,6 @@ final class ChatViewModel {
             return
         }
 
-        // Remove the assistant message from the array and SwiftData
         if let index = messages.firstIndex(where: { $0.id == message.id }) {
             messages.remove(at: index)
         }
@@ -1008,10 +1148,8 @@ final class ChatViewModel {
         modelContext.delete(message)
         try? modelContext.save()
 
-        // Clear state
         errorMessage = nil
 
-        // Create draft for the regenerated response
         let draft = Message(
             role: .assistant,
             content: "",
@@ -1027,6 +1165,8 @@ final class ChatViewModel {
         isThinking = false
         currentStreamingText = ""
         currentThinkingText = ""
+        activeToolCalls = []
+        liveCitations = []
 
         HapticService.shared.impact(.medium)
 
@@ -1044,12 +1184,10 @@ final class ChatViewModel {
         currentConversation = conversation
         messages = conversation.messages
             .sorted { $0.createdAt < $1.createdAt }
-            // Filter out empty draft messages that might have been left over
             .filter { !($0.role == .assistant && $0.content.isEmpty && !$0.isComplete) }
         selectedModel = ModelType(rawValue: conversation.model) ?? .gpt5_4
         reasoningEffort = ReasoningEffort(rawValue: conversation.reasoningEffort) ?? .high
 
-        // Validate effort for loaded model
         if !selectedModel.availableEfforts.contains(reasoningEffort) {
             reasoningEffort = selectedModel.defaultEffort
         }
@@ -1060,8 +1198,10 @@ final class ChatViewModel {
         isThinking = false
         isRecovering = false
         draftMessage = nil
+        activeToolCalls = []
+        liveCitations = []
+        pendingAttachments = []
 
-        // Check for incomplete messages in this conversation and recover them
         Task { @MainActor in
             await recoverIncompleteMessagesInCurrentConversation()
         }
@@ -1069,8 +1209,6 @@ final class ChatViewModel {
 
     // MARK: - Restore Last Conversation
 
-    /// On app launch, restore the most recently updated conversation so the user
-    /// sees their previous chat instead of an empty screen.
     private func restoreLastConversation() async {
         isRestoringConversation = true
 
@@ -1098,13 +1236,10 @@ final class ChatViewModel {
             #endif
         }
 
-        // Brief delay so the UI has time to render the restoring indicator
-        try? await Task.sleep(nanoseconds: 300_000_000) // 0.3s
+        try? await Task.sleep(nanoseconds: 300_000_000)
         isRestoringConversation = false
     }
 
-    /// Generate titles for any conversations that are still "New Chat" but have messages.
-    /// This handles the case where the user exited before title generation completed.
     private func generateTitlesForUntitledConversations() async {
         guard !apiKey.isEmpty else { return }
 
@@ -1133,7 +1268,6 @@ final class ChatViewModel {
                 conversation.title = title
                 try? modelContext.save()
 
-                // Update the current conversation title in the UI if it matches
                 if conversation.id == currentConversation?.id {
                     currentConversation?.title = title
                 }
@@ -1142,7 +1276,6 @@ final class ChatViewModel {
                 print("[Title] Generated title for conversation \(conversation.id): \(title)")
                 #endif
             } catch {
-                // Non-critical
                 #if DEBUG
                 print("[Title] Failed to generate title: \(error.localizedDescription)")
                 #endif

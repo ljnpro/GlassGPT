@@ -19,6 +19,15 @@ final class Message {
     /// false = still streaming or interrupted draft.
     var isComplete: Bool
 
+    /// JSON-encoded array of URLCitation objects from web search.
+    var annotationsData: Data?
+
+    /// JSON-encoded array of ToolCallInfo objects (web search, code interpreter).
+    var toolCallsData: Data?
+
+    /// JSON-encoded array of FileAttachment objects (user-uploaded documents).
+    var fileAttachmentsData: Data?
+
     init(
         id: UUID = UUID(),
         role: MessageRole = .user,
@@ -28,7 +37,10 @@ final class Message {
         createdAt: Date = .now,
         conversation: Conversation? = nil,
         responseId: String? = nil,
-        isComplete: Bool = true
+        isComplete: Bool = true,
+        annotations: [URLCitation]? = nil,
+        toolCalls: [ToolCallInfo]? = nil,
+        fileAttachments: [FileAttachment]? = nil
     ) {
         self.id = id
         self.roleRawValue = role.rawValue
@@ -39,10 +51,46 @@ final class Message {
         self.conversation = conversation
         self.responseId = responseId
         self.isComplete = isComplete
+        self.annotationsData = Self.encode(annotations)
+        self.toolCallsData = Self.encode(toolCalls)
+        self.fileAttachmentsData = Self.encode(fileAttachments)
     }
 
     var role: MessageRole {
         get { MessageRole(rawValue: roleRawValue) ?? .user }
         set { roleRawValue = newValue.rawValue }
+    }
+
+    // MARK: - Annotations (URL Citations)
+
+    var annotations: [URLCitation] {
+        get { Self.decode(annotationsData) ?? [] }
+        set { annotationsData = Self.encode(newValue.isEmpty ? nil : newValue) }
+    }
+
+    // MARK: - Tool Calls
+
+    var toolCalls: [ToolCallInfo] {
+        get { Self.decode(toolCallsData) ?? [] }
+        set { toolCallsData = Self.encode(newValue.isEmpty ? nil : newValue) }
+    }
+
+    // MARK: - File Attachments
+
+    var fileAttachments: [FileAttachment] {
+        get { Self.decode(fileAttachmentsData) ?? [] }
+        set { fileAttachmentsData = Self.encode(newValue.isEmpty ? nil : newValue) }
+    }
+
+    // MARK: - JSON Helpers
+
+    private static func encode<T: Encodable>(_ value: T?) -> Data? {
+        guard let value = value else { return nil }
+        return try? JSONEncoder().encode(value)
+    }
+
+    private static func decode<T: Decodable>(_ data: Data?) -> T? {
+        guard let data = data else { return nil }
+        return try? JSONDecoder().decode(T.self, from: data)
     }
 }
