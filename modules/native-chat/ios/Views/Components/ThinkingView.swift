@@ -1,90 +1,86 @@
 import SwiftUI
 
-// MARK: - Thinking Indicator (shown while model is actively reasoning)
+// MARK: - Thinking Indicator (capsule shown while model is actively reasoning, before text arrives)
 
 struct ThinkingIndicator: View {
-    @State private var animating = false
-
     var body: some View {
-        HStack(spacing: 6) {
+        HStack(spacing: 8) {
             Image(systemName: "brain")
-                .font(.caption)
-                .symbolEffect(.breathe)
-                .foregroundStyle(.purple)
+                .font(.subheadline.weight(.medium))
+                .foregroundStyle(.orange)
+                .symbolEffect(.pulse, options: .repeating)
 
-            Text("Thinking")
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(.purple)
-
-            // Animated dots
-            HStack(spacing: 3) {
-                ForEach(0..<3) { index in
-                    Circle()
-                        .fill(.purple.opacity(0.6))
-                        .frame(width: 5, height: 5)
-                        .scaleEffect(animating ? 1.0 : 0.4)
-                        .opacity(animating ? 1.0 : 0.3)
-                        .animation(
-                            .easeInOut(duration: 0.5)
-                                .repeatForever()
-                                .delay(Double(index) * 0.15),
-                            value: animating
-                        )
-                }
-            }
+            Text("Reasoning…")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
-        .background(.purple.opacity(0.08), in: Capsule())
-        .overlay(
+        .background {
             Capsule()
-                .stroke(.purple.opacity(0.15), lineWidth: 1)
-        )
-        .onAppear { animating = true }
+                .fill(.ultraThinMaterial)
+        }
+        .glassEffect(.regular, in: Capsule())
     }
 }
 
-// MARK: - Thinking View (collapsible reasoning text with Markdown rendering)
+// MARK: - Thinking View (card-style, collapsible reasoning text with Markdown rendering)
 
 struct ThinkingView: View {
     let text: String
     /// Whether the thinking is still in progress (streaming). When true, starts expanded.
     var isLive: Bool = false
+    /// Optional external binding for expanded state (used during streaming to preserve state across re-renders)
+    @Binding var externalIsExpanded: Bool?
 
-    @State private var isExpanded: Bool = false
+    @State private var internalIsExpanded: Bool = false
     @State private var hasInitialized: Bool = false
+
+    /// Use external binding if provided, otherwise fall back to internal state
+    private var isExpanded: Bool {
+        get { externalIsExpanded ?? internalIsExpanded }
+    }
+
+    private func setExpanded(_ value: Bool) {
+        if externalIsExpanded != nil {
+            externalIsExpanded = value
+        } else {
+            internalIsExpanded = value
+        }
+    }
+
+    init(text: String, isLive: Bool = false, externalIsExpanded: Binding<Bool?> = .constant(nil)) {
+        self.text = text
+        self.isLive = isLive
+        self._externalIsExpanded = externalIsExpanded
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             // Header — always visible, tappable to toggle
             Button {
                 withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                    isExpanded.toggle()
+                    setExpanded(!isExpanded)
                 }
             } label: {
-                HStack(spacing: 6) {
-                    Image(systemName: "brain")
-                        .font(.caption)
-                        .foregroundStyle(.purple)
-                        .symbolEffect(.breathe, isActive: !isExpanded)
-
-                    Text("Reasoning")
+                HStack(spacing: 8) {
+                    Image(systemName: isLive ? "brain" : "brain.fill")
                         .font(.caption.weight(.semibold))
-                        .foregroundStyle(.purple)
+                        .foregroundStyle(.orange)
+                        .symbolEffect(.pulse, options: .repeating, isActive: isLive)
 
-                    // Animated dots when collapsed (mimics ThinkingIndicator style)
-                    if !isExpanded {
-                        CollapsedThinkingDots()
-                    }
+                    Text(isLive ? "Reasoning…" : "Reasoning Completed")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
 
                     Spacer()
 
                     Image(systemName: "chevron.right")
                         .font(.caption2.weight(.bold))
-                        .foregroundStyle(.purple.opacity(0.5))
+                        .foregroundStyle(.tertiary)
                         .rotationEffect(.degrees(isExpanded ? 90 : 0))
                 }
-                .padding(.horizontal, 10)
+                .padding(.horizontal, 12)
                 .padding(.vertical, 8)
             }
             .buttonStyle(.plain)
@@ -94,56 +90,34 @@ struct ThinkingView: View {
                 VStack(alignment: .leading, spacing: 4) {
                     ThinkingMarkdownText(text: text)
                 }
-                .padding(.horizontal, 10)
+                .padding(.horizontal, 12)
                 .padding(.bottom, 10)
                 .transition(.opacity.combined(with: .move(edge: .top)))
             }
         }
-        .background(.purple.opacity(0.08), in: RoundedRectangle(cornerRadius: 12))
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(.purple.opacity(0.2), lineWidth: 1)
-        )
+        .background {
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(.ultraThinMaterial)
+        }
+        .overlay {
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .strokeBorder(.quaternary, lineWidth: 0.5)
+        }
         .onAppear {
             if !hasInitialized {
                 hasInitialized = true
                 // Live (streaming) thinking starts expanded; completed thinking starts collapsed
-                isExpanded = isLive
+                setExpanded(isLive)
             }
         }
         .onChange(of: isLive) { _, newValue in
             // When streaming finishes, auto-collapse
             if !newValue && isExpanded {
                 withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                    isExpanded = false
+                    setExpanded(false)
                 }
             }
         }
-    }
-}
-
-// MARK: - Collapsed Thinking Dots (animated indicator)
-
-private struct CollapsedThinkingDots: View {
-    @State private var animating = false
-
-    var body: some View {
-        HStack(spacing: 3) {
-            ForEach(0..<3) { index in
-                Circle()
-                    .fill(.purple.opacity(0.6))
-                    .frame(width: 4, height: 4)
-                    .scaleEffect(animating ? 1.0 : 0.4)
-                    .opacity(animating ? 1.0 : 0.3)
-                    .animation(
-                        .easeInOut(duration: 0.5)
-                            .repeatForever()
-                            .delay(Double(index) * 0.15),
-                        value: animating
-                    )
-            }
-        }
-        .onAppear { animating = true }
     }
 }
 

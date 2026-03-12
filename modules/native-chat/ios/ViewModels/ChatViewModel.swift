@@ -107,11 +107,27 @@ final class ChatViewModel {
 
     private func handleEnterBackground() {
         if isStreaming {
+            // Save current progress immediately
             saveDraftNow()
+            persistToolCallsAndCitations()
+
             backgroundTaskID = UIApplication.shared.beginBackgroundTask(withName: "StreamCompletion") { [weak self] in
+                // Background time expired — gracefully stop stream and prepare for recovery
                 Task { @MainActor in
-                    self?.saveDraftNow()
-                    self?.endBackgroundTask()
+                    guard let self = self else { return }
+                    self.saveDraftNow()
+                    self.persistToolCallsAndCitations()
+
+                    // Cancel the active stream so it doesn't produce errors in the background
+                    self.activeStreamID = UUID()
+                    self.openAIService.cancelStream()
+
+                    // Finalize the draft as partial so it can be recovered later
+                    if let draft = self.draftMessage, !draft.content.isEmpty {
+                        self.finalizeDraftAsPartial()
+                    }
+
+                    self.endBackgroundTask()
                 }
             }
         }
@@ -132,15 +148,26 @@ final class ChatViewModel {
     private func handleReturnToForeground() {
         endBackgroundTask()
 
+        // Cancel any stale recovery tasks first
+        recoveryTask?.cancel()
+        recoveryTask = nil
+
         if !isStreaming, let draft = draftMessage {
             if !draft.content.isEmpty {
                 finalizeDraftAsPartial()
             }
             if let responseId = draft.responseId {
                 recoverResponse(messageId: draft.id, responseId: responseId)
+                // recoverResponse handles isRecovering, so return early
+                // to avoid double-recovery from recoverIncompleteMessagesInCurrentConversation
+                return
+            } else {
+                // No responseId means we can't recover — clean up
+                removeEmptyDraft()
             }
         }
 
+        // Only run incomplete message recovery if we didn't already start recoverResponse above
         Task { @MainActor in
             await recoverIncompleteMessagesInCurrentConversation()
         }
@@ -446,6 +473,28 @@ final class ChatViewModel {
                         }
                     }
 
+                // MARK: File Search Events
+                case .fileSearchStarted(let callId):
+                    withAnimation(.spring(duration: 0.3)) {
+                        activeToolCalls.append(ToolCallInfo(
+                            id: callId, type: .fileSearch, status: .inProgress
+                        ))
+                    }
+
+                case .fileSearchSearching(let callId):
+                    if let idx = activeToolCalls.firstIndex(where: { $0.id == callId }) {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            activeToolCalls[idx].status = .fileSearching
+                        }
+                    }
+
+                case .fileSearchCompleted(let callId):
+                    if let idx = activeToolCalls.firstIndex(where: { $0.id == callId }) {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            activeToolCalls[idx].status = .completed
+                        }
+                    }
+
                 // MARK: Annotation Events
                 case .annotationAdded(let citation):
                     withAnimation(.easeInOut(duration: 0.2)) {
@@ -669,6 +718,7 @@ final class ChatViewModel {
             currentThinkingText = ""
             isStreaming = false
             isThinking = false
+            isRecovering = false
             activeToolCalls = []
             liveCitations = []
 
@@ -683,6 +733,7 @@ final class ChatViewModel {
             currentThinkingText = ""
             isStreaming = false
             isThinking = false
+            isRecovering = false
             activeToolCalls = []
             liveCitations = []
         }
@@ -707,6 +758,7 @@ final class ChatViewModel {
         currentThinkingText = ""
         isStreaming = false
         isThinking = false
+        isRecovering = false
         activeToolCalls = []
         liveCitations = []
 
@@ -731,7 +783,10 @@ final class ChatViewModel {
     // MARK: - Response Recovery (Polling)
 
     private func recoverResponse(messageId: UUID, responseId: String) {
-        guard !apiKey.isEmpty else { return }
+        guard !apiKey.isEmpty else {
+            isRecovering = false
+            return
+        }
 
         recoveryTask?.cancel()
         isRecovering = true
@@ -742,8 +797,13 @@ final class ChatViewModel {
         let respId = responseId
 
         recoveryTask = Task { @MainActor in
+            // Use defer to guarantee isRecovering is always reset, even on cancellation
+            defer {
+                self.isRecovering = false
+            }
+
             var attempts = 0
-            let maxAttempts = 150
+            let maxAttempts = 60  // ~2 minutes max (60 * 2s)
             var lastError: String?
 
             while !Task.isCancelled && attempts < maxAttempts {
@@ -778,7 +838,6 @@ final class ChatViewModel {
                         #endif
                     }
 
-                    self.isRecovering = false
                     self.draftMessage = nil
 
                     if self.currentConversation?.title == "New Chat" && self.messages.count >= 2 {
@@ -813,7 +872,6 @@ final class ChatViewModel {
                 }
             }
 
-            self.isRecovering = false
             self.draftMessage = nil
 
             if let message = self.findMessage(byId: msgId) {
@@ -822,10 +880,15 @@ final class ChatViewModel {
                     message.content = "[Response interrupted. Please try again.]"
                 }
                 try? self.modelContext.save()
+
+                // Refresh the messages array so UI updates
+                if let idx = self.messages.firstIndex(where: { $0.id == msgId }) {
+                    self.messages[idx] = message
+                }
             }
 
             #if DEBUG
-            print("[Recovery] Failed after \(attempts) attempts. Last error: \(lastError ?? "timeout")")
+            print("[Recovery] Failed after \(attempts) attempts. Last error: \(lastError ?? \"timeout\")")
             #endif
         }
     }
@@ -842,12 +905,14 @@ final class ChatViewModel {
         )
 
         guard let incompleteMessages = try? modelContext.fetch(descriptor) else { return }
+        guard !incompleteMessages.isEmpty else { return }
 
         #if DEBUG
-        if !incompleteMessages.isEmpty {
-            print("[Recovery] Found \(incompleteMessages.count) incomplete message(s) to recover")
-        }
+        print("[Recovery] Found \(incompleteMessages.count) incomplete message(s) to recover")
         #endif
+
+        isRecovering = true
+        defer { isRecovering = false }
 
         for message in incompleteMessages {
             guard let responseId = message.responseId else { continue }
@@ -989,6 +1054,11 @@ final class ChatViewModel {
             $0.role == .assistant && !$0.isComplete && $0.responseId != nil
         }
 
+        guard !incompleteMessages.isEmpty else { return }
+
+        isRecovering = true
+        defer { isRecovering = false }
+
         for message in incompleteMessages {
             guard let responseId = message.responseId else { continue }
             await recoverSingleMessage(message: message, responseId: responseId)
@@ -998,7 +1068,7 @@ final class ChatViewModel {
     private func recoverSingleMessage(message: Message, responseId: String) async {
         let key = apiKey
         var attempts = 0
-        let maxAttempts = 150
+        let maxAttempts = 60  // ~2 minutes max
 
         while attempts < maxAttempts {
             attempts += 1

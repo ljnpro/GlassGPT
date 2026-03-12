@@ -25,10 +25,12 @@ struct MessageBubble: View {
 
                 // File attachments (user messages) — aligned right
                 if message.role == .user && !message.fileAttachments.isEmpty {
-                    HStack {
-                        Spacer()
-                        FileAttachmentsRow(attachments: message.fileAttachments)
+                    VStack(alignment: .trailing, spacing: 6) {
+                        ForEach(message.fileAttachments) { attachment in
+                            FileAttachmentChip(attachment: attachment)
+                        }
                     }
+                    .frame(maxWidth: .infinity, alignment: .trailing)
                 }
 
                 // Image attachment
@@ -53,6 +55,12 @@ struct MessageBubble: View {
                     let hasActiveCodeInterpreter = activeToolCalls.contains { $0.type == .codeInterpreter && $0.status != .completed }
                     if hasActiveCodeInterpreter {
                         CodeInterpreterIndicator()
+                    }
+
+                    // Only show ONE file search indicator
+                    let hasActiveFileSearch = activeToolCalls.contains { $0.type == .fileSearch && $0.status != .completed }
+                    if hasActiveFileSearch {
+                        FileSearchIndicator()
                     }
                 }
 
