@@ -888,7 +888,8 @@ final class ChatViewModel {
             }
 
             #if DEBUG
-            print("[Recovery] Failed after \(attempts) attempts. Last error: \(lastError ?? \"timeout\")")
+            let errorDesc = lastError ?? "timeout"
+            print("[Recovery] Failed after \(attempts) attempts. Last error: \(errorDesc)")
             #endif
         }
     }
