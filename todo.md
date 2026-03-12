@@ -175,3 +175,6 @@
 - [x] BUG: Consecutive LaTeX block formulas overlap — removed negative padding, added context-aware spacing (8pt between consecutive LaTeX, -2pt to text), improved height callback with ResizeObserver + multiple timers, increased initial height to 44pt
 - [x] UI: Hide Haptic Feedback toggle on iPad — only show on iPhone (UIDevice.current.userInterfaceIdiom == .phone)
 - [x] RENAME: Changed app display name from "Liquid Glass Chat" to "GlassAI" in app.config.ts
+- [x] RENAME: Changed app display name from "GlassAI" to "GlassGPT" in app.config.ts
+- [x] UPDATE: Updated GitHub Pages support website name and all references to "GlassGPT"
+- [x] DEPLOY: Deployed updated GitHub Pages with new name to gh-pages and main branches

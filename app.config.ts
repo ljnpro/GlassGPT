@@ -19,7 +19,7 @@ const timestamp = bundleId.split(".").pop()?.replace(/^t/, "") ?? "";
 const schemeFromBundleId = `manus${timestamp}`;
 
 const env = {
-  appName: "GlassAI",
+  appName: "GlassGPT",
   appSlug: "liquid-glass-chat",
   logoUrl:
     "https://d2xsxph8kpxj0f.cloudfront.net/310519663234264498/egatTgGcXkgNh48guoR7un/app-icon-NScsboC9nhFvbKoyzsTMfK.png",
