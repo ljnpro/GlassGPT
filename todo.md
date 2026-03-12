@@ -208,3 +208,9 @@
 - [x] FIX: All recovery paths (reconnect, recoverResponse, recoverSingleMessage) now save tool calls and citations
 - [x] PUSH: Pushed feature/tools-and-documents branch to GitHub (ljnpro/GlassGPT)
 - [x] BUG: Build error - fixed argument order: fileSize now precedes fileType in FileAttachment init call
+- [x] UI: File attachment in user message should align right (same as user bubble), not centered
+- [x] UI: Reasoning/thinking should be collapsible — collapsed shows animated indicator like "Searching", expanded shows full thinking text
+- [x] UI: Deduplicate search indicators — only show one "Searching" even if multiple web_search events fire
+- [x] UI: Search timeout — if search indicator stays active too long, auto-dismiss to prevent stuck state
+- [x] UI: Render Markdown in reasoning/thinking text (bold, italic, code, etc.)
+- [x] BUG: Bold markdown (**text**) not rendering in assistant message body — Apple AttributedString fails with Chinese text containing quotes/slashes
