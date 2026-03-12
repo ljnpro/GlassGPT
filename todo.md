@@ -178,3 +178,32 @@
 - [x] RENAME: Changed app display name from "GlassAI" to "GlassGPT" in app.config.ts
 - [x] UPDATE: Updated GitHub Pages support website name and all references to "GlassGPT"
 - [x] DEPLOY: Deployed updated GitHub Pages with new name to gh-pages and main branches
+- [x] REPO: Pushed source code to GitHub (ljnpro/GlassGPT, private)
+- [x] REPO: Created repo as GlassGPT (https://github.com/ljnpro/GlassGPT)
+- [x] REPO: Changed GlassGPT repo visibility from private to public
+- [x] REPO: Added professional README.md with overview, features table, architecture, tech stack, getting started guide
+- [x] WEB: Added source code GitHub link to support website nav bar
+- [x] WEB: Added rename to GlassGPT note + open source, Markdown headings, LaTeX spacing, iPad adaptation in v2.1 changelog
+- [x] DEPLOY: Deployed updated support website to gh-pages and main
+
+## Feature Branch: tools-and-documents
+
+- [x] BRANCH: Created feature/tools-and-documents branch
+- [x] RESEARCH: OpenAI web_search_preview tool API format and response structure
+- [x] RESEARCH: OpenAI code_interpreter tool API format and response structure
+- [x] RESEARCH: OpenAI file input API for document uploads
+- [x] MODEL: Extended ChatModels with ToolCallInfo, URLCitation, FileAttachment types
+- [x] MODEL: Extended Message.swift with annotations, toolCalls, fileAttachments computed properties
+- [x] FEATURE: Extended OpenAIService with tools parameter, file upload, new SSE events
+- [x] UI: Created WebSearchIndicator (animated search-in-progress state)
+- [x] UI: Created CitationLinksView (horizontal scrollable citation cards, Liquid Glass style)
+- [x] UI: Created CodeInterpreterView (code execution indicator + result display)
+- [x] UI: Created FileAttachmentPreview (document chips with file type icons)
+- [x] UI: Created DocumentPicker (UIDocumentPickerViewController wrapper)
+- [x] UI: Updated MessageBubble with tool call indicators, citations, code results, file attachments
+- [x] UI: Updated MessageInputBar with attachment menu (Photo + Document) and pending file previews
+- [x] UI: Updated ChatView with document picker sheet and tool call state in streaming bubble
+- [x] FEATURE: Rewrote ChatViewModel with tool call state management, file upload, document handling
+- [x] FIX: Aligned all type references across files (StreamEvent cases, property names, method signatures)
+- [x] FIX: All recovery paths (reconnect, recoverResponse, recoverSingleMessage) now save tool calls and citations
+- [ ] PUSH: Push feature branch to GitHub using user's PAT
