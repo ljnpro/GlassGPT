@@ -7,6 +7,10 @@ struct MessageBubble: View {
     let message: Message
     var onRegenerate: (() -> Void)?
 
+    // Live tool call state (passed from ChatView during streaming)
+    var activeToolCalls: [ToolCallInfo] = []
+    var liveCitations: [URLCitation] = []
+
     @State private var showThinking = false
 
     var body: some View {
@@ -41,6 +45,11 @@ struct MessageBubble: View {
                     }
                 }
 
+                // File attachments (user messages)
+                if message.role == .user && !message.fileAttachments.isEmpty {
+                    FileAttachmentsRow(attachments: message.fileAttachments)
+                }
+
                 // Image attachment
                 if let imageData = message.imageData,
                    let uiImage = UIImage(data: imageData) {
@@ -51,6 +60,30 @@ struct MessageBubble: View {
                         .clipShape(RoundedRectangle(cornerRadius: 12))
                 }
 
+                // Active tool call indicators (during streaming)
+                if message.role == .assistant {
+                    ForEach(activeToolCalls) { toolCall in
+                        switch toolCall.type {
+                        case .webSearch:
+                            if toolCall.status != .completed {
+                                WebSearchIndicator()
+                            }
+                        case .codeInterpreter:
+                            if toolCall.status != .completed {
+                                CodeInterpreterIndicator()
+                            }
+                        }
+                    }
+                }
+
+                // Completed tool call results (persisted in message)
+                if message.role == .assistant {
+                    let codeInterpreterCalls = message.toolCalls.filter { $0.type == .codeInterpreter }
+                    ForEach(codeInterpreterCalls) { toolCall in
+                        CodeInterpreterResultView(toolCall: toolCall)
+                    }
+                }
+
                 // Message content - only show if non-empty
                 let trimmedContent = message.content.trimmingCharacters(in: .whitespacesAndNewlines)
                 if !trimmedContent.isEmpty {
@@ -59,6 +92,12 @@ struct MessageBubble: View {
                     } else {
                         assistantBubble
                     }
+                }
+
+                // Citations (from web search)
+                if message.role == .assistant {
+                    let allCitations = message.annotations.isEmpty ? liveCitations : message.annotations
+                    CitationLinksView(citations: allCitations)
                 }
 
                 // Incomplete message indicator
@@ -99,23 +138,6 @@ struct MessageBubble: View {
     // MARK: - Assistant Bubble
 
     private var assistantBubble: some View {
-        // The bubble content with MarkdownContentView (contains WKWebViews for
-        // LaTeX and interactive glass Buttons inside CodeBlockView).
-        //
-        // Strategy:
-        //  • .compositingGroup() flattens the entire bubble into a single
-        //    rendered bitmap layer. This prevents WKWebView's CALayer from
-        //    sitting above the system context-menu chrome.
-        //  • .contentShape() ensures the entire rounded rect is the hit-test
-        //    area for the context menu.
-        //  • .contextMenu with an explicit `preview:` supplies a pure-SwiftUI
-        //    snapshot so the system never needs to rasterize WKWebViews.
-        //
-        // Because .contextMenu is on the outer container (not on any child
-        // Button), the system anchors the menu to the whole bubble — not to
-        // the code-block Copy button. The code-block Copy button still
-        // responds to normal taps because .contextMenu only activates on
-        // long-press.
         VStack(alignment: .leading) {
             MarkdownContentView(text: message.content)
         }
@@ -125,10 +147,7 @@ struct MessageBubble: View {
                 .fill(.ultraThinMaterial)
         }
         .glassEffect(.regular.interactive(), in: RoundedRectangle(cornerRadius: 20))
-        // Flatten all sublayers (WKWebView, Buttons) into one composited
-        // bitmap so nothing can poke above the context-menu overlay.
         .compositingGroup()
-        // Make the entire bubble the hit-test target for context menu.
         .contentShape(.contextMenuPreview, RoundedRectangle(cornerRadius: 20))
         .contextMenu {
             copyButton
@@ -143,14 +162,11 @@ struct MessageBubble: View {
 
             shareButton
         } preview: {
-            // Pure-SwiftUI preview — no WKWebView, no interactive buttons.
-            // This avoids the WKWebView snapshot glitch entirely.
             assistantPreview
         }
     }
 
     /// Lightweight, pure-SwiftUI preview for the context menu.
-    /// Shows a plain-text rendition of the message content.
     private var assistantPreview: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(message.content.prefix(1500))

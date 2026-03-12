@@ -4,11 +4,15 @@ struct MessageInputBar: View {
     @Binding var text: String
     let isStreaming: Bool
     @Binding var selectedImageData: Data?
+    @Binding var pendingAttachments: [FileAttachment]
     let onSend: () -> Void
     let onStop: () -> Void
     let onPickImage: () -> Void
+    let onPickDocument: () -> Void
+    let onRemoveAttachment: (FileAttachment) -> Void
 
     @FocusState private var isFocused: Bool
+    @State private var showAttachmentMenu = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -35,11 +39,35 @@ struct MessageInputBar: View {
                 .padding(.top, 8)
             }
 
+            // Pending file attachments preview
+            if !pendingAttachments.isEmpty {
+                FileAttachmentsRow(
+                    attachments: pendingAttachments,
+                    onRemove: { attachment in
+                        withAnimation { onRemoveAttachment(attachment) }
+                    }
+                )
+                .padding(.horizontal, 16)
+                .padding(.top, 8)
+            }
+
             // Input row
             HStack(alignment: .bottom, spacing: 8) {
-                // Image picker button
-                Button(action: onPickImage) {
-                    Image(systemName: "photo")
+                // Attachment menu button (replaces single image picker)
+                Menu {
+                    Button {
+                        onPickImage()
+                    } label: {
+                        Label("Photo", systemImage: "photo")
+                    }
+
+                    Button {
+                        onPickDocument()
+                    } label: {
+                        Label("Document", systemImage: "doc")
+                    }
+                } label: {
+                    Image(systemName: "plus.circle")
                         .font(.title3)
                         .foregroundStyle(.secondary)
                 }
@@ -81,6 +109,8 @@ struct MessageInputBar: View {
     }
 
     private var canSend: Bool {
-        !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || selectedImageData != nil
+        !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            || selectedImageData != nil
+            || !pendingAttachments.isEmpty
     }
 }
