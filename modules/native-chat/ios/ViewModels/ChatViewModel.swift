@@ -172,8 +172,8 @@ final class ChatViewModel {
                 let metadata = try FileMetadata.from(url: url)
                 let attachment = FileAttachment(
                     filename: metadata.filename,
-                    fileType: metadata.fileType,
                     fileSize: metadata.fileSize,
+                    fileType: metadata.fileType,
                     localData: metadata.data,
                     uploadStatus: .pending
                 )
