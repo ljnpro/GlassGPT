@@ -93,3 +93,157 @@ enum MessageRole: String, Codable, CaseIterable, Identifiable, Sendable {
 
     var id: String { rawValue }
 }
+
+// MARK: - Tool Call Types
+
+enum ToolCallType: String, Codable, Sendable {
+    case webSearch = "web_search"
+    case codeInterpreter = "code_interpreter"
+}
+
+enum ToolCallStatus: String, Codable, Sendable {
+    case inProgress = "in_progress"
+    case searching
+    case interpreting
+    case completed
+}
+
+/// Represents a tool call made by the model during response generation.
+struct ToolCallInfo: Codable, Sendable, Identifiable {
+    var id: String
+    var type: ToolCallType
+    var status: ToolCallStatus
+    var code: String?           // For code interpreter: the Python code
+    var results: [String]?      // For code interpreter: execution results
+    var queries: [String]?      // For web search: search queries used
+
+    /// Encode an array of ToolCallInfo to Data for SwiftData storage.
+    static func encode(_ items: [ToolCallInfo]?) -> Data? {
+        guard let items = items, !items.isEmpty else { return nil }
+        return try? JSONEncoder().encode(items)
+    }
+
+    /// Decode an array of ToolCallInfo from Data.
+    static func decode(_ data: Data?) -> [ToolCallInfo]? {
+        guard let data = data else { return nil }
+        return try? JSONDecoder().decode([ToolCallInfo].self, from: data)
+    }
+}
+
+// MARK: - URL Citation
+
+/// A citation from web search results, linking to a source URL.
+struct URLCitation: Codable, Sendable, Identifiable {
+    var id: String { "\(startIndex)-\(endIndex)-\(url)" }
+    var url: String
+    var title: String
+    var startIndex: Int
+    var endIndex: Int
+
+    /// Encode an array of URLCitation to Data for SwiftData storage.
+    static func encode(_ items: [URLCitation]?) -> Data? {
+        guard let items = items, !items.isEmpty else { return nil }
+        return try? JSONEncoder().encode(items)
+    }
+
+    /// Decode an array of URLCitation from Data.
+    static func decode(_ data: Data?) -> [URLCitation]? {
+        guard let data = data else { return nil }
+        return try? JSONDecoder().decode([URLCitation].self, from: data)
+    }
+}
+
+// MARK: - File Attachment
+
+enum FileUploadStatus: String, Codable, Sendable {
+    case pending
+    case uploading
+    case uploaded
+    case failed
+}
+
+/// A file attached to a message (user-uploaded document).
+struct FileAttachment: Codable, Sendable, Identifiable {
+    var id: UUID
+    var filename: String
+    var fileSize: Int64
+    var fileType: String        // pdf, docx, pptx, csv, xlsx
+    var fileId: String?         // OpenAI file ID after upload (alias for openAIFileId)
+    var uploadStatus: FileUploadStatus
+
+    /// Local file data for upload (not persisted in JSON — transient only).
+    /// This is excluded from Codable encoding to avoid bloating SwiftData storage.
+    var localData: Data?
+
+    enum CodingKeys: String, CodingKey {
+        case id, filename, fileSize, fileType, fileId, uploadStatus
+        // localData is intentionally excluded from Codable
+    }
+
+    /// Convenience alias: get/set `fileId` via `openAIFileId`.
+    var openAIFileId: String? {
+        get { fileId }
+        set { fileId = newValue }
+    }
+
+    init(
+        id: UUID = UUID(),
+        filename: String,
+        fileSize: Int64 = 0,
+        fileType: String,
+        fileId: String? = nil,
+        localData: Data? = nil,
+        uploadStatus: FileUploadStatus = .pending
+    ) {
+        self.id = id
+        self.filename = filename
+        self.fileSize = fileSize
+        self.fileType = fileType
+        self.fileId = fileId
+        self.localData = localData
+        self.uploadStatus = uploadStatus
+    }
+
+    /// Human-readable file size string
+    var fileSizeString: String {
+        let formatter = ByteCountFormatter()
+        formatter.countStyle = .file
+        return formatter.string(fromByteCount: fileSize)
+    }
+
+    /// SF Symbol name for this file type
+    var iconName: String {
+        switch fileType.lowercased() {
+        case "pdf": return "doc.richtext"
+        case "docx", "doc": return "doc.text"
+        case "pptx", "ppt": return "doc.text.image"
+        case "csv": return "tablecells"
+        case "xlsx", "xls": return "tablecells.badge.ellipsis"
+        default: return "doc"
+        }
+    }
+
+    /// Color for the file type icon
+    var iconColor: Color {
+        switch fileType.lowercased() {
+        case "pdf": return .red
+        case "docx", "doc": return .blue
+        case "pptx", "ppt": return .orange
+        case "csv": return .green
+        case "xlsx", "xls": return .green
+        default: return .secondary
+        }
+    }
+
+    /// Encode an array of FileAttachment to Data for SwiftData storage.
+    static func encode(_ items: [FileAttachment]?) -> Data? {
+        guard let items = items, !items.isEmpty else { return nil }
+        return try? JSONEncoder().encode(items)
+    }
+
+    /// Decode an array of FileAttachment from Data.
+    static func decode(_ data: Data?) -> [FileAttachment]? {
+        guard let data = data else { return nil }
+        return try? JSONDecoder().decode([FileAttachment].self, from: data)
+    }
+}

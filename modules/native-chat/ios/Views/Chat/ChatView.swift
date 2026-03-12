@@ -7,6 +7,7 @@ struct ChatView: View {
     @State private var scrollProxy: ScrollViewProxy?
     @State private var showPhotoPicker = false
     @State private var selectedPhotoItem: PhotosPickerItem?
+    @State private var showDocumentPicker = false
 
     var body: some View {
         NavigationStack {
@@ -25,9 +26,14 @@ struct ChatView: View {
                     text: $viewModel.inputText,
                     isStreaming: viewModel.isStreaming,
                     selectedImageData: $viewModel.selectedImageData,
+                    pendingAttachments: $viewModel.pendingAttachments,
                     onSend: { viewModel.sendMessage() },
                     onStop: { viewModel.stopGeneration() },
-                    onPickImage: { showPhotoPicker = true }
+                    onPickImage: { showPhotoPicker = true },
+                    onPickDocument: { showDocumentPicker = true },
+                    onRemoveAttachment: { attachment in
+                        viewModel.removePendingAttachment(attachment)
+                    }
                 )
             }
             .navigationBarTitleDisplayMode(.inline)
@@ -73,6 +79,11 @@ struct ChatView: View {
                     } catch {
                         print("Failed to load photo: \(error.localizedDescription)")
                     }
+                }
+            }
+            .sheet(isPresented: $showDocumentPicker) {
+                DocumentPicker { urls in
+                    viewModel.handlePickedDocuments(urls)
                 }
             }
         }
@@ -140,6 +151,11 @@ struct ChatView: View {
                         proxy.scrollTo("bottom", anchor: .bottom)
                     }
                 }
+                .onChange(of: viewModel.activeToolCalls.count) { _, _ in
+                    withAnimation(.easeOut(duration: 0.15)) {
+                        proxy.scrollTo("bottom", anchor: .bottom)
+                    }
+                }
             }
         }
     }
@@ -200,6 +216,31 @@ struct ChatView: View {
     private var streamingBubble: some View {
         HStack(alignment: .top) {
             VStack(alignment: .leading, spacing: 8) {
+                // Active tool call indicators
+                ForEach(viewModel.activeToolCalls) { toolCall in
+                    switch toolCall.type {
+                    case .webSearch:
+                        if toolCall.status != .completed {
+                            WebSearchIndicator()
+                                .transition(.opacity.combined(with: .scale(scale: 0.95)))
+                        }
+                    case .codeInterpreter:
+                        if toolCall.status != .completed {
+                            CodeInterpreterIndicator()
+                                .transition(.opacity.combined(with: .scale(scale: 0.95)))
+                        }
+                    }
+                }
+
+                // Completed code interpreter results (during streaming)
+                let completedCodeCalls = viewModel.activeToolCalls.filter {
+                    $0.type == .codeInterpreter && $0.status == .completed
+                }
+                ForEach(completedCodeCalls) { toolCall in
+                    CodeInterpreterResultView(toolCall: toolCall)
+                        .transition(.opacity.combined(with: .move(edge: .top)))
+                }
+
                 if viewModel.isThinking {
                     ThinkingIndicator()
                         .transition(.opacity.combined(with: .scale(scale: 0.95)))
@@ -211,14 +252,15 @@ struct ChatView: View {
                 }
 
                 if !viewModel.currentStreamingText.isEmpty {
-                    // Use lightweight StreamingTextView during streaming to
-                    // avoid expensive MarkdownContentView re-parses (WKWebView
-                    // creation for LaTeX, code-block highlighting) on every
-                    // single delta. The full MarkdownContentView is used once
-                    // the message is finalized and saved to the messages array.
                     StreamingTextView(text: viewModel.currentStreamingText)
-                } else if !viewModel.isThinking && viewModel.currentThinkingText.isEmpty {
+                } else if !viewModel.isThinking && viewModel.currentThinkingText.isEmpty
+                            && viewModel.activeToolCalls.allSatisfy({ $0.status == .completed }) {
                     TypingIndicator()
+                }
+
+                // Live citations during streaming
+                if !viewModel.liveCitations.isEmpty {
+                    CitationLinksView(citations: viewModel.liveCitations)
                 }
             }
             .padding(12)
