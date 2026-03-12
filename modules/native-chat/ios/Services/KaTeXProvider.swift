@@ -106,12 +106,22 @@ enum KaTeXProvider {
                 } catch(e) {
                     document.getElementById('math').textContent = latexStr;
                 }
-                setTimeout(function() {
+                function reportHeight() {
                     var h = document.body.scrollHeight;
                     if (h > 0) {
                         window.webkit.messageHandlers.sizeCallback.postMessage(h);
                     }
-                }, 50);
+                }
+                // Multiple callbacks to ensure accurate height after fonts load
+                reportHeight();
+                setTimeout(reportHeight, 50);
+                setTimeout(reportHeight, 150);
+                setTimeout(reportHeight, 400);
+                // Also observe size changes from font loading
+                if (typeof ResizeObserver !== 'undefined') {
+                    var ro = new ResizeObserver(function() { reportHeight(); });
+                    ro.observe(document.getElementById('math'));
+                }
             })();
             </script>
             </body>
@@ -161,12 +171,20 @@ enum KaTeXProvider {
                 } catch(e) {
                     document.getElementById('math').textContent = latexStr;
                 }
-                setTimeout(function() {
+                function reportHeight() {
                     var h = document.body.scrollHeight;
                     if (h > 0) {
                         window.webkit.messageHandlers.sizeCallback.postMessage(h);
                     }
-                }, 100);
+                }
+                reportHeight();
+                setTimeout(reportHeight, 100);
+                setTimeout(reportHeight, 300);
+                setTimeout(reportHeight, 600);
+                if (typeof ResizeObserver !== 'undefined') {
+                    var ro = new ResizeObserver(function() { reportHeight(); });
+                    ro.observe(document.getElementById('math'));
+                }
             });
             </script>
             </body>

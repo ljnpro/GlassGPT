@@ -9,12 +9,15 @@ fileprivate enum InlineSegment: Sendable {
 
 fileprivate enum BlockPart: Identifiable, Sendable {
     case richText(id: Int, segments: [InlineSegment])
+    case heading(id: Int, level: Int, text: String)
     case latexBlock(id: Int, content: String)
     case codeBlock(id: Int, language: String?, code: String)
 
     var id: Int {
         switch self {
         case let .richText(id, _):
+            return id
+        case let .heading(id, _, _):
             return id
         case let .latexBlock(id, _):
             return id
@@ -33,8 +36,10 @@ struct MarkdownContentView: View {
         parseBlocks(text)
     }
 
+    /// First pass: extract code blocks and LaTeX blocks from raw text.
+    /// Returns a mix of code/latex blocks and raw text chunks.
     private func parseBlocks(_ input: String) -> [BlockPart] {
-        var parts: [BlockPart] = []
+        var firstPass: [BlockPart] = []
         var inlineBuffer = ""
         let chars = Array(input)
         let count = chars.count
@@ -46,15 +51,18 @@ struct MarkdownContentView: View {
             return nextID
         }
 
+        // Flush accumulated inline text as a temporary richText block (will be refined in second pass)
         func flushInline() {
             if !inlineBuffer.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                // Placeholder: store raw text; we'll split into headings/richText in second pass
                 let segments = parseInlineSegments(inlineBuffer)
-                parts.append(.richText(id: makeID(), segments: segments))
+                firstPass.append(.richText(id: makeID(), segments: segments))
             }
             inlineBuffer = ""
         }
 
         while i < count {
+            // --- Code block ---
             if i + 2 < count && chars[i] == "`" && chars[i + 1] == "`" && chars[i + 2] == "`" {
                 flushInline()
                 let start = i + 3
@@ -78,7 +86,7 @@ struct MarkdownContentView: View {
 
                 if found {
                     let code = String(chars[codeStart..<codeEnd])
-                    parts.append(.codeBlock(id: makeID(), language: lang.isEmpty ? nil : lang, code: code))
+                    firstPass.append(.codeBlock(id: makeID(), language: lang.isEmpty ? nil : lang, code: code))
                     i = codeEnd + 3
                     if i < count && chars[i] == "\n" {
                         i += 1
@@ -90,6 +98,7 @@ struct MarkdownContentView: View {
                 continue
             }
 
+            // --- LaTeX block \[...\] ---
             if i + 1 < count && chars[i] == "\\" && chars[i + 1] == "[" {
                 flushInline()
                 let start = i + 2
@@ -106,7 +115,7 @@ struct MarkdownContentView: View {
                 if found {
                     let latex = String(chars[start..<end]).trimmingCharacters(in: .whitespacesAndNewlines)
                     if !latex.isEmpty {
-                        parts.append(.latexBlock(id: makeID(), content: latex))
+                        firstPass.append(.latexBlock(id: makeID(), content: latex))
                     }
                     i = end + 2
                 } else {
@@ -116,6 +125,7 @@ struct MarkdownContentView: View {
                 continue
             }
 
+            // --- LaTeX block $$...$$ ---
             if i + 1 < count && chars[i] == "$" && chars[i + 1] == "$" {
                 flushInline()
                 let start = i + 2
@@ -132,7 +142,7 @@ struct MarkdownContentView: View {
                 if found {
                     let latex = String(chars[start..<end]).trimmingCharacters(in: .whitespacesAndNewlines)
                     if !latex.isEmpty {
-                        parts.append(.latexBlock(id: makeID(), content: latex))
+                        firstPass.append(.latexBlock(id: makeID(), content: latex))
                     }
                     i = end + 2
                 } else {
@@ -148,11 +158,85 @@ struct MarkdownContentView: View {
 
         flushInline()
 
-        if parts.isEmpty {
+        if firstPass.isEmpty {
             return [.richText(id: 0, segments: [.text(input)])]
         }
 
-        return parts
+        // Second pass: split richText blocks into headings and plain richText by line
+        var finalParts: [BlockPart] = []
+        for part in firstPass {
+            switch part {
+            case let .richText(_, segments):
+                // Reconstruct the raw text from segments to do line-level parsing
+                let rawText = segments.map { seg in
+                    switch seg {
+                    case let .text(str): return str
+                    case let .latexInline(latex): return "$\(latex)$"
+                    }
+                }.joined()
+
+                let lines = rawText.components(separatedBy: "\n")
+                var lineBuffer: [String] = []
+
+                func flushLineBuffer() {
+                    let joined = lineBuffer.joined(separator: "\n")
+                    if !joined.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                        let segs = parseInlineSegments(joined)
+                        finalParts.append(.richText(id: makeID(), segments: segs))
+                    }
+                    lineBuffer = []
+                }
+
+                for line in lines {
+                    let trimmed = line.trimmingCharacters(in: .whitespaces)
+                    // Detect heading: must start with # followed by space
+                    if let headingMatch = detectHeading(trimmed) {
+                        flushLineBuffer()
+                        finalParts.append(.heading(id: makeID(), level: headingMatch.level, text: headingMatch.text))
+                    } else {
+                        lineBuffer.append(line)
+                    }
+                }
+                flushLineBuffer()
+
+            default:
+                finalParts.append(part)
+            }
+        }
+
+        // Re-assign IDs sequentially
+        var result: [BlockPart] = []
+        var finalID = 0
+        for part in finalParts {
+            switch part {
+            case let .richText(_, segments):
+                result.append(.richText(id: finalID, segments: segments))
+            case let .heading(_, level, text):
+                result.append(.heading(id: finalID, level: level, text: text))
+            case let .latexBlock(_, content):
+                result.append(.latexBlock(id: finalID, content: content))
+            case let .codeBlock(_, language, code):
+                result.append(.codeBlock(id: finalID, language: language, code: code))
+            }
+            finalID += 1
+        }
+
+        return result.isEmpty ? [.richText(id: 0, segments: [.text(input)])] : result
+    }
+
+    /// Detect a Markdown heading line. Returns (level, text) or nil.
+    private func detectHeading(_ line: String) -> (level: Int, text: String)? {
+        var level = 0
+        let chars = Array(line)
+        while level < chars.count && level < 6 && chars[level] == "#" {
+            level += 1
+        }
+        guard level > 0 else { return nil }
+        // Must be followed by a space (or be the entire line)
+        guard level < chars.count && chars[level] == " " else { return nil }
+        let text = String(chars[(level + 1)...]).trimmingCharacters(in: .whitespaces)
+        guard !text.isEmpty else { return nil }
+        return (level, text)
     }
 
     private func parseInlineSegments(_ input: String) -> [InlineSegment] {
@@ -232,26 +316,101 @@ struct MarkdownContentView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
-            ForEach(blockParts, id: \.id) { part in
-                blockView(for: part)
+            ForEach(Array(blockParts.enumerated()), id: \.element.id) { index, part in
+                blockView(for: part, at: index)
             }
         }
     }
 
     @ViewBuilder
-    private func blockView(for part: BlockPart) -> some View {
+    private func blockView(for part: BlockPart, at index: Int) -> some View {
         switch part {
         case let .codeBlock(id: id, language: language, code: code):
             CodeBlockView(language: language, code: code)
                 .id(id)
 
         case let .latexBlock(id: id, content: content):
+            let prevIsLatex = index > 0 && isLatexBlock(blockParts[index - 1])
+            let nextIsLatex = index + 1 < blockParts.count && isLatexBlock(blockParts[index + 1])
             BlockLaTeXView(latex: content)
+                .id(id)
+                // Tighten spacing to surrounding text, but keep normal spacing between consecutive LaTeX blocks
+                .padding(.top, prevIsLatex ? 8 : -2)
+                .padding(.bottom, nextIsLatex ? 8 : -2)
+
+        case let .heading(id: id, level: level, text: text):
+            HeadingView(level: level, text: text)
                 .id(id)
 
         case let .richText(id: id, segments: segments):
             RichTextView(segments: segments)
                 .id(id)
+        }
+    }
+
+    private func isLatexBlock(_ part: BlockPart) -> Bool {
+        if case .latexBlock = part { return true }
+        return false
+    }
+}
+
+// MARK: - Heading View
+
+private struct HeadingView: View {
+    let level: Int
+    let text: String
+
+    var body: some View {
+        if let attributed = try? AttributedString(
+            markdown: text,
+            options: .init(
+                allowsExtendedAttributes: true,
+                interpretedSyntax: .inlineOnlyPreservingWhitespace,
+                failurePolicy: .returnPartiallyParsedIfPossible
+            )
+        ) {
+            Text(attributed)
+                .font(fontForLevel)
+                .fontWeight(weightForLevel)
+                .textSelection(.enabled)
+                .padding(.top, topPadding)
+                .padding(.bottom, 2)
+        } else {
+            Text(text)
+                .font(fontForLevel)
+                .fontWeight(weightForLevel)
+                .textSelection(.enabled)
+                .padding(.top, topPadding)
+                .padding(.bottom, 2)
+        }
+    }
+
+    private var fontForLevel: Font {
+        switch level {
+        case 1: return .title
+        case 2: return .title2
+        case 3: return .title3
+        case 4: return .headline
+        default: return .subheadline
+        }
+    }
+
+    private var weightForLevel: Font.Weight {
+        switch level {
+        case 1: return .bold
+        case 2: return .bold
+        case 3: return .semibold
+        case 4: return .semibold
+        default: return .medium
+        }
+    }
+
+    private var topPadding: CGFloat {
+        switch level {
+        case 1: return 12
+        case 2: return 10
+        case 3: return 8
+        default: return 6
         }
     }
 }
@@ -449,7 +608,7 @@ private struct RichTextView: View {
 private struct BlockLaTeXView: View {
     let latex: String
 
-    @State private var height: CGFloat = 20
+    @State private var height: CGFloat = 44
     @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
@@ -461,9 +620,6 @@ private struct BlockLaTeXView: View {
         .frame(height: height)
         .frame(maxWidth: .infinity, alignment: .center)
         .clipped()
-        // Reduce extra vertical spacing between LaTeX block and surrounding text.
-        // The WKWebView already has its own internal padding; we pull it tighter.
-        .padding(.vertical, -4)
     }
 }
 
