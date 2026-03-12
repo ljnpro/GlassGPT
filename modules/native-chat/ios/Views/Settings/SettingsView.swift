@@ -97,7 +97,9 @@ struct SettingsView: View {
                     }
                     .pickerStyle(.segmented)
 
-                    Toggle("Haptic Feedback", isOn: $viewModel.hapticEnabled)
+                    if UIDevice.current.userInterfaceIdiom == .phone {
+                        Toggle("Haptic Feedback", isOn: $viewModel.hapticEnabled)
+                    }
                 }
 
                 // MARK: - About
