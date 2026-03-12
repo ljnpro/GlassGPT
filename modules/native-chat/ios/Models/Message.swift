@@ -12,11 +12,10 @@ final class Message {
     var conversation: Conversation?
 
     /// The OpenAI response ID (from response.created event).
-    /// Used to poll for complete response if streaming was interrupted.
+    /// Used to poll for the complete response if streaming was interrupted.
     var responseId: String?
 
     /// Whether this message has been fully received.
-    /// false = still streaming or interrupted draft.
     var isComplete: Bool
 
     /// JSON-encoded array of URLCitation objects from web search.
@@ -27,10 +26,6 @@ final class Message {
 
     /// JSON-encoded array of FileAttachment objects (user-uploaded documents).
     var fileAttachmentsData: Data?
-
-    /// The last SSE sequence_number received during streaming.
-    /// Used to resume streaming from the breakpoint via GET /v1/responses/{id}?stream=true&starting_after={seq}
-    var lastSequenceNumber: Int?
 
     init(
         id: UUID = UUID(),
@@ -65,7 +60,7 @@ final class Message {
         set { roleRawValue = newValue.rawValue }
     }
 
-    // MARK: - Annotations (URL Citations)
+    // MARK: - Annotations
 
     var annotations: [URLCitation] {
         get { Self.decode(annotationsData) ?? [] }

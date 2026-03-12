@@ -1168,153 +1168,110 @@ describe('Orphaned Draft Detection - Force Quit Recovery', () => {
 
 
 // ============================================================
-// Streaming Recovery Tests (SSE Resume from Breakpoint)
+// Polling Recovery Tests (GET Response with Status Awareness)
 // ============================================================
 
-describe('Streaming Recovery - URL Construction', () => {
+describe('Polling Recovery - URL Construction', () => {
   const baseURL = 'https://api.openai.com/v1/responses';
 
-  it('should construct correct GET URL with stream=true for streaming recovery', () => {
+  it('should construct correct GET URL for polling recovery', () => {
     const responseId = 'resp_abc123def456';
-    const url = `${baseURL}/${responseId}?stream=true`;
+    const url = `${baseURL}/${responseId}`;
 
-    expect(url).toBe('https://api.openai.com/v1/responses/resp_abc123def456?stream=true');
+    expect(url).toBe('https://api.openai.com/v1/responses/resp_abc123def456');
   });
 
-  it('should construct correct GET URL with stream=true and starting_after', () => {
+  it('should NOT include stream=true in polling recovery URL', () => {
     const responseId = 'resp_abc123def456';
-    const startingAfter = 42;
-    const url = `${baseURL}/${responseId}?stream=true&starting_after=${startingAfter}`;
+    const url = `${baseURL}/${responseId}`;
 
-    expect(url).toBe('https://api.openai.com/v1/responses/resp_abc123def456?stream=true&starting_after=42');
-  });
-
-  it('should omit starting_after when sequence number is null', () => {
-    const responseId = 'resp_abc123def456';
-    const startingAfter: number | null = null;
-    let url = `${baseURL}/${responseId}?stream=true`;
-    if (startingAfter !== null) {
-      url += `&starting_after=${startingAfter}`;
-    }
-
-    expect(url).toBe('https://api.openai.com/v1/responses/resp_abc123def456?stream=true');
+    expect(url).not.toContain('stream=true');
     expect(url).not.toContain('starting_after');
   });
+});
 
-  it('should handle starting_after=0 correctly', () => {
-    const responseId = 'resp_abc123def456';
-    const startingAfter = 0;
-    const url = `${baseURL}/${responseId}?stream=true&starting_after=${startingAfter}`;
+describe('Polling Recovery - Status-Aware Recovery', () => {
+  it('should poll until response completes when status is in_progress', async () => {
+    let callCount = 0;
+    const fetchFn = vi.fn().mockImplementation(async () => {
+      callCount++;
+      if (callCount < 5) {
+        return { status: 'in_progress', text: '' };
+      }
+      return { status: 'completed', text: 'Full response', thinking: 'Reasoning text' };
+    });
 
-    expect(url).toContain('starting_after=0');
+    let result;
+    for (let i = 0; i < 10; i++) {
+      result = await fetchFn();
+      if (result.status === 'completed' || result.status === 'failed') break;
+    }
+
+    expect(result!.status).toBe('completed');
+    expect(result!.text).toBe('Full response');
+    expect(fetchFn).toHaveBeenCalledTimes(5);
+  });
+
+  it('should use fallback text when recovery returns empty text', () => {
+    const fallbackText = 'Partial content from before disconnect';
+    const recoveredText = '';
+
+    const finalText = recoveredText || fallbackText || '[Response interrupted. Please try again.]';
+    expect(finalText).toBe(fallbackText);
+  });
+
+  it('should use placeholder when both recovered and fallback are empty', () => {
+    const fallbackText = '';
+    const recoveredText = '';
+
+    const finalText = recoveredText || fallbackText || '[Response interrupted. Please try again.]';
+    expect(finalText).toBe('[Response interrupted. Please try again.]');
   });
 });
 
-describe('Streaming Recovery - Sequence Number Tracking', () => {
-  it('should track sequence_number from SSE events', () => {
-    const events = [
-      { type: 'response.created', sequence_number: 0 },
-      { type: 'response.output_text.delta', sequence_number: 1, delta: 'Hello' },
-      { type: 'response.output_text.delta', sequence_number: 2, delta: ' world' },
-      { type: 'response.output_text.delta', sequence_number: 3, delta: '!' },
-      { type: 'response.output_text.done', sequence_number: 4, text: 'Hello world!' },
-      { type: 'response.completed', sequence_number: 5 },
-    ];
-
-    let lastSeqNum = 0;
-    for (const event of events) {
-      if (event.sequence_number > lastSeqNum) {
-        lastSeqNum = event.sequence_number;
-      }
-    }
-
-    expect(lastSeqNum).toBe(5);
-  });
-
-  it('should only update sequence_number when it increases', () => {
-    let lastSeqNum = 0;
-    const updates: number[] = [];
-
-    const seqNums = [0, 1, 2, 1, 3, 2, 4, 5]; // Some out-of-order
-    for (const seq of seqNums) {
-      if (seq > lastSeqNum) {
-        lastSeqNum = seq;
-        updates.push(seq);
-      }
-    }
-
-    expect(lastSeqNum).toBe(5);
-    expect(updates).toEqual([1, 2, 3, 4, 5]); // Only increasing values
-  });
-
-  it('should save sequence_number to draft periodically (every 10th)', () => {
-    const savedToDb: number[] = [];
-    let lastSeqNum = 0;
-
-    for (let i = 0; i <= 35; i++) {
-      if (i > lastSeqNum) {
-        lastSeqNum = i;
-        // Simulate: save to draft every 10th event
-        if (i % 10 === 0 && i > 0) {
-          savedToDb.push(i);
-        }
-      }
-    }
-
-    expect(savedToDb).toEqual([10, 20, 30]);
-    expect(lastSeqNum).toBe(35);
-  });
-});
-
-describe('Streaming Recovery - Background Request Flag', () => {
-  it('should include background=true in streaming request body', () => {
+describe('Request Configuration - No Background Mode', () => {
+  it('should NOT include background=true in streaming request body (causes high TTFT)', () => {
     const requestBody = {
       model: 'gpt-5.4',
       input: [{ role: 'user', content: 'Hello' }],
       stream: true,
       store: true,
-      background: true,
       tools: [],
     };
 
-    expect(requestBody.background).toBe(true);
+    expect(requestBody).not.toHaveProperty('background');
     expect(requestBody.store).toBe(true);
     expect(requestBody.stream).toBe(true);
   });
 
-  it('background=true ensures server continues after client disconnects', () => {
-    // When background=true:
-    // - Server continues processing even if client disconnects
-    // - Response can be retrieved later via GET /v1/responses/{id}
-    // - GET with stream=true replays events from where client left off
-    const config = { background: true, store: true };
-    expect(config.background).toBe(true);
+  it('store=true ensures response is saved for later retrieval', () => {
+    // When store=true (without background):
+    // - Normal fast TTFT
+    // - Response is saved server-side
+    // - Can be retrieved via GET /v1/responses/{id} for recovery
+    const config = { store: true };
     expect(config.store).toBe(true);
+    expect(config).not.toHaveProperty('background');
   });
 });
 
-describe('Streaming Recovery - Recovery Flow Decision', () => {
+describe('Polling Recovery - Recovery Flow Decision', () => {
   interface RecoveryContext {
     responseId: string | null;
-    lastSequenceNumber: number | null;
     existingText: string;
     existingThinking: string;
-    isStreaming: boolean;
   }
 
   type RecoveryAction =
-    | { type: 'streaming_recovery'; responseId: string; startingAfter: number | null }
     | { type: 'polling_recovery'; responseId: string }
     | { type: 'finalize_partial' }
     | { type: 'cleanup' };
 
   function determineRecoveryAction(ctx: RecoveryContext): RecoveryAction {
     if (ctx.responseId) {
-      // Prefer streaming recovery — resume from breakpoint
       return {
-        type: 'streaming_recovery',
+        type: 'polling_recovery',
         responseId: ctx.responseId,
-        startingAfter: ctx.lastSequenceNumber,
       };
     }
 
@@ -1325,44 +1282,34 @@ describe('Streaming Recovery - Recovery Flow Decision', () => {
     return { type: 'cleanup' };
   }
 
-  it('should choose streaming recovery when responseId and sequence number are available', () => {
+  it('should choose polling recovery when responseId is available', () => {
     const action = determineRecoveryAction({
       responseId: 'resp_abc123',
-      lastSequenceNumber: 42,
       existingText: 'Hello world',
       existingThinking: '',
-      isStreaming: true,
     });
 
-    expect(action.type).toBe('streaming_recovery');
-    if (action.type === 'streaming_recovery') {
+    expect(action.type).toBe('polling_recovery');
+    if (action.type === 'polling_recovery') {
       expect(action.responseId).toBe('resp_abc123');
-      expect(action.startingAfter).toBe(42);
     }
   });
 
-  it('should choose streaming recovery even without sequence number (replays all events)', () => {
+  it('should choose polling recovery even without existing text', () => {
     const action = determineRecoveryAction({
       responseId: 'resp_abc123',
-      lastSequenceNumber: null,
       existingText: '',
       existingThinking: '',
-      isStreaming: true,
     });
 
-    expect(action.type).toBe('streaming_recovery');
-    if (action.type === 'streaming_recovery') {
-      expect(action.startingAfter).toBeNull();
-    }
+    expect(action.type).toBe('polling_recovery');
   });
 
   it('should finalize partial when no responseId but has content', () => {
     const action = determineRecoveryAction({
       responseId: null,
-      lastSequenceNumber: null,
       existingText: 'Some partial content...',
       existingThinking: '',
-      isStreaming: true,
     });
 
     expect(action.type).toBe('finalize_partial');
@@ -1371,206 +1318,200 @@ describe('Streaming Recovery - Recovery Flow Decision', () => {
   it('should cleanup when no responseId and no content', () => {
     const action = determineRecoveryAction({
       responseId: null,
-      lastSequenceNumber: null,
       existingText: '',
       existingThinking: '',
-      isStreaming: true,
     });
 
     expect(action.type).toBe('cleanup');
   });
 });
 
-describe('Streaming Recovery - SSE Event Replay', () => {
+describe('Polling Recovery - Apply Recovered Result', () => {
   /**
-   * Simulates the streaming recovery flow:
-   * 1. Client reconnects with starting_after=N
-   * 2. Server replays events from sequence N+1 onwards
-   * 3. If response is still in progress, new events continue in real-time
-   * 4. If response is completed, all remaining events are replayed quickly
+   * Simulates the applyRecoveredResult logic:
+   * - If recovered result has text, use it
+   * - If recovered result is empty, fall back to existing partial text
+   * - If both are empty, use placeholder
+   * - Always set isComplete = true
    */
 
-  interface SSEEvent {
-    type: string;
-    sequence_number: number;
-    delta?: string;
-    text?: string;
+  interface RecoveredResult {
+    status: string;
+    text: string;
+    thinking?: string;
+    toolCalls: unknown[];
+    annotations: unknown[];
   }
 
-  function simulateStreamRecovery(
-    allEvents: SSEEvent[],
-    startingAfter: number | null,
-  ): SSEEvent[] {
-    if (startingAfter === null) {
-      return allEvents;
-    }
-    return allEvents.filter((e) => e.sequence_number > startingAfter);
+  interface MockMessage {
+    content: string;
+    thinking?: string;
+    isComplete: boolean;
   }
 
-  it('should replay all events when starting_after is null', () => {
-    const allEvents: SSEEvent[] = [
-      { type: 'response.created', sequence_number: 0 },
-      { type: 'response.output_text.delta', sequence_number: 1, delta: 'Hello' },
-      { type: 'response.output_text.delta', sequence_number: 2, delta: ' world' },
-      { type: 'response.completed', sequence_number: 3 },
-    ];
-
-    const replayed = simulateStreamRecovery(allEvents, null);
-    expect(replayed).toHaveLength(4);
-  });
-
-  it('should replay only events after starting_after sequence number', () => {
-    const allEvents: SSEEvent[] = [
-      { type: 'response.created', sequence_number: 0 },
-      { type: 'response.output_text.delta', sequence_number: 1, delta: 'Hello' },
-      { type: 'response.output_text.delta', sequence_number: 2, delta: ' world' },
-      { type: 'response.output_text.delta', sequence_number: 3, delta: '!' },
-      { type: 'response.completed', sequence_number: 4 },
-    ];
-
-    const replayed = simulateStreamRecovery(allEvents, 1);
-
-    expect(replayed).toHaveLength(3); // events 2, 3, 4
-    expect(replayed[0].sequence_number).toBe(2);
-    expect(replayed[0].delta).toBe(' world');
-    expect(replayed[replayed.length - 1].type).toBe('response.completed');
-  });
-
-  it('should return empty array when starting_after is at the last event', () => {
-    const allEvents: SSEEvent[] = [
-      { type: 'response.created', sequence_number: 0 },
-      { type: 'response.completed', sequence_number: 1 },
-    ];
-
-    const replayed = simulateStreamRecovery(allEvents, 1);
-    expect(replayed).toHaveLength(0);
-  });
-
-  it('should correctly accumulate text from replayed events', () => {
-    const allEvents: SSEEvent[] = [
-      { type: 'response.output_text.delta', sequence_number: 1, delta: 'Hello' },
-      { type: 'response.output_text.delta', sequence_number: 2, delta: ' beautiful' },
-      { type: 'response.output_text.delta', sequence_number: 3, delta: ' world' },
-      { type: 'response.output_text.delta', sequence_number: 4, delta: '!' },
-    ];
-
-    // Client already has "Hello" (received before disconnect at seq 1)
-    const existingText = 'Hello';
-    const replayed = simulateStreamRecovery(allEvents, 1);
-
-    let recoveredText = existingText;
-    for (const event of replayed) {
-      if (event.delta) {
-        recoveredText += event.delta;
-      }
+  function applyRecoveredResult(
+    result: RecoveredResult | null,
+    message: MockMessage,
+    fallbackText: string,
+    fallbackThinking?: string,
+  ): void {
+    if (result) {
+      if (result.text) message.content = result.text;
+      if (result.thinking) message.thinking = result.thinking;
     }
 
-    expect(recoveredText).toBe('Hello beautiful world!');
+    if (!message.content) {
+      message.content = fallbackText || '[Response interrupted. Please try again.]';
+    }
+
+    if (!message.thinking && fallbackThinking) {
+      message.thinking = fallbackThinking;
+    }
+
+    message.isComplete = true;
+  }
+
+  it('should apply recovered text and thinking', () => {
+    const msg: MockMessage = { content: '', isComplete: false };
+    applyRecoveredResult(
+      { status: 'completed', text: 'Full response', thinking: 'My reasoning', toolCalls: [], annotations: [] },
+      msg, '', '',
+    );
+
+    expect(msg.content).toBe('Full response');
+    expect(msg.thinking).toBe('My reasoning');
+    expect(msg.isComplete).toBe(true);
   });
 
-  it('should handle recovery when response completed while app was in background', () => {
-    // All events already happened on server
-    const allEvents: SSEEvent[] = [
-      { type: 'response.output_text.delta', sequence_number: 1, delta: 'The answer is ' },
-      { type: 'response.output_text.delta', sequence_number: 2, delta: '42.' },
-      { type: 'response.output_text.done', sequence_number: 3, text: 'The answer is 42.' },
-      { type: 'response.completed', sequence_number: 4 },
-    ];
+  it('should fall back to existing text when recovered text is empty', () => {
+    const msg: MockMessage = { content: '', isComplete: false };
+    applyRecoveredResult(
+      { status: 'completed', text: '', toolCalls: [], annotations: [] },
+      msg, 'Partial from before',
+    );
 
-    // Client disconnected at seq 1 (only got "The answer is ")
-    const replayed = simulateStreamRecovery(allEvents, 1);
+    expect(msg.content).toBe('Partial from before');
+    expect(msg.isComplete).toBe(true);
+  });
 
-    expect(replayed).toHaveLength(3); // events 2, 3, 4
-    // The .done event contains the full text as a safety net
-    const doneEvent = replayed.find((e) => e.type === 'response.output_text.done');
-    expect(doneEvent?.text).toBe('The answer is 42.');
+  it('should use placeholder when both recovered and fallback are empty', () => {
+    const msg: MockMessage = { content: '', isComplete: false };
+    applyRecoveredResult(
+      { status: 'completed', text: '', toolCalls: [], annotations: [] },
+      msg, '',
+    );
+
+    expect(msg.content).toBe('[Response interrupted. Please try again.]');
+    expect(msg.isComplete).toBe(true);
+  });
+
+  it('should handle null result with fallback', () => {
+    const msg: MockMessage = { content: '', isComplete: false };
+    applyRecoveredResult(null, msg, 'Fallback text', 'Fallback thinking');
+
+    expect(msg.content).toBe('Fallback text');
+    expect(msg.thinking).toBe('Fallback thinking');
+    expect(msg.isComplete).toBe(true);
+  });
+
+  it('should preserve recovered thinking over fallback', () => {
+    const msg: MockMessage = { content: '', isComplete: false };
+    applyRecoveredResult(
+      { status: 'completed', text: 'Response', thinking: 'Server reasoning', toolCalls: [], annotations: [] },
+      msg, '', 'Old thinking',
+    );
+
+    expect(msg.thinking).toBe('Server reasoning');
   });
 });
 
-describe('Streaming Recovery - Message State with Sequence Number', () => {
-  interface MockMessageWithSeq {
+describe('Polling Recovery - Background Enter Saves Draft State', () => {
+  interface MockDraftState {
     id: string;
-    role: 'user' | 'assistant';
     content: string;
     thinking?: string;
     responseId?: string;
     isComplete: boolean;
-    lastSequenceNumber?: number;
   }
 
-  it('should save lastSequenceNumber to draft during streaming', () => {
-    const draft: MockMessageWithSeq = {
+  it('should save draft content and responseId when entering background', () => {
+    const draft: MockDraftState = {
       id: 'msg_1',
-      role: 'assistant',
-      content: '',
-      responseId: 'resp_abc123',
-      isComplete: false,
-    };
-
-    // Simulate receiving events with sequence numbers
-    draft.lastSequenceNumber = 5;
-    draft.content = 'Hello';
-
-    draft.lastSequenceNumber = 10;
-    draft.content = 'Hello world';
-
-    expect(draft.lastSequenceNumber).toBe(10);
-    expect(draft.content).toBe('Hello world');
-  });
-
-  it('should preserve lastSequenceNumber when saving draft on background enter', () => {
-    const draft: MockMessageWithSeq = {
-      id: 'msg_1',
-      role: 'assistant',
       content: 'Partial response so far...',
       responseId: 'resp_abc123',
       isComplete: false,
-      lastSequenceNumber: 25,
     };
 
     // Simulate background enter: save draft
     const savedDraft = { ...draft };
 
-    expect(savedDraft.lastSequenceNumber).toBe(25);
     expect(savedDraft.responseId).toBe('resp_abc123');
+    expect(savedDraft.content).toBe('Partial response so far...');
     expect(savedDraft.isComplete).toBe(false);
   });
 
-  it('should use lastSequenceNumber from draft for recovery on foreground return', () => {
-    const draft: MockMessageWithSeq = {
+  it('should mark draft as complete with content when background task expires', () => {
+    const draft: MockDraftState = {
       id: 'msg_1',
-      role: 'assistant',
+      content: 'Partial response...',
+      responseId: 'resp_abc123',
+      isComplete: false,
+    };
+
+    // Background task expiration handler
+    if (draft.content) {
+      draft.isComplete = true;
+    } else {
+      draft.content = '[Response interrupted. Please try again.]';
+      draft.isComplete = true;
+    }
+
+    expect(draft.isComplete).toBe(true);
+    expect(draft.content).toBe('Partial response...');
+  });
+
+  it('should use placeholder when background task expires with empty content', () => {
+    const draft: MockDraftState = {
+      id: 'msg_1',
+      content: '',
+      responseId: 'resp_abc123',
+      isComplete: false,
+    };
+
+    if (!draft.content) {
+      draft.content = '[Response interrupted. Please try again.]';
+    }
+    draft.isComplete = true;
+
+    expect(draft.isComplete).toBe(true);
+    expect(draft.content).toBe('[Response interrupted. Please try again.]');
+  });
+
+  it('should use responseId for polling recovery on foreground return', () => {
+    const draft: MockDraftState = {
+      id: 'msg_1',
       content: 'Partial...',
       responseId: 'resp_abc123',
       isComplete: false,
-      lastSequenceNumber: 42,
     };
 
-    // On foreground return, construct recovery URL
     const baseURL = 'https://api.openai.com/v1/responses';
-    let url = `${baseURL}/${draft.responseId}?stream=true`;
-    if (draft.lastSequenceNumber !== undefined) {
-      url += `&starting_after=${draft.lastSequenceNumber}`;
-    }
+    const url = `${baseURL}/${draft.responseId}`;
 
-    expect(url).toBe('https://api.openai.com/v1/responses/resp_abc123?stream=true&starting_after=42');
+    expect(url).toBe('https://api.openai.com/v1/responses/resp_abc123');
   });
 
-  it('should clear lastSequenceNumber after successful recovery completion', () => {
-    const draft: MockMessageWithSeq = {
+  it('should finalize as partial when no responseId available', () => {
+    const draft: MockDraftState = {
       id: 'msg_1',
-      role: 'assistant',
-      content: 'Full response recovered',
-      responseId: 'resp_abc123',
+      content: 'Some partial text...',
       isComplete: false,
-      lastSequenceNumber: 50,
     };
 
-    // Simulate successful recovery completion
+    // No responseId — can't poll, just finalize
     draft.isComplete = true;
-    draft.lastSequenceNumber = undefined;
 
     expect(draft.isComplete).toBe(true);
-    expect(draft.lastSequenceNumber).toBeUndefined();
+    expect(draft.content).toBe('Some partial text...');
   });
 });
