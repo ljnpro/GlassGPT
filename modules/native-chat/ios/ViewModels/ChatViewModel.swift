@@ -13,7 +13,7 @@ final class ChatViewModel {
     var currentThinkingText: String = ""
     var isStreaming: Bool = false
     var isThinking: Bool = false
-    var isRecovering: Bool = false          // True when polling for a previously interrupted response
+    var isRecovering: Bool = false          // True when recovering a previously interrupted response (streaming or polling)
     var isRestoringConversation: Bool = false // True when loading previous conversation on app launch
     var inputText: String = ""
     var selectedModel: ModelType = .gpt5_4
@@ -46,8 +46,11 @@ final class ChatViewModel {
     // Background task
     private var backgroundTaskID: UIBackgroundTaskIdentifier = .invalid
 
-    // Recovery polling
+    // Recovery task (streaming or polling)
     private var recoveryTask: Task<Void, Never>?
+
+    // Last SSE sequence_number received (for streaming resume from breakpoint)
+    private var lastSequenceNumber: Int?
 
     // MARK: - Init
 
@@ -107,7 +110,10 @@ final class ChatViewModel {
 
     private func handleEnterBackground() {
         if isStreaming {
-            // Save current progress immediately
+            // Save current progress immediately (including sequence number for resume)
+            if let draft = draftMessage {
+                draft.lastSequenceNumber = lastSequenceNumber
+            }
             saveDraftNow()
             persistToolCallsAndCitations()
 
@@ -152,22 +158,76 @@ final class ChatViewModel {
         recoveryTask?.cancel()
         recoveryTask = nil
 
-        if !isStreaming, let draft = draftMessage {
-            if !draft.content.isEmpty {
-                finalizeDraftAsPartial()
+        // Case 1: Stream is still marked as active but connection is likely dead after background
+        if isStreaming {
+            #if DEBUG
+            print("[Foreground] isStreaming=true on return, forcing stream cleanup")
+            #endif
+
+            // Force cancel the stream — connection is dead after background suspension
+            activeStreamID = UUID()  // Invalidate current stream
+            openAIService.cancelStream()
+
+            // Save current progress
+            saveDraftNow()
+            persistToolCallsAndCitations()
+
+            // Grab draft info before finalization clears it
+            let savedDraftId = draftMessage?.id
+            let savedResponseId = draftMessage?.responseId
+            let savedSeqNum = draftMessage?.lastSequenceNumber ?? lastSequenceNumber
+            let savedText = currentStreamingText
+            let savedThinking = currentThinkingText
+
+            // DO NOT finalize as partial — keep the draft alive for streaming recovery
+            // Just reset streaming flags so we can restart
+            isStreaming = false
+            isThinking = false
+
+            // Attempt streaming recovery if we have a responseId
+            if let respId = savedResponseId {
+                startStreamingRecovery(
+                    responseId: respId,
+                    startingAfter: savedSeqNum,
+                    existingText: savedText,
+                    existingThinking: savedThinking
+                )
+                return
             }
-            if let responseId = draft.responseId {
-                recoverResponse(messageId: draft.id, responseId: responseId)
-                // recoverResponse handles isRecovering, so return early
-                // to avoid double-recovery from recoverIncompleteMessagesInCurrentConversation
+
+            // No responseId — finalize what we have
+            finalizeDraftAsPartial()
+        }
+
+        // Case 2: Stream already stopped (background task expiration handler ran)
+        if let draft = draftMessage {
+            let savedResponseId = draft.responseId
+            let savedSeqNum = draft.lastSequenceNumber
+            let savedText = draft.content
+            let savedThinking = draft.thinking ?? ""
+
+            if let respId = savedResponseId {
+                // Restore streaming state from draft for recovery
+                currentStreamingText = savedText
+                currentThinkingText = savedThinking
+
+                startStreamingRecovery(
+                    responseId: respId,
+                    startingAfter: savedSeqNum,
+                    existingText: savedText,
+                    existingThinking: savedThinking
+                )
                 return
             } else {
-                // No responseId means we can't recover — clean up
-                removeEmptyDraft()
+                if !draft.content.isEmpty {
+                    finalizeDraftAsPartial()
+                } else {
+                    removeEmptyDraft()
+                }
             }
         }
 
-        // Only run incomplete message recovery if we didn't already start recoverResponse above
+        // Case 3: No active draft — check for any incomplete messages in current conversation
         Task { @MainActor in
             await recoverIncompleteMessagesInCurrentConversation()
         }
@@ -394,6 +454,13 @@ final class ChatViewModel {
                         #endif
                     }
 
+                case .sequenceUpdate(let seqNum):
+                    lastSequenceNumber = seqNum
+                    // Periodically persist to draft for recovery
+                    if let draft = draftMessage, seqNum % 10 == 0 {
+                        draft.lastSequenceNumber = seqNum
+                    }
+
                 case .textDelta(let delta):
                     if isThinking {
                         withAnimation(.easeOut(duration: 0.2)) {
@@ -525,20 +592,35 @@ final class ChatViewModel {
 
                 case .error(let error):
                     if !currentStreamingText.isEmpty {
-                        persistToolCallsAndCitations()
-                        finalizeDraftAsPartial()
+                        // Try streaming recovery first if we have a responseId
                         if let draft = draftMessage, let responseId = draft.responseId {
-                            recoverResponse(messageId: draft.id, responseId: responseId)
+                            let savedText = currentStreamingText
+                            let savedThinking = currentThinkingText
+                            let savedSeqNum = draft.lastSequenceNumber ?? lastSequenceNumber
+                            persistToolCallsAndCitations()
+                            saveDraftNow()
+                            startStreamingRecovery(
+                                responseId: responseId,
+                                startingAfter: savedSeqNum,
+                                existingText: savedText,
+                                existingThinking: savedThinking
+                            )
+                        } else {
+                            persistToolCallsAndCitations()
+                            finalizeDraftAsPartial()
                         }
                     } else {
                         removeEmptyDraft()
                     }
-                    errorMessage = error.localizedDescription
-                    isStreaming = false
-                    isThinking = false
-                    activeToolCalls = []
-                    liveCitations = []
-                    HapticService.shared.notify(.error)
+                    if draftMessage?.responseId == nil {
+                        // Only show error if we couldn't start recovery
+                        errorMessage = error.localizedDescription
+                        isStreaming = false
+                        isThinking = false
+                        activeToolCalls = []
+                        liveCitations = []
+                        HapticService.shared.notify(.error)
+                    }
                 }
             }
 
@@ -547,51 +629,34 @@ final class ChatViewModel {
                 let nextAttempt = reconnectAttempt + 1
 
                 if nextAttempt < Self.maxReconnectAttempts {
+                    // If we have a responseId, use streaming recovery (resume from breakpoint)
                     if let draft = draftMessage, let responseId = draft.responseId {
-                        do {
-                            let result = try await openAIService.fetchResponse(responseId: responseId, apiKey: requestAPIKey)
-                            if !result.text.isEmpty {
-                                currentStreamingText = result.text
-                            }
-                            if let thinking = result.thinking, !thinking.isEmpty {
-                                currentThinkingText = thinking
-                            }
-                            // Merge recovered tool calls and citations into live state
-                            for tc in result.toolCalls {
-                                if !activeToolCalls.contains(where: { $0.id == tc.id }) {
-                                    activeToolCalls.append(tc)
-                                }
-                            }
-                            for cit in result.annotations {
-                                if !liveCitations.contains(where: { $0.url == cit.url && $0.startIndex == cit.startIndex }) {
-                                    liveCitations.append(cit)
-                                }
-                            }
-                            persistToolCallsAndCitations()
-                            finalizeDraft()
+                        let delay = Self.reconnectBaseDelay * UInt64(1 << reconnectAttempt)
+                        #if DEBUG
+                        print("[VM] Reconnecting via streaming recovery in \(Double(delay) / 1_000_000_000)s")
+                        #endif
+                        try? await Task.sleep(nanoseconds: delay)
+
+                        guard activeStreamID == streamID else {
                             endBackgroundTask()
                             return
-                        } catch {
-                            let errorMsg = error.localizedDescription
-                            if errorMsg.contains("__IN_PROGRESS__") {
-                                let delay = Self.reconnectBaseDelay * UInt64(1 << reconnectAttempt)
-                                #if DEBUG
-                                print("[VM] Reconnecting in \(Double(delay) / 1_000_000_000)s (server still in progress)")
-                                #endif
-                                try? await Task.sleep(nanoseconds: delay)
-
-                                guard activeStreamID == streamID else {
-                                    endBackgroundTask()
-                                    return
-                                }
-
-                                recoverResponse(messageId: draft.id, responseId: responseId)
-                                endBackgroundTask()
-                                return
-                            }
                         }
+
+                        let savedText = currentStreamingText
+                        let savedThinking = currentThinkingText
+                        let savedSeqNum = draft.lastSequenceNumber ?? lastSequenceNumber
+
+                        startStreamingRecovery(
+                            responseId: responseId,
+                            startingAfter: savedSeqNum,
+                            existingText: savedText,
+                            existingThinking: savedThinking
+                        )
+                        endBackgroundTask()
+                        return
                     }
 
+                    // No responseId — full retry (re-send the request)
                     let delay = Self.reconnectBaseDelay * UInt64(1 << reconnectAttempt)
                     #if DEBUG
                     print("[VM] Reconnecting in \(Double(delay) / 1_000_000_000)s (no responseId, full retry)")
@@ -611,9 +676,17 @@ final class ChatViewModel {
                     print("[VM] Max reconnect attempts exhausted")
                     #endif
                     if let draft = draftMessage, let responseId = draft.responseId {
+                        // Last resort: try streaming recovery even after max attempts
+                        let savedText = currentStreamingText
+                        let savedThinking = currentThinkingText
+                        let savedSeqNum = draft.lastSequenceNumber ?? lastSequenceNumber
                         persistToolCallsAndCitations()
-                        finalizeDraftAsPartial()
-                        recoverResponse(messageId: draft.id, responseId: responseId)
+                        startStreamingRecovery(
+                            responseId: responseId,
+                            startingAfter: savedSeqNum,
+                            existingText: savedText,
+                            existingThinking: savedThinking
+                        )
                     } else if !currentStreamingText.isEmpty {
                         persistToolCallsAndCitations()
                         finalizeDraftAsPartial()
@@ -633,26 +706,30 @@ final class ChatViewModel {
 
             // Stream ended without explicit completed event
             if activeStreamID == streamID && isStreaming {
-                if !currentStreamingText.isEmpty {
+                if let draft = draftMessage, let responseId = draft.responseId {
+                    // Use streaming recovery to resume from breakpoint
+                    let savedText = currentStreamingText
+                    let savedThinking = currentThinkingText
+                    let savedSeqNum = draft.lastSequenceNumber ?? lastSequenceNumber
+                    persistToolCallsAndCitations()
+                    saveDraftNow()
+                    startStreamingRecovery(
+                        responseId: responseId,
+                        startingAfter: savedSeqNum,
+                        existingText: savedText,
+                        existingThinking: savedThinking
+                    )
+                } else if !currentStreamingText.isEmpty {
                     persistToolCallsAndCitations()
                     finalizeDraftAsPartial()
-                    if let draft = draftMessage, let responseId = draft.responseId {
-                        recoverResponse(messageId: draft.id, responseId: responseId)
-                    }
                 } else {
-                    if let draft = draftMessage, let responseId = draft.responseId {
-                        isStreaming = false
-                        isThinking = false
-                        activeToolCalls = []
-                        liveCitations = []
-                        recoverResponse(messageId: draft.id, responseId: responseId)
-                    } else {
-                        removeEmptyDraft()
-                        isStreaming = false
-                        isThinking = false
-                        activeToolCalls = []
-                        liveCitations = []
-                    }
+                    // No responseId and no content — clean up
+                    removeEmptyDraft()
+                    isStreaming = false
+                    isThinking = false
+                    activeToolCalls = []
+                    liveCitations = []
+                    lastSequenceNumber = nil
                 }
             }
 
@@ -683,7 +760,7 @@ final class ChatViewModel {
 
     private func saveDraftIfNeeded() {
         let now = Date()
-        guard now.timeIntervalSince(lastDraftSaveTime) >= 1.0 else { return }
+        guard now.timeIntervalSince(lastDraftSaveTime) >= 2.0 else { return }
         saveDraftNow()
     }
 
@@ -691,6 +768,7 @@ final class ChatViewModel {
         guard let draft = draftMessage else { return }
         draft.content = currentStreamingText
         draft.thinking = currentThinkingText.isEmpty ? nil : currentThinkingText
+        draft.lastSequenceNumber = lastSequenceNumber
         lastDraftSaveTime = Date()
         try? modelContext.save()
     }
@@ -721,6 +799,7 @@ final class ChatViewModel {
             isRecovering = false
             activeToolCalls = []
             liveCitations = []
+            lastSequenceNumber = nil
 
             if !messages.contains(where: { $0.id == draft.id }) {
                 messages.append(draft)
@@ -736,6 +815,7 @@ final class ChatViewModel {
             isRecovering = false
             activeToolCalls = []
             liveCitations = []
+            lastSequenceNumber = nil
         }
 
         if currentConversation?.title == "New Chat" && messages.count >= 2 {
@@ -752,6 +832,7 @@ final class ChatViewModel {
 
         draft.content = currentStreamingText
         draft.thinking = currentThinkingText.isEmpty ? nil : currentThinkingText
+        draft.lastSequenceNumber = lastSequenceNumber
         currentConversation?.updatedAt = .now
 
         currentStreamingText = ""
@@ -761,6 +842,7 @@ final class ChatViewModel {
         isRecovering = false
         activeToolCalls = []
         liveCitations = []
+        lastSequenceNumber = nil
 
         if !messages.contains(where: { $0.id == draft.id }) {
             messages.append(draft)
@@ -780,7 +862,224 @@ final class ChatViewModel {
         draftMessage = nil
     }
 
-    // MARK: - Response Recovery (Polling)
+    // MARK: - Streaming Recovery (Resume from breakpoint)
+
+    /// Resume SSE streaming from the last known sequence_number.
+    /// This reconnects to the server via GET /v1/responses/{id}?stream=true&starting_after={seq}
+    /// and continues real-time streaming output instead of falling back to polling.
+    private func startStreamingRecovery(
+        responseId: String,
+        startingAfter: Int?,
+        existingText: String,
+        existingThinking: String
+    ) {
+        guard !apiKey.isEmpty else {
+            isRecovering = false
+            return
+        }
+
+        recoveryTask?.cancel()
+        isRecovering = true
+        isStreaming = true
+
+        // If we had thinking content, we might still be in thinking phase
+        if !existingThinking.isEmpty && existingText.isEmpty {
+            isThinking = true
+        }
+
+        let requestAPIKey = apiKey
+        let streamID = UUID()
+        activeStreamID = streamID
+
+        #if DEBUG
+        print("[Recovery] Starting streaming recovery for \(responseId), starting_after=\(startingAfter ?? -1), existing text=\(existingText.count) chars")
+        #endif
+
+        recoveryTask = Task { @MainActor in
+            let stream = openAIService.streamRecovery(
+                responseId: responseId,
+                startingAfter: startingAfter,
+                apiKey: requestAPIKey
+            )
+
+            var receivedAnyEvent = false
+
+            for await event in stream {
+                guard activeStreamID == streamID else { break }
+
+                switch event {
+                case .responseCreated:
+                    // Already have the responseId, ignore
+                    break
+
+                case .sequenceUpdate(let seqNum):
+                    lastSequenceNumber = seqNum
+                    if let draft = draftMessage {
+                        if seqNum % 10 == 0 {
+                            draft.lastSequenceNumber = seqNum
+                        }
+                    }
+
+                case .textDelta(let delta):
+                    receivedAnyEvent = true
+                    isRecovering = false  // Hide recovery banner once content starts flowing
+                    if isThinking {
+                        withAnimation(.easeOut(duration: 0.2)) {
+                            isThinking = false
+                        }
+                    }
+                    currentStreamingText += delta
+                    saveDraftIfNeeded()
+
+                case .thinkingDelta(let delta):
+                    receivedAnyEvent = true
+                    isRecovering = false
+                    currentThinkingText += delta
+                    saveDraftIfNeeded()
+
+                case .thinkingStarted:
+                    withAnimation(.easeIn(duration: 0.2)) {
+                        isThinking = true
+                    }
+
+                case .thinkingFinished:
+                    withAnimation(.easeOut(duration: 0.2)) {
+                        isThinking = false
+                    }
+                    saveDraftNow()
+
+                // Tool call events — same handling as normal streaming
+                case .webSearchStarted(let callId):
+                    receivedAnyEvent = true
+                    isRecovering = false
+                    withAnimation(.spring(duration: 0.3)) {
+                        if !activeToolCalls.contains(where: { $0.id == callId }) {
+                            activeToolCalls.append(ToolCallInfo(id: callId, type: .webSearch, status: .inProgress))
+                        }
+                    }
+                case .webSearchSearching(let callId):
+                    if let idx = activeToolCalls.firstIndex(where: { $0.id == callId }) {
+                        withAnimation(.easeInOut(duration: 0.2)) { activeToolCalls[idx].status = .searching }
+                    }
+                case .webSearchCompleted(let callId):
+                    if let idx = activeToolCalls.firstIndex(where: { $0.id == callId }) {
+                        withAnimation(.easeInOut(duration: 0.2)) { activeToolCalls[idx].status = .completed }
+                    }
+                case .codeInterpreterStarted(let callId):
+                    receivedAnyEvent = true
+                    isRecovering = false
+                    withAnimation(.spring(duration: 0.3)) {
+                        if !activeToolCalls.contains(where: { $0.id == callId }) {
+                            activeToolCalls.append(ToolCallInfo(id: callId, type: .codeInterpreter, status: .inProgress))
+                        }
+                    }
+                case .codeInterpreterInterpreting(let callId):
+                    if let idx = activeToolCalls.firstIndex(where: { $0.id == callId }) {
+                        withAnimation(.easeInOut(duration: 0.2)) { activeToolCalls[idx].status = .interpreting }
+                    }
+                case .codeInterpreterCodeDelta(let callId, let codeDelta):
+                    if let idx = activeToolCalls.firstIndex(where: { $0.id == callId }) {
+                        let existing = activeToolCalls[idx].code ?? ""
+                        activeToolCalls[idx].code = existing + codeDelta
+                    }
+                case .codeInterpreterCodeDone(let callId, let fullCode):
+                    if let idx = activeToolCalls.firstIndex(where: { $0.id == callId }) {
+                        activeToolCalls[idx].code = fullCode
+                    }
+                case .codeInterpreterCompleted(let callId):
+                    if let idx = activeToolCalls.firstIndex(where: { $0.id == callId }) {
+                        withAnimation(.easeInOut(duration: 0.2)) { activeToolCalls[idx].status = .completed }
+                    }
+                case .fileSearchStarted(let callId):
+                    receivedAnyEvent = true
+                    isRecovering = false
+                    withAnimation(.spring(duration: 0.3)) {
+                        if !activeToolCalls.contains(where: { $0.id == callId }) {
+                            activeToolCalls.append(ToolCallInfo(id: callId, type: .fileSearch, status: .inProgress))
+                        }
+                    }
+                case .fileSearchSearching(let callId):
+                    if let idx = activeToolCalls.firstIndex(where: { $0.id == callId }) {
+                        withAnimation(.easeInOut(duration: 0.2)) { activeToolCalls[idx].status = .fileSearching }
+                    }
+                case .fileSearchCompleted(let callId):
+                    if let idx = activeToolCalls.firstIndex(where: { $0.id == callId }) {
+                        withAnimation(.easeInOut(duration: 0.2)) { activeToolCalls[idx].status = .completed }
+                    }
+
+                case .annotationAdded(let citation):
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        if !liveCitations.contains(where: { $0.url == citation.url }) {
+                            liveCitations.append(citation)
+                        }
+                    }
+
+                case .completed(let fullText, let fullThinking):
+                    if !fullText.isEmpty && fullText.count > currentStreamingText.count {
+                        currentStreamingText = fullText
+                    }
+                    if let thinking = fullThinking, !thinking.isEmpty,
+                       thinking.count > currentThinkingText.count {
+                        currentThinkingText = thinking
+                    }
+                    persistToolCallsAndCitations()
+                    finalizeDraft()
+                    isRecovering = false
+                    #if DEBUG
+                    print("[Recovery] Streaming recovery completed successfully (\(currentStreamingText.count) chars)")
+                    #endif
+                    return
+
+                case .connectionLost:
+                    #if DEBUG
+                    print("[Recovery] Connection lost during streaming recovery")
+                    #endif
+                    // Fall through to post-loop handling
+                    break
+
+                case .error(let error):
+                    #if DEBUG
+                    print("[Recovery] Streaming recovery error: \(error.localizedDescription)")
+                    #endif
+                    // Fall through to fallback
+                    break
+                }
+            }
+
+            // Stream ended without .completed event
+            // Fall back to polling recovery to get the final result
+            if activeStreamID == streamID {
+                #if DEBUG
+                print("[Recovery] Streaming recovery stream ended without completion, falling back to polling. receivedAnyEvent=\(receivedAnyEvent)")
+                #endif
+
+                if receivedAnyEvent && !currentStreamingText.isEmpty {
+                    // We got some content via streaming, try polling for the rest
+                    persistToolCallsAndCitations()
+                    saveDraftNow()
+                }
+
+                // Fall back to polling-based recovery
+                if let draft = draftMessage {
+                    let msgId = draft.id
+                    // Don't finalize yet — let recoverResponse handle it
+                    isStreaming = false
+                    isThinking = false
+                    recoverResponse(messageId: msgId, responseId: responseId)
+                } else {
+                    // No draft — just clean up
+                    isStreaming = false
+                    isThinking = false
+                    isRecovering = false
+                    activeToolCalls = []
+                    liveCitations = []
+                    lastSequenceNumber = nil
+                }
+            }
+        }
+    }
+
+    // MARK: - Response Recovery (Polling Fallback)
 
     private func recoverResponse(messageId: UUID, responseId: String) {
         guard !apiKey.isEmpty else {
@@ -803,7 +1102,7 @@ final class ChatViewModel {
             }
 
             var attempts = 0
-            let maxAttempts = 60  // ~2 minutes max (60 * 2s)
+            let maxAttempts = 180  // ~6 minutes max (180 * 2s) — reasoning models can take several minutes
             var lastError: String?
 
             while !Task.isCancelled && attempts < maxAttempts {
@@ -849,7 +1148,7 @@ final class ChatViewModel {
 
                 } catch {
                     let errorMsg = error.localizedDescription
-                    if errorMsg.contains("__IN_PROGRESS__") {
+                    if errorMsg.contains("__IN_PROGRESS__") || errorMsg.contains("__QUEUED__") {
                         #if DEBUG
                         if attempts <= 3 || attempts % 10 == 0 {
                             print("[Recovery] Response still in progress, attempt \(attempts)/\(maxAttempts)")
@@ -862,12 +1161,11 @@ final class ChatViewModel {
                         #if DEBUG
                         print("[Recovery] Error: \(errorMsg), attempt \(attempts)")
                         #endif
-                        if attempts < 5 {
-                            try? await Task.sleep(nanoseconds: 3_000_000_000)
-                            continue
-                        } else {
-                            break
-                        }
+                        // Be more tolerant of transient errors (network issues after background)
+                        // Keep retrying with backoff up to maxAttempts
+                        let delay: UInt64 = attempts < 10 ? 2_000_000_000 : 3_000_000_000
+                        try? await Task.sleep(nanoseconds: delay)
+                        continue
                     }
                 }
             }
@@ -1143,6 +1441,7 @@ final class ChatViewModel {
         openAIService.cancelStream()
         recoveryTask?.cancel()
         errorMessage = nil
+        lastSequenceNumber = nil
 
         if savePartial && !currentStreamingText.isEmpty {
             persistToolCallsAndCitations()
@@ -1196,6 +1495,7 @@ final class ChatViewModel {
         draftMessage = nil
         activeToolCalls = []
         liveCitations = []
+        lastSequenceNumber = nil
         HapticService.shared.selection()
     }
 
@@ -1272,6 +1572,7 @@ final class ChatViewModel {
         activeToolCalls = []
         liveCitations = []
         pendingAttachments = []
+        lastSequenceNumber = nil
 
         Task { @MainActor in
             await recoverIncompleteMessagesInCurrentConversation()
