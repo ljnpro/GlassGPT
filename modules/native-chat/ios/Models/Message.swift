@@ -28,6 +28,10 @@ final class Message {
     /// JSON-encoded array of FileAttachment objects (user-uploaded documents).
     var fileAttachmentsData: Data?
 
+    /// The last SSE sequence_number received during streaming.
+    /// Used to resume streaming from the breakpoint via GET /v1/responses/{id}?stream=true&starting_after={seq}
+    var lastSequenceNumber: Int?
+
     init(
         id: UUID = UUID(),
         role: MessageRole = .user,
