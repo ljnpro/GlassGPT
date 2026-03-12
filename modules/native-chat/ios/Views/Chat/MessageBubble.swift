@@ -11,8 +11,6 @@ struct MessageBubble: View {
     var activeToolCalls: [ToolCallInfo] = []
     var liveCitations: [URLCitation] = []
 
-    @State private var showThinking = false
-
     var body: some View {
         HStack(alignment: .top) {
             if message.role == .user {
@@ -20,34 +18,17 @@ struct MessageBubble: View {
             }
 
             VStack(alignment: message.role == .user ? .trailing : .leading, spacing: 8) {
-                // Thinking toggle
+                // Thinking/reasoning (collapsible, completed — starts collapsed)
                 if message.role == .assistant, let thinking = message.thinking, !thinking.isEmpty {
-                    Button {
-                        withAnimation(.spring(duration: 0.3)) {
-                            showThinking.toggle()
-                        }
-                    } label: {
-                        HStack(spacing: 4) {
-                            Image(systemName: "brain")
-                                .font(.caption2)
-                            Text(showThinking ? "Hide Thinking" : "Show Thinking")
-                                .font(.caption2)
-                            Image(systemName: showThinking ? "chevron.up" : "chevron.down")
-                                .font(.caption2)
-                        }
-                        .foregroundStyle(.secondary)
-                    }
-                    .buttonStyle(.plain)
-
-                    if showThinking {
-                        ThinkingView(text: thinking)
-                            .transition(.opacity.combined(with: .move(edge: .top)))
-                    }
+                    ThinkingView(text: thinking, isLive: false)
                 }
 
-                // File attachments (user messages)
+                // File attachments (user messages) — aligned right
                 if message.role == .user && !message.fileAttachments.isEmpty {
-                    FileAttachmentsRow(attachments: message.fileAttachments)
+                    HStack {
+                        Spacer()
+                        FileAttachmentsRow(attachments: message.fileAttachments)
+                    }
                 }
 
                 // Image attachment
@@ -60,19 +41,18 @@ struct MessageBubble: View {
                         .clipShape(RoundedRectangle(cornerRadius: 12))
                 }
 
-                // Active tool call indicators (during streaming)
+                // Active tool call indicators (during streaming) — deduplicated
                 if message.role == .assistant {
-                    ForEach(activeToolCalls) { toolCall in
-                        switch toolCall.type {
-                        case .webSearch:
-                            if toolCall.status != .completed {
-                                WebSearchIndicator()
-                            }
-                        case .codeInterpreter:
-                            if toolCall.status != .completed {
-                                CodeInterpreterIndicator()
-                            }
-                        }
+                    // Only show ONE web search indicator, regardless of how many web search calls are active
+                    let hasActiveWebSearch = activeToolCalls.contains { $0.type == .webSearch && $0.status != .completed }
+                    if hasActiveWebSearch {
+                        WebSearchIndicator()
+                    }
+
+                    // Only show ONE code interpreter indicator
+                    let hasActiveCodeInterpreter = activeToolCalls.contains { $0.type == .codeInterpreter && $0.status != .completed }
+                    if hasActiveCodeInterpreter {
+                        CodeInterpreterIndicator()
                     }
                 }
 
