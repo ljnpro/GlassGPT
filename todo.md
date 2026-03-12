@@ -230,8 +230,10 @@
 - [x] BUG: Background resume recovery succeeds (banner disappears) but model stops outputting — stuck in Reasoning state with stop button still visible, isStreaming not properly reset (fixed via streaming recovery)
 - [x] VERIFY: Confirmed streaming is real SSE (URLSessionDataDelegate), no simulated output
 - [x] REVIEW: Streaming speed optimized — disabled waitsForConnectivity, added HTTP pipelining, explicit high-priority delegate queue, reduced draft save frequency to 2s
-- [x] FEATURE: Add background=true to all streaming requests so server continues even if client disconnects
-- [x] FEATURE: Track sequence_number during SSE streaming for resume capability
-- [x] FEATURE: Implement streaming recovery via GET /v1/responses/{id}?stream=true&starting_after={seq} — resume from breakpoint instead of polling final output
-- [x] FIX: handleReturnToForeground uses streaming recovery (continues real-time output) instead of polling recovery (one-shot final output)
-- [x] FIX: If response already completed on server, GET stream replays remaining events quickly (still streaming UX)
+- [x] REVERTED: Removed background=true (caused 90s TTFT), kept store=true for server-side response persistence
+- [x] REVERTED: Removed sequence_number tracking and streaming recovery — replaced with robust polling recovery
+- [x] FIX: handleReturnToForeground uses status-aware polling recovery (polls until completed, then applies full result)
+- [x] FIX: Recovery handles in_progress responses by polling every 2s until completed (up to 5 min timeout)
+- [x] BUG: Force-quit and relaunch shows "Recovering interrupted response..." forever — fixed: finalizeDraftAsPartial now sets isComplete=true, background task expiry handler also sets isComplete=true
+- [x] BUG: First token takes over 90 seconds — fixed: removed background=true flag which caused low-priority queuing
+- [x] BUG: After streaming recovery, reasoning content is truncated — fixed: response.completed SSE event now extracts full reasoning via extractReasoningText, fetchResponse also returns full reasoning
