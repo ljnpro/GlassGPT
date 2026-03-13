@@ -182,3 +182,14 @@
 - [x] REPO: Created repo as GlassGPT (https://github.com/ljnpro/GlassGPT)
 - [x] REPO: Changed GlassGPT repo visibility from private to public
 - [x] REPO: Added professional README.md with overview, features table, architecture, tech stack, getting started guide
+
+## v3.4: Cloudflare AI Gateway Migration
+- [x] Migrate from broken WebSocket relay to Cloudflare AI Gateway
+- [x] Delete RelayAPIService.swift and RelaySocketService.swift
+- [x] OpenAIService: dynamic base URL + cf-aig-authorization header on all endpoints
+- [x] FeatureFlags: add Cloudflare gateway config (URL, token, toggle)
+- [x] ChatViewModel: remove all relay logic, always use direct streaming (through gateway)
+- [x] FileDownloadService: remove relay download path, use gateway
+- [x] Settings UI: replace "Relay Server" with "Cloudflare Gateway" toggle + health check
+- [x] NativeChatAppDelegate: remove relay URL bridging
+- [x] app.config.ts: remove RelayServerURL from infoPlist
