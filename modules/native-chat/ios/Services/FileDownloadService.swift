@@ -1,7 +1,6 @@
 import Foundation
 
 /// Actor responsible for downloading files from OpenAI (sandbox files from code interpreter output).
-/// Handles both direct API access and relay-proxied downloads.
 actor FileDownloadService {
 
     static let shared = FileDownloadService()
@@ -20,7 +19,6 @@ actor FileDownloadService {
     /// Returns the local file URL.
     /// If a download for the same fileId is already in flight, joins that download.
     func downloadFile(fileId: String, suggestedFilename: String?, apiKey: String) async throws -> URL {
-        // Deduplicate in-flight downloads
         if let existingTask = inFlightDownloads[fileId] {
             return try await existingTask.value
         }
@@ -35,25 +33,14 @@ actor FileDownloadService {
     }
 
     private func performDownload(fileId: String, suggestedFilename: String?, apiKey: String) async throws -> URL {
-        let isRelayConfigured = FeatureFlags.isRelayConfigured
+        let (data, response) = try await downloadFromAPI(fileId: fileId, apiKey: apiKey)
 
-        let data: Data
-        let response: URLResponse
-
-        if isRelayConfigured {
-            (data, response) = try await downloadViaRelay(fileId: fileId, apiKey: apiKey)
-        } else {
-            (data, response) = try await downloadDirect(fileId: fileId, apiKey: apiKey)
-        }
-
-        // Determine filename
         let filename = resolveFilename(
             suggestedFilename: suggestedFilename,
             fileId: fileId,
             response: response
         )
 
-        // Save to temp directory
         let tempDir = FileManager.default.temporaryDirectory
             .appendingPathComponent("file_previews", isDirectory: true)
 
@@ -61,15 +48,14 @@ actor FileDownloadService {
 
         let localURL = tempDir.appendingPathComponent(filename)
 
-        // Remove existing file if present
         try? FileManager.default.removeItem(at: localURL)
         try data.write(to: localURL)
 
         return localURL
     }
 
-    private func downloadDirect(fileId: String, apiKey: String) async throws -> (Data, URLResponse) {
-        guard let url = URL(string: "https://api.openai.com/v1/files/\(fileId)/content") else {
+    private func downloadFromAPI(fileId: String, apiKey: String) async throws -> (Data, URLResponse) {
+        guard let url = URL(string: "\(FeatureFlags.openAIBaseURL)/files/\(fileId)/content") else {
             throw FileDownloadError.invalidURL
         }
 
@@ -77,34 +63,7 @@ actor FileDownloadService {
         request.httpMethod = "GET"
         request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
         request.timeoutInterval = 120
-
-        let (data, response) = try await session.data(for: request)
-
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw FileDownloadError.invalidResponse
-        }
-
-        if httpResponse.statusCode >= 400 {
-            let errorMsg = String(data: data, encoding: .utf8) ?? "Download failed"
-            throw FileDownloadError.httpError(httpResponse.statusCode, errorMsg)
-        }
-
-        return (data, response)
-    }
-
-    private func downloadViaRelay(fileId: String, apiKey: String) async throws -> (Data, URLResponse) {
-        let baseURL = try RelayAPIService.configuredBaseURL()
-        let basePath = RELAY_HTTP_BASE_PATH.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
-        let url = baseURL
-            .appendingPathComponent(basePath)
-            .appendingPathComponent("files")
-            .appendingPathComponent(fileId)
-            .appendingPathComponent("content")
-
-        var request = URLRequest(url: url)
-        request.httpMethod = "GET"
-        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
-        request.timeoutInterval = 120
+        FeatureFlags.applyCloudflareAuthorization(to: &request)
 
         let (data, response) = try await session.data(for: request)
 
@@ -121,12 +80,10 @@ actor FileDownloadService {
     }
 
     private func resolveFilename(suggestedFilename: String?, fileId: String, response: URLResponse) -> String {
-        // Try suggested filename first
         if let suggested = suggestedFilename, !suggested.isEmpty {
             return suggested
         }
 
-        // Try Content-Disposition header
         if let httpResponse = response as? HTTPURLResponse,
            let disposition = httpResponse.value(forHTTPHeaderField: "Content-Disposition"),
            let filenameRange = disposition.range(of: "filename=\""),
@@ -137,12 +94,10 @@ actor FileDownloadService {
             }
         }
 
-        // Try suggested filename from URLResponse
         if let suggested = response.suggestedFilename, !suggested.isEmpty, suggested != "Unknown" {
             return suggested
         }
 
-        // Determine extension from MIME type
         let ext: String
         if let mimeType = response.mimeType {
             ext = Self.extensionForMimeType(mimeType)
@@ -177,7 +132,6 @@ actor FileDownloadService {
         }
     }
 
-    /// Clean up all cached preview files
     func cleanupCache() {
         let tempDir = FileManager.default.temporaryDirectory
             .appendingPathComponent("file_previews", isDirectory: true)

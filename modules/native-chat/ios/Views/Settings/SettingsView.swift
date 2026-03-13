@@ -4,8 +4,6 @@ import UIKit
 struct SettingsView: View {
     @State private var viewModel = SettingsViewModel()
 
-    /// Dynamically reads the device OS name and version.
-    /// Shows "Liquid Glass" suffix only on iOS/iPadOS 26+.
     private var platformString: String {
         let device = UIDevice.current
         let osName: String
@@ -27,9 +25,9 @@ struct SettingsView: View {
         }
     }
 
-    private var relayStatusColor: Color {
-        switch viewModel.relayHealthStatus {
-        case .healthy:
+    private var cloudflareStatusColor: Color {
+        switch viewModel.cloudflareHealthStatus {
+        case .connected:
             return .green
         case .checking:
             return .yellow
@@ -40,9 +38,9 @@ struct SettingsView: View {
         }
     }
 
-    private var relayStatusText: String {
-        switch viewModel.relayHealthStatus {
-        case .healthy:
+    private var cloudflareStatusText: String {
+        switch viewModel.cloudflareHealthStatus {
+        case .connected:
             return "Connected"
         case .checking:
             return "Checking connection…"
@@ -53,21 +51,9 @@ struct SettingsView: View {
         }
     }
 
-    private var relayURLDisplayText: String {
-        let trimmed = viewModel.relayServerURL.trimmingCharacters(in: .whitespacesAndNewlines)
-        return trimmed.isEmpty ? "Not configured" : trimmed
-    }
-
-    private func formattedUptime(_ seconds: Int) -> String {
-        let hours = max(0, seconds) / 3600
-        let minutes = (max(0, seconds) % 3600) / 60
-        return "\(hours)h \(minutes)m"
-    }
-
     var body: some View {
         NavigationStack {
             Form {
-                // MARK: - API Configuration
                 Section {
                     SecureField("sk-proj-...", text: $viewModel.apiKey)
                         .textContentType(.password)
@@ -113,82 +99,45 @@ struct SettingsView: View {
                     Text("Your API key is stored securely in the device Keychain.")
                 }
 
-                // MARK: - Relay Server
                 Section {
-                    Toggle("Enable Relay Server", isOn: $viewModel.relayServerEnabled)
+                    Toggle("Enable Cloudflare Gateway", isOn: $viewModel.cloudflareEnabled)
 
-                    if viewModel.isRelayAutoDetected {
-                        LabeledContent("URL") {
-                            VStack(alignment: .trailing, spacing: 4) {
-                                Text(relayURLDisplayText)
-                                    .multilineTextAlignment(.trailing)
-                                    .textSelection(.enabled)
+                    if viewModel.cloudflareEnabled {
+                        HStack(spacing: 10) {
+                            Image(systemName: "circle.fill")
+                                .font(.system(size: 10))
+                                .foregroundStyle(cloudflareStatusColor)
 
-                                Text("Auto-detected")
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Connection Status")
+                                Text(cloudflareStatusText)
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
+                                    .multilineTextAlignment(.leading)
+                            }
+
+                            Spacer()
+
+                            if viewModel.isCheckingCloudflareHealth {
+                                ProgressView()
+                                    .controlSize(.small)
                             }
                         }
-                    } else {
-                        TextField("https://relay.example.com", text: $viewModel.relayServerURL)
-                            .textInputAutocapitalization(.never)
-                            .autocorrectionDisabled()
-                            .keyboardType(.URL)
-                    }
 
-                    HStack(spacing: 10) {
-                        Image(systemName: "circle.fill")
-                            .font(.system(size: 10))
-                            .foregroundStyle(relayStatusColor)
-
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("Connection Status")
-                            Text(relayStatusText)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                                .multilineTextAlignment(.leading)
+                        Button("Check Connection") {
+                            Task { @MainActor in
+                                await viewModel.checkCloudflareHealth()
+                            }
                         }
-
-                        Spacer()
-
-                        if viewModel.isCheckingRelayHealth {
-                            ProgressView()
-                                .controlSize(.small)
-                        }
+                        .buttonStyle(.glass)
+                        .disabled(viewModel.isCheckingCloudflareHealth)
                     }
-
-                    switch viewModel.relayHealthStatus {
-                    case .healthy(let uptime, let activeRuns):
-                        LabeledContent("Uptime", value: formattedUptime(uptime))
-                        LabeledContent("Active Runs", value: "\(activeRuns)")
-
-                        if let relayVersion = viewModel.relayVersion, !relayVersion.isEmpty {
-                            LabeledContent("Version", value: relayVersion)
-                        }
-
-                    case .error(let message):
-                        Text(message)
-                            .font(.caption)
-                            .foregroundStyle(.red)
-
-                    case .unknown, .checking:
-                        EmptyView()
-                    }
-
-                    Button("Check Connection") {
-                        Task { @MainActor in
-                            await viewModel.checkRelayHealth()
-                        }
-                    }
-                    .buttonStyle(.glass)
-                    .disabled(viewModel.relayServerURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || viewModel.isCheckingRelayHealth)
                 } header: {
-                    Text("Relay Server")
+                    Text("Cloudflare Gateway")
                 } footer: {
-                    Text("Use the relay server for resumable streaming, live socket updates, and more reliable long-running chat responses.")
+                    Text("Route API requests through Cloudflare's global edge network for improved reliability and analytics.")
                 }
 
-                // MARK: - Chat Defaults
                 Section("Chat Defaults") {
                     Picker("Default Model", selection: $viewModel.defaultModel) {
                         ForEach(ModelType.allCases) { model in
@@ -203,7 +152,6 @@ struct SettingsView: View {
                     }
                 }
 
-                // MARK: - Appearance
                 Section("Appearance") {
                     Picker("Theme", selection: $viewModel.appTheme) {
                         ForEach(AppTheme.allCases) { theme in
@@ -217,7 +165,6 @@ struct SettingsView: View {
                     }
                 }
 
-                // MARK: - About
                 Section("About") {
                     LabeledContent("Version", value: "2.1.0")
                     LabeledContent("Platform", value: platformString)

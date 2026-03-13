@@ -20,7 +20,6 @@ Pod::Spec.new do |s|
 
   s.dependency 'ExpoModulesCore'
   s.dependency 'React-Core'
-  s.dependency 'Socket.IO-Client-Swift', '~> 16.1'
 
   s.frameworks     = 'SwiftUI', 'SwiftData', 'Security', 'WebKit'
 end
