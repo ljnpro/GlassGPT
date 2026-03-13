@@ -11,6 +11,15 @@ public class NativeChatAppDelegate: ExpoAppDelegateSubscriber {
         _ application: UIApplication,
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
     ) -> Bool {
+        // Auto-configure relay server URL from Info.plist (injected by Expo from EXPO_PUBLIC_API_BASE_URL)
+        if let relayURL = Bundle.main.infoDictionary?["RelayServerURL"] as? String,
+           !relayURL.isEmpty {
+            FeatureFlags.configurePlatformRelay(url: relayURL)
+            #if DEBUG
+            print("[Relay] Auto-configured relay server URL: \(relayURL)")
+            #endif
+        }
+        
         // Schedule root replacement after React Native has set up the window
         DispatchQueue.main.async { [weak self] in
             self?.replaceRootViewController()
