@@ -15,6 +15,15 @@ final class Message {
     /// Used to poll for the complete response if streaming was interrupted.
     var responseId: String?
 
+    /// Relay run identifier for relay-server-backed streaming.
+    var relayRunId: String?
+
+    /// Secret relay resume token returned by the relay server.
+    var relayResumeToken: String?
+
+    /// Highest OpenAI sequence_number acknowledged by the iOS client.
+    var relayLastSequenceNumber: Int?
+
     /// Whether this message has been fully received.
     var isComplete: Bool
 
@@ -36,6 +45,9 @@ final class Message {
         createdAt: Date = .now,
         conversation: Conversation? = nil,
         responseId: String? = nil,
+        relayRunId: String? = nil,
+        relayResumeToken: String? = nil,
+        relayLastSequenceNumber: Int? = nil,
         isComplete: Bool = true,
         annotations: [URLCitation]? = nil,
         toolCalls: [ToolCallInfo]? = nil,
@@ -49,6 +61,9 @@ final class Message {
         self.createdAt = createdAt
         self.conversation = conversation
         self.responseId = responseId
+        self.relayRunId = relayRunId
+        self.relayResumeToken = relayResumeToken
+        self.relayLastSequenceNumber = relayLastSequenceNumber
         self.isComplete = isComplete
         self.annotationsData = Self.encode(annotations)
         self.toolCallsData = Self.encode(toolCalls)

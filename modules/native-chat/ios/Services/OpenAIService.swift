@@ -460,72 +460,15 @@ final class OpenAIService {
     // MARK: - Extractors
 
     private nonisolated static func extractOutputText(from json: [String: Any]) -> String? {
-        if let text = json["output_text"] as? String, !text.isEmpty {
-            return text
-        }
-
-        guard let output = json["output"] as? [[String: Any]] else { return nil }
-
-        var texts: [String] = []
-
-        for item in output {
-            guard let type = item["type"] as? String, type == "message" else { continue }
-            guard let content = item["content"] as? [[String: Any]] else { continue }
-
-            for part in content {
-                if let partType = part["type"] as? String,
-                   partType == "output_text",
-                   let text = part["text"] as? String {
-                    texts.append(text)
-                }
-            }
-        }
-
-        let joined = texts.joined()
-        return joined.isEmpty ? nil : joined
+        OpenAIStreamEventTranslator.extractOutputText(from: json)
     }
 
     private nonisolated static func extractReasoningText(from json: [String: Any]) -> String? {
-        var texts: [String] = []
-
-        if let reasoning = json["reasoning"] as? [String: Any] {
-            if let text = reasoning["text"] as? String, !text.isEmpty {
-                texts.append(text)
-            }
-            if let summary = reasoning["summary"] as? [[String: Any]] {
-                texts.append(contentsOf: summary.compactMap { $0["text"] as? String })
-            }
-        }
-
-        if let output = json["output"] as? [[String: Any]] {
-            for item in output {
-                guard let type = item["type"] as? String, type == "reasoning" else { continue }
-
-                if let text = item["text"] as? String, !text.isEmpty {
-                    texts.append(text)
-                }
-
-                if let summary = item["summary"] as? [[String: Any]] {
-                    texts.append(contentsOf: summary.compactMap { $0["text"] as? String })
-                }
-
-                if let content = item["content"] as? [[String: Any]] {
-                    texts.append(contentsOf: content.compactMap { $0["text"] as? String })
-                }
-            }
-        }
-
-        let joined = texts.joined()
-        return joined.isEmpty ? nil : joined
+        OpenAIStreamEventTranslator.extractReasoningText(from: json)
     }
 
     private nonisolated static func extractErrorMessage(from json: [String: Any]) -> String? {
-        if let error = json["error"] as? [String: Any],
-           let message = error["message"] as? String,
-           !message.isEmpty {
-            return message
-        }
-        return nil
+        OpenAIStreamEventTranslator.extractErrorMessage(from: json)
     }
 
     // MARK: - Build Input Array
@@ -811,31 +754,22 @@ private final class SSEDelegate: NSObject, URLSessionDataDelegate, @unchecked Se
     }
 
     private func processEvent(type: String, data: String) -> EventResult {
-        guard let jsonData = data.data(using: .utf8) else { return .continued }
+        guard
+            let jsonData = data.data(using: .utf8),
+            let json = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any]
+        else {
+            return .continued
+        }
 
-        switch type {
-
-        case "response.output_text.delta":
-            if let json = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any],
-               let delta = json["delta"] as? String {
+        if let translated = OpenAIStreamEventTranslator.translate(eventType: type, data: json) {
+            switch translated {
+            case .textDelta(let delta):
                 emittedAnyOutput = true
                 accumulatedText += delta
                 continuation.yield(.textDelta(delta))
-            }
-            return .continued
+                return .continued
 
-        case "response.output_text.done":
-            if let json = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any],
-               let fullText = json["text"] as? String,
-               !fullText.isEmpty {
-                emittedAnyOutput = true
-                accumulatedText = fullText
-            }
-            return .continued
-
-        case "response.reasoning_summary_text.delta":
-            if let json = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any],
-               let delta = json["delta"] as? String {
+            case .thinkingDelta(let delta):
                 if !thinkingActive {
                     thinkingActive = true
                     continuation.yield(.thinkingStarted)
@@ -843,232 +777,54 @@ private final class SSEDelegate: NSObject, URLSessionDataDelegate, @unchecked Se
                 emittedAnyOutput = true
                 accumulatedThinking += delta
                 continuation.yield(.thinkingDelta(delta))
-            }
-            return .continued
+                return .continued
 
-        case "response.reasoning_summary_text.done":
-            if let json = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any],
-               let fullText = json["text"] as? String,
-               !fullText.isEmpty {
-                accumulatedThinking = fullText
-            }
-            if thinkingActive {
-                thinkingActive = false
-                continuation.yield(.thinkingFinished)
-            }
-            return .continued
-
-        case "response.reasoning_text.delta":
-            if let json = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any],
-               let delta = json["delta"] as? String {
-                if !thinkingActive {
-                    thinkingActive = true
-                    continuation.yield(.thinkingStarted)
+            case .thinkingFinished:
+                if thinkingActive {
+                    thinkingActive = false
+                    continuation.yield(.thinkingFinished)
                 }
-                emittedAnyOutput = true
-                accumulatedThinking += delta
-                continuation.yield(.thinkingDelta(delta))
-            }
-            return .continued
+                return .continued
 
-        case "response.reasoning_text.done":
-            if let json = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any],
-               let fullText = json["text"] as? String,
-               !fullText.isEmpty {
-                accumulatedThinking = fullText
-            }
-            if thinkingActive {
-                thinkingActive = false
-                continuation.yield(.thinkingFinished)
-            }
-            return .continued
-
-        case "response.web_search_call.in_progress":
-            if let json = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any],
-               let itemId = json["item_id"] as? String {
-                continuation.yield(.webSearchStarted(itemId))
-                #if DEBUG
-                print("[SSE] Web search started: \(itemId)")
-                #endif
-            }
-            return .continued
-
-        case "response.web_search_call.searching":
-            if let json = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any],
-               let itemId = json["item_id"] as? String {
-                continuation.yield(.webSearchSearching(itemId))
-            }
-            return .continued
-
-        case "response.web_search_call.completed":
-            if let json = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any],
-               let itemId = json["item_id"] as? String {
-                continuation.yield(.webSearchCompleted(itemId))
-                #if DEBUG
-                print("[SSE] Web search completed: \(itemId)")
-                #endif
-            }
-            return .continued
-
-        case "response.code_interpreter_call.in_progress":
-            if let json = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any],
-               let itemId = json["item_id"] as? String {
-                continuation.yield(.codeInterpreterStarted(itemId))
-                #if DEBUG
-                print("[SSE] Code interpreter started: \(itemId)")
-                #endif
-            }
-            return .continued
-
-        case "response.code_interpreter_call.interpreting":
-            if let json = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any],
-               let itemId = json["item_id"] as? String {
-                continuation.yield(.codeInterpreterInterpreting(itemId))
-            }
-            return .continued
-
-        case "response.code_interpreter_call_code.delta":
-            if let json = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any],
-               let delta = json["delta"] as? String {
-                let itemId = json["item_id"] as? String ?? ""
-                continuation.yield(.codeInterpreterCodeDelta(itemId, delta))
-            }
-            return .continued
-
-        case "response.code_interpreter_call_code.done":
-            if let json = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any],
-               let code = json["code"] as? String {
-                let itemId = json["item_id"] as? String ?? ""
-                continuation.yield(.codeInterpreterCodeDone(itemId, code))
-            }
-            return .continued
-
-        case "response.code_interpreter_call.completed":
-            if let json = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any],
-               let itemId = json["item_id"] as? String {
-                continuation.yield(.codeInterpreterCompleted(itemId))
-                #if DEBUG
-                print("[SSE] Code interpreter completed: \(itemId)")
-                #endif
-            }
-            return .continued
-
-        case "response.file_search_call.in_progress":
-            if let json = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any],
-               let itemId = json["item_id"] as? String {
-                continuation.yield(.fileSearchStarted(itemId))
-                #if DEBUG
-                print("[SSE] File search started: \(itemId)")
-                #endif
-            }
-            return .continued
-
-        case "response.file_search_call.searching":
-            if let json = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any],
-               let itemId = json["item_id"] as? String {
-                continuation.yield(.fileSearchSearching(itemId))
-            }
-            return .continued
-
-        case "response.file_search_call.completed":
-            if let json = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any],
-               let itemId = json["item_id"] as? String {
-                continuation.yield(.fileSearchCompleted(itemId))
-                #if DEBUG
-                print("[SSE] File search completed: \(itemId)")
-                #endif
-            }
-            return .continued
-
-        case "response.output_text.annotation.added":
-            if let json = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any],
-               let annotation = json["annotation"] as? [String: Any],
-               let annType = annotation["type"] as? String,
-               annType == "url_citation",
-               let url = annotation["url"] as? String,
-               let title = annotation["title"] as? String {
-                let startIdx = annotation["start_index"] as? Int ?? 0
-                let endIdx = annotation["end_index"] as? Int ?? 0
-                let citation = URLCitation(url: url, title: title, startIndex: startIdx, endIndex: endIdx)
-                continuation.yield(.annotationAdded(citation))
-                #if DEBUG
-                print("[SSE] Citation: \(title) → \(url)")
-                #endif
-            }
-            return .continued
-
-        case "response.completed":
-            sawTerminalEvent = true
-            if let json = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any],
-               let responseObj = json["response"] as? [String: Any] {
-                if let text = Self.extractOutputText(from: responseObj), !text.isEmpty {
-                    accumulatedText = text
-                }
-                if let thinking = Self.extractReasoningText(from: responseObj), !thinking.isEmpty {
-                    accumulatedThinking = thinking
-                }
-                emittedAnyOutput = emittedAnyOutput || !accumulatedText.isEmpty || !accumulatedThinking.isEmpty
-            }
-            return .terminalCompleted
-
-        case "response.incomplete":
-            sawTerminalEvent = true
-            if let json = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any],
-               let responseObj = json["response"] as? [String: Any] {
-                if let text = Self.extractOutputText(from: responseObj), !text.isEmpty {
-                    accumulatedText = text
-                }
-                if let thinking = Self.extractReasoningText(from: responseObj), !thinking.isEmpty {
-                    accumulatedThinking = thinking
-                }
-                emittedAnyOutput = emittedAnyOutput || !accumulatedText.isEmpty || !accumulatedThinking.isEmpty
-            }
-            return .terminalCompleted
-
-        case "response.failed":
-            sawTerminalEvent = true
-            var errorMsg = "Response generation failed"
-
-            if let json = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any],
-               let responseObj = json["response"] as? [String: Any] {
-                if let text = Self.extractOutputText(from: responseObj), !text.isEmpty {
-                    accumulatedText = text
-                }
-                if let thinking = Self.extractReasoningText(from: responseObj), !thinking.isEmpty {
-                    accumulatedThinking = thinking
-                }
-                if let errorObj = responseObj["error"] as? [String: Any],
-                   let message = errorObj["message"] as? String {
-                    errorMsg = message
-                }
-            }
-
-            continuation.yield(.error(.requestFailed(errorMsg)))
-            return .terminalError
-
-        case "error":
-            sawTerminalEvent = true
-            var errorMsg = data
-            if let json = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any],
-               let message = json["message"] as? String {
-                errorMsg = message
-            }
-            continuation.yield(.error(.requestFailed(errorMsg)))
-            return .terminalError
-
-        case "response.created":
-            if let json = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any],
-               let responseObj = json["response"] as? [String: Any],
-               let responseId = responseObj["id"] as? String {
+            case .responseCreated(let responseId):
                 continuation.yield(.responseCreated(responseId))
                 #if DEBUG
                 print("[SSE] Response created: \(responseId)")
                 #endif
+                return .continued
+
+            case .completed(let fullText, let fullThinking):
+                sawTerminalEvent = true
+                if !fullText.isEmpty {
+                    accumulatedText = fullText
+                }
+                if let fullThinking, !fullThinking.isEmpty {
+                    accumulatedThinking = fullThinking
+                }
+                emittedAnyOutput = emittedAnyOutput || !accumulatedText.isEmpty || !accumulatedThinking.isEmpty
+                return .terminalCompleted
+
+            case .error(let error):
+                sawTerminalEvent = true
+                continuation.yield(.error(error))
+                return .terminalError
+
+            default:
+                continuation.yield(translated)
+                return .continued
+            }
+        }
+
+        switch type {
+        case "response.output_text.done":
+            if let fullText = json["text"] as? String, !fullText.isEmpty {
+                accumulatedText = fullText
+                emittedAnyOutput = true
             }
             return .continued
 
-        case "response.in_progress",
-             "response.queued",
+        case "response.queued",
+             "response.in_progress",
              "response.output_item.added",
              "response.output_item.done",
              "response.content_part.added",
@@ -1141,65 +897,5 @@ private final class SSEDelegate: NSObject, URLSessionDataDelegate, @unchecked Se
         guard !alreadyFinished else { return }
         continuation.yield(.error(error))
         continuation.finish()
-    }
-
-    private static func extractOutputText(from json: [String: Any]) -> String? {
-        if let text = json["output_text"] as? String, !text.isEmpty {
-            return text
-        }
-
-        guard let output = json["output"] as? [[String: Any]] else { return nil }
-
-        var texts: [String] = []
-
-        for item in output {
-            guard let type = item["type"] as? String, type == "message" else { continue }
-            guard let content = item["content"] as? [[String: Any]] else { continue }
-
-            for part in content {
-                if let partType = part["type"] as? String,
-                   partType == "output_text",
-                   let text = part["text"] as? String {
-                    texts.append(text)
-                }
-            }
-        }
-
-        let joined = texts.joined()
-        return joined.isEmpty ? nil : joined
-    }
-
-    private static func extractReasoningText(from json: [String: Any]) -> String? {
-        var texts: [String] = []
-
-        if let reasoning = json["reasoning"] as? [String: Any] {
-            if let text = reasoning["text"] as? String, !text.isEmpty {
-                texts.append(text)
-            }
-            if let summary = reasoning["summary"] as? [[String: Any]] {
-                texts.append(contentsOf: summary.compactMap { $0["text"] as? String })
-            }
-        }
-
-        if let output = json["output"] as? [[String: Any]] {
-            for item in output {
-                guard let type = item["type"] as? String, type == "reasoning" else { continue }
-
-                if let text = item["text"] as? String, !text.isEmpty {
-                    texts.append(text)
-                }
-
-                if let summary = item["summary"] as? [[String: Any]] {
-                    texts.append(contentsOf: summary.compactMap { $0["text"] as? String })
-                }
-
-                if let content = item["content"] as? [[String: Any]] {
-                    texts.append(contentsOf: content.compactMap { $0["text"] as? String })
-                }
-            }
-        }
-
-        let joined = texts.joined()
-        return joined.isEmpty ? nil : joined
     }
 }
