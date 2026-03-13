@@ -923,7 +923,7 @@ describe('Relay socket handler integration', () => {
 
     expect(socket.join).toHaveBeenCalledWith('run:relay_socket_join_1');
 
-    const emittedNames = socket.emit.mock.calls.map(([eventName]) => eventName);
+    const emittedNames = socket.emit.mock.calls.map(([eventName]: [string]) => eventName);
     expect(emittedNames).toEqual(['relay:joined', 'relay:event', 'relay:event', 'relay:done']);
 
     const joinedPayload = emittedPayloads(socket, 'relay:joined')[0];
