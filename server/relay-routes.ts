@@ -69,6 +69,18 @@ export function registerRelayRoutes(app: Express, deps: RelayRouteDeps): void {
     maxRequests: 20,
   });
 
+  // Health check endpoint
+  const APP_VERSION = process.env.npm_package_version ?? "dev";
+
+  router.get("/health", (_req, res) => {
+    res.status(200).json({
+      status: "ok",
+      uptime: Math.floor(process.uptime()),
+      activeRuns: deps.store.getActiveRunCount(),
+      version: APP_VERSION,
+    });
+  });
+
   router.post(
     "/files",
     uploadLimiter,

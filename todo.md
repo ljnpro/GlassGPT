@@ -260,3 +260,14 @@
 - [x] TEST: Write tests for relay routes (create run, cancel, file upload) — included in relay-integration.test.ts
 - [x] TEST: Write tests for Socket.IO event protocol (join, replay, live forwarding) — included in relay-integration.test.ts
 - [x] TEST: Write tests for Swift client reconnection flow — 19 integration tests passing
+
+## Relay Auto-Detection & Health Check UI
+- [x] FEATURE: Auto-detect relay server URL from EXPO_PUBLIC_API_BASE_URL — no manual configuration needed
+- [x] FEATURE: Add relay health check UI in Settings — show connection status (connected/reconnecting/disconnected)
+- [x] FEATURE: Ensure health check UI matches liquid glass design style
+- [x] TEST: Write tests for auto-detection logic and health check — health endpoint verified returning status/uptime/activeRuns/version
+
+## Xcode Build Error Fixes
+- [x] BUG: Socket.IO fileprivate access level errors — fixed: changed private extension to internal extension
+- [x] BUG: RelaySocketService non-Sendable capture in @Sendable closure — fixed: marked @unchecked Sendable
+- [x] BUG: SocketAckValue not found in scope — fixed: use "NO ACK" string check instead
