@@ -281,4 +281,4 @@
 - [x] BUG: Code interpreter output file links (sandbox:// URLs) not tappable — implemented: FilePathAnnotation model, file_path annotation parsing in streaming, FileDownloadService actor, QLPreviewController wrapper, openURL interception in MarkdownContentView
 - [x] PLAN: Consulted GPT-5.4 High for analysis + Claude Opus 4.6 for code generation
 - [x] BUG: Build fails with "no expo project found (missing app.json, app.config.js, or package.json)" — fixed: added minimal app.json with expo name/slug
-- [ ] BUG: Xcode build error — tuple pattern mismatch for StreamEvent.completed (missing FilePathAnnotation parameter in some call sites)
+- [x] BUG: Xcode build error — tuple pattern mismatch for StreamEvent.completed — fixed: updated 3 occurrences in RelaySocketService.swift to 3-parameter format
