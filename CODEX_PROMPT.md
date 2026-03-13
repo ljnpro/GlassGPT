@@ -1,183 +1,358 @@
-# GlassGPT Beta — Xcode Codex Bug Fix Prompt
+# Codex Task: Migrate from Relay Server to Cloudflare AI Gateway
 
-## Clone & Setup
+## Overview
 
-```bash
-git clone https://github.com/ljnpro/GlassGPT.git
-cd GlassGPT
-git checkout beta
-```
+GlassGPT currently has two modes for calling OpenAI:
+1. **Direct mode** — iOS app calls `api.openai.com` directly (works fine)
+2. **Relay mode** — iOS app calls through a WebSocket-based relay server (BROKEN: produces no output when enabled)
 
-Open the Xcode project: the native iOS Swift code lives entirely under `modules/native-chat/ios/`.
+**Goal**: Replace the broken relay system entirely with **Cloudflare AI Gateway**, which is a simple HTTP proxy that transparently forwards requests to OpenAI. The UI should show "Cloudflare" instead of "Relay". Keep the health check functionality.
 
-This is an **Expo + Swift native module** project. The Swift code is a full native iOS chat app (SwiftUI + SwiftData) embedded as an Expo module. You only need to fix the Swift files — do NOT touch TypeScript/JS files.
+## Cloudflare AI Gateway Details
 
----
+- **Gateway Base URL**: `https://gateway.ai.cloudflare.com/v1/887b39f387990e7ef89e400eb228e193/glass-gpt/openai`
+- **Auth Token**: `W3AAxNEfdJNnhh-tT-w9TX4mPTLtU2_e_ox0Pwd7`
+- **Auth Header**: `cf-aig-authorization: Bearer W3AAxNEfdJNnhh-tT-w9TX4mPTLtU2_e_ox0Pwd7`
 
-## Task: Fix All Xcode Build Errors
+### How Cloudflare AI Gateway works
 
-The project currently fails to compile on Xcode (EAS Build / iOS). Your job is to **make all Swift files compile successfully** with **Swift 6 strict concurrency checking** enabled (deployment target iOS 26.0).
+It is a **transparent HTTP proxy**. You simply replace `https://api.openai.com/v1` with the gateway URL. All OpenAI API endpoints work identically:
 
-### Known Error Categories
+| Original URL | Gateway URL |
+|---|---|
+| `https://api.openai.com/v1/responses` | `https://gateway.ai.cloudflare.com/v1/.../glass-gpt/openai/responses` |
+| `https://api.openai.com/v1/files` | `https://gateway.ai.cloudflare.com/v1/.../glass-gpt/openai/files` |
+| `https://api.openai.com/v1/files/{id}/content` | `https://gateway.ai.cloudflare.com/v1/.../glass-gpt/openai/files/{id}/content` |
+| `https://api.openai.com/v1/models` | `https://gateway.ai.cloudflare.com/v1/.../glass-gpt/openai/models` |
 
-#### 1. StreamEvent.completed Tuple Mismatch (LIKELY FIXED — verify)
+**Two headers are needed on every request through the gateway:**
+1. `Authorization: Bearer {user's OpenAI API key}` (same as before)
+2. `cf-aig-authorization: Bearer W3AAxNEfdJNnhh-tT-w9TX4mPTLtU2_e_ox0Pwd7` (gateway auth)
 
-`StreamEvent.completed` is defined as a 3-tuple:
+SSE streaming works identically through the gateway — no WebSocket translation needed.
 
-```swift
-// In OpenAIService.swift, line 27
-case completed(String, String?, [FilePathAnnotation]?)
-```
-
-All `switch` statements and call sites that construct or destructure `.completed(...)` **must use 3 parameters**. Check every file for mismatches:
-
-**Files to check:**
-- `Services/OpenAIService.swift`
-- `Services/OpenAIStreamEventTranslator.swift`
-- `Services/RelaySocketService.swift`
-- `ViewModels/ChatViewModel.swift`
-
-If you see `.completed(text, thinking)` (2 params), fix it to `.completed(text, thinking, nil)` or `.completed(text, thinking, filePathAnns)`.
-
-#### 2. Concurrency Safety (LIKELY FIXED — verify)
-
-`FeatureFlags.swift` previously had a `static var _platformRelayURL` which is a nonisolated global shared mutable state. This has been replaced with an `NSLock`-backed `PlatformRelayStorage` class. Verify it compiles cleanly under strict concurrency.
-
-#### 3. Any Other Build Errors
-
-There may be additional errors we haven't seen yet. Common patterns to watch for:
-
-- **Missing imports**: `FileDownloadService.swift` and `FilePreviewController.swift` are new files. Ensure they are included in the Xcode build target.
-- **Type mismatches**: `FilePathAnnotation` is defined in `Models/ChatModels.swift`. All files referencing it must see this type.
-- **Sendable conformance**: All types crossing concurrency boundaries must be `Sendable`. Check `FileDownloadError`, `FilePathAnnotation`, etc.
-- **Actor isolation**: `FileDownloadService` is an `actor`. Calls to it from `@MainActor` contexts need `await`.
-- **QuickLook import**: `FilePreviewController.swift` uses `import QuickLook` — this is iOS-only, ensure it's not accidentally included in a shared target.
-
----
-
-## Project Structure (Swift files only)
+## Project Structure
 
 ```
 modules/native-chat/ios/
 ├── Models/
-│   ├── ChatModels.swift          # URLCitation, ToolCallInfo, FilePathAnnotation, etc.
-│   ├── Conversation.swift        # SwiftData @Model for conversations
-│   └── Message.swift             # SwiftData @Model for messages (has filePathAnnotations computed property)
+│   ├── ChatModels.swift
+│   ├── Conversation.swift
+│   └── Message.swift
+├── NativeChatAppDelegate.swift
+├── NativeChatModule.swift
+├── NativeChatPersistence.swift
 ├── Services/
-│   ├── FeatureFlags.swift        # Relay config flags (NSLock-backed PlatformRelayStorage)
-│   ├── FileDownloadService.swift # NEW: actor for downloading files from OpenAI API
+│   ├── FeatureFlags.swift
+│   ├── FileDownloadService.swift
 │   ├── HapticService.swift
 │   ├── KaTeXProvider.swift
 │   ├── KeychainService.swift
-│   ├── OpenAIService.swift       # StreamEvent enum + OpenAI streaming logic
-│   ├── OpenAIStreamEventTranslator.swift  # SSE JSON → StreamEvent translation
-│   ├── RelayAPIService.swift     # HTTP helpers for relay server
-│   └── RelaySocketService.swift  # WebSocket-based relay streaming
+│   ├── OpenAIService.swift
+│   ├── OpenAIStreamEventTranslator.swift
+│   ├── RelayAPIService.swift      # TO BE REMOVED/REPLACED
+│   └── RelaySocketService.swift   # TO BE REMOVED/REPLACED
 ├── ViewModels/
-│   ├── ChatViewModel.swift       # Main VM: handleSandboxLinkTap, file preview state
-│   └── SettingsViewModel.swift   # Settings/health check VM
-├── Views/
-│   ├── Chat/
-│   │   ├── ChatView.swift        # Main chat UI: file preview sheet, download overlay
-│   │   ├── MessageBubble.swift   # Individual message bubble (passes filePathAnnotations)
-│   │   ├── MessageInputBar.swift
-│   │   └── ModelSelectorSheet.swift
-│   ├── Components/
-│   │   ├── CodeInterpreterView.swift
-│   │   ├── FilePreviewController.swift  # NEW: QLPreviewController wrapper
-│   │   ├── MarkdownContentView.swift    # Markdown rendering + sandbox:// link interception
-│   │   └── ... (other components)
-│   ├── History/
-│   ├── Root/
-│   └── Settings/
-├── NativeChatAppDelegate.swift
-├── NativeChatModule.swift
-└── NativeChatPersistence.swift
+│   ├── ChatViewModel.swift
+│   └── SettingsViewModel.swift
+└── Views/
+    ├── Chat/
+    │   ├── ChatView.swift
+    │   ├── MessageBubble.swift
+    │   ├── MessageInputBar.swift
+    │   └── ModelSelectorSheet.swift
+    ├── Components/ (various)
+    ├── History/ (various)
+    ├── Root/ (various)
+    └── Settings/
+        └── SettingsView.swift
 ```
 
----
+## What to Change
 
-## Key Type Definitions (for reference)
+### 1. `FeatureFlags.swift` — Replace relay config with Cloudflare config
 
-### StreamEvent (OpenAIService.swift)
+**Current state**: Stores `relayServerURL`, `useRelayServer`, `platformRelayURL` via `PlatformRelayStorage` with NSLock.
+
+**Replace with** Cloudflare AI Gateway config. Keep the `PlatformRelayStorage` class (it was just fixed for concurrency safety), but add new Cloudflare properties:
+
 ```swift
-enum StreamEvent: Sendable {
-    case textDelta(String)
-    case thinkingDelta(String)
-    case thinkingStarted
-    case thinkingFinished
-    case responseCreated(String)
-    case completed(String, String?, [FilePathAnnotation]?)
-    case connectionLost
-    case error(OpenAIServiceError)
-    case webSearchStarted(String)
-    case webSearchSearching(String)
-    case webSearchCompleted(String)
-    case codeInterpreterStarted(String)
-    case codeInterpreterInterpreting(String)
-    case codeInterpreterCodeDelta(String, String)
-    case codeInterpreterCodeDone(String, String)
-    case codeInterpreterCompleted(String)
-    case fileSearchStarted(String)
-    case fileSearchSearching(String)
-    case fileSearchCompleted(String)
-    case annotationAdded(URLCitation)
-    case filePathAnnotationAdded(FilePathAnnotation)
+enum FeatureFlags {
+    // Cloudflare AI Gateway
+    private static let cloudflareEnabledKey = "cloudflareGatewayEnabled"
+    
+    static let cloudflareGatewayBaseURL = "https://gateway.ai.cloudflare.com/v1/887b39f387990e7ef89e400eb228e193/glass-gpt/openai"
+    static let cloudflareAIGToken = "W3AAxNEfdJNnhh-tT-w9TX4mPTLtU2_e_ox0Pwd7"
+    
+    static var useCloudflareGateway: Bool {
+        get { UserDefaults.standard.bool(forKey: cloudflareEnabledKey) }
+        set { UserDefaults.standard.set(newValue, forKey: cloudflareEnabledKey) }
+    }
+    
+    /// Returns the OpenAI base URL (without trailing /responses, /files, etc.)
+    static var openAIBaseURL: String {
+        if useCloudflareGateway {
+            return cloudflareGatewayBaseURL
+        }
+        return "https://api.openai.com/v1"
+    }
+    
+    static var isCloudflareConfigured: Bool {
+        useCloudflareGateway
+    }
+    
+    // Keep existing relay properties for backward compat but they are unused
 }
 ```
 
-### FilePathAnnotation (ChatModels.swift)
+### 2. `OpenAIService.swift` — Use dynamic base URL + add CF auth header
+
+**Current**: `private let baseURL = "https://api.openai.com/v1/responses"` and hardcoded URLs everywhere.
+
+**Change to dynamic URLs**:
 ```swift
-struct FilePathAnnotation: Codable, Sendable, Identifiable {
-    var id: String { "\(startIndex)-\(endIndex)-\(fileId)" }
-    var fileId: String
-    var sandboxPath: String
-    var startIndex: Int
-    var endIndex: Int
+private var openAIBaseURL: String { FeatureFlags.openAIBaseURL }
+private var responsesURL: String { "\(openAIBaseURL)/responses" }
+```
+
+**Add helper**:
+```swift
+private func applyCloudflareAuth(_ request: inout URLRequest) {
+    if FeatureFlags.useCloudflareGateway {
+        request.setValue(
+            "Bearer \(FeatureFlags.cloudflareAIGToken)",
+            forHTTPHeaderField: "cf-aig-authorization"
+        )
+    }
 }
 ```
 
-### FileDownloadError (FileDownloadService.swift)
+**Apply to ALL methods**:
+- `uploadFile()` — change `"https://api.openai.com/v1/files"` → `"\(openAIBaseURL)/files"`, call `applyCloudflareAuth(&request)`
+- `streamChat()` — use `responsesURL` instead of `self.baseURL`, call `applyCloudflareAuth(&request)`
+- `generateTitle()` — use `responsesURL`, call `applyCloudflareAuth(&request)`
+- `fetchResponse()` — use `responsesURL`, call `applyCloudflareAuth(&request)`
+- `validateAPIKey()` — change `"https://api.openai.com/v1/models"` → `"\(openAIBaseURL)/models"`, call `applyCloudflareAuth(&request)`
+
+**IMPORTANT**: `uploadFile()` is `nonisolated`. Since `FeatureFlags` properties are static and thread-safe (using NSLock or UserDefaults), accessing them from `nonisolated` context is fine. But the `applyCloudflareAuth` helper on `OpenAIService` is `@MainActor`-isolated. Solutions:
+- Make `applyCloudflareAuth` a `nonisolated` method, OR
+- Make it a static function on `FeatureFlags`, OR
+- Inline the header-setting code in `uploadFile()`
+
+### 3. `FileDownloadService.swift` — Simplify to single download path
+
+**Remove** `downloadViaRelay()` method entirely.
+**Remove** `isRelayConfigured` check in `performDownload()`.
+**Modify** the download method to use dynamic base URL:
+
 ```swift
-enum FileDownloadError: Error, LocalizedError, Sendable {
-    case invalidURL
-    case invalidResponse
-    case httpError(Int, String)
-    case fileNotFound
+private func performDownload(fileId: String, suggestedFilename: String?, apiKey: String) async throws -> URL {
+    let (data, response) = try await downloadFromAPI(fileId: fileId, apiKey: apiKey)
+    let filename = resolveFilename(suggestedFilename: suggestedFilename, fileId: fileId, response: response)
+    // ... save to temp dir (same as before)
+}
+
+private func downloadFromAPI(fileId: String, apiKey: String) async throws -> (Data, URLResponse) {
+    let baseURL = FeatureFlags.openAIBaseURL
+    guard let url = URL(string: "\(baseURL)/files/\(fileId)/content") else {
+        throw FileDownloadError.invalidURL
+    }
+
+    var request = URLRequest(url: url)
+    request.httpMethod = "GET"
+    request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+    request.timeoutInterval = 120
+    
+    if FeatureFlags.useCloudflareGateway {
+        request.setValue(
+            "Bearer \(FeatureFlags.cloudflareAIGToken)",
+            forHTTPHeaderField: "cf-aig-authorization"
+        )
+    }
+
+    let (data, response) = try await session.data(for: request)
+
+    guard let httpResponse = response as? HTTPURLResponse else {
+        throw FileDownloadError.invalidResponse
+    }
+
+    if httpResponse.statusCode >= 400 {
+        let errorMsg = String(data: data, encoding: .utf8) ?? "Download failed"
+        throw FileDownloadError.httpError(httpResponse.statusCode, errorMsg)
+    }
+
+    return (data, response)
 }
 ```
 
----
+Remove imports/references to `RelayAPIService`, `RELAY_HTTP_BASE_PATH`.
+
+### 4. `ChatViewModel.swift` — Remove relay mode, always use direct (through gateway)
+
+This is the biggest change:
+
+- **Remove** `private let relayAPIService = RelayAPIService()`
+- **Remove** `private let relaySocketService = RelaySocketService()`
+- **Remove** `private var isRelayModeEnabled: Bool` computed property
+- **Remove** `startRelayStreamingRequest()` method entirely
+- **Remove** `consumeRelayStream()` method entirely
+- **Remove** relay-specific recovery methods if any
+- **Remove** `relaySocketService.reset()` calls
+- **In `startStreamingRequest()`**: Always call `startDirectStreamingRequest()` directly. Remove the relay mode branching logic.
+- **Clean up** any remaining references to relay services
+
+The `startDirectStreamingRequest()` method stays as-is — it calls `openAIService.streamChat()` which will now route through Cloudflare when enabled.
+
+### 5. `SettingsView.swift` — Replace "Relay Server" section with "Cloudflare Gateway"
+
+**Remove** the entire relay server section.
+
+**Replace with**:
+```swift
+Section {
+    Toggle("Enable Cloudflare Gateway", isOn: $viewModel.cloudflareEnabled)
+    
+    if viewModel.cloudflareEnabled {
+        HStack(spacing: 10) {
+            Image(systemName: "circle.fill")
+                .font(.system(size: 10))
+                .foregroundStyle(cloudflareStatusColor)
+            
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Connection Status")
+                Text(cloudflareStatusText)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            
+            Spacer()
+            
+            if viewModel.isCheckingCloudflareHealth {
+                ProgressView()
+                    .controlSize(.small)
+            }
+        }
+        
+        Button("Check Connection") {
+            Task { await viewModel.checkCloudflareHealth() }
+        }
+        .disabled(viewModel.isCheckingCloudflareHealth)
+    }
+} header: {
+    Text("Cloudflare Gateway")
+} footer: {
+    Text("Route API requests through Cloudflare's global edge network for improved reliability and analytics.")
+}
+```
+
+Add computed properties for `cloudflareStatusColor` and `cloudflareStatusText` based on `viewModel.cloudflareHealthStatus`.
+
+### 6. `SettingsViewModel.swift` — Replace relay health check with Cloudflare health check
+
+**Replace** `RelayHealthStatus` with:
+```swift
+enum CloudflareHealthStatus: Equatable {
+    case unknown
+    case checking
+    case connected
+    case error(String)
+}
+```
+
+**Replace properties**:
+- `relayHealthStatus` → `@Published var cloudflareHealthStatus: CloudflareHealthStatus = .unknown`
+- `relayServerEnabled` → `var cloudflareEnabled: Bool` (get/set `FeatureFlags.useCloudflareGateway`)
+- `isCheckingRelayHealth` → `@Published var isCheckingCloudflareHealth = false`
+- Remove `relayServerURL`, `relayVersion`, `isRelayAutoDetected`
+
+**Health check method**:
+```swift
+func checkCloudflareHealth() async {
+    isCheckingCloudflareHealth = true
+    cloudflareHealthStatus = .checking
+    
+    let gatewayURL = FeatureFlags.cloudflareGatewayBaseURL
+    guard let url = URL(string: "\(gatewayURL)/models") else {
+        cloudflareHealthStatus = .error("Invalid gateway URL")
+        isCheckingCloudflareHealth = false
+        return
+    }
+    
+    let apiKey = KeychainService.shared.loadAPIKey() ?? ""
+    guard !apiKey.isEmpty else {
+        cloudflareHealthStatus = .error("No API key configured")
+        isCheckingCloudflareHealth = false
+        return
+    }
+    
+    var request = URLRequest(url: url)
+    request.httpMethod = "GET"
+    request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+    request.setValue("Bearer \(FeatureFlags.cloudflareAIGToken)", forHTTPHeaderField: "cf-aig-authorization")
+    request.timeoutInterval = 10
+    
+    do {
+        let (_, response) = try await URLSession.shared.data(for: request)
+        if let httpResponse = response as? HTTPURLResponse, (200...299).contains(httpResponse.statusCode) {
+            cloudflareHealthStatus = .connected
+        } else {
+            let code = (response as? HTTPURLResponse)?.statusCode ?? 0
+            cloudflareHealthStatus = .error("Status \(code)")
+        }
+    } catch {
+        cloudflareHealthStatus = .error(error.localizedDescription)
+    }
+    
+    isCheckingCloudflareHealth = false
+}
+```
+
+### 7. `NativeChatAppDelegate.swift` — Clean up relay bridging
+
+Remove or simplify the relay URL bridging from Info.plist. The Cloudflare config is hardcoded, so no bridging is needed.
+
+### 8. `app.config.ts` — Remove RelayServerURL
+
+Remove from `infoPlist`:
+```typescript
+RelayServerURL: process.env.EXPO_PUBLIC_API_BASE_URL ?? "",
+```
+
+### 9. Files to delete (recommended)
+
+- `RelayAPIService.swift`
+- `RelaySocketService.swift`
+
+If deleting causes compilation issues, keep them as dead code and remove all references from other files.
+
+## Important Constraints
+
+1. **Do NOT break direct mode** — When Cloudflare is disabled, app calls `api.openai.com` directly
+2. **SSE streaming must work** — Gateway transparently proxies SSE, no special handling needed
+3. **Keep user's OpenAI API key flow** — `Authorization: Bearer {key}` always sent. `cf-aig-authorization` is ADDITIONAL
+4. **All endpoints must route through gateway** when enabled: `/responses`, `/files`, `/files/{id}/content`, `/models`
+5. **CF_AIG_TOKEN is hardcoded** — developer's gateway auth token, not user-configurable
+6. **UI must say "Cloudflare"** — No mention of "relay" in user-facing UI
+7. **Swift 6 strict concurrency** — No warnings. Use `@MainActor`, `Sendable`, `nonisolated` correctly
+8. **Keep Message.swift relay fields** — `relayRunId`, `relayResumeToken`, `relayLastSequenceNumber` remain as optional properties for SwiftData backward compatibility
 
 ## Verification Checklist
 
-After fixing, ensure:
+- [ ] App compiles without errors (Swift 6 strict concurrency)
+- [ ] With Cloudflare disabled: app calls `api.openai.com` directly
+- [ ] With Cloudflare enabled: all requests go through `gateway.ai.cloudflare.com`
+- [ ] `cf-aig-authorization` header present on all gateway requests
+- [ ] SSE streaming works through gateway
+- [ ] File upload works through gateway
+- [ ] File download works through gateway
+- [ ] Health check in Settings works
+- [ ] Settings UI shows "Cloudflare Gateway" toggle and health status
+- [ ] No "relay" text in user-facing UI
+- [ ] No Swift concurrency warnings
 
-1. **`xcodebuild` compiles with zero errors** (strict concurrency, iOS 26.0 deployment target)
-2. All `switch` on `StreamEvent` are exhaustive (especially `.completed` and `.filePathAnnotationAdded`)
-3. No `static var` that is nonisolated global shared mutable state
-4. All new files (`FileDownloadService.swift`, `FilePreviewController.swift`) are in the correct build target
-5. `FilePreviewItem` struct in `ChatView.swift` conforms to `Identifiable`
-6. `MarkdownContentView` correctly intercepts `sandbox://` URLs via `.environment(\.openURL, ...)`
+## Git
 
----
-
-## What NOT to Change
-
-- Do NOT modify any TypeScript/JavaScript files
-- Do NOT change the app architecture or feature logic — only fix compilation errors
-- Do NOT remove any functionality — all the file preview / download code should remain
-- Do NOT change the `StreamEvent` enum definition — fix the call sites instead
-- Keep all `@MainActor`, `actor`, `Sendable` annotations as-is unless they cause build errors
-
----
-
-## Commit Convention
-
-After fixing, commit to the `beta` branch:
-
-```bash
-git add -A
-git commit -m "fix: resolve all Xcode build errors for beta branch"
-git push origin beta
+Commit to `beta` branch:
+```
+feat: migrate from relay server to Cloudflare AI Gateway
 ```
