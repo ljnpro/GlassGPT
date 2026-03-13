@@ -92,13 +92,15 @@ struct OpenAIResponseFetchResult {
 @MainActor
 final class OpenAIService {
 
-    private let baseURL = "https://api.openai.com/v1/responses"
     private var currentDelegate: SSEDelegate?
+    private var responsesURL: String {
+        "\(FeatureFlags.openAIBaseURL)/responses"
+    }
 
     // MARK: - Upload File
 
     nonisolated func uploadFile(data: Data, filename: String, apiKey: String) async throws -> String {
-        guard let url = URL(string: "https://api.openai.com/v1/files") else {
+        guard let url = URL(string: "\(FeatureFlags.openAIBaseURL)/files") else {
             throw OpenAIServiceError.invalidURL
         }
 
@@ -108,6 +110,7 @@ final class OpenAIService {
         request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
         request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
         request.timeoutInterval = 120
+        FeatureFlags.applyCloudflareAuthorization(to: &request)
 
         var body = Data()
 
@@ -162,13 +165,13 @@ final class OpenAIService {
     ) -> AsyncStream<StreamEvent> {
         cancelStream()
 
-        let baseURL = self.baseURL
+        let responsesURL = self.responsesURL
 
         return AsyncStream(bufferingPolicy: .unbounded) { continuation in
             let delegate = SSEDelegate(continuation: continuation)
             self.currentDelegate = delegate
 
-            guard let url = URL(string: baseURL) else {
+            guard let url = URL(string: responsesURL) else {
                 continuation.yield(.error(.invalidURL))
                 continuation.finish()
                 return
@@ -180,6 +183,7 @@ final class OpenAIService {
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
             request.setValue("text/event-stream", forHTTPHeaderField: "Accept")
             request.timeoutInterval = 300
+            FeatureFlags.applyCloudflareAuthorization(to: &request)
 
             let input = Self.buildInputArray(messages: messages)
 
@@ -230,7 +234,6 @@ final class OpenAIService {
             config.requestCachePolicy = .reloadIgnoringLocalCacheData
             config.urlCache = nil
             config.waitsForConnectivity = false
-            config.httpShouldUsePipelining = true
             config.timeoutIntervalForResource = 600
 
             let delegateQueue = OperationQueue()
@@ -262,7 +265,7 @@ final class OpenAIService {
     // MARK: - Generate Title
 
     func generateTitle(for conversationPreview: String, apiKey: String) async throws -> String {
-        guard let url = URL(string: baseURL) else {
+        guard let url = URL(string: responsesURL) else {
             throw OpenAIServiceError.invalidURL
         }
 
@@ -271,6 +274,7 @@ final class OpenAIService {
         request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.timeoutInterval = 30
+        FeatureFlags.applyCloudflareAuthorization(to: &request)
 
         let body: [String: Any] = [
             "model": "gpt-5.4",
@@ -309,7 +313,7 @@ final class OpenAIService {
     // MARK: - Fetch Complete Response (Polling Recovery)
 
     func fetchResponse(responseId: String, apiKey: String) async throws -> OpenAIResponseFetchResult {
-        guard let url = URL(string: "\(baseURL)/\(responseId)") else {
+        guard let url = URL(string: "\(responsesURL)/\(responseId)") else {
             throw OpenAIServiceError.invalidURL
         }
 
@@ -317,6 +321,7 @@ final class OpenAIService {
         request.httpMethod = "GET"
         request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
         request.timeoutInterval = 30
+        FeatureFlags.applyCloudflareAuthorization(to: &request)
 
         let (data, response) = try await URLSession.shared.data(for: request)
 
@@ -447,11 +452,12 @@ final class OpenAIService {
     // MARK: - Validate API Key
 
     func validateAPIKey(_ apiKey: String) async -> Bool {
-        guard let url = URL(string: "https://api.openai.com/v1/models") else { return false }
+        guard let url = URL(string: "\(FeatureFlags.openAIBaseURL)/models") else { return false }
 
         var request = URLRequest(url: url)
         request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
         request.timeoutInterval = 10
+        FeatureFlags.applyCloudflareAuthorization(to: &request)
 
         do {
             let (_, response) = try await URLSession.shared.data(for: request)

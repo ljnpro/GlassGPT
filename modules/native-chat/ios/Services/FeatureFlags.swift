@@ -1,103 +1,50 @@
 import Foundation
 
 enum FeatureFlags {
-    private static let relayEnabledKey = "relayServerEnabled"
-    private static let relayURLKey = "relayServerURL"
+    private static let cloudflareEnabledKey = "cloudflareGatewayEnabled"
+    private static let defaultOpenAIBaseURL = "https://api.openai.com/v1"
 
-    // MARK: - Thread-safe storage for platform relay URL
-
+    // Legacy storage kept to preserve the prior concurrency-safe relay config shape.
     private final class PlatformRelayStorage: @unchecked Sendable {
         private let lock = NSLock()
-        private var _url: String?
+        private var url: String?
 
-        var url: String? {
-            get {
-                lock.lock()
-                defer { lock.unlock() }
-                return _url
-            }
-            set {
-                lock.lock()
-                defer { lock.unlock() }
-                _url = newValue
-            }
+        func store(_ newValue: String?) {
+            lock.lock()
+            defer { lock.unlock() }
+            url = newValue
         }
     }
 
     private static let platformRelayStorage = PlatformRelayStorage()
 
-    private static var storedRelayURL: String? {
-        let stored = UserDefaults.standard.string(forKey: relayURLKey)?
-            .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        return stored.isEmpty ? nil : stored
-    }
+    static let cloudflareGatewayBaseURL =
+        "https://gateway.ai.cloudflare.com/v1/887b39f387990e7ef89e400eb228e193/glass-gpt/openai"
+    static let cloudflareAIGToken = "W3AAxNEfdJNnhh-tT-w9TX4mPTLtU2_e_ox0Pwd7"
 
-    static var platformRelayURL: String? {
-        get {
-            platformRelayStorage.url
-        }
+    static var useCloudflareGateway: Bool {
+        get { UserDefaults.standard.bool(forKey: cloudflareEnabledKey) }
         set {
-            let trimmed = newValue?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-            let resolved = trimmed.isEmpty ? nil : trimmed
-            platformRelayStorage.url = resolved
-
-            if resolved != nil {
-                useRelayServer = true
+            UserDefaults.standard.set(newValue, forKey: cloudflareEnabledKey)
+            if !newValue {
+                platformRelayStorage.store(nil)
             }
         }
     }
 
-    static var useRelayServer: Bool {
-        get {
-            if let stored = UserDefaults.standard.object(forKey: relayEnabledKey) as? Bool {
-                return stored
-            }
-
-            return !relayServerURL.isEmpty
-        }
-        set {
-            UserDefaults.standard.set(newValue, forKey: relayEnabledKey)
-        }
+    static var openAIBaseURL: String {
+        useCloudflareGateway ? cloudflareGatewayBaseURL : defaultOpenAIBaseURL
     }
 
-    static var relayServerURL: String {
-        get {
-            if let stored = storedRelayURL {
-                return stored
-            }
-
-            if let platform = platformRelayStorage.url, !platform.isEmpty {
-                return platform
-            }
-
-            return ""
-        }
-        set {
-            let trimmed = newValue.trimmingCharacters(in: .whitespacesAndNewlines)
-
-            if trimmed.isEmpty {
-                UserDefaults.standard.removeObject(forKey: relayURLKey)
-            } else {
-                UserDefaults.standard.set(trimmed, forKey: relayURLKey)
-                useRelayServer = true
-            }
-        }
+    static var isCloudflareConfigured: Bool {
+        useCloudflareGateway
     }
 
-    static var isRelayAutoDetected: Bool {
-        storedRelayURL == nil && (platformRelayStorage.url?.isEmpty == false)
-    }
-
-    static var isRelayConfigured: Bool {
-        useRelayServer && !relayServerURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-    }
-
-    static func configurePlatformRelay(url: String) {
-        let trimmed = url.trimmingCharacters(in: .whitespacesAndNewlines)
-        let resolved = trimmed.isEmpty ? nil : trimmed
-        platformRelayStorage.url = resolved
-        if resolved != nil {
-            useRelayServer = true
-        }
+    static func applyCloudflareAuthorization(to request: inout URLRequest) {
+        guard useCloudflareGateway else { return }
+        request.setValue(
+            "Bearer \(cloudflareAIGToken)",
+            forHTTPHeaderField: "cf-aig-authorization"
+        )
     }
 }

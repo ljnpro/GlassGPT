@@ -39,8 +39,6 @@ final class ChatViewModel {
     // MARK: - Dependencies
 
     private let openAIService = OpenAIService()
-    private let relayAPIService = RelayAPIService()
-    private let relaySocketService = RelaySocketService()
     private let keychainService = KeychainService()
     private var modelContext: ModelContext
 
@@ -56,10 +54,6 @@ final class ChatViewModel {
 
     // Recovery task
     private var recoveryTask: Task<Void, Never>?
-
-    private var isRelayModeEnabled: Bool {
-        FeatureFlags.isRelayConfigured
-    }
 
     // MARK: - Init
 
@@ -119,42 +113,40 @@ final class ChatViewModel {
             saveDraftNow()
             persistToolCallsAndCitations()
 
-            if !isRelayModeEnabled {
-                backgroundTaskID = UIApplication.shared.beginBackgroundTask(withName: "StreamCompletion") { [weak self] in
-                    Task { @MainActor in
-                        guard let self = self else { return }
+            backgroundTaskID = UIApplication.shared.beginBackgroundTask(withName: "StreamCompletion") { [weak self] in
+                Task { @MainActor in
+                    guard let self = self else { return }
 
-                        self.saveDraftNow()
-                        self.persistToolCallsAndCitations()
+                    self.saveDraftNow()
+                    self.persistToolCallsAndCitations()
 
-                        self.activeStreamID = UUID()
-                        self.openAIService.cancelStream()
+                    self.activeStreamID = UUID()
+                    self.openAIService.cancelStream()
 
-                        if let draft = self.draftMessage {
-                            if !self.currentStreamingText.isEmpty {
-                                draft.content = self.currentStreamingText
-                            }
-                            if !self.currentThinkingText.isEmpty {
-                                draft.thinking = self.currentThinkingText
-                            }
-                            if draft.content.isEmpty {
-                                draft.content = "[Response interrupted. Please try again.]"
-                                draft.thinking = nil
-                            }
-                            draft.isComplete = true
-                            draft.conversation?.updatedAt = .now
-                            self.upsertMessage(draft)
-                            try? self.modelContext.save()
+                    if let draft = self.draftMessage {
+                        if !self.currentStreamingText.isEmpty {
+                            draft.content = self.currentStreamingText
                         }
-
-                        self.isStreaming = false
-                        self.isThinking = false
-                        self.activeToolCalls = []
-                        self.liveCitations = []
-                        self.liveFilePathAnnotations = []
-
-                        self.endBackgroundTask()
+                        if !self.currentThinkingText.isEmpty {
+                            draft.thinking = self.currentThinkingText
+                        }
+                        if draft.content.isEmpty {
+                            draft.content = "[Response interrupted. Please try again.]"
+                            draft.thinking = nil
+                        }
+                        draft.isComplete = true
+                        draft.conversation?.updatedAt = .now
+                        self.upsertMessage(draft)
+                        try? self.modelContext.save()
                     }
+
+                    self.isStreaming = false
+                    self.isThinking = false
+                    self.activeToolCalls = []
+                    self.liveCitations = []
+                    self.liveFilePathAnnotations = []
+
+                    self.endBackgroundTask()
                 }
             }
         }
@@ -177,39 +169,6 @@ final class ChatViewModel {
 
         recoveryTask?.cancel()
         recoveryTask = nil
-
-        if isRelayModeEnabled,
-           let draft = activeIncompleteAssistantDraft(),
-           let relayRunId = draft.relayRunId,
-           let resumeToken = draft.relayResumeToken {
-            draftMessage = draft
-            currentStreamingText = draft.content
-            currentThinkingText = draft.thinking ?? ""
-            activeToolCalls = draft.toolCalls
-            liveCitations = draft.annotations
-            liveFilePathAnnotations = draft.filePathAnnotations
-
-            if isStreaming {
-                isRecovering = true
-                relaySocketService.rejoinRun(
-                    relayRunId: relayRunId,
-                    resumeToken: resumeToken,
-                    responseId: draft.responseId,
-                    apiKey: apiKey,
-                    lastSequenceNumber: draft.relayLastSequenceNumber ?? 0
-                )
-                return
-            }
-
-            recoverResponseViaRelay(
-                messageId: draft.id,
-                relayRunId: relayRunId,
-                resumeToken: resumeToken,
-                responseId: draft.responseId,
-                lastSequenceNumber: draft.relayLastSequenceNumber ?? 0
-            )
-            return
-        }
 
         if isStreaming {
             #if DEBUG
@@ -353,24 +312,11 @@ final class ChatViewModel {
             }
 
             do {
-                let mimeType = OpenAIService.mimeType(for: pendingAttachments[i].filename)
-
-                let fileId: String
-                if isRelayModeEnabled {
-                    let result = try await relayAPIService.uploadFile(
-                        apiKey: apiKey,
-                        fileData: data,
-                        filename: pendingAttachments[i].filename,
-                        contentType: mimeType
-                    )
-                    fileId = result.fileId
-                } else {
-                    fileId = try await openAIService.uploadFile(
-                        data: data,
-                        filename: pendingAttachments[i].filename,
-                        apiKey: apiKey
-                    )
-                }
+                let fileId = try await openAIService.uploadFile(
+                    data: data,
+                    filename: pendingAttachments[i].filename,
+                    apiKey: apiKey
+                )
 
                 pendingAttachments[i].openAIFileId = fileId
                 pendingAttachments[i].uploadStatus = .uploaded
@@ -395,11 +341,6 @@ final class ChatViewModel {
         guard !text.isEmpty || selectedImageData != nil || !pendingAttachments.isEmpty else { return }
         guard !apiKey.isEmpty else {
             errorMessage = "Please add your OpenAI API key in Settings."
-            return
-        }
-
-        if FeatureFlags.useRelayServer && !isRelayModeEnabled {
-            errorMessage = "Relay mode is enabled, but the relay server URL is not configured."
             return
         }
 
@@ -449,7 +390,6 @@ final class ChatViewModel {
             isComplete: false
         )
         draft.conversation = currentConversation
-        draft.relayLastSequenceNumber = 0
         currentConversation?.messages.append(draft)
         try? modelContext.save()
         draftMessage = draft
@@ -486,257 +426,7 @@ final class ChatViewModel {
     private static let reconnectBaseDelay: UInt64 = 1_000_000_000
 
     private func startStreamingRequest(reconnectAttempt: Int = 0) {
-        if isRelayModeEnabled {
-            startRelayStreamingRequest()
-        } else {
-            startDirectStreamingRequest(reconnectAttempt: reconnectAttempt)
-        }
-    }
-
-    private func startRelayStreamingRequest() {
-        let requestAPIKey = apiKey
-        let requestModel = selectedModel
-        let requestEffort = reasoningEffort
-
-        let requestMessages = messages
-            .filter { $0.isComplete || $0.role == .user }
-            .sorted(by: { $0.createdAt < $1.createdAt })
-            .map {
-                APIMessage(
-                    role: $0.role,
-                    content: $0.content,
-                    imageData: $0.imageData,
-                    fileAttachments: $0.fileAttachments
-                )
-            }
-
-        let input = OpenAIService.buildInputArray(messages: requestMessages)
-        let streamID = UUID()
-        activeStreamID = streamID
-
-        Task { @MainActor in
-            do {
-                let relayRequest = RelayRunStartRequest(
-                    clientRequestId: UUID().uuidString,
-                    conversationId: currentConversation?.id.uuidString ?? UUID().uuidString,
-                    messages: input,
-                    model: requestModel.rawValue,
-                    reasoningEffort: requestEffort.apiValue,
-                    vectorStoreIds: [],
-                    metadata: [
-                        "draftMessageId": draftMessage?.id.uuidString ?? ""
-                    ]
-                )
-
-                let started = try await relayAPIService.createRun(
-                    apiKey: requestAPIKey,
-                    request: relayRequest
-                )
-
-                guard activeStreamID == streamID else { return }
-
-                if let draft = draftMessage {
-                    draft.relayRunId = started.relayRunId
-                    draft.relayResumeToken = started.resumeToken
-                    if let responseId = started.responseId, !responseId.isEmpty {
-                        draft.responseId = responseId
-                    }
-                    draft.relayLastSequenceNumber = 0
-                    try? modelContext.save()
-                }
-
-                let stream = relaySocketService.streamRun(
-                    relayRunId: started.relayRunId,
-                    resumeToken: started.resumeToken,
-                    responseId: started.responseId,
-                    apiKey: requestAPIKey,
-                    lastSequenceNumber: draftMessage?.relayLastSequenceNumber ?? 0
-                )
-
-                await consumeRelayStream(stream, streamID: streamID)
-            } catch {
-                guard activeStreamID == streamID else { return }
-
-                if !currentStreamingText.isEmpty {
-                    finalizeDraftAsPartial()
-                } else {
-                    removeEmptyDraft()
-                    clearLiveGenerationState(clearDraft: true)
-                }
-
-                isRecovering = false
-                errorMessage = error.localizedDescription
-                HapticService.shared.notify(.error)
-            }
-        }
-    }
-
-    private func consumeRelayStream(_ stream: AsyncStream<StreamEvent>, streamID: UUID) async {
-        var didReceiveCompletedEvent = false
-        var terminalError: OpenAIServiceError?
-
-        for await event in stream {
-            guard activeStreamID == streamID else { break }
-
-            let isReplayEvent = relaySocketService.lastDeliveredEventWasReplay
-            let shouldAnimate = !isReplayEvent
-
-            if !isReplayEvent {
-                isRecovering = false
-            }
-
-            switch event {
-            case .responseCreated(let responseId):
-                if let draft = draftMessage {
-                    draft.responseId = responseId
-                    try? modelContext.save()
-                }
-
-            case .textDelta(let delta):
-                if isThinking {
-                    animateIfNeeded(shouldAnimate, animation: .easeOut(duration: 0.2)) {
-                        isThinking = false
-                    }
-                }
-                currentStreamingText += delta
-                saveDraftIfNeeded()
-
-            case .thinkingDelta(let delta):
-                currentThinkingText += delta
-                saveDraftIfNeeded()
-
-            case .thinkingStarted:
-                animateIfNeeded(shouldAnimate, animation: .easeIn(duration: 0.2)) {
-                    isThinking = true
-                }
-
-            case .thinkingFinished:
-                animateIfNeeded(shouldAnimate, animation: .easeOut(duration: 0.2)) {
-                    isThinking = false
-                }
-                saveDraftNow()
-
-            case .webSearchStarted(let callId):
-                startToolCallIfNeeded(id: callId, type: .webSearch, animated: shouldAnimate)
-
-            case .webSearchSearching(let callId):
-                setToolCallStatus(callId, status: .searching, animated: shouldAnimate)
-
-            case .webSearchCompleted(let callId):
-                setToolCallStatus(callId, status: .completed, animated: shouldAnimate)
-
-            case .codeInterpreterStarted(let callId):
-                startToolCallIfNeeded(id: callId, type: .codeInterpreter, animated: shouldAnimate)
-
-            case .codeInterpreterInterpreting(let callId):
-                setToolCallStatus(callId, status: .interpreting, animated: shouldAnimate)
-
-            case .codeInterpreterCodeDelta(let callId, let codeDelta):
-                appendToolCodeDelta(callId, delta: codeDelta)
-
-            case .codeInterpreterCodeDone(let callId, let fullCode):
-                setToolCode(callId, code: fullCode)
-
-            case .codeInterpreterCompleted(let callId):
-                setToolCallStatus(callId, status: .completed, animated: shouldAnimate)
-
-            case .fileSearchStarted(let callId):
-                startToolCallIfNeeded(id: callId, type: .fileSearch, animated: shouldAnimate)
-
-            case .fileSearchSearching(let callId):
-                setToolCallStatus(callId, status: .fileSearching, animated: shouldAnimate)
-
-            case .fileSearchCompleted(let callId):
-                setToolCallStatus(callId, status: .completed, animated: shouldAnimate)
-
-            case .annotationAdded(let citation):
-                addLiveCitationIfNeeded(citation, animated: shouldAnimate)
-
-            case .filePathAnnotationAdded(let annotation):
-                addLiveFilePathAnnotationIfNeeded(annotation, animated: shouldAnimate)
-
-            case .completed(let fullText, let fullThinking, let filePathAnns):
-                didReceiveCompletedEvent = true
-
-                if !fullText.isEmpty {
-                    currentStreamingText = fullText
-                }
-                if let fullThinking, !fullThinking.isEmpty {
-                    currentThinkingText = fullThinking
-                }
-                if let filePathAnns, !filePathAnns.isEmpty {
-                    liveFilePathAnnotations = filePathAnns
-                }
-
-                persistToolCallsAndCitations()
-                finalizeDraft()
-                relaySocketService.reset()
-
-            case .connectionLost:
-                isRecovering = true
-                saveDraftNow()
-                persistToolCallsAndCitations()
-                #if DEBUG
-                print("[Relay] Connection lost; waiting for reconnect/replay")
-                #endif
-
-            case .error(let error):
-                terminalError = error
-                saveDraftNow()
-                persistToolCallsAndCitations()
-            }
-
-            syncRelayCursorToDraft()
-        }
-
-        guard activeStreamID == streamID else {
-            relaySocketService.reset()
-            return
-        }
-
-        if didReceiveCompletedEvent {
-            return
-        }
-
-        if let error = terminalError {
-            relaySocketService.reset()
-
-            if !currentStreamingText.isEmpty {
-                finalizeDraftAsPartial()
-            } else {
-                removeEmptyDraft()
-                clearLiveGenerationState(clearDraft: true)
-            }
-
-            isRecovering = false
-            errorMessage = error.localizedDescription
-            HapticService.shared.notify(.error)
-            return
-        }
-
-        if let draft = draftMessage, let responseId = draft.responseId {
-            relaySocketService.reset()
-            isStreaming = false
-            isThinking = false
-            recoverResponseViaPolling(messageId: draft.id, responseId: responseId)
-            return
-        }
-
-        if isStreaming {
-            if !currentStreamingText.isEmpty {
-                persistToolCallsAndCitations()
-                finalizeDraftAsPartial()
-            } else {
-                removeEmptyDraft()
-                isStreaming = false
-                isThinking = false
-                activeToolCalls = []
-                liveCitations = []
-                liveFilePathAnnotations = []
-            }
-        }
-
-        relaySocketService.reset()
+        startDirectStreamingRequest(reconnectAttempt: reconnectAttempt)
     }
 
     private func startDirectStreamingRequest(reconnectAttempt: Int = 0) {
@@ -1059,7 +749,6 @@ final class ChatViewModel {
             draft.filePathAnnotationsData = FilePathAnnotation.encode(liveFilePathAnnotations)
         }
 
-        syncRelayCursorToDraft()
         try? modelContext.save()
     }
 
@@ -1075,17 +764,8 @@ final class ChatViewModel {
         guard let draft = draftMessage else { return }
         draft.content = currentStreamingText
         draft.thinking = currentThinkingText.isEmpty ? nil : currentThinkingText
-        syncRelayCursorToDraft()
         lastDraftSaveTime = Date()
         try? modelContext.save()
-    }
-
-    private func syncRelayCursorToDraft() {
-        guard isRelayModeEnabled, let draft = draftMessage else { return }
-        let sequence = relaySocketService.currentLastSequenceNumber
-        if sequence > (draft.relayLastSequenceNumber ?? 0) {
-            draft.relayLastSequenceNumber = sequence
-        }
     }
 
     private func finalizeDraft() {
@@ -1168,66 +848,7 @@ final class ChatViewModel {
     // MARK: - Recovery
 
     private func recoverResponse(messageId: UUID, responseId: String) {
-        if isRelayModeEnabled,
-           let message = findMessage(byId: messageId),
-           let relayRunId = message.relayRunId,
-           let resumeToken = message.relayResumeToken {
-            recoverResponseViaRelay(
-                messageId: messageId,
-                relayRunId: relayRunId,
-                resumeToken: resumeToken,
-                responseId: responseId,
-                lastSequenceNumber: message.relayLastSequenceNumber ?? 0
-            )
-            return
-        }
-
         recoverResponseViaPolling(messageId: messageId, responseId: responseId)
-    }
-
-    private func recoverResponseViaRelay(
-        messageId: UUID,
-        relayRunId: String,
-        resumeToken: String,
-        responseId: String?,
-        lastSequenceNumber: Int
-    ) {
-        guard !apiKey.isEmpty else {
-            isRecovering = false
-            return
-        }
-
-        recoveryTask?.cancel()
-        errorMessage = nil
-        isRecovering = true
-        isStreaming = true
-        isThinking = false
-
-        if let message = findMessage(byId: messageId) {
-            draftMessage = message
-            currentStreamingText = message.content
-            currentThinkingText = message.thinking ?? ""
-            activeToolCalls = message.toolCalls
-            liveCitations = message.annotations
-            liveFilePathAnnotations = message.filePathAnnotations
-            message.isComplete = false
-            try? modelContext.save()
-        }
-
-        let key = apiKey
-        let streamID = UUID()
-        activeStreamID = streamID
-
-        recoveryTask = Task { @MainActor in
-            let stream = relaySocketService.streamRun(
-                relayRunId: relayRunId,
-                resumeToken: resumeToken,
-                responseId: responseId,
-                apiKey: key,
-                lastSequenceNumber: lastSequenceNumber
-            )
-            await consumeRelayStream(stream, streamID: streamID)
-        }
     }
 
     private func recoverResponseViaPolling(messageId: UUID, responseId: String) {
@@ -1518,34 +1139,6 @@ final class ChatViewModel {
     }
 
     private func recoverSingleMessage(message: Message, responseId: String) async {
-        if isRelayModeEnabled,
-           message.conversation?.id == currentConversation?.id,
-           let relayRunId = message.relayRunId,
-           let resumeToken = message.relayResumeToken {
-            currentStreamingText = message.content
-            currentThinkingText = message.thinking ?? ""
-            activeToolCalls = message.toolCalls
-            liveCitations = message.annotations
-            liveFilePathAnnotations = message.filePathAnnotations
-            draftMessage = message
-            isStreaming = true
-            isRecovering = true
-            message.isComplete = false
-            try? modelContext.save()
-
-            let streamID = UUID()
-            activeStreamID = streamID
-            let stream = relaySocketService.streamRun(
-                relayRunId: relayRunId,
-                resumeToken: resumeToken,
-                responseId: message.responseId,
-                apiKey: apiKey,
-                lastSequenceNumber: message.relayLastSequenceNumber ?? 0
-            )
-            await consumeRelayStream(stream, streamID: streamID)
-            return
-        }
-
         let key = apiKey
         var attempts = 0
         let maxAttempts = 180
@@ -1620,32 +1213,6 @@ final class ChatViewModel {
         recoveryTask?.cancel()
         errorMessage = nil
 
-        if isRelayModeEnabled,
-           let draft = draftMessage,
-           let relayRunId = draft.relayRunId,
-           let resumeToken = draft.relayResumeToken,
-           !apiKey.isEmpty {
-            Task {
-                do {
-                    _ = try await relaySocketService.cancelRun(
-                        relayRunId: relayRunId,
-                        resumeToken: resumeToken,
-                        apiKey: apiKey
-                    )
-                } catch {
-                    _ = try? await relayAPIService.cancelRun(
-                        relayRunId: relayRunId,
-                        resumeToken: resumeToken,
-                        apiKey: apiKey
-                    )
-                }
-                relaySocketService.leaveRun(relayRunId: relayRunId)
-                relaySocketService.reset()
-            }
-        } else {
-            relaySocketService.reset()
-        }
-
         if savePartial && !currentStreamingText.isEmpty {
             persistToolCallsAndCitations()
             finalizeDraft()
@@ -1683,7 +1250,6 @@ final class ChatViewModel {
         }
 
         recoveryTask?.cancel()
-        relaySocketService.reset()
 
         currentConversation = nil
         messages = []
@@ -1760,7 +1326,6 @@ final class ChatViewModel {
         }
 
         recoveryTask?.cancel()
-        relaySocketService.reset()
 
         currentConversation = conversation
         messages = conversation.messages
