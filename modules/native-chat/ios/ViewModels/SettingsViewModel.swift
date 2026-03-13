@@ -17,7 +17,6 @@ final class SettingsViewModel {
     var defaultModel: ModelType {
         didSet {
             UserDefaults.standard.set(defaultModel.rawValue, forKey: "defaultModel")
-            // Validate effort for new model
             if !defaultModel.availableEfforts.contains(defaultEffort) {
                 defaultEffort = defaultModel.defaultEffort
             }
@@ -42,6 +41,18 @@ final class SettingsViewModel {
         }
     }
 
+    var relayServerEnabled: Bool {
+        didSet {
+            FeatureFlags.useRelayServer = relayServerEnabled
+        }
+    }
+
+    var relayServerURL: String {
+        didSet {
+            FeatureFlags.relayServerURL = relayServerURL
+        }
+    }
+
     // MARK: - Available efforts for current default model
 
     var availableDefaultEfforts: [ReasoningEffort] {
@@ -55,7 +66,6 @@ final class SettingsViewModel {
     // MARK: - Init
 
     init() {
-        // Load persisted values from UserDefaults
         if let raw = UserDefaults.standard.string(forKey: "defaultModel"),
            let model = ModelType(rawValue: raw) {
             self.defaultModel = model
@@ -83,7 +93,9 @@ final class SettingsViewModel {
             self.hapticEnabled = true
         }
 
-        apiKey = keychainService.loadAPIKey() ?? ""
+        self.relayServerEnabled = FeatureFlags.useRelayServer
+        self.relayServerURL = FeatureFlags.relayServerURL
+        self.apiKey = keychainService.loadAPIKey() ?? ""
     }
 
     // MARK: - Actions
