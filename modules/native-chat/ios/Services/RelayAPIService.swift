@@ -258,7 +258,10 @@ final class RelayAPIService {
     }
 
     func getRunStatus(relayRunId: String, resumeToken: String) async throws -> RelayStatusResponse {
-        var components = URLComponents(url: try Self.makeRelayURL(pathComponents: ["runs", relayRunId, "status"]), resolvingAgainstBaseURL: false)
+        var components = URLComponents(
+            url: try Self.makeRelayURL(pathComponents: ["runs", relayRunId, "status"]),
+            resolvingAgainstBaseURL: false
+        )
         components?.queryItems = [
             URLQueryItem(name: "resumeToken", value: resumeToken)
         ]
@@ -436,7 +439,7 @@ final class RelayAPIService {
     }
 }
 
-private extension Dictionary where Key == String, Value == Any {
+extension Dictionary where Key == String, Value == Any {
     func string(_ key: String) -> String? {
         self[key] as? String
     }

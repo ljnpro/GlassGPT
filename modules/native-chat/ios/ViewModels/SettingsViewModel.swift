@@ -1,6 +1,20 @@
 import Foundation
 import SwiftUI
 
+enum RelayHealthStatus: Equatable {
+    case unknown
+    case checking
+    case healthy(uptime: Int, activeRuns: Int)
+    case error(String)
+}
+
+private struct RelayHealthResponse: Decodable {
+    let status: String
+    let uptime: Int
+    let activeRuns: Int
+    let version: String
+}
+
 @Observable
 @MainActor
 final class SettingsViewModel {
@@ -11,6 +25,10 @@ final class SettingsViewModel {
     var isAPIKeyValid: Bool?
     var isValidating: Bool = false
     var saveConfirmation: Bool = false
+
+    var relayHealthStatus: RelayHealthStatus = .unknown
+    var relayVersion: String?
+    var isRelayAutoDetected: Bool = FeatureFlags.isRelayAutoDetected
 
     // MARK: - Persisted Settings (stored properties for @Observable tracking)
 
@@ -49,7 +67,28 @@ final class SettingsViewModel {
 
     var relayServerURL: String {
         didSet {
-            FeatureFlags.relayServerURL = relayServerURL
+            let trimmed = relayServerURL.trimmingCharacters(in: .whitespacesAndNewlines)
+
+            if relayServerURL != trimmed {
+                relayServerURL = trimmed
+                return
+            }
+
+            FeatureFlags.relayServerURL = trimmed
+
+            let resolvedURL = FeatureFlags.relayServerURL
+            if relayServerURL != resolvedURL {
+                relayServerURL = resolvedURL
+                return
+            }
+
+            isRelayAutoDetected = FeatureFlags.isRelayAutoDetected
+            relayServerEnabled = FeatureFlags.useRelayServer
+
+            if resolvedURL.isEmpty {
+                relayHealthStatus = .unknown
+                relayVersion = nil
+            }
         }
     }
 
@@ -57,6 +96,13 @@ final class SettingsViewModel {
 
     var availableDefaultEfforts: [ReasoningEffort] {
         defaultModel.availableEfforts
+    }
+
+    var isCheckingRelayHealth: Bool {
+        if case .checking = relayHealthStatus {
+            return true
+        }
+        return false
     }
 
     // MARK: - Dependencies
@@ -96,13 +142,23 @@ final class SettingsViewModel {
         self.relayServerEnabled = FeatureFlags.useRelayServer
         self.relayServerURL = FeatureFlags.relayServerURL
         self.apiKey = keychainService.loadAPIKey() ?? ""
+        self.isRelayAutoDetected = FeatureFlags.isRelayAutoDetected
+
+        if !self.relayServerURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            Task {
+                await checkRelayHealth()
+            }
+        }
     }
 
     // MARK: - Actions
 
     func saveAPIKey() {
-        guard !apiKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
-        try? keychainService.saveAPIKey(apiKey.trimmingCharacters(in: .whitespacesAndNewlines))
+        let trimmedKey = apiKey.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedKey.isEmpty else { return }
+
+        try? keychainService.saveAPIKey(trimmedKey)
+        apiKey = trimmedKey
         saveConfirmation = true
         HapticService.shared.notify(.success)
     }
@@ -115,7 +171,9 @@ final class SettingsViewModel {
     }
 
     func validateAPIKey() async {
-        guard !apiKey.isEmpty else {
+        let trimmedKey = apiKey.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        guard !trimmedKey.isEmpty else {
             isAPIKeyValid = false
             return
         }
@@ -130,8 +188,9 @@ final class SettingsViewModel {
 
         do {
             var request = URLRequest(url: url)
-            request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+            request.setValue("Bearer \(trimmedKey)", forHTTPHeaderField: "Authorization")
             request.timeoutInterval = 10
+
             let (_, response) = try await URLSession.shared.data(for: request)
             let httpResponse = response as? HTTPURLResponse
             isAPIKeyValid = httpResponse?.statusCode == 200
@@ -141,5 +200,92 @@ final class SettingsViewModel {
 
         isValidating = false
         HapticService.shared.notify(isAPIKeyValid == true ? .success : .error)
+    }
+
+    func checkRelayHealth() async {
+        let resolvedURL = FeatureFlags.relayServerURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        relayServerURL = resolvedURL
+        isRelayAutoDetected = FeatureFlags.isRelayAutoDetected
+
+        guard !resolvedURL.isEmpty else {
+            relayHealthStatus = .error("Relay server URL is not configured.")
+            relayVersion = nil
+            return
+        }
+
+        guard let baseURL = URL(string: resolvedURL) else {
+            relayHealthStatus = .error("Relay server URL is invalid.")
+            relayVersion = nil
+            return
+        }
+
+        let relayBasePath = RELAY_HTTP_BASE_PATH.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        let healthURL = baseURL
+            .appendingPathComponent(relayBasePath)
+            .appendingPathComponent("health")
+
+        relayHealthStatus = .checking
+
+        do {
+            var request = URLRequest(url: healthURL)
+            request.httpMethod = "GET"
+            request.setValue("application/json", forHTTPHeaderField: "Accept")
+            request.timeoutInterval = 10
+
+            let (data, response) = try await URLSession.shared.data(for: request)
+
+            guard let httpResponse = response as? HTTPURLResponse else {
+                relayHealthStatus = .error("Invalid response from relay server.")
+                relayVersion = nil
+                return
+            }
+
+            guard (200...299).contains(httpResponse.statusCode) else {
+                let message = Self.parseErrorMessage(from: data) ?? "Relay health check failed with status \(httpResponse.statusCode)."
+                relayHealthStatus = .error(message)
+                relayVersion = nil
+                return
+            }
+
+            let decoded = try JSONDecoder().decode(RelayHealthResponse.self, from: data)
+            relayVersion = decoded.version
+
+            let normalizedStatus = decoded.status.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            guard normalizedStatus == "ok" || normalizedStatus == "healthy" || normalizedStatus == "up" else {
+                relayHealthStatus = .error("Relay reported status: \(decoded.status)")
+                return
+            }
+
+            relayHealthStatus = .healthy(
+                uptime: max(0, decoded.uptime),
+                activeRuns: max(0, decoded.activeRuns)
+            )
+        } catch is DecodingError {
+            relayHealthStatus = .error("Relay health response could not be decoded.")
+            relayVersion = nil
+        } catch {
+            relayHealthStatus = .error(error.localizedDescription)
+            relayVersion = nil
+        }
+    }
+
+    // MARK: - Helpers
+
+    private static func parseErrorMessage(from data: Data) -> String? {
+        guard
+            let json = try? JSONSerialization.jsonObject(with: data, options: []) as? JSONDictionary
+        else {
+            return String(data: data, encoding: .utf8)
+        }
+
+        if let message = json.string("message"), !message.isEmpty {
+            return message
+        }
+
+        if let error = json.dictionary("error"), let message = error.string("message"), !message.isEmpty {
+            return message
+        }
+
+        return String(data: data, encoding: .utf8)
     }
 }
