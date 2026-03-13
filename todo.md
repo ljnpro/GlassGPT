@@ -283,3 +283,4 @@
 - [x] BUG: Build fails with "no expo project found (missing app.json, app.config.js, or package.json)" — fixed: added minimal app.json with expo name/slug
 - [x] BUG: Xcode build error — tuple pattern mismatch for StreamEvent.completed — fixed: updated 3 occurrences in RelaySocketService.swift to 3-parameter format
 - [ ] INFRA: Install Swift toolchain in sandbox for local compile-check before pushing to EAS Build
+- [x] FIX: RelayAPIService not Sendable — fixed via Xcode Codex: added @unchecked Sendable (URLSession is thread-safe, no mutable shared state)

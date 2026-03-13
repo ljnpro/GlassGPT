@@ -154,7 +154,8 @@ enum RelayAPIServiceError: Error, LocalizedError, Sendable {
     }
 }
 
-final class RelayAPIService {
+// URLSession is thread-safe and this service keeps no mutable shared state.
+final class RelayAPIService: @unchecked Sendable {
 
     private let session: URLSession
 
