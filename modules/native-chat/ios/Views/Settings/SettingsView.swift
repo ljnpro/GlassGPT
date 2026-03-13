@@ -9,19 +9,59 @@ struct SettingsView: View {
     private var platformString: String {
         let device = UIDevice.current
         let osName: String
+
         switch device.userInterfaceIdiom {
         case .pad:
             osName = "iPadOS"
         default:
             osName = "iOS"
         }
+
         let version = device.systemVersion
         let majorVersion = Int(version.components(separatedBy: ".").first ?? "0") ?? 0
+
         if majorVersion >= 26 {
             return "\(osName) \(version) · Liquid Glass"
         } else {
             return "\(osName) \(version)"
         }
+    }
+
+    private var relayStatusColor: Color {
+        switch viewModel.relayHealthStatus {
+        case .healthy:
+            return .green
+        case .checking:
+            return .yellow
+        case .error:
+            return .red
+        case .unknown:
+            return .gray
+        }
+    }
+
+    private var relayStatusText: String {
+        switch viewModel.relayHealthStatus {
+        case .healthy:
+            return "Connected"
+        case .checking:
+            return "Checking connection…"
+        case .error(let message):
+            return message
+        case .unknown:
+            return "Not checked"
+        }
+    }
+
+    private var relayURLDisplayText: String {
+        let trimmed = viewModel.relayServerURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? "Not configured" : trimmed
+    }
+
+    private func formattedUptime(_ seconds: Int) -> String {
+        let hours = max(0, seconds) / 3600
+        let minutes = (max(0, seconds) % 3600) / 60
+        return "\(hours)h \(minutes)m"
     }
 
     var body: some View {
@@ -73,6 +113,81 @@ struct SettingsView: View {
                     Text("Your API key is stored securely in the device Keychain.")
                 }
 
+                // MARK: - Relay Server
+                Section {
+                    Toggle("Enable Relay Server", isOn: $viewModel.relayServerEnabled)
+
+                    if viewModel.isRelayAutoDetected {
+                        LabeledContent("URL") {
+                            VStack(alignment: .trailing, spacing: 4) {
+                                Text(relayURLDisplayText)
+                                    .multilineTextAlignment(.trailing)
+                                    .textSelection(.enabled)
+
+                                Text("Auto-detected")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                    } else {
+                        TextField("https://relay.example.com", text: $viewModel.relayServerURL)
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled()
+                            .keyboardType(.URL)
+                    }
+
+                    HStack(spacing: 10) {
+                        Image(systemName: "circle.fill")
+                            .font(.system(size: 10))
+                            .foregroundStyle(relayStatusColor)
+
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Connection Status")
+                            Text(relayStatusText)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .multilineTextAlignment(.leading)
+                        }
+
+                        Spacer()
+
+                        if viewModel.isCheckingRelayHealth {
+                            ProgressView()
+                                .controlSize(.small)
+                        }
+                    }
+
+                    switch viewModel.relayHealthStatus {
+                    case .healthy(let uptime, let activeRuns):
+                        LabeledContent("Uptime", value: formattedUptime(uptime))
+                        LabeledContent("Active Runs", value: "\(activeRuns)")
+
+                        if let relayVersion = viewModel.relayVersion, !relayVersion.isEmpty {
+                            LabeledContent("Version", value: relayVersion)
+                        }
+
+                    case .error(let message):
+                        Text(message)
+                            .font(.caption)
+                            .foregroundStyle(.red)
+
+                    case .unknown, .checking:
+                        EmptyView()
+                    }
+
+                    Button("Check Connection") {
+                        Task { @MainActor in
+                            await viewModel.checkRelayHealth()
+                        }
+                    }
+                    .buttonStyle(.glass)
+                    .disabled(viewModel.relayServerURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || viewModel.isCheckingRelayHealth)
+                } header: {
+                    Text("Relay Server")
+                } footer: {
+                    Text("Use the relay server for resumable streaming, live socket updates, and more reliable long-running chat responses.")
+                }
+
                 // MARK: - Chat Defaults
                 Section("Chat Defaults") {
                     Picker("Default Model", selection: $viewModel.defaultModel) {
@@ -109,14 +224,14 @@ struct SettingsView: View {
                     LabeledContent("Engine", value: "SwiftUI")
 
                     if let supportURL = URL(string: "https://ljnpro.github.io/liquid-glass-chat-support/") {
-                    Link(destination: supportURL) {
-                        HStack {
-                            Text("Support Website")
-                            Spacer()
-                            Image(systemName: "safari")
-                                .foregroundStyle(.secondary)
+                        Link(destination: supportURL) {
+                            HStack {
+                                Text("Support Website")
+                                Spacer()
+                                Image(systemName: "safari")
+                                    .foregroundStyle(.secondary)
+                            }
                         }
-                    }
                     }
                 }
             }

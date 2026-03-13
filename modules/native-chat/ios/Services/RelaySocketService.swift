@@ -43,7 +43,7 @@ private struct ActiveRelaySubscription {
     }
 }
 
-final class RelaySocketService {
+final class RelaySocketService: @unchecked Sendable {
 
     private let queue = DispatchQueue(label: "com.liquidglasschat.relay.socket")
     private let lock = NSLock()
@@ -545,7 +545,11 @@ final class RelaySocketService {
             }
 
             didYieldTerminalEvent = true
-            yield(.completed(accumulatedText, accumulatedThinking.isEmpty ? nil : accumulatedThinking), replay: replay, sequenceNumber: sequenceNumber)
+            yield(
+                .completed(accumulatedText, accumulatedThinking.isEmpty ? nil : accumulatedThinking),
+                replay: replay,
+                sequenceNumber: sequenceNumber
+            )
             finishContinuation()
 
         case .error(let error):
@@ -580,7 +584,7 @@ final class RelaySocketService {
         }
 
         socket.emitWithAck(event, payload).timingOut(after: timeout) { data in
-            if let first = data.first as? String, first == SocketAckValue.noAck {
+            if let first = data.first as? String, first == "NO ACK" {
                 completion(.failure(OpenAIServiceError.requestFailed("Relay socket ack timeout for \(event).")))
                 return
             }

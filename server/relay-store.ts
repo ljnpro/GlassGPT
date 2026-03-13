@@ -92,6 +92,10 @@ export class RelayStore {
     clearInterval(this.janitor);
   }
 
+  public getActiveRunCount(): number {
+    return Array.from(this.runsById.values()).filter((run) => !isTerminalStatus(run.status)).length;
+  }
+
   public createRun(input: CreateRelayRunInput, options?: { indexClientRequestId?: boolean }): RelayRun {
     if (this.runsById.has(input.relayRunId)) {
       throw new RelayStoreError("duplicate_run_id", `Relay run already exists: ${input.relayRunId}`);
