@@ -45,6 +45,7 @@ const config: ExpoConfig = {
       UIDesignRequiresCompatibility: false,
       NSPhotoLibraryUsageDescription:
         "Allow $(PRODUCT_NAME) to access your photo library so you can attach images to chats.",
+      RelayServerURL: process.env.EXPO_PUBLIC_API_BASE_URL ?? "",
     },
   },
   android: {
