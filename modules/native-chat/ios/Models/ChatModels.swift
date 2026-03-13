@@ -155,6 +155,29 @@ struct URLCitation: Codable, Sendable, Identifiable {
     }
 }
 
+// MARK: - File Path Annotation
+
+/// A file path annotation from code interpreter output, linking a sandbox path to a downloadable file_id.
+struct FilePathAnnotation: Codable, Sendable, Identifiable {
+    var id: String { "\(startIndex)-\(endIndex)-\(fileId)" }
+    var fileId: String
+    var sandboxPath: String
+    var startIndex: Int
+    var endIndex: Int
+
+    /// Encode an array of FilePathAnnotation to Data for SwiftData storage.
+    static func encode(_ items: [FilePathAnnotation]?) -> Data? {
+        guard let items = items, !items.isEmpty else { return nil }
+        return try? JSONEncoder().encode(items)
+    }
+
+    /// Decode an array of FilePathAnnotation from Data.
+    static func decode(_ data: Data?) -> [FilePathAnnotation]? {
+        guard let data = data else { return nil }
+        return try? JSONDecoder().decode([FilePathAnnotation].self, from: data)
+    }
+}
+
 // MARK: - File Attachment
 
 enum FileUploadStatus: String, Codable, Sendable {

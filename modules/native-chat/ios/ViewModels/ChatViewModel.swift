@@ -26,9 +26,15 @@ final class ChatViewModel {
     // Tool call state
     var activeToolCalls: [ToolCallInfo] = []
     var liveCitations: [URLCitation] = []
+    var liveFilePathAnnotations: [FilePathAnnotation] = []
 
     // File attachments pending send
     var pendingAttachments: [FileAttachment] = []
+
+    // File preview state
+    var filePreviewURL: URL?
+    var isDownloadingFile: Bool = false
+    var fileDownloadError: String?
 
     // MARK: - Dependencies
 
@@ -145,6 +151,7 @@ final class ChatViewModel {
                         self.isThinking = false
                         self.activeToolCalls = []
                         self.liveCitations = []
+                        self.liveFilePathAnnotations = []
 
                         self.endBackgroundTask()
                     }
@@ -180,6 +187,7 @@ final class ChatViewModel {
             currentThinkingText = draft.thinking ?? ""
             activeToolCalls = draft.toolCalls
             liveCitations = draft.annotations
+            liveFilePathAnnotations = draft.filePathAnnotations
 
             if isStreaming {
                 isRecovering = true
@@ -253,6 +261,58 @@ final class ChatViewModel {
 
     var hasAPIKey: Bool {
         !apiKey.isEmpty
+    }
+
+    // MARK: - File Preview
+
+    func handleSandboxLinkTap(sandboxURL: String, annotation: FilePathAnnotation?) {
+        guard let annotation = annotation else {
+            fileDownloadError = "Cannot download file: no file reference found."
+            return
+        }
+
+        guard !apiKey.isEmpty else {
+            fileDownloadError = "No API key configured."
+            return
+        }
+
+        let fileId = annotation.fileId
+        let suggestedFilename = extractFilename(from: sandboxURL)
+        let key = apiKey
+
+        isDownloadingFile = true
+        fileDownloadError = nil
+
+        Task { @MainActor in
+            do {
+                let localURL = try await FileDownloadService.shared.downloadFile(
+                    fileId: fileId,
+                    suggestedFilename: suggestedFilename,
+                    apiKey: key
+                )
+                isDownloadingFile = false
+                filePreviewURL = localURL
+                HapticService.shared.impact(.light)
+            } catch {
+                isDownloadingFile = false
+                fileDownloadError = error.localizedDescription
+                HapticService.shared.notify(.error)
+                #if DEBUG
+                print("[FileDownload] Failed: \(error)")
+                #endif
+            }
+        }
+    }
+
+    private func extractFilename(from sandboxURL: String) -> String? {
+        let path: String
+        if sandboxURL.hasPrefix("sandbox:") {
+            path = String(sandboxURL.dropFirst("sandbox:".count))
+        } else {
+            path = sandboxURL
+        }
+        let filename = (path as NSString).lastPathComponent
+        return filename.isEmpty ? nil : filename
     }
 
     // MARK: - Document Handling
@@ -400,6 +460,7 @@ final class ChatViewModel {
         currentThinkingText = ""
         activeToolCalls = []
         liveCitations = []
+        liveFilePathAnnotations = []
 
         HapticService.shared.impact(.light)
 
@@ -591,7 +652,10 @@ final class ChatViewModel {
             case .annotationAdded(let citation):
                 addLiveCitationIfNeeded(citation, animated: shouldAnimate)
 
-            case .completed(let fullText, let fullThinking):
+            case .filePathAnnotationAdded(let annotation):
+                addLiveFilePathAnnotationIfNeeded(annotation, animated: shouldAnimate)
+
+            case .completed(let fullText, let fullThinking, let filePathAnns):
                 didReceiveCompletedEvent = true
 
                 if !fullText.isEmpty {
@@ -599,6 +663,9 @@ final class ChatViewModel {
                 }
                 if let fullThinking, !fullThinking.isEmpty {
                     currentThinkingText = fullThinking
+                }
+                if let filePathAnns, !filePathAnns.isEmpty {
+                    liveFilePathAnnotations = filePathAnns
                 }
 
                 persistToolCallsAndCitations()
@@ -665,6 +732,7 @@ final class ChatViewModel {
                 isThinking = false
                 activeToolCalls = []
                 liveCitations = []
+                liveFilePathAnnotations = []
             }
         }
 
@@ -827,7 +895,14 @@ final class ChatViewModel {
                         }
                     }
 
-                case .completed(let fullText, let fullThinking):
+                case .filePathAnnotationAdded(let annotation):
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        if !liveFilePathAnnotations.contains(where: { $0.fileId == annotation.fileId }) {
+                            liveFilePathAnnotations.append(annotation)
+                        }
+                    }
+
+                case .completed(let fullText, let fullThinking, let filePathAnns):
                     didReceiveCompletedEvent = true
 
                     if !fullText.isEmpty {
@@ -835,6 +910,9 @@ final class ChatViewModel {
                     }
                     if let thinking = fullThinking, !thinking.isEmpty {
                         currentThinkingText = thinking
+                    }
+                    if let filePathAnns, !filePathAnns.isEmpty {
+                        liveFilePathAnnotations = filePathAnns
                     }
 
                     persistToolCallsAndCitations()
@@ -868,6 +946,7 @@ final class ChatViewModel {
                         isThinking = false
                         activeToolCalls = []
                         liveCitations = []
+                        liveFilePathAnnotations = []
                         HapticService.shared.notify(.error)
                     }
                 }
@@ -931,6 +1010,7 @@ final class ChatViewModel {
                     isThinking = false
                     activeToolCalls = []
                     liveCitations = []
+                    liveFilePathAnnotations = []
                     HapticService.shared.notify(.error)
                 }
 
@@ -954,6 +1034,7 @@ final class ChatViewModel {
                     isThinking = false
                     activeToolCalls = []
                     liveCitations = []
+                    liveFilePathAnnotations = []
                 }
             }
 
@@ -972,6 +1053,10 @@ final class ChatViewModel {
 
         if !liveCitations.isEmpty {
             draft.annotationsData = URLCitation.encode(liveCitations)
+        }
+
+        if !liveFilePathAnnotations.isEmpty {
+            draft.filePathAnnotationsData = FilePathAnnotation.encode(liveFilePathAnnotations)
         }
 
         syncRelayCursorToDraft()
@@ -1025,6 +1110,11 @@ final class ChatViewModel {
         draft.isComplete = true
         draft.conversation?.updatedAt = .now
 
+        // Persist file path annotations
+        if !liveFilePathAnnotations.isEmpty {
+            draft.filePathAnnotationsData = FilePathAnnotation.encode(liveFilePathAnnotations)
+        }
+
         upsertMessage(draft)
         try? modelContext.save()
 
@@ -1050,6 +1140,10 @@ final class ChatViewModel {
         draft.thinking = finalThinking
         draft.isComplete = true
         draft.conversation?.updatedAt = .now
+
+        if !liveFilePathAnnotations.isEmpty {
+            draft.filePathAnnotationsData = FilePathAnnotation.encode(liveFilePathAnnotations)
+        }
 
         upsertMessage(draft)
         try? modelContext.save()
@@ -1115,6 +1209,7 @@ final class ChatViewModel {
             currentThinkingText = message.thinking ?? ""
             activeToolCalls = message.toolCalls
             liveCitations = message.annotations
+            liveFilePathAnnotations = message.filePathAnnotations
             message.isComplete = false
             try? modelContext.save()
         }
@@ -1391,6 +1486,7 @@ final class ChatViewModel {
             currentThinkingText = ""
             activeToolCalls = []
             liveCitations = []
+            liveFilePathAnnotations = []
             errorMessage = nil
 
             #if DEBUG
@@ -1430,6 +1526,7 @@ final class ChatViewModel {
             currentThinkingText = message.thinking ?? ""
             activeToolCalls = message.toolCalls
             liveCitations = message.annotations
+            liveFilePathAnnotations = message.filePathAnnotations
             draftMessage = message
             isStreaming = true
             isRecovering = true
@@ -1601,6 +1698,9 @@ final class ChatViewModel {
         draftMessage = nil
         activeToolCalls = []
         liveCitations = []
+        liveFilePathAnnotations = []
+        filePreviewURL = nil
+        fileDownloadError = nil
         HapticService.shared.selection()
     }
 
@@ -1645,6 +1745,7 @@ final class ChatViewModel {
         currentThinkingText = ""
         activeToolCalls = []
         liveCitations = []
+        liveFilePathAnnotations = []
 
         HapticService.shared.impact(.medium)
 
@@ -1681,7 +1782,10 @@ final class ChatViewModel {
         draftMessage = nil
         activeToolCalls = []
         liveCitations = []
+        liveFilePathAnnotations = []
         pendingAttachments = []
+        filePreviewURL = nil
+        fileDownloadError = nil
 
         Task { @MainActor in
             await recoverIncompleteMessagesInCurrentConversation()
@@ -1783,6 +1887,7 @@ final class ChatViewModel {
         isThinking = false
         activeToolCalls = []
         liveCitations = []
+        liveFilePathAnnotations = []
         if clearDraft {
             draftMessage = nil
         }
@@ -1806,6 +1911,9 @@ final class ChatViewModel {
             }
             if !result.annotations.isEmpty {
                 message.annotationsData = URLCitation.encode(result.annotations)
+            }
+            if !result.filePathAnnotations.isEmpty {
+                message.filePathAnnotationsData = FilePathAnnotation.encode(result.filePathAnnotations)
             }
         }
 
@@ -1903,6 +2011,16 @@ final class ChatViewModel {
 
         let insert = {
             self.liveCitations.append(citation)
+        }
+
+        animateIfNeeded(animated, animation: .easeInOut(duration: 0.2), insert)
+    }
+
+    private func addLiveFilePathAnnotationIfNeeded(_ annotation: FilePathAnnotation, animated: Bool) {
+        guard !liveFilePathAnnotations.contains(where: { $0.fileId == annotation.fileId }) else { return }
+
+        let insert = {
+            self.liveFilePathAnnotations.append(annotation)
         }
 
         animateIfNeeded(animated, animation: .easeInOut(duration: 0.2), insert)

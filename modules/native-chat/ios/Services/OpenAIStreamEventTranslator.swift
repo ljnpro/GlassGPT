@@ -84,28 +84,60 @@ enum OpenAIStreamEventTranslator {
         case "response.output_text.annotation.added":
             guard
                 let annotation = data["annotation"] as? [String: Any],
-                let type = annotation["type"] as? String,
-                type == "url_citation",
-                let url = annotation["url"] as? String,
-                let title = annotation["title"] as? String
+                let type = annotation["type"] as? String
             else {
                 return nil
             }
 
-            return .annotationAdded(
-                URLCitation(
-                    url: url,
-                    title: title,
-                    startIndex: annotation["start_index"] as? Int ?? 0,
-                    endIndex: annotation["end_index"] as? Int ?? 0
+            if type == "url_citation" {
+                guard
+                    let url = annotation["url"] as? String,
+                    let title = annotation["title"] as? String
+                else {
+                    return nil
+                }
+
+                return .annotationAdded(
+                    URLCitation(
+                        url: url,
+                        title: title,
+                        startIndex: annotation["start_index"] as? Int ?? 0,
+                        endIndex: annotation["end_index"] as? Int ?? 0
+                    )
                 )
-            )
+            }
+
+            if type == "file_path" {
+                guard
+                    let fileId = annotation["file_id"] as? String,
+                    !fileId.isEmpty
+                else {
+                    return nil
+                }
+
+                let startIndex = annotation["start_index"] as? Int ?? 0
+                let endIndex = annotation["end_index"] as? Int ?? 0
+
+                // The sandbox path isn't directly in the annotation; we'll extract from text context later.
+                // For now, store what we have.
+                return .filePathAnnotationAdded(
+                    FilePathAnnotation(
+                        fileId: fileId,
+                        sandboxPath: "",
+                        startIndex: startIndex,
+                        endIndex: endIndex
+                    )
+                )
+            }
+
+            return nil
 
         case "response.completed", "response.incomplete":
             let response = data["response"] as? [String: Any] ?? data
             let text = extractOutputText(from: response) ?? ""
             let thinking = extractReasoningText(from: response)
-            return .completed(text, thinking)
+            let filePathAnnotations = extractFilePathAnnotations(from: response)
+            return .completed(text, thinking, filePathAnnotations)
 
         case "response.failed":
             let response = data["response"] as? [String: Any] ?? data
@@ -204,6 +236,61 @@ enum OpenAIStreamEventTranslator {
 
         let joined = texts.joined()
         return joined.isEmpty ? nil : joined
+    }
+
+    /// Extract file_path annotations from a completed response
+    static func extractFilePathAnnotations(from json: [String: Any]) -> [FilePathAnnotation] {
+        var annotations: [FilePathAnnotation] = []
+
+        guard let output = json["output"] as? [[String: Any]] else {
+            return annotations
+        }
+
+        // Also extract the output text to resolve sandbox paths
+        var outputText: String = ""
+
+        for item in output {
+            guard let type = item["type"] as? String, type == "message" else { continue }
+            guard let content = item["content"] as? [[String: Any]] else { continue }
+
+            for part in content {
+                guard let partType = part["type"] as? String, partType == "output_text" else { continue }
+
+                if let text = part["text"] as? String {
+                    outputText = text
+                }
+
+                if let partAnnotations = part["annotations"] as? [[String: Any]] {
+                    for ann in partAnnotations {
+                        guard let annType = ann["type"] as? String, annType == "file_path" else { continue }
+                        guard let fileId = ann["file_id"] as? String, !fileId.isEmpty else { continue }
+
+                        let startIndex = ann["start_index"] as? Int ?? 0
+                        let endIndex = ann["end_index"] as? Int ?? 0
+
+                        // Extract the sandbox path from the output text using indices
+                        var sandboxPath = ""
+                        if !outputText.isEmpty && startIndex < endIndex {
+                            let utf8Array = Array(outputText.utf8)
+                            if startIndex < utf8Array.count && endIndex <= utf8Array.count {
+                                if let extracted = String(bytes: Array(utf8Array[startIndex..<endIndex]), encoding: .utf8) {
+                                    sandboxPath = extracted
+                                }
+                            }
+                        }
+
+                        annotations.append(FilePathAnnotation(
+                            fileId: fileId,
+                            sandboxPath: sandboxPath,
+                            startIndex: startIndex,
+                            endIndex: endIndex
+                        ))
+                    }
+                }
+            }
+        }
+
+        return annotations
     }
 
     static func extractErrorMessage(from json: [String: Any]) -> String? {

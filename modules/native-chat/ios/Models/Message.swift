@@ -36,6 +36,9 @@ final class Message {
     /// JSON-encoded array of FileAttachment objects (user-uploaded documents).
     var fileAttachmentsData: Data?
 
+    /// JSON-encoded array of FilePathAnnotation objects from code interpreter output.
+    var filePathAnnotationsData: Data?
+
     init(
         id: UUID = UUID(),
         role: MessageRole = .user,
@@ -51,7 +54,8 @@ final class Message {
         isComplete: Bool = true,
         annotations: [URLCitation]? = nil,
         toolCalls: [ToolCallInfo]? = nil,
-        fileAttachments: [FileAttachment]? = nil
+        fileAttachments: [FileAttachment]? = nil,
+        filePathAnnotations: [FilePathAnnotation]? = nil
     ) {
         self.id = id
         self.roleRawValue = role.rawValue
@@ -68,6 +72,7 @@ final class Message {
         self.annotationsData = Self.encode(annotations)
         self.toolCallsData = Self.encode(toolCalls)
         self.fileAttachmentsData = Self.encode(fileAttachments)
+        self.filePathAnnotationsData = Self.encode(filePathAnnotations)
     }
 
     var role: MessageRole {
@@ -94,6 +99,13 @@ final class Message {
     var fileAttachments: [FileAttachment] {
         get { Self.decode(fileAttachmentsData) ?? [] }
         set { fileAttachmentsData = Self.encode(newValue.isEmpty ? nil : newValue) }
+    }
+
+    // MARK: - File Path Annotations
+
+    var filePathAnnotations: [FilePathAnnotation] {
+        get { Self.decode(filePathAnnotationsData) ?? [] }
+        set { filePathAnnotationsData = Self.encode(newValue.isEmpty ? nil : newValue) }
     }
 
     // MARK: - JSON Helpers
