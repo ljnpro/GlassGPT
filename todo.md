@@ -193,3 +193,8 @@
 - [x] Settings UI: replace "Relay Server" with "Cloudflare Gateway" toggle + health check
 - [x] NativeChatAppDelegate: remove relay URL bridging
 - [x] app.config.ts: remove RelayServerURL from infoPlist
+
+## v3.0.0 Release
+- [ ] Update GitHub Pages support website with v3.0.0 changelog and features (English, mark as in development)
+- [ ] Unify all version numbers to 3-digit semver format (v3.0.0)
+- [ ] Update app.config.ts version to 3.0.0

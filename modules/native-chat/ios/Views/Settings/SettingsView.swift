@@ -166,7 +166,7 @@ struct SettingsView: View {
                 }
 
                 Section("About") {
-                    LabeledContent("Version", value: "2.1.0")
+                    LabeledContent("Version", value: "3.0.0")
                     LabeledContent("Platform", value: platformString)
                     LabeledContent("Engine", value: "SwiftUI")
 
