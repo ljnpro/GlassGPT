@@ -464,7 +464,7 @@ final class RelaySocketService: @unchecked Sendable {
                 yield(.thinkingFinished, replay: false, sequenceNumber: currentLastSequenceNumber)
             }
             yield(
-                .completed(accumulatedText, accumulatedThinking.isEmpty ? nil : accumulatedThinking),
+                .completed(accumulatedText, accumulatedThinking.isEmpty ? nil : accumulatedThinking, nil),
                 replay: false,
                 sequenceNumber: currentLastSequenceNumber
             )
@@ -531,7 +531,7 @@ final class RelaySocketService: @unchecked Sendable {
             updateActiveResponseId(responseId)
             yield(.responseCreated(responseId), replay: replay, sequenceNumber: sequenceNumber)
 
-        case .completed(let fullText, let fullThinking):
+        case .completed(let fullText, let fullThinking, let filePathAnns):
             if thinkingActive {
                 thinkingActive = false
                 yield(.thinkingFinished, replay: replay, sequenceNumber: sequenceNumber)
@@ -546,7 +546,7 @@ final class RelaySocketService: @unchecked Sendable {
 
             didYieldTerminalEvent = true
             yield(
-                .completed(accumulatedText, accumulatedThinking.isEmpty ? nil : accumulatedThinking),
+                .completed(accumulatedText, accumulatedThinking.isEmpty ? nil : accumulatedThinking, filePathAnns),
                 replay: replay,
                 sequenceNumber: sequenceNumber
             )
