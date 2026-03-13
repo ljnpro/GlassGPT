@@ -20,8 +20,15 @@ struct ChatView: View {
                     restoringOverlay
                         .transition(.opacity)
                 }
+
+                // File download overlay
+                if viewModel.isDownloadingFile {
+                    fileDownloadingOverlay
+                        .transition(.opacity)
+                }
             }
             .animation(.easeInOut(duration: 0.25), value: viewModel.isRestoringConversation)
+            .animation(.easeInOut(duration: 0.2), value: viewModel.isDownloadingFile)
             .safeAreaInset(edge: .bottom, spacing: 0) {
                 MessageInputBar(
                     text: $viewModel.inputText,
@@ -65,6 +72,10 @@ struct ChatView: View {
                 .presentationDragIndicator(.visible)
                 .presentationCornerRadius(24)
             }
+            .sheet(item: filePreviewBinding) { previewItem in
+                FilePreviewController(fileURL: previewItem.url)
+                    .ignoresSafeArea()
+            }
             .photosPicker(isPresented: $showPhotoPicker, selection: $selectedPhotoItem, matching: .images)
             .onChange(of: selectedPhotoItem) { _, newItem in
                 Task {
@@ -87,7 +98,37 @@ struct ChatView: View {
                     viewModel.handlePickedDocuments(urls)
                 }
             }
+            .alert("File Download Error", isPresented: fileDownloadErrorBinding) {
+                Button("OK", role: .cancel) {
+                    viewModel.fileDownloadError = nil
+                }
+            } message: {
+                Text(viewModel.fileDownloadError ?? "An unknown error occurred.")
+            }
         }
+    }
+
+    // MARK: - File Preview Binding
+
+    private var filePreviewBinding: Binding<FilePreviewItem?> {
+        Binding(
+            get: {
+                if let url = viewModel.filePreviewURL {
+                    return FilePreviewItem(url: url)
+                }
+                return nil
+            },
+            set: { newValue in
+                viewModel.filePreviewURL = newValue?.url
+            }
+        )
+    }
+
+    private var fileDownloadErrorBinding: Binding<Bool> {
+        Binding(
+            get: { viewModel.fileDownloadError != nil },
+            set: { if !$0 { viewModel.fileDownloadError = nil } }
+        )
     }
 
     // MARK: - Chat Content
@@ -105,6 +146,9 @@ struct ChatView: View {
                                 message: message,
                                 onRegenerate: message.role == .assistant ? {
                                     viewModel.regenerateMessage(message)
+                                } : nil,
+                                onSandboxLinkTap: message.role == .assistant ? { sandboxURL, annotation in
+                                    viewModel.handleSandboxLinkTap(sandboxURL: sandboxURL, annotation: annotation)
                                 } : nil
                             )
                             .id(message.id)
@@ -178,6 +222,31 @@ struct ChatView: View {
                 ProgressView()
                     .controlSize(.small)
                 Text("Restoring conversation…")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+            .padding(.horizontal, 20)
+            .padding(.vertical, 12)
+            .background {
+                Capsule()
+                    .fill(.ultraThinMaterial)
+            }
+            .glassEffect(.regular, in: Capsule())
+
+            Spacer()
+        }
+    }
+
+    // MARK: - File Downloading Overlay
+
+    private var fileDownloadingOverlay: some View {
+        VStack(spacing: 12) {
+            Spacer()
+
+            HStack(spacing: 10) {
+                ProgressView()
+                    .controlSize(.small)
+                Text("Downloading file…")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             }
@@ -340,4 +409,11 @@ struct ChatView: View {
         }
         .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 12))
     }
+}
+
+// MARK: - File Preview Item
+
+struct FilePreviewItem: Identifiable {
+    let id = UUID()
+    let url: URL
 }

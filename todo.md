@@ -272,3 +272,11 @@
 - [x] BUG: RelaySocketService non-Sendable capture in @Sendable closure — fixed: marked @unchecked Sendable
 - [x] BUG: SocketAckValue not found in scope — fixed: use "NO ACK" string check instead
 - [x] BRIDGE: Inject EXPO_PUBLIC_API_BASE_URL into Info.plist via app.config.ts, read in NativeChatAppDelegate to auto-configure relay
+
+## v3.3: Next Development Phase
+- [x] FIX: Xcode build error — _platformRelayURL is not concurrency-safe (nonisolated global shared mutable state) — fixed with NSLock-backed PlatformRelayStorage class
+- [ ] UI: Hide health check section in Settings when relay is disabled
+- [ ] UI: Add relay mode manual toggle in Settings (switch between direct/relay modes)
+- [ ] UI: Add real-time connection status indicator in chat header (green/yellow/red dot for WebSocket status)
+- [x] BUG: Code interpreter output file links (sandbox:// URLs) not tappable — implemented: FilePathAnnotation model, file_path annotation parsing in streaming, FileDownloadService actor, QLPreviewController wrapper, openURL interception in MarkdownContentView
+- [x] PLAN: Consulted GPT-5.4 High for analysis + Claude Opus 4.6 for code generation
