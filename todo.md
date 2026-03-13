@@ -237,3 +237,26 @@
 - [x] BUG: Force-quit and relaunch shows "Recovering interrupted response..." forever — fixed: finalizeDraftAsPartial now sets isComplete=true, background task expiry handler also sets isComplete=true
 - [x] BUG: First token takes over 90 seconds — fixed: removed background=true flag which caused low-priority queuing
 - [x] BUG: After streaming recovery, reasoning content is truncated — fixed: response.completed SSE event now extracts full reasoning via extractReasoningText, fetchResponse also returns full reasoning
+
+## Relay Server Architecture (v3.0)
+- [x] SERVER: Create server/relay-types.ts — shared relay types (RelayRun, CachedOpenAIEvent, RelaySnapshot, socket payloads, DTOs)
+- [x] SERVER: Create server/relay-store.ts — in-memory store with TTL janitor, event caching by sequence_number
+- [x] SERVER: Create server/openai-relay.ts — OpenAI HTTP/SSE interactions (startBackgroundStream, resumeBackgroundStream, cancelResponse, retrieveFinalResponse)
+- [x] SERVER: Create server/openai-event-normalizer.ts — server-side snapshot accumulation helpers
+- [x] SERVER: Create server/relay-socket.ts — Socket.IO handlers (relay:join, relay:leave, relay:cancel, relay:resume-openai)
+- [x] SERVER: Create server/relay-routes.ts — Express REST routes (POST /api/relay/files, POST /api/relay/runs, POST /api/relay/runs/:id/cancel)
+- [x] SERVER: Create server/relay-security.ts — request validation, key redaction, rate limiting
+- [x] SERVER: Modify server/_core/index.ts — attach Socket.IO to existing HTTP server, register relay routes and socket handlers
+- [x] INSTALL: Add socket.io npm package to server dependencies
+- [ ] CLIENT: Create RelayAPIService.swift — HTTP layer for relay routes (uploadFile, createRun, cancelRun)
+- [ ] CLIENT: Create RelaySocketService.swift — Socket.IO client wrapper (connect, joinRun, resumeFromOpenAI, event stream)
+- [ ] CLIENT: Create OpenAIStreamEventTranslator.swift — extract SSE event mapping from SSEDelegate into reusable parser
+- [ ] CLIENT: Modify OpenAIService.swift — keep direct mode, split SSE parsing into translator
+- [ ] CLIENT: Modify ChatViewModel.swift — add relay mode with feature flag, switch send/recovery to relay path
+- [ ] CLIENT: Modify Message.swift — add relayRunId, relayResumeToken, relayLastSequenceNumber fields
+- [ ] CLIENT: Create FeatureFlags.swift — toggle between direct OpenAI and relay modes
+- [ ] INSTALL: Add Socket.IO-Client-Swift via CocoaPods to iOS native module
+- [ ] TEST: Write tests for relay store (caching, TTL, replay)
+- [ ] TEST: Write tests for relay routes (create run, cancel, file upload)
+- [ ] TEST: Write tests for Socket.IO event protocol (join, replay, live forwarding)
+- [ ] TEST: Write tests for Swift client reconnection flow
