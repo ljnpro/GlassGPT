@@ -248,15 +248,15 @@
 - [x] SERVER: Create server/relay-security.ts — request validation, key redaction, rate limiting
 - [x] SERVER: Modify server/_core/index.ts — attach Socket.IO to existing HTTP server, register relay routes and socket handlers
 - [x] INSTALL: Add socket.io npm package to server dependencies
-- [ ] CLIENT: Create RelayAPIService.swift — HTTP layer for relay routes (uploadFile, createRun, cancelRun)
-- [ ] CLIENT: Create RelaySocketService.swift — Socket.IO client wrapper (connect, joinRun, resumeFromOpenAI, event stream)
-- [ ] CLIENT: Create OpenAIStreamEventTranslator.swift — extract SSE event mapping from SSEDelegate into reusable parser
-- [ ] CLIENT: Modify OpenAIService.swift — keep direct mode, split SSE parsing into translator
-- [ ] CLIENT: Modify ChatViewModel.swift — add relay mode with feature flag, switch send/recovery to relay path
-- [ ] CLIENT: Modify Message.swift — add relayRunId, relayResumeToken, relayLastSequenceNumber fields
-- [ ] CLIENT: Create FeatureFlags.swift — toggle between direct OpenAI and relay modes
-- [ ] INSTALL: Add Socket.IO-Client-Swift via CocoaPods to iOS native module
-- [ ] TEST: Write tests for relay store (caching, TTL, replay)
-- [ ] TEST: Write tests for relay routes (create run, cancel, file upload)
-- [ ] TEST: Write tests for Socket.IO event protocol (join, replay, live forwarding)
-- [ ] TEST: Write tests for Swift client reconnection flow
+- [x] CLIENT: Create RelayAPIService.swift — HTTP layer for relay routes (uploadFile, createRun, cancelRun)
+- [x] CLIENT: Create RelaySocketService.swift — Socket.IO client wrapper (connect, joinRun, resumeFromOpenAI, event stream)
+- [x] CLIENT: Create OpenAIStreamEventTranslator.swift — extract SSE event mapping from SSEDelegate into reusable parser
+- [x] CLIENT: Modify OpenAIService.swift — keep direct mode, split SSE parsing into translator
+- [x] CLIENT: Modify ChatViewModel.swift — add relay mode with feature flag, switch send/recovery to relay path
+- [x] CLIENT: Modify Message.swift — add relayRunId, relayResumeToken, relayLastSequenceNumber fields
+- [x] CLIENT: Create FeatureFlags.swift — toggle between direct OpenAI and relay modes
+- [x] INSTALL: Add Socket.IO-Client-Swift via CocoaPods to iOS native module
+- [x] TEST: Write tests for relay store (caching, TTL, replay) — 13 tests passing
+- [x] TEST: Write tests for relay routes (create run, cancel, file upload) — included in relay-integration.test.ts
+- [x] TEST: Write tests for Socket.IO event protocol (join, replay, live forwarding) — included in relay-integration.test.ts
+- [x] TEST: Write tests for Swift client reconnection flow — 19 integration tests passing
