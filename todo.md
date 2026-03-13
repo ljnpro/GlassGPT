@@ -271,3 +271,4 @@
 - [x] BUG: Socket.IO fileprivate access level errors — fixed: changed private extension to internal extension
 - [x] BUG: RelaySocketService non-Sendable capture in @Sendable closure — fixed: marked @unchecked Sendable
 - [x] BUG: SocketAckValue not found in scope — fixed: use "NO ACK" string check instead
+- [x] BRIDGE: Inject EXPO_PUBLIC_API_BASE_URL into Info.plist via app.config.ts, read in NativeChatAppDelegate to auto-configure relay
