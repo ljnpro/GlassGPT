@@ -11,6 +11,9 @@ struct MessageBubble: View {
     var activeToolCalls: [ToolCallInfo] = []
     var liveCitations: [URLCitation] = []
 
+    // File preview handler
+    var onSandboxLinkTap: ((String, FilePathAnnotation?) -> Void)?
+
     var body: some View {
         HStack(alignment: .top) {
             if message.role == .user {
@@ -127,7 +130,11 @@ struct MessageBubble: View {
 
     private var assistantBubble: some View {
         VStack(alignment: .leading) {
-            MarkdownContentView(text: message.content)
+            MarkdownContentView(
+                text: message.content,
+                filePathAnnotations: message.filePathAnnotations,
+                onSandboxLinkTap: onSandboxLinkTap
+            )
         }
         .padding(12)
         .background {

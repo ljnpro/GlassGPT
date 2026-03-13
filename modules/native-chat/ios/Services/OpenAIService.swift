@@ -1,6 +1,6 @@
 import Foundation
 
-// MARK: - Sendable DTOO for crossing concurrency boundaries
+// MARK: - Sendable DTO for crossing concurrency boundaries
 
 struct APIMessage: Sendable {
     let role: MessageRole
@@ -24,7 +24,7 @@ enum StreamEvent: Sendable {
     case thinkingStarted
     case thinkingFinished
     case responseCreated(String)
-    case completed(String, String?)
+    case completed(String, String?, [FilePathAnnotation]?)
     case connectionLost
     case error(OpenAIServiceError)
 
@@ -43,6 +43,7 @@ enum StreamEvent: Sendable {
 
     // Annotation events
     case annotationAdded(URLCitation)
+    case filePathAnnotationAdded(FilePathAnnotation)
 }
 
 // MARK: - Errors
@@ -82,6 +83,7 @@ struct OpenAIResponseFetchResult {
     let thinking: String?
     let annotations: [URLCitation]
     let toolCalls: [ToolCallInfo]
+    let filePathAnnotations: [FilePathAnnotation]
     let errorMessage: String?
 }
 
@@ -338,6 +340,7 @@ final class OpenAIService {
 
         var annotations: [URLCitation] = []
         var toolCalls: [ToolCallInfo] = []
+        let filePathAnns = OpenAIStreamEventTranslator.extractFilePathAnnotations(from: json)
 
         if let output = json["output"] as? [[String: Any]] {
             for item in output {
@@ -436,6 +439,7 @@ final class OpenAIService {
             thinking: thinking,
             annotations: annotations,
             toolCalls: toolCalls,
+            filePathAnnotations: filePathAnns,
             errorMessage: errorMessage
         )
     }
@@ -556,6 +560,7 @@ private final class SSEDelegate: NSObject, URLSessionDataDelegate, @unchecked Se
 
     private var accumulatedText = ""
     private var accumulatedThinking = ""
+    private var accumulatedFilePathAnnotations: [FilePathAnnotation] = []
     private var thinkingActive = false
     private var emittedAnyOutput = false
     private var finished = false
@@ -793,13 +798,21 @@ private final class SSEDelegate: NSObject, URLSessionDataDelegate, @unchecked Se
                 #endif
                 return .continued
 
-            case .completed(let fullText, let fullThinking):
+            case .filePathAnnotationAdded(let annotation):
+                accumulatedFilePathAnnotations.append(annotation)
+                continuation.yield(.filePathAnnotationAdded(annotation))
+                return .continued
+
+            case .completed(let fullText, let fullThinking, let filePathAnns):
                 sawTerminalEvent = true
                 if !fullText.isEmpty {
                     accumulatedText = fullText
                 }
                 if let fullThinking, !fullThinking.isEmpty {
                     accumulatedThinking = fullThinking
+                }
+                if let filePathAnns, !filePathAnns.isEmpty {
+                    accumulatedFilePathAnnotations = filePathAnns
                 }
                 emittedAnyOutput = emittedAnyOutput || !accumulatedText.isEmpty || !accumulatedThinking.isEmpty
                 return .terminalCompleted
@@ -862,7 +875,8 @@ private final class SSEDelegate: NSObject, URLSessionDataDelegate, @unchecked Se
             }
 
             let thinking: String? = accumulatedThinking.isEmpty ? nil : accumulatedThinking
-            continuation.yield(.completed(accumulatedText, thinking))
+            let filePathAnns: [FilePathAnnotation]? = accumulatedFilePathAnnotations.isEmpty ? nil : accumulatedFilePathAnnotations
+            continuation.yield(.completed(accumulatedText, thinking, filePathAnns))
             continuation.finish()
             task?.cancel()
             session?.invalidateAndCancel()

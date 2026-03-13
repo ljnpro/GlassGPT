@@ -4,7 +4,27 @@ enum FeatureFlags {
     private static let relayEnabledKey = "relayServerEnabled"
     private static let relayURLKey = "relayServerURL"
 
-    private static var _platformRelayURL: String?
+    // MARK: - Thread-safe storage for platform relay URL
+
+    private final class PlatformRelayStorage: @unchecked Sendable {
+        private let lock = NSLock()
+        private var _url: String?
+
+        var url: String? {
+            get {
+                lock.lock()
+                defer { lock.unlock() }
+                return _url
+            }
+            set {
+                lock.lock()
+                defer { lock.unlock() }
+                _url = newValue
+            }
+        }
+    }
+
+    private static let platformRelayStorage = PlatformRelayStorage()
 
     private static var storedRelayURL: String? {
         let stored = UserDefaults.standard.string(forKey: relayURLKey)?
@@ -14,13 +34,14 @@ enum FeatureFlags {
 
     static var platformRelayURL: String? {
         get {
-            _platformRelayURL
+            platformRelayStorage.url
         }
         set {
             let trimmed = newValue?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-            _platformRelayURL = trimmed.isEmpty ? nil : trimmed
+            let resolved = trimmed.isEmpty ? nil : trimmed
+            platformRelayStorage.url = resolved
 
-            if _platformRelayURL != nil {
+            if resolved != nil {
                 useRelayServer = true
             }
         }
@@ -41,12 +62,12 @@ enum FeatureFlags {
 
     static var relayServerURL: String {
         get {
-            if let storedRelayURL {
-                return storedRelayURL
+            if let stored = storedRelayURL {
+                return stored
             }
 
-            if let platformRelayURL, !platformRelayURL.isEmpty {
-                return platformRelayURL
+            if let platform = platformRelayStorage.url, !platform.isEmpty {
+                return platform
             }
 
             return ""
@@ -64,7 +85,7 @@ enum FeatureFlags {
     }
 
     static var isRelayAutoDetected: Bool {
-        storedRelayURL == nil && (platformRelayURL?.isEmpty == false)
+        storedRelayURL == nil && (platformRelayStorage.url?.isEmpty == false)
     }
 
     static var isRelayConfigured: Bool {
@@ -72,8 +93,10 @@ enum FeatureFlags {
     }
 
     static func configurePlatformRelay(url: String) {
-        platformRelayURL = url.trimmingCharacters(in: .whitespacesAndNewlines)
-        if platformRelayURL != nil {
+        let trimmed = url.trimmingCharacters(in: .whitespacesAndNewlines)
+        let resolved = trimmed.isEmpty ? nil : trimmed
+        platformRelayStorage.url = resolved
+        if resolved != nil {
             useRelayServer = true
         }
     }

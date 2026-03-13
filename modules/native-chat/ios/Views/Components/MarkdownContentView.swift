@@ -31,6 +31,8 @@ fileprivate enum BlockPart: Identifiable, Sendable {
 
 struct MarkdownContentView: View {
     let text: String
+    var filePathAnnotations: [FilePathAnnotation] = []
+    var onSandboxLinkTap: ((String, FilePathAnnotation?) -> Void)?
 
     private var blockParts: [BlockPart] {
         parseBlocks(text)
@@ -343,8 +345,12 @@ struct MarkdownContentView: View {
                 .id(id)
 
         case let .richText(id: id, segments: segments):
-            RichTextView(segments: segments)
-                .id(id)
+            RichTextView(
+                segments: segments,
+                filePathAnnotations: filePathAnnotations,
+                onSandboxLinkTap: onSandboxLinkTap
+            )
+            .id(id)
         }
     }
 
@@ -419,6 +425,8 @@ private struct HeadingView: View {
 
 private struct RichTextView: View {
     let segments: [InlineSegment]
+    var filePathAnnotations: [FilePathAnnotation] = []
+    var onSandboxLinkTap: ((String, FilePathAnnotation?) -> Void)?
 
     var body: some View {
         let combinedText = segments.map { segment in
@@ -434,6 +442,58 @@ private struct RichTextView: View {
         Text(attributed)
             .font(.body)
             .textSelection(.enabled)
+            .environment(\.openURL, OpenURLAction { url in
+                if url.scheme == "sandbox" {
+                    let sandboxPath = url.absoluteString
+                    let annotation = findFilePathAnnotation(for: sandboxPath)
+                    onSandboxLinkTap?(sandboxPath, annotation)
+                    return .handled
+                }
+                // Let the system handle http/https URLs
+                return .systemAction
+            })
+    }
+
+    /// Find a matching FilePathAnnotation for a given sandbox URL string
+    private func findFilePathAnnotation(for sandboxURL: String) -> FilePathAnnotation? {
+        // Try exact match first
+        if let exact = filePathAnnotations.first(where: { $0.sandboxPath == sandboxURL }) {
+            return exact
+        }
+
+        // Try matching by extracting just the path portion
+        // sandbox:/mnt/user/file.png -> /mnt/user/file.png
+        let pathOnly: String
+        if sandboxURL.hasPrefix("sandbox:") {
+            pathOnly = String(sandboxURL.dropFirst("sandbox:".count))
+        } else {
+            pathOnly = sandboxURL
+        }
+
+        if let match = filePathAnnotations.first(where: {
+            $0.sandboxPath == pathOnly ||
+            $0.sandboxPath.hasSuffix(pathOnly) ||
+            pathOnly.hasSuffix($0.sandboxPath)
+        }) {
+            return match
+        }
+
+        // Try matching by filename
+        let filename = (pathOnly as NSString).lastPathComponent
+        if !filename.isEmpty {
+            if let match = filePathAnnotations.first(where: {
+                ($0.sandboxPath as NSString).lastPathComponent == filename
+            }) {
+                return match
+            }
+        }
+
+        // If there's exactly one annotation, use it
+        if filePathAnnotations.count == 1 {
+            return filePathAnnotations.first
+        }
+
+        return nil
     }
 
     /// Robust Markdown parser that handles bold/italic even when Apple's
@@ -442,7 +502,7 @@ private struct RichTextView: View {
     /// Strategy: first try Apple's parser. If the result still contains
     /// literal `**` or `*` markers, fall back to manual regex-based parsing.
     private func robustMarkdownParse(_ text: String) -> AttributedString {
-        // Try Apple's parser first
+        // Try Apple's parser first — this also handles [text](url) links
         if let appleResult = try? AttributedString(
             markdown: text,
             options: .init(
@@ -456,6 +516,18 @@ private struct RichTextView: View {
             if !plainText.contains("**") {
                 return appleResult
             }
+            // Apple's parser left literal ** in. Check if it at least parsed links.
+            // If so, try manual bold/italic but preserve the link info from Apple's result.
+            // For simplicity, fall back to manual parsing which won't preserve links
+            // unless we enhance it. But first check if there are actually links.
+            let hasLinks = appleResult.runs.contains { run in
+                run.link != nil
+            }
+            if hasLinks {
+                // Apple parsed links but missed bold. Return Apple's result
+                // since link interactivity is more important than bold styling.
+                return appleResult
+            }
         }
 
         // Fallback: manual parsing for bold and italic
@@ -465,43 +537,18 @@ private struct RichTextView: View {
     /// Manually parse **bold**, __bold__, *italic*, _italic_, `code`,
     /// and ***bold italic*** markers into an AttributedString.
     private func manualMarkdownParse(_ text: String) -> AttributedString {
-        // We'll work with NSMutableAttributedString for easier range manipulation
-        var working = text
-
-        // Collect styled ranges: (range in final string, isBold, isItalic, isCode)
-        struct StyledRange {
-            let range: Range<String.Index>
-            let isBold: Bool
-            let isItalic: Bool
-            let isCode: Bool
-        }
-
         var result = AttributedString()
 
         // Process the text character by character, handling markers
-        let chars = Array(working)
+        let chars = Array(text)
         let count = chars.count
         var i = 0
         var currentText = ""
-        var isBold = false
-        var isItalic = false
-        var isCode = false
 
         func flushCurrent() {
             if !currentText.isEmpty {
                 var chunk = AttributedString(currentText)
-                if isBold && isItalic {
-                    chunk.font = .body.bold().italic()
-                } else if isBold {
-                    chunk.font = .body.bold()
-                } else if isItalic {
-                    chunk.font = .body.italic()
-                } else if isCode {
-                    chunk.font = .body.monospaced()
-                    chunk.backgroundColor = .secondary.opacity(0.12)
-                } else {
-                    chunk.font = .body
-                }
+                chunk.font = .body
                 result += chunk
                 currentText = ""
             }
@@ -509,7 +556,7 @@ private struct RichTextView: View {
 
         while i < count {
             // Inline code: `...`
-            if chars[i] == "`" && !isCode {
+            if chars[i] == "`" {
                 // Find closing backtick
                 var end = i + 1
                 while end < count && chars[end] != "`" { end += 1 }
@@ -556,7 +603,6 @@ private struct RichTextView: View {
                 if end + 1 < count {
                     flushCurrent()
                     let content = String(chars[(i + 2)..<end])
-                    // Recursively parse the content for nested italic
                     var chunk = AttributedString(content)
                     chunk.font = .body.bold()
                     result += chunk
