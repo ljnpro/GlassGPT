@@ -17,23 +17,44 @@ actor FileDownloadService {
 
     /// Download a file by its OpenAI file_id and save to a temp location.
     /// Returns the local file URL.
-    /// If a download for the same fileId is already in flight, joins that download.
-    func downloadFile(fileId: String, suggestedFilename: String?, apiKey: String) async throws -> URL {
-        if let existingTask = inFlightDownloads[fileId] {
+    /// If a download for the same file reference is already in flight, joins that download.
+    func downloadFile(
+        fileId: String,
+        containerId: String?,
+        suggestedFilename: String?,
+        apiKey: String
+    ) async throws -> URL {
+        let downloadKey = downloadKey(fileId: fileId, containerId: containerId)
+
+        if let existingTask = inFlightDownloads[downloadKey] {
             return try await existingTask.value
         }
 
         let task = Task<URL, Error> {
-            defer { inFlightDownloads[fileId] = nil }
-            return try await performDownload(fileId: fileId, suggestedFilename: suggestedFilename, apiKey: apiKey)
+            defer { inFlightDownloads[downloadKey] = nil }
+            return try await performDownload(
+                fileId: fileId,
+                containerId: containerId,
+                suggestedFilename: suggestedFilename,
+                apiKey: apiKey
+            )
         }
 
-        inFlightDownloads[fileId] = task
+        inFlightDownloads[downloadKey] = task
         return try await task.value
     }
 
-    private func performDownload(fileId: String, suggestedFilename: String?, apiKey: String) async throws -> URL {
-        let (data, response) = try await downloadFromAPI(fileId: fileId, apiKey: apiKey)
+    private func performDownload(
+        fileId: String,
+        containerId: String?,
+        suggestedFilename: String?,
+        apiKey: String
+    ) async throws -> URL {
+        let (data, response) = try await downloadFromAPI(
+            fileId: fileId,
+            containerId: containerId,
+            apiKey: apiKey
+        )
 
         let filename = resolveFilename(
             suggestedFilename: suggestedFilename,
@@ -54,8 +75,20 @@ actor FileDownloadService {
         return localURL
     }
 
-    private func downloadFromAPI(fileId: String, apiKey: String) async throws -> (Data, URLResponse) {
-        guard let url = URL(string: "\(FeatureFlags.openAIBaseURL)/files/\(fileId)/content") else {
+    private func downloadFromAPI(
+        fileId: String,
+        containerId: String?,
+        apiKey: String
+    ) async throws -> (Data, URLResponse) {
+        let urlString: String
+
+        if let containerId, !containerId.isEmpty {
+            urlString = "\(FeatureFlags.openAIBaseURL)/containers/\(containerId)/files/\(fileId)/content"
+        } else {
+            urlString = "\(FeatureFlags.openAIBaseURL)/files/\(fileId)/content"
+        }
+
+        guard let url = URL(string: urlString) else {
             throw FileDownloadError.invalidURL
         }
 
@@ -77,6 +110,13 @@ actor FileDownloadService {
         }
 
         return (data, response)
+    }
+
+    private func downloadKey(fileId: String, containerId: String?) -> String {
+        if let containerId, !containerId.isEmpty {
+            return "\(containerId):\(fileId)"
+        }
+        return fileId
     }
 
     private func resolveFilename(suggestedFilename: String?, fileId: String, response: URLResponse) -> String {

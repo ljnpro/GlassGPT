@@ -2407,6 +2407,13 @@ describe('Background-Off Relaunch Strategy', () => {
 });
 
 describe('Code Interpreter File Link Resolution', () => {
+  function buildDownloadPath(input: { baseURL: string; fileId: string; containerId?: string | null }) {
+    if (input.containerId) {
+      return `${input.baseURL}/containers/${input.containerId}/files/${input.fileId}/content`;
+    }
+    return `${input.baseURL}/files/${input.fileId}/content`;
+  }
+
   function isFileCitationAnnotationType(type: string) {
     return type === 'file_path' || type === 'container_file_citation';
   }
@@ -2445,6 +2452,21 @@ describe('Code Interpreter File Link Resolution', () => {
     expect(isFileCitationAnnotationType('file_path')).toBe(true);
   });
 
+  it('builds container file download URLs when the annotation includes a container id', () => {
+    expect(buildDownloadPath({
+      baseURL: 'https://api.openai.com/v1',
+      containerId: 'cntr_123',
+      fileId: 'cfile_456',
+    })).toBe('https://api.openai.com/v1/containers/cntr_123/files/cfile_456/content');
+  });
+
+  it('falls back to the standard files content URL for non-container files', () => {
+    expect(buildDownloadPath({
+      baseURL: 'https://api.openai.com/v1',
+      fileId: 'file_456',
+    })).toBe('https://api.openai.com/v1/files/file_456/content');
+  });
+
   it('extracts the sandbox path using character indices so CJK prefixes do not corrupt the slice', () => {
     const text = '已帮你生成一个 PNG 文件：[下载 generated_image.png](sandbox:/mnt/data/generated_image.png)';
     const sandboxURL = 'sandbox:/mnt/data/generated_image.png';
@@ -2461,5 +2483,20 @@ describe('Code Interpreter File Link Resolution', () => {
         { sandboxPath: '', filename: 'generated_image.png' },
       ],
     })).toEqual({ sandboxPath: '', filename: 'generated_image.png' });
+  });
+
+  it('can match a refreshed container annotation by sandbox path and filename', () => {
+    expect(findMatchingFileAnnotation({
+      sandboxURL: 'sandbox:/mnt/data/generated_image.png',
+      annotations: [
+        {
+          sandboxPath: 'sandbox:/mnt/data/generated_image.png',
+          filename: 'generated_image.png',
+        },
+      ],
+    })).toEqual({
+      sandboxPath: 'sandbox:/mnt/data/generated_image.png',
+      filename: 'generated_image.png',
+    });
   });
 });

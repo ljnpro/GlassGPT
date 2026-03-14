@@ -298,19 +298,12 @@ final class ChatViewModel {
 
     // MARK: - File Preview
 
-    func handleSandboxLinkTap(sandboxURL: String, annotation: FilePathAnnotation?) {
-        guard let annotation = annotation else {
-            fileDownloadError = "Cannot download file: no file reference found."
-            return
-        }
-
+    func handleSandboxLinkTap(message: Message, sandboxURL: String, annotation: FilePathAnnotation?) {
         guard !apiKey.isEmpty else {
             fileDownloadError = "No API key configured."
             return
         }
 
-        let fileId = annotation.fileId
-        let suggestedFilename = extractFilename(from: sandboxURL)
         let key = apiKey
 
         isDownloadingFile = true
@@ -318,9 +311,19 @@ final class ChatViewModel {
 
         Task { @MainActor in
             do {
+                guard let resolvedAnnotation = try await resolveDownloadAnnotation(
+                    for: message,
+                    sandboxURL: sandboxURL,
+                    fallback: annotation,
+                    apiKey: key
+                ) else {
+                    throw FileDownloadError.fileNotFound
+                }
+
                 let localURL = try await FileDownloadService.shared.downloadFile(
-                    fileId: fileId,
-                    suggestedFilename: suggestedFilename,
+                    fileId: resolvedAnnotation.fileId,
+                    containerId: resolvedAnnotation.containerId,
+                    suggestedFilename: resolvedAnnotation.filename ?? extractFilename(from: sandboxURL),
                     apiKey: key
                 )
                 isDownloadingFile = false
@@ -335,6 +338,95 @@ final class ChatViewModel {
                 #endif
             }
         }
+    }
+
+    private func resolveDownloadAnnotation(
+        for message: Message,
+        sandboxURL: String,
+        fallback: FilePathAnnotation?,
+        apiKey: String
+    ) async throws -> FilePathAnnotation? {
+        if let fallback, annotationCanDownloadDirectly(fallback) {
+            return fallback
+        }
+
+        guard let responseId = message.responseId, !responseId.isEmpty else {
+            return fallback
+        }
+
+        let result = try await openAIService.fetchResponse(responseId: responseId, apiKey: apiKey)
+        guard let refreshedAnnotation = findMatchingFilePathAnnotation(
+            in: result.filePathAnnotations,
+            sandboxURL: sandboxURL,
+            fallback: fallback
+        ) else {
+            return fallback
+        }
+
+        var persistedAnnotations = message.filePathAnnotations
+
+        if let existingIndex = persistedAnnotations.firstIndex(where: { $0.id == refreshedAnnotation.id }) {
+            persistedAnnotations[existingIndex] = refreshedAnnotation
+        } else if !persistedAnnotations.contains(where: { $0.fileId == refreshedAnnotation.fileId }) {
+            persistedAnnotations.append(refreshedAnnotation)
+        }
+
+        message.filePathAnnotations = persistedAnnotations
+        try? modelContext.save()
+        return refreshedAnnotation
+    }
+
+    private func annotationCanDownloadDirectly(_ annotation: FilePathAnnotation) -> Bool {
+        if let containerId = annotation.containerId, !containerId.isEmpty {
+            return true
+        }
+
+        return !annotation.fileId.hasPrefix("cfile_")
+    }
+
+    private func findMatchingFilePathAnnotation(
+        in annotations: [FilePathAnnotation],
+        sandboxURL: String,
+        fallback: FilePathAnnotation?
+    ) -> FilePathAnnotation? {
+        if let fallback,
+           let exactFileIdMatch = annotations.first(where: { $0.fileId == fallback.fileId }) {
+            return exactFileIdMatch
+        }
+
+        if let exact = annotations.first(where: { $0.sandboxPath == sandboxURL }) {
+            return exact
+        }
+
+        let pathOnly: String
+        if sandboxURL.hasPrefix("sandbox:") {
+            pathOnly = String(sandboxURL.dropFirst("sandbox:".count))
+        } else {
+            pathOnly = sandboxURL
+        }
+
+        if let match = annotations.first(where: {
+            $0.sandboxPath == pathOnly ||
+            $0.sandboxPath.hasSuffix(pathOnly) ||
+            pathOnly.hasSuffix($0.sandboxPath)
+        }) {
+            return match
+        }
+
+        let filename = (pathOnly as NSString).lastPathComponent
+        if !filename.isEmpty,
+           let match = annotations.first(where: {
+               ($0.sandboxPath as NSString).lastPathComponent == filename ||
+               $0.filename == filename
+           }) {
+            return match
+        }
+
+        if annotations.count == 1 {
+            return annotations.first
+        }
+
+        return fallback
     }
 
     private func extractFilename(from sandboxURL: String) -> String? {
