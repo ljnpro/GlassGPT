@@ -14,8 +14,6 @@ struct ChatView: View {
     @State private var bottomAnchorMaxY: CGFloat = 0
 
     private let autoFollowThreshold: CGFloat = 96
-    private let sheetCornerRadiusPhone: CGFloat = 32
-    private let sheetCornerRadiusPad: CGFloat = 38
 
     var body: some View {
         NavigationStack {
@@ -33,9 +31,16 @@ struct ChatView: View {
                     fileDownloadingOverlay
                         .transition(.opacity)
                 }
+
+                if viewModel.showModelSelector {
+                    modelSelectorOverlay
+                        .transition(.opacity.combined(with: .scale(scale: 0.98)))
+                        .zIndex(10)
+                }
             }
             .animation(.easeInOut(duration: 0.25), value: viewModel.isRestoringConversation)
             .animation(.easeInOut(duration: 0.2), value: viewModel.isDownloadingFile)
+            .animation(.spring(response: 0.28, dampingFraction: 0.92), value: viewModel.showModelSelector)
             .safeAreaInset(edge: .bottom, spacing: 0) {
                 MessageInputBar(
                     text: $viewModel.inputText,
@@ -70,23 +75,6 @@ struct ChatView: View {
                 }
             }
             .toolbarBackgroundVisibility(.hidden, for: .navigationBar)
-            .sheet(isPresented: $viewModel.showModelSelector) {
-                ModelSelectorSheet(
-                    proModeEnabled: Binding(
-                        get: { viewModel.proModeEnabled },
-                        set: { viewModel.proModeEnabled = $0 }
-                    ),
-                    backgroundModeEnabled: $viewModel.backgroundModeEnabled,
-                    flexModeEnabled: Binding(
-                        get: { viewModel.flexModeEnabled },
-                        set: { viewModel.flexModeEnabled = $0 }
-                    ),
-                    reasoningEffort: $viewModel.reasoningEffort
-                )
-                .presentationSizing(.form)
-                .presentationDragIndicator(.visible)
-                .presentationCornerRadius(modelSelectorSheetCornerRadius)
-            }
             .sheet(item: filePreviewBinding) { previewItem in
                 FilePreviewController(fileURL: previewItem.url)
                     .ignoresSafeArea()
@@ -348,6 +336,41 @@ struct ChatView: View {
         }
     }
 
+    private var modelSelectorOverlay: some View {
+        GeometryReader { geometry in
+            let idiom = UIDevice.current.userInterfaceIdiom
+            let horizontalInset = idiom == .pad ? 32.0 : 16.0
+            let maxPanelWidth = idiom == .pad ? 680.0 : min(geometry.size.width - (horizontalInset * 2), 520.0)
+            let topInset = geometry.safeAreaInsets.top + (idiom == .pad ? 18.0 : 12.0)
+
+            ZStack(alignment: .top) {
+                Color.black.opacity(0.08)
+                    .ignoresSafeArea()
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        viewModel.showModelSelector = false
+                    }
+
+                ModelSelectorSheet(
+                    proModeEnabled: Binding(
+                        get: { viewModel.proModeEnabled },
+                        set: { viewModel.proModeEnabled = $0 }
+                    ),
+                    backgroundModeEnabled: $viewModel.backgroundModeEnabled,
+                    flexModeEnabled: Binding(
+                        get: { viewModel.flexModeEnabled },
+                        set: { viewModel.flexModeEnabled = $0 }
+                    ),
+                    reasoningEffort: $viewModel.reasoningEffort,
+                    onDone: { viewModel.showModelSelector = false }
+                )
+                .frame(maxWidth: maxPanelWidth)
+                .padding(.top, topInset)
+                .padding(.horizontal, horizontalInset)
+            }
+        }
+    }
+
     // MARK: - Streaming Bubble
 
     private var streamingBubble: some View {
@@ -449,10 +472,6 @@ struct ChatView: View {
 }
 
 private extension ChatView {
-    var modelSelectorSheetCornerRadius: CGFloat {
-        UIDevice.current.userInterfaceIdiom == .pad ? sheetCornerRadiusPad : sheetCornerRadiusPhone
-    }
-
     var assistantBubbleMaxWidth: CGFloat {
         UIDevice.current.userInterfaceIdiom == .pad ? 680 : 520
     }

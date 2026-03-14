@@ -42,16 +42,19 @@ struct ModelSelectorSheet: View {
     @Binding var backgroundModeEnabled: Bool
     @Binding var flexModeEnabled: Bool
     @Binding var reasoningEffort: ReasoningEffort
-    @Environment(\.dismiss) private var dismiss
+    let onDone: () -> Void
 
     private struct Metrics {
         let contentHorizontalPadding: CGFloat
         let contentVerticalPadding: CGFloat
         let cardCornerRadius: CGFloat
+        let panelCornerRadius: CGFloat
         let sheetMaxWidth: CGFloat?
         let rowVerticalPadding: CGFloat
         let rowHorizontalPadding: CGFloat
         let sectionSpacing: CGFloat
+        let columnSpacing: CGFloat
+        let reasoningColumnWidth: CGFloat?
 
         init(idiom: UIUserInterfaceIdiom) {
             switch idiom {
@@ -59,18 +62,24 @@ struct ModelSelectorSheet: View {
                 contentHorizontalPadding = 24
                 contentVerticalPadding = 22
                 cardCornerRadius = 28
+                panelCornerRadius = 36
                 sheetMaxWidth = 620
                 rowVerticalPadding = 18
                 rowHorizontalPadding = 22
                 sectionSpacing = 18
+                columnSpacing = 18
+                reasoningColumnWidth = 280
             default:
                 contentHorizontalPadding = 20
                 contentVerticalPadding = 18
                 cardCornerRadius = 24
+                panelCornerRadius = 32
                 sheetMaxWidth = nil
                 rowVerticalPadding = 16
                 rowHorizontalPadding = 18
                 sectionSpacing = 16
+                columnSpacing = 14
+                reasoningColumnWidth = nil
             }
         }
     }
@@ -83,8 +92,15 @@ struct ModelSelectorSheet: View {
         Metrics(idiom: UIDevice.current.userInterfaceIdiom)
     }
 
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
+
     private var efforts: [ReasoningEffort] {
         selectedModel.availableEfforts
+    }
+
+    private var prefersTwoColumnLayout: Bool {
+        UIDevice.current.userInterfaceIdiom == .pad || verticalSizeClass == .compact || horizontalSizeClass == .regular
     }
 
     private var configurationSummary: String {
@@ -120,15 +136,34 @@ struct ModelSelectorSheet: View {
         VStack(spacing: metrics.sectionSpacing) {
             header
 
-            toggleGroup
+            if prefersTwoColumnLayout {
+                HStack(alignment: .top, spacing: metrics.columnSpacing) {
+                    toggleGroup
+                        .frame(maxWidth: .infinity)
 
-            reasoningControl
+                    reasoningControl
+                        .frame(width: metrics.reasoningColumnWidth)
+                }
+            } else {
+                VStack(spacing: metrics.sectionSpacing) {
+                    toggleGroup
+                    reasoningControl
+                }
+            }
         }
         .frame(maxWidth: metrics.sheetMaxWidth)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .padding(.horizontal, metrics.contentHorizontalPadding)
         .padding(.top, metrics.contentVerticalPadding)
         .padding(.bottom, metrics.contentVerticalPadding)
+        .background {
+            RoundedRectangle(cornerRadius: metrics.panelCornerRadius, style: .continuous)
+                .fill(.thickMaterial)
+        }
+        .glassEffect(
+            .regular.interactive(),
+            in: RoundedRectangle(cornerRadius: metrics.panelCornerRadius, style: .continuous)
+        )
+        .shadow(color: .black.opacity(0.08), radius: 24, x: 0, y: 10)
     }
 
     private var reasoningControl: some View {
@@ -203,7 +238,7 @@ struct ModelSelectorSheet: View {
 
             Spacer(minLength: 12)
 
-            Button("Done") { dismiss() }
+            Button("Done") { onDone() }
                 .buttonStyle(.glassProminent)
         }
         .padding(.horizontal, 2)
