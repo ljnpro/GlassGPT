@@ -59,7 +59,8 @@ actor FileDownloadService {
         let filename = resolveFilename(
             suggestedFilename: suggestedFilename,
             fileId: fileId,
-            response: response
+            response: response,
+            data: data
         )
 
         let tempDir = FileManager.default.temporaryDirectory
@@ -119,8 +120,15 @@ actor FileDownloadService {
         return fileId
     }
 
-    private func resolveFilename(suggestedFilename: String?, fileId: String, response: URLResponse) -> String {
-        if let suggested = suggestedFilename, !suggested.isEmpty {
+    private func resolveFilename(
+        suggestedFilename: String?,
+        fileId: String,
+        response: URLResponse,
+        data: Data
+    ) -> String {
+        let inferredExtension = inferredFileExtension(from: response, data: data)
+
+        if let suggested = normalizedFilename(suggestedFilename, inferredExtension: inferredExtension) {
             return suggested
         }
 
@@ -129,26 +137,51 @@ actor FileDownloadService {
            let filenameRange = disposition.range(of: "filename=\""),
            let endRange = disposition[filenameRange.upperBound...].range(of: "\"") {
             let extracted = String(disposition[filenameRange.upperBound..<endRange.lowerBound])
-            if !extracted.isEmpty {
-                return extracted
+            if let normalized = normalizedFilename(extracted, inferredExtension: inferredExtension) {
+                return normalized
             }
         }
 
-        if let suggested = response.suggestedFilename, !suggested.isEmpty, suggested != "Unknown" {
+        if let responseSuggested = response.suggestedFilename,
+           !responseSuggested.isEmpty,
+           responseSuggested != "Unknown",
+           let suggested = normalizedFilename(responseSuggested, inferredExtension: inferredExtension) {
             return suggested
         }
 
-        let ext: String
-        if let mimeType = response.mimeType {
-            ext = Self.extensionForMimeType(mimeType)
-        } else {
-            ext = "bin"
-        }
-
-        return "\(fileId).\(ext)"
+        return "\(fileId).\(inferredExtension ?? "bin")"
     }
 
-    private static func extensionForMimeType(_ mimeType: String) -> String {
+    private func normalizedFilename(_ candidate: String?, inferredExtension: String?) -> String? {
+        guard let candidate else { return nil }
+
+        let trimmed = candidate.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+
+        let sanitized = URL(fileURLWithPath: trimmed).lastPathComponent
+        guard !sanitized.isEmpty else { return nil }
+
+        if !URL(fileURLWithPath: sanitized).pathExtension.isEmpty {
+            return sanitized
+        }
+
+        if let inferredExtension, !inferredExtension.isEmpty {
+            return "\(sanitized).\(inferredExtension)"
+        }
+
+        return sanitized
+    }
+
+    private func inferredFileExtension(from response: URLResponse, data: Data) -> String? {
+        if let mimeType = response.mimeType,
+           let ext = Self.extensionForMimeType(mimeType) {
+            return ext
+        }
+
+        return Self.extensionForFileSignature(data)
+    }
+
+    private static func extensionForMimeType(_ mimeType: String) -> String? {
         let lower = mimeType.lowercased()
         switch lower {
         case "image/png": return "png"
@@ -168,8 +201,35 @@ actor FileDownloadService {
         default:
             if lower.hasPrefix("text/") { return "txt" }
             if lower.hasPrefix("image/") { return lower.replacingOccurrences(of: "image/", with: "") }
-            return "bin"
+            return nil
         }
+    }
+
+    private static func extensionForFileSignature(_ data: Data) -> String? {
+        if data.starts(with: [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]) {
+            return "png"
+        }
+
+        if data.starts(with: [0xFF, 0xD8, 0xFF]) {
+            return "jpg"
+        }
+
+        if data.starts(with: Array("GIF8".utf8)) {
+            return "gif"
+        }
+
+        if data.starts(with: Array("%PDF".utf8)) {
+            return "pdf"
+        }
+
+        if data.count >= 12 {
+            let prefix = data.prefix(12)
+            if prefix.prefix(4) == Data("RIFF".utf8) && prefix.suffix(4) == Data("WEBP".utf8) {
+                return "webp"
+            }
+        }
+
+        return nil
     }
 
     func cleanupCache() {
