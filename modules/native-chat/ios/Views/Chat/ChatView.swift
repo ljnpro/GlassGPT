@@ -249,7 +249,7 @@ struct ChatView: View {
             liveFilePathAnnotations: isLiveDraft ? viewModel.liveFilePathAnnotations : [],
             showsRecoveryIndicator: isLiveDraft && viewModel.isRecovering,
             onSandboxLinkTap: message.role == .assistant ? { sandboxURL, annotation in
-                viewModel.handleSandboxLinkTap(sandboxURL: sandboxURL, annotation: annotation)
+                viewModel.handleSandboxLinkTap(message: message, sandboxURL: sandboxURL, annotation: annotation)
             } : nil
         )
         .id(message.id)
