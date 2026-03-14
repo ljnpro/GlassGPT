@@ -2081,6 +2081,42 @@ describe('Interrupted Synchronous Recovery Messaging', () => {
   });
 });
 
+describe('Recovering Indicator Visibility', () => {
+  type RecoveryPhase = 'idle' | 'checkingStatus' | 'streamResuming' | 'pollingTerminal';
+
+  function shouldShowRecoveringIndicator(input: {
+    isVisibleDraft: boolean;
+    phase: RecoveryPhase;
+  }) {
+    return input.isVisibleDraft && input.phase === 'streamResuming';
+  }
+
+  it('shows Recovering only for the visible draft while stream resume is active', () => {
+    expect(shouldShowRecoveringIndicator({
+      isVisibleDraft: true,
+      phase: 'streamResuming',
+    })).toBe(true);
+  });
+
+  it('does not show Recovering while only checking status or polling terminal state', () => {
+    expect(shouldShowRecoveringIndicator({
+      isVisibleDraft: true,
+      phase: 'checkingStatus',
+    })).toBe(false);
+    expect(shouldShowRecoveringIndicator({
+      isVisibleDraft: true,
+      phase: 'pollingTerminal',
+    })).toBe(false);
+  });
+
+  it('does not show Recovering for hidden history sessions', () => {
+    expect(shouldShowRecoveringIndicator({
+      isVisibleDraft: false,
+      phase: 'streamResuming',
+    })).toBe(false);
+  });
+});
+
 describe('Concurrent Conversation Session Logic', () => {
   interface SessionDescriptor {
     messageId: string;
@@ -2148,6 +2184,78 @@ describe('Concurrent Conversation Session Logic', () => {
       expect.arrayContaining(['msg_hidden_stream', 'msg_other_stream']),
     );
     expect(result.visibleSessionMessageId).toBe('msg_hidden_stream');
+  });
+});
+
+describe('Conversation Message Isolation', () => {
+  interface VisibleMessage {
+    id: string;
+    conversationId: string;
+    content: string;
+  }
+
+  function upsertVisibleMessage(input: {
+    currentConversationId: string | null;
+    visibleMessages: VisibleMessage[];
+    incomingMessage: VisibleMessage;
+  }) {
+    if (input.incomingMessage.conversationId !== input.currentConversationId) {
+      return input.visibleMessages;
+    }
+
+    const existingIndex = input.visibleMessages.findIndex(
+      (message) => message.id === input.incomingMessage.id,
+    );
+
+    if (existingIndex >= 0) {
+      const next = [...input.visibleMessages];
+      next[existingIndex] = input.incomingMessage;
+      return next;
+    }
+
+    return [...input.visibleMessages, input.incomingMessage];
+  }
+
+  it('does not insert an old conversation response into a brand-new chat', () => {
+    expect(upsertVisibleMessage({
+      currentConversationId: null,
+      visibleMessages: [],
+      incomingMessage: {
+        id: 'msg_old',
+        conversationId: 'conv_old',
+        content: 'Old hidden response',
+      },
+    })).toEqual([]);
+  });
+
+  it('does not insert a hidden history update into the currently open conversation', () => {
+    expect(upsertVisibleMessage({
+      currentConversationId: 'conv_new',
+      visibleMessages: [
+        { id: 'msg_new_user', conversationId: 'conv_new', content: 'Hello' },
+      ],
+      incomingMessage: {
+        id: 'msg_old_assistant',
+        conversationId: 'conv_old',
+        content: 'Hidden recovery completed',
+      },
+    })).toEqual([
+      { id: 'msg_new_user', conversationId: 'conv_new', content: 'Hello' },
+    ]);
+  });
+
+  it('still updates the visible conversation when the incoming message belongs to it', () => {
+    expect(upsertVisibleMessage({
+      currentConversationId: 'conv_current',
+      visibleMessages: [],
+      incomingMessage: {
+        id: 'msg_current',
+        conversationId: 'conv_current',
+        content: 'Visible response',
+      },
+    })).toEqual([
+      { id: 'msg_current', conversationId: 'conv_current', content: 'Visible response' },
+    ]);
   });
 });
 
@@ -2253,5 +2361,47 @@ describe('Launch Recovery Planning', () => {
     expect(plan).toEqual([
       { messageId: 'msg_history', visibility: 'hidden', strategy: 'poll' },
     ]);
+  });
+});
+
+describe('Background-Off Relaunch Strategy', () => {
+  function decideBackgroundOffRecovery(status: 'completed' | 'queued' | 'in_progress' | '404') {
+    switch (status) {
+      case 'completed':
+        return 'pull-final';
+      case 'queued':
+      case 'in_progress':
+        return 'poll-until-terminal';
+      case '404':
+        return 'interrupted-fallback';
+    }
+  }
+
+  function suspendForAppTermination(input: { responseId: string | null }) {
+    return {
+      shouldRemainIncomplete: input.responseId != null,
+    };
+  }
+
+  it('pulls the final result immediately when the synchronous response is already complete', () => {
+    expect(decideBackgroundOffRecovery('completed')).toBe('pull-final');
+  });
+
+  it('keeps polling while the synchronous response is still queued or running', () => {
+    expect(decideBackgroundOffRecovery('queued')).toBe('poll-until-terminal');
+    expect(decideBackgroundOffRecovery('in_progress')).toBe('poll-until-terminal');
+  });
+
+  it('falls back to the interrupted notice when the server no longer has the response', () => {
+    expect(decideBackgroundOffRecovery('404')).toBe('interrupted-fallback');
+  });
+
+  it('keeps response-backed drafts incomplete when the app is terminated', () => {
+    expect(suspendForAppTermination({ responseId: 'resp_123' })).toEqual({
+      shouldRemainIncomplete: true,
+    });
+    expect(suspendForAppTermination({ responseId: null })).toEqual({
+      shouldRemainIncomplete: false,
+    });
   });
 });
