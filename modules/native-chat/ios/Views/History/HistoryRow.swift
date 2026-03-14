@@ -38,7 +38,25 @@ struct HistoryRow: View {
 
     private var lastMessagePreview: String {
         let sorted = conversation.messages.sorted { $0.createdAt < $1.createdAt }
-        return sorted.last?.content.prefix(100).description ?? "No messages"
+        guard let lastMessage = sorted.last else {
+            return "No messages"
+        }
+
+        let trimmedContent = lastMessage.content.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmedContent.isEmpty {
+            return trimmedContent.prefix(100).description
+        }
+
+        if lastMessage.role == .assistant && !lastMessage.isComplete {
+            if let thinking = lastMessage.thinking?.trimmingCharacters(in: .whitespacesAndNewlines),
+               !thinking.isEmpty {
+                return thinking.prefix(100).description
+            }
+
+            return "Generating..."
+        }
+
+        return "No messages"
     }
 
     private var modelDisplayName: String {

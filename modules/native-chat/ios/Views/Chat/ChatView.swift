@@ -175,12 +175,6 @@ struct ChatView: View {
                                 }
                             }
 
-                        // Recovery indicator
-                        if viewModel.isRecovering {
-                            recoveryBanner
-                                .id("recovery")
-                        }
-
                         // Error message
                         if let error = viewModel.errorMessage {
                             errorBanner(error)
@@ -379,25 +373,6 @@ struct ChatView: View {
 
             Spacer(minLength: 40)
         }
-    }
-
-    // MARK: - Recovery Banner
-
-    private var recoveryBanner: some View {
-        HStack(spacing: 8) {
-            ProgressView()
-                .controlSize(.small)
-            Text("Recovering interrupted response…")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-        }
-        .padding(12)
-        .background {
-            RoundedRectangle(cornerRadius: 12)
-                .fill(.ultraThinMaterial)
-        }
-        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 12))
-        .transition(.opacity.combined(with: .move(edge: .bottom)))
     }
 
     // MARK: - Error Banner

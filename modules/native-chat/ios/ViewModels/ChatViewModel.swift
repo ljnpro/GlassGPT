@@ -28,6 +28,7 @@ final class ChatViewModel {
             if !selectedModel.availableEfforts.contains(reasoningEffort) {
                 reasoningEffort = selectedModel.defaultEffort
             }
+            guard !isApplyingStoredConversationConfiguration else { return }
             syncConversationConfiguration()
         }
     }
@@ -37,16 +38,19 @@ final class ChatViewModel {
                 reasoningEffort = selectedModel.defaultEffort
                 return
             }
+            guard !isApplyingStoredConversationConfiguration else { return }
             syncConversationConfiguration()
         }
     }
     var backgroundModeEnabled: Bool = false {
         didSet {
+            guard !isApplyingStoredConversationConfiguration else { return }
             syncConversationConfiguration()
         }
     }
     var serviceTier: ServiceTier = .standard {
         didSet {
+            guard !isApplyingStoredConversationConfiguration else { return }
             syncConversationConfiguration()
         }
     }
@@ -85,26 +89,31 @@ final class ChatViewModel {
     private var activeRequestEffort: ReasoningEffort?
     private var activeRequestUsesBackgroundMode = false
     private var activeRequestServiceTier: ServiceTier = .standard
+    private var isApplyingStoredConversationConfiguration = false
+    private var didCompleteLaunchBootstrap = false
 
     // Background task
     private var backgroundTaskID: UIBackgroundTaskIdentifier = .invalid
 
     // Recovery task
     private var recoveryTask: Task<Void, Never>?
+    private var activeRecoveryMessageID: UUID?
+    private var activeRecoveryResponseID: String?
 
     // MARK: - Init
 
     init(modelContext: ModelContext) {
         self.modelContext = modelContext
         loadDefaultsFromSettings()
+        restoreLastConversationIfAvailable()
 
         setupLifecycleObservers()
 
         Task { @MainActor in
-            await restoreLastConversation()
-            await recoverActiveDraftIfNeededOnLaunch()
+            await recoverIncompleteMessagesInCurrentConversation()
             await recoverIncompleteMessages()
             await resendOrphanedDrafts()
+            self.didCompleteLaunchBootstrap = true
             await generateTitlesForUntitledConversations()
         }
     }
@@ -129,6 +138,16 @@ final class ChatViewModel {
         ) { [weak self] _ in
             Task { @MainActor in
                 self?.handleEnterBackground()
+            }
+        }
+
+        NotificationCenter.default.addObserver(
+            forName: UIApplication.didEnterBackgroundNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in
+                self?.handleDidEnterBackground()
             }
         }
 
@@ -195,11 +214,15 @@ final class ChatViewModel {
         }
     }
 
-    private func handleReturnToForeground() {
-        endBackgroundTask()
+    private func handleDidEnterBackground() {
+        guard isStreaming else { return }
+        _ = detachBackgroundResponseIfPossible(reason: "background")
+    }
 
-        recoveryTask?.cancel()
-        recoveryTask = nil
+    private func handleReturnToForeground() {
+        guard didCompleteLaunchBootstrap else { return }
+
+        endBackgroundTask()
 
         if isStreaming {
             #if DEBUG
@@ -213,6 +236,15 @@ final class ChatViewModel {
         }
 
         if let draft = activeIncompleteAssistantDraft() {
+            if let responseId = draft.responseId,
+               isRecoveryInFlight(for: draft.id, responseId: responseId) {
+                restoreDraftState(from: draft)
+                return
+            }
+
+            recoveryTask?.cancel()
+            recoveryTask = nil
+
             restoreDraftState(from: draft)
 
             if let responseId = draft.responseId {
@@ -227,6 +259,9 @@ final class ChatViewModel {
 
             removeEmptyDraft()
         }
+
+        recoveryTask?.cancel()
+        recoveryTask = nil
 
         Task { @MainActor in
             await recoverIncompleteMessagesInCurrentConversation()
@@ -646,7 +681,8 @@ final class ChatViewModel {
 
     private func saveDraftIfNeeded() {
         let now = Date()
-        guard now.timeIntervalSince(lastDraftSaveTime) >= 2.0 else { return }
+        let minimumInterval = activeRequestUsesBackgroundMode ? 0.25 : 2.0
+        guard now.timeIntervalSince(lastDraftSaveTime) >= minimumInterval else { return }
         saveDraftNow()
     }
 
@@ -751,11 +787,17 @@ final class ChatViewModel {
             return
         }
 
+        if isRecoveryInFlight(for: messageId, responseId: responseId) {
+            return
+        }
+
         recoveryTask?.cancel()
         errorMessage = nil
         isRecovering = true
         isStreaming = false
         isThinking = false
+        activeRecoveryMessageID = messageId
+        activeRecoveryResponseID = responseId
 
         if let message = findMessage(byId: messageId),
            !message.content.isEmpty,
@@ -770,6 +812,10 @@ final class ChatViewModel {
 
         recoveryTask = Task { @MainActor in
             defer {
+                if self.activeRecoveryMessageID == msgId && self.activeRecoveryResponseID == respId {
+                    self.activeRecoveryMessageID = nil
+                    self.activeRecoveryResponseID = nil
+                }
                 self.isRecovering = false
                 self.isStreaming = false
                 self.isThinking = false
@@ -812,6 +858,14 @@ final class ChatViewModel {
                     return
                 }
             } catch {
+                if self.handleUnrecoverableRecoveryError(
+                    error,
+                    for: message,
+                    responseId: respId
+                ) {
+                    return
+                }
+
                 #if DEBUG
                 print("[Recovery] Status fetch failed for \(respId): \(error.localizedDescription)")
                 #endif
@@ -824,7 +878,8 @@ final class ChatViewModel {
         messageId: UUID,
         responseId: String,
         lastSeq: Int,
-        apiKey: String
+        apiKey: String,
+        useDirectEndpoint: Bool = false
     ) async {
         guard let message = findMessage(byId: messageId) else { return }
 
@@ -839,14 +894,36 @@ final class ChatViewModel {
         let stream = openAIService.streamRecovery(
             responseId: responseId,
             startingAfter: lastSeq,
-            apiKey: apiKey
+            apiKey: apiKey,
+            useDirectBaseURL: useDirectEndpoint
         )
 
         var finishedFromStream = false
         var encounteredRecoverableFailure = false
+        var receivedAnyRecoveryEvent = false
+        var gatewayResumeTimedOut = false
+        let gatewayFallbackTask: Task<Void, Never>? = {
+            guard FeatureFlags.useCloudflareGateway, !useDirectEndpoint else {
+                return nil
+            }
+
+            return Task { @MainActor in
+                try? await Task.sleep(nanoseconds: 4_000_000_000)
+
+                guard self.activeStreamID == streamID, !receivedAnyRecoveryEvent else {
+                    return
+                }
+
+                gatewayResumeTimedOut = true
+                self.openAIService.cancelStream()
+            }
+        }()
+        defer { gatewayFallbackTask?.cancel() }
 
         for await event in stream {
             guard activeStreamID == streamID else { return }
+            receivedAnyRecoveryEvent = true
+            gatewayFallbackTask?.cancel()
 
             switch applyStreamEvent(event, animated: false) {
             case .continued:
@@ -877,6 +954,22 @@ final class ChatViewModel {
         guard !Task.isCancelled else { return }
 
         clearLiveGenerationState(clearDraft: false)
+
+        if FeatureFlags.useCloudflareGateway,
+           !useDirectEndpoint,
+           gatewayResumeTimedOut || !receivedAnyRecoveryEvent {
+            #if DEBUG
+            print("[Recovery] Gateway resume stalled for \(responseId); retrying direct")
+            #endif
+            await startStreamingRecovery(
+                messageId: messageId,
+                responseId: responseId,
+                lastSeq: lastSeq,
+                apiKey: apiKey,
+                useDirectEndpoint: true
+            )
+            return
+        }
 
         if encounteredRecoverableFailure || draftMessage?.responseId != nil {
             await pollResponseUntilTerminal(messageId: messageId, responseId: responseId)
@@ -924,6 +1017,11 @@ final class ChatViewModel {
                     return
                 }
             } catch {
+                if let message = findMessage(byId: messageId),
+                   handleUnrecoverableRecoveryError(error, for: message, responseId: responseId) {
+                    return
+                }
+
                 lastError = error.localizedDescription
                 #if DEBUG
                 print("[Recovery] Poll error: \(lastError ?? "unknown"), attempt \(attempts)/\(maxAttempts)")
@@ -966,7 +1064,10 @@ final class ChatViewModel {
 
         guard let fetchedMessages = try? modelContext.fetch(descriptor) else { return }
         let activeDraftID = activeIncompleteAssistantDraft()?.id
-        let incompleteMessages = fetchedMessages.filter { $0.id != activeDraftID }
+        let currentConversationID = currentConversation?.id
+        let incompleteMessages = fetchedMessages.filter {
+            $0.id != activeDraftID && $0.conversation?.id != currentConversationID
+        }
         guard !incompleteMessages.isEmpty else { return }
 
         #if DEBUG
@@ -1037,10 +1138,16 @@ final class ChatViewModel {
         }
         #endif
 
+        let currentConversationID = currentConversation?.id
+
         for draft in draftsToResend {
             guard let conversation = draft.conversation else {
                 modelContext.delete(draft)
                 try? modelContext.save()
+                continue
+            }
+
+            if let currentConversationID, conversation.id != currentConversationID {
                 continue
             }
 
@@ -1059,18 +1166,10 @@ final class ChatViewModel {
             #endif
 
             currentConversation = conversation
-            messages = conversation.messages
-                .sorted { $0.createdAt < $1.createdAt }
+            messages = visibleMessages(for: conversation)
                 .filter { $0.id != draft.id }
 
-            selectedModel = ModelType(rawValue: conversation.model) ?? .gpt5_4
-            reasoningEffort = ReasoningEffort(rawValue: conversation.reasoningEffort) ?? .high
-            backgroundModeEnabled = conversation.backgroundModeEnabled
-            serviceTier = ServiceTier(rawValue: conversation.serviceTierRawValue) ?? .standard
-
-            if !selectedModel.availableEfforts.contains(reasoningEffort) {
-                reasoningEffort = selectedModel.defaultEffort
-            }
+            applyConversationConfiguration(from: conversation)
 
             if let idx = conversation.messages.firstIndex(where: { $0.id == draft.id }) {
                 conversation.messages.remove(at: idx)
@@ -1178,6 +1277,10 @@ final class ChatViewModel {
                 }
 
             } catch {
+                if handleUnrecoverableRecoveryError(error, for: message, responseId: responseId) {
+                    return
+                }
+
                 let delay: UInt64 = attempts < 10 ? 2_000_000_000 : 3_000_000_000
                 try? await Task.sleep(nanoseconds: delay)
             }
@@ -1208,6 +1311,39 @@ final class ChatViewModel {
             predicate: #Predicate<Message> { $0.id == id }
         )
         return try? modelContext.fetch(descriptor).first
+    }
+
+    @discardableResult
+    private func detachBackgroundResponseIfPossible(reason: String) -> Bool {
+        guard
+            isStreaming,
+            let draft = draftMessage,
+            draft.usedBackgroundMode,
+            draft.responseId != nil
+        else {
+            return false
+        }
+
+        saveDraftNow()
+        activeStreamID = UUID()
+        openAIService.cancelStream()
+        recoveryTask?.cancel()
+        errorMessage = nil
+
+        draft.isComplete = false
+        draft.conversation?.updatedAt = .now
+        upsertMessage(draft)
+        try? modelContext.save()
+
+        clearLiveGenerationState(clearDraft: true)
+        isRecovering = false
+        endBackgroundTask()
+
+        #if DEBUG
+        print("[Detach] Detached background response for \(reason)")
+        #endif
+
+        return true
     }
 
     // MARK: - Stop Generation
@@ -1272,7 +1408,9 @@ final class ChatViewModel {
 
     func startNewChat() {
         if isStreaming {
-            stopGeneration(savePartial: true)
+            if !detachBackgroundResponseIfPossible(reason: "new-chat") {
+                stopGeneration(savePartial: true)
+            }
         }
 
         recoveryTask?.cancel()
@@ -1358,24 +1496,17 @@ final class ChatViewModel {
 
     func loadConversation(_ conversation: Conversation) {
         if isStreaming {
-            stopGeneration(savePartial: true)
+            if !detachBackgroundResponseIfPossible(reason: "switch-conversation") {
+                stopGeneration(savePartial: true)
+            }
         }
 
         recoveryTask?.cancel()
 
         currentConversation = conversation
-        messages = conversation.messages
-            .sorted { $0.createdAt < $1.createdAt }
-            .filter { !($0.role == .assistant && $0.content.isEmpty && !$0.isComplete) }
+        messages = visibleMessages(for: conversation)
 
-        selectedModel = ModelType(rawValue: conversation.model) ?? .gpt5_4
-        reasoningEffort = ReasoningEffort(rawValue: conversation.reasoningEffort) ?? .high
-        backgroundModeEnabled = conversation.backgroundModeEnabled
-        serviceTier = ServiceTier(rawValue: conversation.serviceTierRawValue) ?? .standard
-
-        if !selectedModel.availableEfforts.contains(reasoningEffort) {
-            reasoningEffort = selectedModel.defaultEffort
-        }
+        applyConversationConfiguration(from: conversation)
 
         currentStreamingText = ""
         currentThinkingText = ""
@@ -1399,9 +1530,7 @@ final class ChatViewModel {
 
     // MARK: - Restore Last Conversation
 
-    private func restoreLastConversation() async {
-        isRestoringConversation = true
-
+    private func restoreLastConversationIfAvailable() {
         var descriptor = FetchDescriptor<Conversation>(
             sortBy: [SortDescriptor(\Conversation.updatedAt, order: .reverse)]
         )
@@ -1411,26 +1540,14 @@ final class ChatViewModel {
            let lastConversation = conversations.first,
            !lastConversation.messages.isEmpty {
             currentConversation = lastConversation
-            messages = lastConversation.messages
-                .sorted { $0.createdAt < $1.createdAt }
-                .filter { !($0.role == .assistant && $0.content.isEmpty && !$0.isComplete) }
+            messages = visibleMessages(for: lastConversation)
 
-            selectedModel = ModelType(rawValue: lastConversation.model) ?? .gpt5_4
-            reasoningEffort = ReasoningEffort(rawValue: lastConversation.reasoningEffort) ?? .high
-            backgroundModeEnabled = lastConversation.backgroundModeEnabled
-            serviceTier = ServiceTier(rawValue: lastConversation.serviceTierRawValue) ?? .standard
-
-            if !selectedModel.availableEfforts.contains(reasoningEffort) {
-                reasoningEffort = selectedModel.defaultEffort
-            }
+            applyConversationConfiguration(from: lastConversation)
 
             #if DEBUG
             print("[Restore] Loaded last conversation: \(lastConversation.title) (\(messages.count) messages)")
             #endif
         }
-
-        try? await Task.sleep(nanoseconds: 300_000_000)
-        isRestoringConversation = false
     }
 
     private func generateTitlesForUntitledConversations() async {
@@ -1519,6 +1636,91 @@ final class ChatViewModel {
         }
     }
 
+    private func applyConversationConfiguration(from conversation: Conversation) {
+        let model = ModelType(rawValue: conversation.model) ?? .gpt5_4
+        let storedEffort = ReasoningEffort(rawValue: conversation.reasoningEffort) ?? .high
+        let resolvedEffort = model.availableEfforts.contains(storedEffort) ? storedEffort : model.defaultEffort
+        let resolvedTier = ServiceTier(rawValue: conversation.serviceTierRawValue) ?? .standard
+
+        isApplyingStoredConversationConfiguration = true
+        selectedModel = model
+        reasoningEffort = resolvedEffort
+        backgroundModeEnabled = conversation.backgroundModeEnabled
+        serviceTier = resolvedTier
+        isApplyingStoredConversationConfiguration = false
+    }
+
+    private func visibleMessages(for conversation: Conversation) -> [Message] {
+        conversation.messages
+            .sorted { $0.createdAt < $1.createdAt }
+            .filter { !shouldHideMessage($0) }
+    }
+
+    private func shouldHideMessage(_ message: Message) -> Bool {
+        guard message.role == .assistant, !message.isComplete else {
+            return false
+        }
+
+        if message.responseId != nil {
+            return false
+        }
+
+        if !message.content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return false
+        }
+
+        if let thinking = message.thinking,
+           !thinking.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return false
+        }
+
+        if !message.toolCalls.isEmpty || !message.annotations.isEmpty || !message.filePathAnnotations.isEmpty {
+            return false
+        }
+
+        return true
+    }
+
+    private func isRecoveryInFlight(for messageId: UUID, responseId: String) -> Bool {
+        activeRecoveryMessageID == messageId &&
+        activeRecoveryResponseID == responseId &&
+        recoveryTask != nil
+    }
+
+    @discardableResult
+    private func handleUnrecoverableRecoveryError(
+        _ error: Error,
+        for message: Message,
+        responseId: String
+    ) -> Bool {
+        guard case let OpenAIServiceError.httpError(statusCode, responseBody) = error,
+              statusCode == 404 else {
+            return false
+        }
+
+        let fallbackText: String
+
+        if message.usedBackgroundMode {
+            errorMessage = "This response is no longer resumable."
+            fallbackText = recoveryFallbackText(for: message)
+        } else {
+            errorMessage = nil
+            fallbackText = interruptedResponseFallbackText(for: message)
+        }
+
+        #if DEBUG
+        print("[Recovery] Response \(responseId) is no longer available: \(responseBody)")
+        #endif
+
+        finishRecovery(
+            for: message,
+            result: nil,
+            fallbackText: fallbackText,
+            fallbackThinking: recoveryFallbackThinking(for: message)
+        )
+        return true
+    }
+
     private func syncConversationConfiguration() {
         guard let currentConversation else { return }
         currentConversation.model = selectedModel.rawValue
@@ -1527,20 +1729,6 @@ final class ChatViewModel {
         currentConversation.serviceTierRawValue = serviceTier.rawValue
         currentConversation.updatedAt = .now
         try? modelContext.save()
-    }
-
-    private func recoverActiveDraftIfNeededOnLaunch() async {
-        guard let draft = activeIncompleteAssistantDraft(),
-              let responseId = draft.responseId else {
-            return
-        }
-
-        restoreDraftState(from: draft)
-        recoverResponse(
-            messageId: draft.id,
-            responseId: responseId,
-            preferStreamingResume: draft.usedBackgroundMode
-        )
     }
 
     private func upsertMessage(_ message: Message) {
@@ -1646,6 +1834,22 @@ final class ChatViewModel {
 
     private func recoveryFallbackThinking(for message: Message) -> String? {
         !currentThinkingText.isEmpty ? currentThinkingText : message.thinking
+    }
+
+    private func interruptedResponseFallbackText(for message: Message) -> String {
+        let interruptionNotice = "Response interrupted because the app was closed before completion."
+        let baseText = recoveryFallbackText(for: message)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+
+        guard !baseText.isEmpty else {
+            return interruptionNotice
+        }
+
+        if baseText.contains(interruptionNotice) {
+            return baseText
+        }
+
+        return "\(baseText)\n\n\(interruptionNotice)"
     }
 
     private func restoreDraftState(from message: Message) {

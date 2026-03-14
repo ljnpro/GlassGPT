@@ -95,8 +95,9 @@ struct OpenAIResponseFetchResult {
 final class OpenAIService {
 
     private var currentDelegate: SSEDelegate?
-    private var responsesURL: String {
-        "\(FeatureFlags.openAIBaseURL)/responses"
+    private func responsesURL(useDirectBaseURL: Bool = false) -> String {
+        let baseURL = useDirectBaseURL ? FeatureFlags.directOpenAIBaseURL : FeatureFlags.openAIBaseURL
+        return "\(baseURL)/responses"
     }
 
     // MARK: - Upload File
@@ -169,7 +170,7 @@ final class OpenAIService {
     ) -> AsyncStream<StreamEvent> {
         cancelStream()
 
-        guard let url = URL(string: responsesURL) else {
+        guard let url = URL(string: responsesURL()) else {
             return AsyncStream { continuation in
                 continuation.yield(.error(.invalidURL))
                 continuation.finish()
@@ -241,13 +242,14 @@ final class OpenAIService {
     func streamRecovery(
         responseId: String,
         startingAfter: Int,
-        apiKey: String
+        apiKey: String,
+        useDirectBaseURL: Bool = false
     ) -> AsyncStream<StreamEvent> {
         cancelStream()
 
         do {
             let url = try Self.makeResponseURL(
-                baseURL: responsesURL,
+                baseURL: responsesURL(useDirectBaseURL: useDirectBaseURL),
                 responseId: responseId,
                 stream: true,
                 startingAfter: startingAfter,
@@ -259,11 +261,13 @@ final class OpenAIService {
                 apiKey: apiKey,
                 method: "GET",
                 accept: "text/event-stream",
-                timeoutInterval: 300
+                timeoutInterval: 300,
+                includeCloudflareAuthorization: !useDirectBaseURL
             )
 
             #if DEBUG
-            print("[OpenAI] Resuming stream → \(responseId) starting_after=\(startingAfter)")
+            let route = useDirectBaseURL ? "direct" : "default"
+            print("[OpenAI] Resuming stream (\(route)) → \(responseId) starting_after=\(startingAfter)")
             #endif
 
             return makeSSEStream(request: request)
@@ -313,35 +317,24 @@ final class OpenAIService {
     }
 
     func cancelResponse(responseId: String, apiKey: String) async throws {
-        guard let url = URL(string: "\(responsesURL)/\(responseId)/cancel") else {
-            throw OpenAIServiceError.invalidURL
-        }
+        do {
+            try await cancelResponse(responseId: responseId, apiKey: apiKey, useDirectBaseURL: false)
+        } catch {
+            guard FeatureFlags.useCloudflareGateway else {
+                throw error
+            }
 
-        var request = try Self.makeJSONRequest(
-            url: url,
-            apiKey: apiKey,
-            method: "POST",
-            accept: "application/json",
-            timeoutInterval: 30
-        )
-        request.httpBody = Data()
-
-        let (data, response) = try await URLSession.shared.data(for: request)
-
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw OpenAIServiceError.requestFailed("Invalid response")
-        }
-
-        if httpResponse.statusCode >= 400 {
-            let errorMsg = String(data: data, encoding: .utf8) ?? "Failed to cancel response"
-            throw OpenAIServiceError.httpError(httpResponse.statusCode, errorMsg)
+            #if DEBUG
+            print("[OpenAI] Gateway cancel failed for \(responseId); retrying direct: \(error.localizedDescription)")
+            #endif
+            try await cancelResponse(responseId: responseId, apiKey: apiKey, useDirectBaseURL: true)
         }
     }
 
     // MARK: - Generate Title
 
     func generateTitle(for conversationPreview: String, apiKey: String) async throws -> String {
-        guard let url = URL(string: responsesURL) else {
+        guard let url = URL(string: responsesURL()) else {
             throw OpenAIServiceError.invalidURL
         }
 
@@ -389,62 +382,18 @@ final class OpenAIService {
     // MARK: - Fetch Complete Response (Polling Recovery)
 
     func fetchResponse(responseId: String, apiKey: String) async throws -> OpenAIResponseFetchResult {
-        let url = try Self.makeResponseURL(
-            baseURL: responsesURL,
-            responseId: responseId,
-            stream: false,
-            startingAfter: nil,
-            include: [
-                "reasoning.encrypted_content",
-                "code_interpreter_call.outputs",
-                "file_search_call.results",
-                "web_search_call.action.sources"
-            ]
-        )
+        do {
+            return try await fetchResponse(responseId: responseId, apiKey: apiKey, useDirectBaseURL: false)
+        } catch {
+            guard FeatureFlags.useCloudflareGateway else {
+                throw error
+            }
 
-        let request = try Self.makeJSONRequest(
-            url: url,
-            apiKey: apiKey,
-            method: "GET",
-            accept: "application/json",
-            timeoutInterval: 30
-        )
-
-        let (data, response) = try await URLSession.shared.data(for: request)
-
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw OpenAIServiceError.requestFailed("Invalid response")
+            #if DEBUG
+            print("[OpenAI] Gateway fetch failed for \(responseId); retrying direct: \(error.localizedDescription)")
+            #endif
+            return try await fetchResponse(responseId: responseId, apiKey: apiKey, useDirectBaseURL: true)
         }
-
-        if httpResponse.statusCode >= 400 {
-            let errorMsg = String(data: data, encoding: .utf8) ?? "Failed to fetch response"
-            throw OpenAIServiceError.httpError(httpResponse.statusCode, errorMsg)
-        }
-
-        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-            throw OpenAIServiceError.requestFailed("Failed to parse response")
-        }
-
-        let statusString = json["status"] as? String ?? "unknown"
-        let status = OpenAIResponseFetchResult.Status(rawValue: statusString) ?? .unknown
-        let text = Self.extractOutputText(from: json) ?? ""
-        let thinking = Self.extractReasoningText(from: json)
-
-        let annotations = Self.extractCitations(from: json)
-        let toolCalls = Self.extractToolCalls(from: json)
-        let filePathAnns = OpenAIStreamEventTranslator.extractFilePathAnnotations(from: json)
-
-        let errorMessage = Self.extractErrorMessage(from: json)
-
-        return OpenAIResponseFetchResult(
-            status: status,
-            text: text,
-            thinking: thinking,
-            annotations: annotations,
-            toolCalls: toolCalls,
-            filePathAnnotations: filePathAnns,
-            errorMessage: errorMessage
-        )
     }
 
     // MARK: - Validate API Key
@@ -631,7 +580,8 @@ final class OpenAIService {
         apiKey: String,
         method: String,
         accept: String,
-        timeoutInterval: TimeInterval
+        timeoutInterval: TimeInterval,
+        includeCloudflareAuthorization: Bool = FeatureFlags.useCloudflareGateway
     ) throws -> URLRequest {
         var request = URLRequest(url: url)
         request.httpMethod = method
@@ -643,8 +593,96 @@ final class OpenAIService {
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         }
 
-        FeatureFlags.applyCloudflareAuthorization(to: &request)
+        if includeCloudflareAuthorization {
+            FeatureFlags.applyCloudflareAuthorization(to: &request)
+        }
         return request
+    }
+
+    private func cancelResponse(responseId: String, apiKey: String, useDirectBaseURL: Bool) async throws {
+        guard let url = URL(string: "\(responsesURL(useDirectBaseURL: useDirectBaseURL))/\(responseId)/cancel") else {
+            throw OpenAIServiceError.invalidURL
+        }
+
+        var request = try Self.makeJSONRequest(
+            url: url,
+            apiKey: apiKey,
+            method: "POST",
+            accept: "application/json",
+            timeoutInterval: 30,
+            includeCloudflareAuthorization: !useDirectBaseURL
+        )
+        request.httpBody = Data()
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw OpenAIServiceError.requestFailed("Invalid response")
+        }
+
+        if httpResponse.statusCode >= 400 {
+            let errorMsg = String(data: data, encoding: .utf8) ?? "Failed to cancel response"
+            throw OpenAIServiceError.httpError(httpResponse.statusCode, errorMsg)
+        }
+    }
+
+    private func fetchResponse(responseId: String, apiKey: String, useDirectBaseURL: Bool) async throws -> OpenAIResponseFetchResult {
+        let url = try Self.makeResponseURL(
+            baseURL: responsesURL(useDirectBaseURL: useDirectBaseURL),
+            responseId: responseId,
+            stream: false,
+            startingAfter: nil,
+            include: [
+                "code_interpreter_call.outputs",
+                "file_search_call.results",
+                "web_search_call.action.sources"
+            ]
+        )
+
+        let request = try Self.makeJSONRequest(
+            url: url,
+            apiKey: apiKey,
+            method: "GET",
+            accept: "application/json",
+            timeoutInterval: 30,
+            includeCloudflareAuthorization: !useDirectBaseURL
+        )
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw OpenAIServiceError.requestFailed("Invalid response")
+        }
+
+        if httpResponse.statusCode >= 400 {
+            let errorMsg = String(data: data, encoding: .utf8) ?? "Failed to fetch response"
+            throw OpenAIServiceError.httpError(httpResponse.statusCode, errorMsg)
+        }
+
+        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            throw OpenAIServiceError.requestFailed("Failed to parse response")
+        }
+
+        let statusString = json["status"] as? String ?? "unknown"
+        let status = OpenAIResponseFetchResult.Status(rawValue: statusString) ?? .unknown
+        let text = Self.extractOutputText(from: json) ?? ""
+        let thinking = Self.extractReasoningText(from: json)
+
+        let annotations = Self.extractCitations(from: json)
+        let toolCalls = Self.extractToolCalls(from: json)
+        let filePathAnns = OpenAIStreamEventTranslator.extractFilePathAnnotations(from: json)
+
+        let errorMessage = Self.extractErrorMessage(from: json)
+
+        return OpenAIResponseFetchResult(
+            status: status,
+            text: text,
+            thinking: thinking,
+            annotations: annotations,
+            toolCalls: toolCalls,
+            filePathAnnotations: filePathAnns,
+            errorMessage: errorMessage
+        )
     }
 
     private nonisolated static func makeResponseURL(
@@ -669,7 +707,7 @@ final class OpenAIService {
         }
 
         if let include {
-            queryItems.append(contentsOf: include.map { URLQueryItem(name: "include", value: $0) })
+            queryItems.append(contentsOf: include.map { URLQueryItem(name: "include[]", value: $0) })
         }
 
         if !queryItems.isEmpty {
