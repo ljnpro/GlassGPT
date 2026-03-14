@@ -2405,3 +2405,61 @@ describe('Background-Off Relaunch Strategy', () => {
     });
   });
 });
+
+describe('Code Interpreter File Link Resolution', () => {
+  function isFileCitationAnnotationType(type: string) {
+    return type === 'file_path' || type === 'container_file_citation';
+  }
+
+  function extractAnnotatedSubstring(text: string, startIndex: number, endIndex: number) {
+    if (!text || startIndex < 0 || endIndex <= startIndex) {
+      return '';
+    }
+
+    return Array.from(text).slice(startIndex, endIndex).join('');
+  }
+
+  function findMatchingFileAnnotation(input: {
+    sandboxURL: string;
+    annotations: Array<{ sandboxPath: string; filename?: string | null }>;
+  }) {
+    const pathOnly = input.sandboxURL.startsWith('sandbox:')
+      ? input.sandboxURL.slice('sandbox:'.length)
+      : input.sandboxURL;
+    const filename = pathOnly.split('/').at(-1) ?? '';
+
+    return input.annotations.find((annotation) => {
+      const annotationFilename = annotation.filename ?? annotation.sandboxPath.split('/').at(-1) ?? '';
+      return (
+        annotation.sandboxPath === input.sandboxURL ||
+        annotation.sandboxPath === pathOnly ||
+        annotation.sandboxPath.endsWith(pathOnly) ||
+        pathOnly.endsWith(annotation.sandboxPath) ||
+        (!!filename && annotationFilename === filename)
+      );
+    }) ?? null;
+  }
+
+  it('treats container_file_citation as a downloadable file annotation', () => {
+    expect(isFileCitationAnnotationType('container_file_citation')).toBe(true);
+    expect(isFileCitationAnnotationType('file_path')).toBe(true);
+  });
+
+  it('extracts the sandbox path using character indices so CJK prefixes do not corrupt the slice', () => {
+    const text = '已帮你生成一个 PNG 文件：[下载 generated_image.png](sandbox:/mnt/data/generated_image.png)';
+    const sandboxURL = 'sandbox:/mnt/data/generated_image.png';
+    const startIndex = Array.from(text).join('').indexOf(sandboxURL);
+    const endIndex = startIndex + Array.from(sandboxURL).length;
+
+    expect(extractAnnotatedSubstring(text, startIndex, endIndex)).toBe(sandboxURL);
+  });
+
+  it('can still match a tapped sandbox URL by filename when the annotation path is empty', () => {
+    expect(findMatchingFileAnnotation({
+      sandboxURL: 'sandbox:/mnt/data/generated_image.png',
+      annotations: [
+        { sandboxPath: '', filename: 'generated_image.png' },
+      ],
+    })).toEqual({ sandboxPath: '', filename: 'generated_image.png' });
+  });
+});
