@@ -34,13 +34,13 @@ struct ChatView: View {
 
                 if viewModel.showModelSelector {
                     modelSelectorOverlay
-                        .transition(.opacity.combined(with: .scale(scale: 0.98)))
+                        .transition(.opacity)
                         .zIndex(10)
                 }
             }
             .animation(.easeInOut(duration: 0.25), value: viewModel.isRestoringConversation)
             .animation(.easeInOut(duration: 0.2), value: viewModel.isDownloadingFile)
-            .animation(.spring(response: 0.28, dampingFraction: 0.92), value: viewModel.showModelSelector)
+            .animation(.easeOut(duration: 0.18), value: viewModel.showModelSelector)
             .safeAreaInset(edge: .bottom, spacing: 0) {
                 MessageInputBar(
                     text: $viewModel.inputText,
@@ -341,7 +341,7 @@ struct ChatView: View {
             let idiom = UIDevice.current.userInterfaceIdiom
             let horizontalInset = idiom == .pad ? 32.0 : 16.0
             let maxPanelWidth = idiom == .pad ? 680.0 : min(geometry.size.width - (horizontalInset * 2), 520.0)
-            let topInset = geometry.safeAreaInsets.top + (idiom == .pad ? 18.0 : 12.0)
+            let topInset = idiom == .pad ? 18.0 : 12.0
 
             ZStack(alignment: .top) {
                 Color.black.opacity(0.08)
