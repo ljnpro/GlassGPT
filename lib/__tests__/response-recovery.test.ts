@@ -478,6 +478,135 @@ describe('Message State Management', () => {
 });
 
 // ============================================================
+// Live Draft Presentation Tests
+// ============================================================
+
+describe('Live Draft Presentation Logic', () => {
+  function resolveLivePresentationState(input: {
+    isStreaming: boolean;
+    liveDraftMessageId?: string | null;
+  }): {
+    showsDetachedStreamingBubble: boolean;
+    renderedLiveDraftMessageId: string | null;
+  } {
+    const renderedLiveDraftMessageId = input.liveDraftMessageId ?? null;
+
+    return {
+      showsDetachedStreamingBubble: input.isStreaming && renderedLiveDraftMessageId == null,
+      renderedLiveDraftMessageId,
+    };
+  }
+
+  it('uses the persisted draft row during recovery and suppresses the detached streaming bubble', () => {
+    const result = resolveLivePresentationState({
+      isStreaming: true,
+      liveDraftMessageId: 'msg_recovery_draft',
+    });
+
+    expect(result.renderedLiveDraftMessageId).toBe('msg_recovery_draft');
+    expect(result.showsDetachedStreamingBubble).toBe(false);
+  });
+
+  it('keeps the detached streaming bubble for fresh streaming without a visible draft row', () => {
+    const result = resolveLivePresentationState({
+      isStreaming: true,
+      liveDraftMessageId: null,
+    });
+
+    expect(result.renderedLiveDraftMessageId).toBeNull();
+    expect(result.showsDetachedStreamingBubble).toBe(true);
+  });
+});
+
+// ============================================================
+// Bottom Follow State Tests
+// ============================================================
+
+describe('Bottom Follow State Logic', () => {
+  const threshold = 96;
+
+  function reduceBottomFollowState(
+    state: {
+      shouldFollowLiveOutput: boolean;
+      isNearBottom: boolean;
+    },
+    input: {
+      distanceToBottom: number;
+      sessionStarted?: boolean;
+      userEndedDrag?: boolean;
+    },
+  ) {
+    const isNearBottom = input.distanceToBottom <= threshold;
+    let shouldFollowLiveOutput = state.shouldFollowLiveOutput;
+
+    if (input.sessionStarted) {
+      shouldFollowLiveOutput = true;
+    }
+
+    if (isNearBottom) {
+      shouldFollowLiveOutput = true;
+    }
+
+    if (input.userEndedDrag) {
+      shouldFollowLiveOutput = isNearBottom;
+    }
+
+    return {
+      isNearBottom,
+      shouldFollowLiveOutput,
+    };
+  }
+
+  it('starts bottom follow when a new stream or recovery session begins', () => {
+    const result = reduceBottomFollowState(
+      {
+        shouldFollowLiveOutput: false,
+        isNearBottom: false,
+      },
+      {
+        distanceToBottom: 240,
+        sessionStarted: true,
+      },
+    );
+
+    expect(result.shouldFollowLiveOutput).toBe(true);
+    expect(result.isNearBottom).toBe(false);
+  });
+
+  it('disables bottom follow when the user leaves the bottom zone', () => {
+    const result = reduceBottomFollowState(
+      {
+        shouldFollowLiveOutput: true,
+        isNearBottom: true,
+      },
+      {
+        distanceToBottom: 140,
+        userEndedDrag: true,
+      },
+    );
+
+    expect(result.isNearBottom).toBe(false);
+    expect(result.shouldFollowLiveOutput).toBe(false);
+  });
+
+  it('re-enables bottom follow when the user returns near the bottom', () => {
+    const result = reduceBottomFollowState(
+      {
+        shouldFollowLiveOutput: false,
+        isNearBottom: false,
+      },
+      {
+        distanceToBottom: 28,
+        userEndedDrag: true,
+      },
+    );
+
+    expect(result.isNearBottom).toBe(true);
+    expect(result.shouldFollowLiveOutput).toBe(true);
+  });
+});
+
+// ============================================================
 // OpenAI Responses API URL Construction Tests
 // ============================================================
 

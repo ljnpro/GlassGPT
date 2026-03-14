@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 // MARK: - Model Badge (Toolbar)
 
@@ -43,12 +44,59 @@ struct ModelSelectorSheet: View {
     @Binding var reasoningEffort: ReasoningEffort
     @Environment(\.dismiss) private var dismiss
 
+    private struct Metrics {
+        let contentHorizontalPadding: CGFloat
+        let contentVerticalPadding: CGFloat
+        let cardCornerRadius: CGFloat
+        let sheetMaxWidth: CGFloat?
+        let rowVerticalPadding: CGFloat
+        let rowHorizontalPadding: CGFloat
+        let sectionSpacing: CGFloat
+
+        init(idiom: UIUserInterfaceIdiom) {
+            switch idiom {
+            case .pad:
+                contentHorizontalPadding = 24
+                contentVerticalPadding = 22
+                cardCornerRadius = 28
+                sheetMaxWidth = 620
+                rowVerticalPadding = 18
+                rowHorizontalPadding = 22
+                sectionSpacing = 18
+            default:
+                contentHorizontalPadding = 20
+                contentVerticalPadding = 18
+                cardCornerRadius = 24
+                sheetMaxWidth = nil
+                rowVerticalPadding = 16
+                rowHorizontalPadding = 18
+                sectionSpacing = 16
+            }
+        }
+    }
+
     private var selectedModel: ModelType {
         proModeEnabled ? .gpt5_4_pro : .gpt5_4
     }
 
+    private var metrics: Metrics {
+        Metrics(idiom: UIDevice.current.userInterfaceIdiom)
+    }
+
     private var efforts: [ReasoningEffort] {
         selectedModel.availableEfforts
+    }
+
+    private var configurationSummary: String {
+        var parts: [String] = [selectedModel.displayName]
+        parts.append(backgroundModeEnabled ? "Background" : "Standard")
+
+        if flexModeEnabled {
+            parts.append("Flex")
+        }
+
+        parts.append(reasoningEffort.displayName)
+        return parts.joined(separator: " · ")
     }
 
     private var sliderBinding: Binding<Double> {
@@ -69,44 +117,18 @@ struct ModelSelectorSheet: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            HStack {
-                Text("Model")
-                    .font(.headline)
-                Spacer()
-                Button("Done") { dismiss() }
-                    .buttonStyle(.glassProminent)
-            }
-            .padding(.horizontal, 20)
-            .padding(.top, 20)
-            .padding(.bottom, 16)
+        VStack(spacing: metrics.sectionSpacing) {
+            header
 
-            ScrollView {
-                VStack(alignment: .leading, spacing: 14) {
-                    toggleCard(
-                        title: "Pro Mode",
-                        subtitle: "Switches between GPT-5.4 and GPT-5.4 Pro.",
-                        isOn: $proModeEnabled
-                    )
+            toggleGroup
 
-                    toggleCard(
-                        title: "Background Mode",
-                        subtitle: "Slower initial response, but better resume for long-running generations.",
-                        isOn: $backgroundModeEnabled
-                    )
-
-                    toggleCard(
-                        title: "Flex Mode",
-                        subtitle: "Lower cost, but slower and less consistent response times.",
-                        isOn: $flexModeEnabled
-                    )
-
-                    reasoningControl
-                }
-                .padding(.horizontal, 20)
-                .padding(.bottom, 24)
-            }
+            reasoningControl
         }
+        .frame(maxWidth: metrics.sheetMaxWidth)
+        .frame(maxWidth: .infinity)
+        .padding(.horizontal, metrics.contentHorizontalPadding)
+        .padding(.top, metrics.contentVerticalPadding)
+        .padding(.bottom, metrics.contentVerticalPadding)
     }
 
     private var reasoningControl: some View {
@@ -155,33 +177,97 @@ struct ModelSelectorSheet: View {
                 }
             }
         }
-        .padding(14)
+        .padding(metrics.rowHorizontalPadding)
         .background {
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
+            RoundedRectangle(cornerRadius: metrics.cardCornerRadius, style: .continuous)
                 .fill(.ultraThinMaterial)
         }
-        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .glassEffect(
+            .regular.interactive(),
+            in: RoundedRectangle(cornerRadius: metrics.cardCornerRadius, style: .continuous)
+        )
     }
 
-    private func toggleCard(title: String, subtitle: String, isOn: Binding<Bool>) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Toggle(title, isOn: isOn)
-                .font(.subheadline.weight(.medium))
+    private var header: some View {
+        HStack(alignment: .top, spacing: 12) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Model")
+                    .font(.title3.weight(.semibold))
+
+                Text(configurationSummary)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            Spacer(minLength: 12)
+
+            Button("Done") { dismiss() }
+                .buttonStyle(.glassProminent)
+        }
+        .padding(.horizontal, 2)
+    }
+
+    private var toggleGroup: some View {
+        VStack(spacing: 0) {
+            toggleRow(
+                title: "Pro Mode",
+                subtitle: "Switches between GPT-5.4 and GPT-5.4 Pro.",
+                isOn: $proModeEnabled
+            )
+
+            Divider()
+                .padding(.leading, metrics.rowHorizontalPadding)
+
+            toggleRow(
+                title: "Background Mode",
+                subtitle: "Slower initial response, but better resume for long-running generations.",
+                isOn: $backgroundModeEnabled
+            )
+
+            Divider()
+                .padding(.leading, metrics.rowHorizontalPadding)
+
+            toggleRow(
+                title: "Flex Mode",
+                subtitle: "Lower cost, but slower and less consistent response times.",
+                isOn: $flexModeEnabled
+            )
+        }
+        .background {
+            RoundedRectangle(cornerRadius: metrics.cardCornerRadius, style: .continuous)
+                .fill(.ultraThinMaterial)
+        }
+        .glassEffect(
+            .regular.interactive(),
+            in: RoundedRectangle(cornerRadius: metrics.cardCornerRadius, style: .continuous)
+        )
+    }
+
+    private func toggleRow(title: String, subtitle: String, isOn: Binding<Bool>) -> some View {
+        HStack(alignment: .top, spacing: 16) {
+            VStack(alignment: .leading, spacing: 6) {
+                Text(title)
+                    .font(.headline.weight(.semibold))
+
+                Text(subtitle)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            Spacer(minLength: 12)
+
+            Toggle("", isOn: isOn)
+                .labelsHidden()
+                .toggleStyle(.switch)
                 .onChange(of: isOn.wrappedValue) { _, _ in
                     HapticService.shared.selection()
                 }
-
-            Text(subtitle)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
         }
-        .padding(14)
-        .background {
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .fill(.ultraThinMaterial)
-        }
-        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .padding(.horizontal, metrics.rowHorizontalPadding)
+        .padding(.vertical, metrics.rowVerticalPadding)
     }
 
     private func effortShortLabel(_ effort: ReasoningEffort) -> String {
