@@ -178,6 +178,7 @@ struct FilePathAnnotation: Codable, Sendable, Identifiable {
     var id: String { "\(startIndex)-\(endIndex)-\(fileId)" }
     var fileId: String
     var sandboxPath: String
+    var filename: String?
     var startIndex: Int
     var endIndex: Int
 

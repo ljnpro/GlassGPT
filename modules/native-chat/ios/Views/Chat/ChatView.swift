@@ -76,8 +76,7 @@ struct ChatView: View {
             }
             .toolbarBackgroundVisibility(.hidden, for: .navigationBar)
             .sheet(item: filePreviewBinding) { previewItem in
-                FilePreviewController(fileURL: previewItem.url)
-                    .ignoresSafeArea()
+                FilePreviewSheet(fileURL: previewItem.url)
             }
             .photosPicker(isPresented: $showPhotoPicker, selection: $selectedPhotoItem, matching: .images)
             .onChange(of: selectedPhotoItem) { _, newItem in

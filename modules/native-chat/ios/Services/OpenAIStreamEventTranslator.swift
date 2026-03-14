@@ -129,7 +129,7 @@ enum OpenAIStreamEventTranslator {
                 )
             }
 
-            if type == "file_path" {
+            if isFileCitationAnnotationType(type) {
                 guard
                     let fileId = annotation["file_id"] as? String,
                     !fileId.isEmpty
@@ -146,6 +146,7 @@ enum OpenAIStreamEventTranslator {
                     FilePathAnnotation(
                         fileId: fileId,
                         sandboxPath: "",
+                        filename: annotation["filename"] as? String,
                         startIndex: startIndex,
                         endIndex: endIndex
                     )
@@ -292,26 +293,27 @@ enum OpenAIStreamEventTranslator {
 
                 if let partAnnotations = part["annotations"] as? [[String: Any]] {
                     for ann in partAnnotations {
-                        guard let annType = ann["type"] as? String, annType == "file_path" else { continue }
+                        guard
+                            let annType = ann["type"] as? String,
+                            isFileCitationAnnotationType(annType)
+                        else {
+                            continue
+                        }
                         guard let fileId = ann["file_id"] as? String, !fileId.isEmpty else { continue }
 
                         let startIndex = ann["start_index"] as? Int ?? 0
                         let endIndex = ann["end_index"] as? Int ?? 0
 
-                        // Extract the sandbox path from the output text using indices
-                        var sandboxPath = ""
-                        if !outputText.isEmpty && startIndex < endIndex {
-                            let utf8Array = Array(outputText.utf8)
-                            if startIndex < utf8Array.count && endIndex <= utf8Array.count {
-                                if let extracted = String(bytes: Array(utf8Array[startIndex..<endIndex]), encoding: .utf8) {
-                                    sandboxPath = extracted
-                                }
-                            }
-                        }
+                        let sandboxPath = extractAnnotatedSubstring(
+                            from: outputText,
+                            startIndex: startIndex,
+                            endIndex: endIndex
+                        )
 
                         annotations.append(FilePathAnnotation(
                             fileId: fileId,
                             sandboxPath: sandboxPath,
+                            filename: ann["filename"] as? String,
                             startIndex: startIndex,
                             endIndex: endIndex
                         ))
@@ -321,6 +323,32 @@ enum OpenAIStreamEventTranslator {
         }
 
         return annotations
+    }
+
+    private static func isFileCitationAnnotationType(_ type: String) -> Bool {
+        type == "file_path" || type == "container_file_citation"
+    }
+
+    private static func extractAnnotatedSubstring(
+        from text: String,
+        startIndex: Int,
+        endIndex: Int
+    ) -> String {
+        guard !text.isEmpty, startIndex >= 0, endIndex > startIndex else {
+            return ""
+        }
+
+        let characters = Array(text)
+        guard startIndex < characters.count else {
+            return ""
+        }
+
+        let safeEndIndex = min(endIndex, characters.count)
+        guard safeEndIndex > startIndex else {
+            return ""
+        }
+
+        return String(characters[startIndex..<safeEndIndex])
     }
 
     static func extractErrorMessage(from json: [String: Any]) -> String? {
