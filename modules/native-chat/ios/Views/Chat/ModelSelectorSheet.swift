@@ -26,8 +26,6 @@ struct ModelBadge: View {
         .glassEffect(.regular, in: .capsule)
     }
 
-    /// Combined badge text: "GPT-5.4 Medium" or "GPT-5.4 Pro High"
-    /// When effort is .none, just show the model name: "GPT-5.4"
     private var badgeText: String {
         if effort == .none {
             return model.displayName
@@ -39,16 +37,20 @@ struct ModelBadge: View {
 // MARK: - Model Selector Sheet
 
 struct ModelSelectorSheet: View {
-    @Binding var selectedModel: ModelType
+    @Binding var proModeEnabled: Bool
+    @Binding var backgroundModeEnabled: Bool
+    @Binding var flexModeEnabled: Bool
     @Binding var reasoningEffort: ReasoningEffort
     @Environment(\.dismiss) private var dismiss
 
-    /// Available efforts for the current model.
+    private var selectedModel: ModelType {
+        proModeEnabled ? .gpt5_4_pro : .gpt5_4
+    }
+
     private var efforts: [ReasoningEffort] {
         selectedModel.availableEfforts
     }
 
-    /// Current effort as a slider index value.
     private var sliderBinding: Binding<Double> {
         Binding<Double>(
             get: {
@@ -68,7 +70,6 @@ struct ModelSelectorSheet: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // Header bar
             HStack {
                 Text("Model")
                     .font(.headline)
@@ -80,129 +81,109 @@ struct ModelSelectorSheet: View {
             .padding(.top, 20)
             .padding(.bottom, 16)
 
-            // Content
-            VStack(spacing: 20) {
-                // Model selection — two equal-width cards
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("Model")
-                        .font(.subheadline.weight(.medium))
-                        .foregroundStyle(.secondary)
-                        .padding(.horizontal, 4)
+            ScrollView {
+                VStack(alignment: .leading, spacing: 14) {
+                    toggleCard(
+                        title: "Pro Mode",
+                        subtitle: "Switches between GPT-5.4 and GPT-5.4 Pro.",
+                        isOn: $proModeEnabled
+                    )
 
-                    HStack(spacing: 10) {
-                        ForEach(ModelType.allCases) { model in
-                            modelChip(model)
-                        }
-                    }
+                    toggleCard(
+                        title: "Background Mode",
+                        subtitle: "Slower initial response, but better resume for long-running generations.",
+                        isOn: $backgroundModeEnabled
+                    )
+
+                    toggleCard(
+                        title: "Flex Mode",
+                        subtitle: "Lower cost, but slower and less consistent response times.",
+                        isOn: $flexModeEnabled
+                    )
+
+                    reasoningControl
                 }
-
-                // Reasoning Effort — Native iOS 26 Slider (Liquid Glass)
-                VStack(alignment: .leading, spacing: 10) {
-                    HStack {
-                        Text("Reasoning")
-                            .font(.subheadline.weight(.medium))
-                            .foregroundStyle(.secondary)
-
-                        Spacer()
-
-                        Text(reasoningEffort.displayName)
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(.primary)
-                            .contentTransition(.numericText())
-                            .animation(.easeInOut(duration: 0.15), value: reasoningEffort)
-                    }
-                    .padding(.horizontal, 4)
-
-                    // Native Slider — on iOS 26 this automatically renders
-                    // with Liquid Glass thumb and track styling.
-                    VStack(spacing: 4) {
-                        Slider(
-                            value: sliderBinding,
-                            in: 0...Double(max(efforts.count - 1, 1)),
-                            step: 1
-                        ) {
-                            Text("Reasoning Effort")
-                        } minimumValueLabel: {
-                            Text(effortShortLabel(efforts.first ?? .none))
-                                .font(.caption2)
-                                .foregroundStyle(.secondary)
-                        } maximumValueLabel: {
-                            Text(effortShortLabel(efforts.last ?? .xhigh))
-                                .font(.caption2)
-                                .foregroundStyle(.secondary)
-                        }
-                        .tint(.accentColor)
-
-                        // Tick labels below the slider
-                        HStack {
-                            ForEach(Array(efforts.enumerated()), id: \.offset) { _, effort in
-                                Text(effortShortLabel(effort))
-                                    .font(.caption2)
-                                    .foregroundStyle(effort == reasoningEffort ? .primary : .tertiary)
-                                    .fontWeight(effort == reasoningEffort ? .semibold : .regular)
-                                    .frame(maxWidth: .infinity)
-                            }
-                        }
-                    }
-                }
+                .padding(.horizontal, 20)
+                .padding(.bottom, 24)
             }
-            .padding(.horizontal, 20)
-            .padding(.bottom, 24)
-
-            Spacer(minLength: 0)
         }
     }
 
-    // MARK: - Model Chip
-
-    private func modelChip(_ model: ModelType) -> some View {
-        let isSelected = model == selectedModel
-
-        return Button {
-            let previousModel = selectedModel
-            selectedModel = model
-            if !model.availableEfforts.contains(reasoningEffort) {
-                reasoningEffort = model.defaultEffort
-            }
-            if model != previousModel {
-                HapticService.shared.selection()
-            }
-        } label: {
-            VStack(spacing: 4) {
-                Text(model.displayName)
-                    .font(.subheadline.weight(.semibold))
-
-                Text(modelDescription(for: model))
-                    .font(.caption2)
+    private var reasoningControl: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Text("Reasoning")
+                    .font(.subheadline.weight(.medium))
                     .foregroundStyle(.secondary)
-                    .lineLimit(1)
+
+                Spacer()
+
+                Text(reasoningEffort.displayName)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.primary)
+                    .contentTransition(.numericText())
+                    .animation(.easeInOut(duration: 0.15), value: reasoningEffort)
             }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 12)
-            .padding(.horizontal, 8)
-            .background {
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(isSelected ? Color.accentColor.opacity(0.12) : Color.clear)
-            }
-            .overlay {
-                RoundedRectangle(cornerRadius: 12)
-                    .strokeBorder(isSelected ? Color.accentColor.opacity(0.4) : Color.primary.opacity(0.1), lineWidth: 1)
+            .padding(.horizontal, 4)
+
+            VStack(spacing: 4) {
+                Slider(
+                    value: sliderBinding,
+                    in: 0...Double(max(efforts.count - 1, 1)),
+                    step: 1
+                ) {
+                    Text("Reasoning Effort")
+                } minimumValueLabel: {
+                    Text(effortShortLabel(efforts.first ?? .none))
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                } maximumValueLabel: {
+                    Text(effortShortLabel(efforts.last ?? .xhigh))
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+                .tint(.accentColor)
+
+                HStack {
+                    ForEach(Array(efforts.enumerated()), id: \.offset) { _, effort in
+                        Text(effortShortLabel(effort))
+                            .font(.caption2)
+                            .foregroundStyle(effort == reasoningEffort ? .primary : .tertiary)
+                            .fontWeight(effort == reasoningEffort ? .semibold : .regular)
+                            .frame(maxWidth: .infinity)
+                    }
+                }
             }
         }
-        .buttonStyle(.plain)
-        .foregroundStyle(isSelected ? .primary : .secondary)
-    }
-
-    // MARK: - Descriptions
-
-    private func modelDescription(for model: ModelType) -> String {
-        switch model {
-        case .gpt5_4: return "Fast and capable"
-        case .gpt5_4_pro: return "Complex reasoning"
+        .padding(14)
+        .background {
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(.ultraThinMaterial)
         }
+        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
     }
 
-    /// Short labels for the slider ticks.
+    private func toggleCard(title: String, subtitle: String, isOn: Binding<Bool>) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Toggle(title, isOn: isOn)
+                .font(.subheadline.weight(.medium))
+                .onChange(of: isOn.wrappedValue) { _, _ in
+                    HapticService.shared.selection()
+                }
+
+            Text(subtitle)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(14)
+        .background {
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(.ultraThinMaterial)
+        }
+        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+    }
+
     private func effortShortLabel(_ effort: ReasoningEffort) -> String {
         switch effort {
         case .none: return "Off"

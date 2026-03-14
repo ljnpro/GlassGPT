@@ -25,6 +25,13 @@ struct SettingsView: View {
         }
     }
 
+    private var appVersionString: String {
+        let info = Bundle.main.infoDictionary
+        let shortVersion = info?["CFBundleShortVersionString"] as? String ?? "Unknown"
+        let buildNumber = info?["CFBundleVersion"] as? String ?? "?"
+        return "\(shortVersion) (\(buildNumber))"
+    }
+
     private var cloudflareStatusColor: Color {
         switch viewModel.cloudflareHealthStatus {
         case .connected:
@@ -138,18 +145,28 @@ struct SettingsView: View {
                     Text("Route API requests through Cloudflare's global edge network for improved reliability and analytics.")
                 }
 
-                Section("Chat Defaults") {
-                    Picker("Default Model", selection: $viewModel.defaultModel) {
-                        ForEach(ModelType.allCases) { model in
-                            Text(model.displayName).tag(model)
-                        }
-                    }
+                Section {
+                    Toggle("Default Pro Mode", isOn: Binding(
+                        get: { viewModel.defaultProModeEnabled },
+                        set: { viewModel.defaultProModeEnabled = $0 }
+                    ))
+
+                    Toggle("Default Background Mode", isOn: $viewModel.defaultBackgroundModeEnabled)
+
+                    Toggle("Default Flex Mode", isOn: Binding(
+                        get: { viewModel.defaultFlexModeEnabled },
+                        set: { viewModel.defaultFlexModeEnabled = $0 }
+                    ))
 
                     Picker("Reasoning Effort", selection: $viewModel.defaultEffort) {
                         ForEach(viewModel.availableDefaultEfforts) { effort in
                             Text(effort.displayName).tag(effort)
                         }
                     }
+                } header: {
+                    Text("Chat Defaults")
+                } footer: {
+                    Text("These defaults are applied only when you start a new chat. Existing conversations keep their own model, background, and pricing settings.")
                 }
 
                 Section("Appearance") {
@@ -166,7 +183,7 @@ struct SettingsView: View {
                 }
 
                 Section("About") {
-                    LabeledContent("Version", value: "2.1.0")
+                    LabeledContent("Version", value: appVersionString)
                     LabeledContent("Platform", value: platformString)
                     LabeledContent("Engine", value: "SwiftUI")
 

@@ -65,10 +65,18 @@ struct ChatView: View {
             .toolbarBackgroundVisibility(.hidden, for: .navigationBar)
             .sheet(isPresented: $viewModel.showModelSelector) {
                 ModelSelectorSheet(
-                    selectedModel: $viewModel.selectedModel,
+                    proModeEnabled: Binding(
+                        get: { viewModel.proModeEnabled },
+                        set: { viewModel.proModeEnabled = $0 }
+                    ),
+                    backgroundModeEnabled: $viewModel.backgroundModeEnabled,
+                    flexModeEnabled: Binding(
+                        get: { viewModel.flexModeEnabled },
+                        set: { viewModel.flexModeEnabled = $0 }
+                    ),
                     reasoningEffort: $viewModel.reasoningEffort
                 )
-                .presentationDetents([.height(300)])
+                .presentationDetents([.height(430)])
                 .presentationDragIndicator(.visible)
                 .presentationCornerRadius(24)
             }
