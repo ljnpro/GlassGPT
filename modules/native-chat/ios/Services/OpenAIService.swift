@@ -24,7 +24,9 @@ enum StreamEvent: Sendable {
     case thinkingStarted
     case thinkingFinished
     case responseCreated(String)
+    case sequenceUpdate(Int)
     case completed(String, String?, [FilePathAnnotation]?)
+    case incomplete(String, String?, [FilePathAnnotation]?, String?)
     case connectionLost
     case error(OpenAIServiceError)
 
@@ -161,29 +163,27 @@ final class OpenAIService {
         messages: [APIMessage],
         model: ModelType,
         reasoningEffort: ReasoningEffort,
+        backgroundModeEnabled: Bool,
+        serviceTier: ServiceTier,
         vectorStoreIds: [String] = []
     ) -> AsyncStream<StreamEvent> {
         cancelStream()
 
-        let responsesURL = self.responsesURL
-
-        return AsyncStream(bufferingPolicy: .unbounded) { continuation in
-            let delegate = SSEDelegate(continuation: continuation)
-            self.currentDelegate = delegate
-
-            guard let url = URL(string: responsesURL) else {
+        guard let url = URL(string: responsesURL) else {
+            return AsyncStream { continuation in
                 continuation.yield(.error(.invalidURL))
                 continuation.finish()
-                return
             }
+        }
 
-            var request = URLRequest(url: url)
-            request.httpMethod = "POST"
-            request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
-            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-            request.setValue("text/event-stream", forHTTPHeaderField: "Accept")
-            request.timeoutInterval = 300
-            FeatureFlags.applyCloudflareAuthorization(to: &request)
+        do {
+            var request = try Self.makeJSONRequest(
+                url: url,
+                apiKey: apiKey,
+                method: "POST",
+                accept: "text/event-stream",
+                timeoutInterval: 300
+            )
 
             let input = Self.buildInputArray(messages: messages)
 
@@ -207,8 +207,13 @@ final class OpenAIService {
                 "input": input,
                 "stream": true,
                 "store": true,
+                "service_tier": serviceTier.rawValue,
                 "tools": tools
             ]
+
+            if backgroundModeEnabled {
+                body["background"] = true
+            }
 
             if reasoningEffort != .none {
                 body["reasoning"] = [
@@ -217,18 +222,70 @@ final class OpenAIService {
                 ]
             }
 
-            do {
-                request.httpBody = try JSONSerialization.data(withJSONObject: body)
-            } catch {
-                continuation.yield(.error(.requestFailed("Failed to encode request")))
-                continuation.finish()
-                return
-            }
+            request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
             #if DEBUG
             let toolNames = vectorStoreIds.isEmpty ? "[web_search, code_interpreter]" : "[web_search, code_interpreter, file_search]"
-            print("[OpenAI] Streaming request → \(model.rawValue), effort: \(reasoningEffort.rawValue), tools: \(toolNames)")
+            print("[OpenAI] Streaming request → \(model.rawValue), effort: \(reasoningEffort.rawValue), tier: \(serviceTier.rawValue), background: \(backgroundModeEnabled), tools: \(toolNames)")
             #endif
+
+            return makeSSEStream(request: request)
+        } catch {
+            return AsyncStream { continuation in
+                continuation.yield(.error(.requestFailed("Failed to encode request")))
+                continuation.finish()
+            }
+        }
+    }
+
+    func streamRecovery(
+        responseId: String,
+        startingAfter: Int,
+        apiKey: String
+    ) -> AsyncStream<StreamEvent> {
+        cancelStream()
+
+        do {
+            let url = try Self.makeResponseURL(
+                baseURL: responsesURL,
+                responseId: responseId,
+                stream: true,
+                startingAfter: startingAfter,
+                include: nil
+            )
+
+            let request = try Self.makeJSONRequest(
+                url: url,
+                apiKey: apiKey,
+                method: "GET",
+                accept: "text/event-stream",
+                timeoutInterval: 300
+            )
+
+            #if DEBUG
+            print("[OpenAI] Resuming stream → \(responseId) starting_after=\(startingAfter)")
+            #endif
+
+            return makeSSEStream(request: request)
+        } catch {
+            return AsyncStream { continuation in
+                continuation.yield(.error(.invalidURL))
+                continuation.finish()
+            }
+        }
+    }
+
+    // MARK: - Cancel
+
+    func cancelStream() {
+        currentDelegate?.cancel()
+        currentDelegate = nil
+    }
+
+    private func makeSSEStream(request: URLRequest) -> AsyncStream<StreamEvent> {
+        AsyncStream(bufferingPolicy: .unbounded) { continuation in
+            let delegate = SSEDelegate(continuation: continuation)
+            self.currentDelegate = delegate
 
             let config = URLSessionConfiguration.default
             config.requestCachePolicy = .reloadIgnoringLocalCacheData
@@ -255,11 +312,30 @@ final class OpenAIService {
         }
     }
 
-    // MARK: - Cancel
+    func cancelResponse(responseId: String, apiKey: String) async throws {
+        guard let url = URL(string: "\(responsesURL)/\(responseId)/cancel") else {
+            throw OpenAIServiceError.invalidURL
+        }
 
-    func cancelStream() {
-        currentDelegate?.cancel()
-        currentDelegate = nil
+        var request = try Self.makeJSONRequest(
+            url: url,
+            apiKey: apiKey,
+            method: "POST",
+            accept: "application/json",
+            timeoutInterval: 30
+        )
+        request.httpBody = Data()
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw OpenAIServiceError.requestFailed("Invalid response")
+        }
+
+        if httpResponse.statusCode >= 400 {
+            let errorMsg = String(data: data, encoding: .utf8) ?? "Failed to cancel response"
+            throw OpenAIServiceError.httpError(httpResponse.statusCode, errorMsg)
+        }
     }
 
     // MARK: - Generate Title
@@ -313,15 +389,26 @@ final class OpenAIService {
     // MARK: - Fetch Complete Response (Polling Recovery)
 
     func fetchResponse(responseId: String, apiKey: String) async throws -> OpenAIResponseFetchResult {
-        guard let url = URL(string: "\(responsesURL)/\(responseId)") else {
-            throw OpenAIServiceError.invalidURL
-        }
+        let url = try Self.makeResponseURL(
+            baseURL: responsesURL,
+            responseId: responseId,
+            stream: false,
+            startingAfter: nil,
+            include: [
+                "reasoning.encrypted_content",
+                "code_interpreter_call.outputs",
+                "file_search_call.results",
+                "web_search_call.action.sources"
+            ]
+        )
 
-        var request = URLRequest(url: url)
-        request.httpMethod = "GET"
-        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
-        request.timeoutInterval = 30
-        FeatureFlags.applyCloudflareAuthorization(to: &request)
+        let request = try Self.makeJSONRequest(
+            url: url,
+            apiKey: apiKey,
+            method: "GET",
+            accept: "application/json",
+            timeoutInterval: 30
+        )
 
         let (data, response) = try await URLSession.shared.data(for: request)
 
@@ -343,98 +430,9 @@ final class OpenAIService {
         let text = Self.extractOutputText(from: json) ?? ""
         let thinking = Self.extractReasoningText(from: json)
 
-        var annotations: [URLCitation] = []
-        var toolCalls: [ToolCallInfo] = []
+        let annotations = Self.extractCitations(from: json)
+        let toolCalls = Self.extractToolCalls(from: json)
         let filePathAnns = OpenAIStreamEventTranslator.extractFilePathAnnotations(from: json)
-
-        if let output = json["output"] as? [[String: Any]] {
-            for item in output {
-                let type = item["type"] as? String ?? ""
-
-                if type == "web_search_call" {
-                    let callId = item["id"] as? String ?? UUID().uuidString
-                    var queries: [String]? = nil
-
-                    if let action = item["action"] as? [String: Any],
-                       let q = action["query"] as? String {
-                        queries = [q]
-                    } else if let q = item["query"] as? String {
-                        queries = [q]
-                    }
-
-                    toolCalls.append(ToolCallInfo(
-                        id: callId,
-                        type: .webSearch,
-                        status: .completed,
-                        queries: queries
-                    ))
-                }
-
-                if type == "code_interpreter_call" {
-                    let callId = item["id"] as? String ?? UUID().uuidString
-                    let code = item["code"] as? String
-                    var results: [String]? = nil
-
-                    if let resultArray = item["results"] as? [[String: Any]] {
-                        results = resultArray.compactMap { result in
-                            if let output = result["output"] as? String {
-                                return output
-                            }
-                            return nil
-                        }
-                    }
-
-                    toolCalls.append(ToolCallInfo(
-                        id: callId,
-                        type: .codeInterpreter,
-                        status: .completed,
-                        code: code,
-                        results: results
-                    ))
-                }
-
-                if type == "file_search_call" {
-                    let callId = item["id"] as? String ?? UUID().uuidString
-                    var queries: [String]? = nil
-
-                    if let q = item["query"] as? String {
-                        queries = [q]
-                    } else if let q = item["queries"] as? [String] {
-                        queries = q
-                    }
-
-                    toolCalls.append(ToolCallInfo(
-                        id: callId,
-                        type: .fileSearch,
-                        status: .completed,
-                        queries: queries
-                    ))
-                }
-
-                if type == "message",
-                   let content = item["content"] as? [[String: Any]] {
-                    for part in content {
-                        if let partAnnotations = part["annotations"] as? [[String: Any]] {
-                            for ann in partAnnotations {
-                                if let annType = ann["type"] as? String,
-                                   annType == "url_citation",
-                                   let url = ann["url"] as? String,
-                                   let title = ann["title"] as? String {
-                                    let startIdx = ann["start_index"] as? Int ?? 0
-                                    let endIdx = ann["end_index"] as? Int ?? 0
-                                    annotations.append(URLCitation(
-                                        url: url,
-                                        title: title,
-                                        startIndex: startIdx,
-                                        endIndex: endIdx
-                                    ))
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
 
         let errorMessage = Self.extractErrorMessage(from: json)
 
@@ -479,6 +477,210 @@ final class OpenAIService {
 
     private nonisolated static func extractErrorMessage(from json: [String: Any]) -> String? {
         OpenAIStreamEventTranslator.extractErrorMessage(from: json)
+    }
+
+    private nonisolated static func extractCitations(from json: [String: Any]) -> [URLCitation] {
+        var annotations: [URLCitation] = []
+
+        guard let output = json["output"] as? [[String: Any]] else {
+            return annotations
+        }
+
+        for item in output {
+            guard let type = item["type"] as? String, type == "message" else { continue }
+            guard let content = item["content"] as? [[String: Any]] else { continue }
+
+            for part in content {
+                guard let partAnnotations = part["annotations"] as? [[String: Any]] else { continue }
+
+                for ann in partAnnotations {
+                    guard
+                        let annType = ann["type"] as? String,
+                        annType == "url_citation",
+                        let url = ann["url"] as? String,
+                        let title = ann["title"] as? String
+                    else {
+                        continue
+                    }
+
+                    annotations.append(URLCitation(
+                        url: url,
+                        title: title,
+                        startIndex: ann["start_index"] as? Int ?? 0,
+                        endIndex: ann["end_index"] as? Int ?? 0
+                    ))
+                }
+            }
+        }
+
+        return annotations
+    }
+
+    private nonisolated static func extractToolCalls(from json: [String: Any]) -> [ToolCallInfo] {
+        guard let output = json["output"] as? [[String: Any]] else {
+            return []
+        }
+
+        var toolCalls: [ToolCallInfo] = []
+
+        for item in output {
+            let type = item["type"] as? String ?? ""
+            let callId = item["id"] as? String ?? UUID().uuidString
+
+            switch type {
+            case "web_search_call":
+                var queries: [String]? = nil
+
+                if let action = item["action"] as? [String: Any] {
+                    if let query = action["query"] as? String {
+                        queries = [query]
+                    } else if let queryList = action["queries"] as? [String] {
+                        queries = queryList
+                    }
+                }
+
+                if queries == nil {
+                    if let query = item["query"] as? String {
+                        queries = [query]
+                    } else if let queryList = item["queries"] as? [String] {
+                        queries = queryList
+                    }
+                }
+
+                toolCalls.append(ToolCallInfo(
+                    id: callId,
+                    type: .webSearch,
+                    status: .completed,
+                    queries: queries
+                ))
+
+            case "code_interpreter_call":
+                let code = item["code"] as? String
+                let results = extractCodeInterpreterOutputs(from: item)
+
+                toolCalls.append(ToolCallInfo(
+                    id: callId,
+                    type: .codeInterpreter,
+                    status: .completed,
+                    code: code,
+                    results: results.isEmpty ? nil : results
+                ))
+
+            case "file_search_call":
+                var queries: [String]? = nil
+
+                if let query = item["query"] as? String {
+                    queries = [query]
+                } else if let queryList = item["queries"] as? [String] {
+                    queries = queryList
+                }
+
+                toolCalls.append(ToolCallInfo(
+                    id: callId,
+                    type: .fileSearch,
+                    status: .completed,
+                    queries: queries
+                ))
+
+            default:
+                continue
+            }
+        }
+
+        return toolCalls
+    }
+
+    private nonisolated static func extractCodeInterpreterOutputs(from item: [String: Any]) -> [String] {
+        var outputs: [String] = []
+
+        if let resultArray = item["results"] as? [[String: Any]] {
+            outputs.append(contentsOf: resultArray.compactMap { result in
+                if let output = result["output"] as? String, !output.isEmpty {
+                    return output
+                }
+                if let text = result["text"] as? String, !text.isEmpty {
+                    return text
+                }
+                if let logs = result["logs"] as? String, !logs.isEmpty {
+                    return logs
+                }
+                return nil
+            })
+        }
+
+        if let outputArray = item["outputs"] as? [[String: Any]] {
+            outputs.append(contentsOf: outputArray.compactMap { output in
+                if let text = output["text"] as? String, !text.isEmpty {
+                    return text
+                }
+                if let outputString = output["output"] as? String, !outputString.isEmpty {
+                    return outputString
+                }
+                if let logs = output["logs"] as? String, !logs.isEmpty {
+                    return logs
+                }
+                return nil
+            })
+        }
+
+        return outputs
+    }
+
+    private nonisolated static func makeJSONRequest(
+        url: URL,
+        apiKey: String,
+        method: String,
+        accept: String,
+        timeoutInterval: TimeInterval
+    ) throws -> URLRequest {
+        var request = URLRequest(url: url)
+        request.httpMethod = method
+        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        request.setValue(accept, forHTTPHeaderField: "Accept")
+        request.timeoutInterval = timeoutInterval
+
+        if method != "GET" {
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        }
+
+        FeatureFlags.applyCloudflareAuthorization(to: &request)
+        return request
+    }
+
+    private nonisolated static func makeResponseURL(
+        baseURL: String,
+        responseId: String,
+        stream: Bool,
+        startingAfter: Int?,
+        include: [String]?
+    ) throws -> URL {
+        guard var components = URLComponents(string: "\(baseURL)/\(responseId)") else {
+            throw OpenAIServiceError.invalidURL
+        }
+
+        var queryItems: [URLQueryItem] = []
+
+        if stream {
+            queryItems.append(URLQueryItem(name: "stream", value: "true"))
+        }
+
+        if let startingAfter {
+            queryItems.append(URLQueryItem(name: "starting_after", value: String(startingAfter)))
+        }
+
+        if let include {
+            queryItems.append(contentsOf: include.map { URLQueryItem(name: "include", value: $0) })
+        }
+
+        if !queryItems.isEmpty {
+            components.queryItems = queryItems
+        }
+
+        guard let url = components.url else {
+            throw OpenAIServiceError.invalidURL
+        }
+
+        return url
     }
 
     // MARK: - Build Input Array
@@ -761,6 +963,7 @@ private final class SSEDelegate: NSObject, URLSessionDataDelegate, @unchecked Se
     private enum EventResult {
         case continued
         case terminalCompleted
+        case terminalIncomplete(String?)
         case terminalError
     }
 
@@ -772,12 +975,15 @@ private final class SSEDelegate: NSObject, URLSessionDataDelegate, @unchecked Se
             return .continued
         }
 
+        let sequenceNumber = OpenAIStreamEventTranslator.extractSequenceNumber(from: json)
+
         if let translated = OpenAIStreamEventTranslator.translate(eventType: type, data: json) {
             switch translated {
             case .textDelta(let delta):
                 emittedAnyOutput = true
                 accumulatedText += delta
                 continuation.yield(.textDelta(delta))
+                yieldSequenceIfNeeded(sequenceNumber)
                 return .continued
 
             case .thinkingDelta(let delta):
@@ -788,6 +994,7 @@ private final class SSEDelegate: NSObject, URLSessionDataDelegate, @unchecked Se
                 emittedAnyOutput = true
                 accumulatedThinking += delta
                 continuation.yield(.thinkingDelta(delta))
+                yieldSequenceIfNeeded(sequenceNumber)
                 return .continued
 
             case .thinkingFinished:
@@ -795,18 +1002,25 @@ private final class SSEDelegate: NSObject, URLSessionDataDelegate, @unchecked Se
                     thinkingActive = false
                     continuation.yield(.thinkingFinished)
                 }
+                yieldSequenceIfNeeded(sequenceNumber)
                 return .continued
 
             case .responseCreated(let responseId):
                 continuation.yield(.responseCreated(responseId))
+                yieldSequenceIfNeeded(sequenceNumber)
                 #if DEBUG
                 print("[SSE] Response created: \(responseId)")
                 #endif
                 return .continued
 
+            case .sequenceUpdate(_):
+                yieldSequenceIfNeeded(sequenceNumber)
+                return .continued
+
             case .filePathAnnotationAdded(let annotation):
                 accumulatedFilePathAnnotations.append(annotation)
                 continuation.yield(.filePathAnnotationAdded(annotation))
+                yieldSequenceIfNeeded(sequenceNumber)
                 return .continued
 
             case .completed(let fullText, let fullThinking, let filePathAnns):
@@ -823,6 +1037,20 @@ private final class SSEDelegate: NSObject, URLSessionDataDelegate, @unchecked Se
                 emittedAnyOutput = emittedAnyOutput || !accumulatedText.isEmpty || !accumulatedThinking.isEmpty
                 return .terminalCompleted
 
+            case .incomplete(let fullText, let fullThinking, let filePathAnns, let message):
+                sawTerminalEvent = true
+                if !fullText.isEmpty {
+                    accumulatedText = fullText
+                }
+                if let fullThinking, !fullThinking.isEmpty {
+                    accumulatedThinking = fullThinking
+                }
+                if let filePathAnns, !filePathAnns.isEmpty {
+                    accumulatedFilePathAnnotations = filePathAnns
+                }
+                emittedAnyOutput = emittedAnyOutput || !accumulatedText.isEmpty || !accumulatedThinking.isEmpty
+                return .terminalIncomplete(message)
+
             case .error(let error):
                 sawTerminalEvent = true
                 continuation.yield(.error(error))
@@ -830,6 +1058,7 @@ private final class SSEDelegate: NSObject, URLSessionDataDelegate, @unchecked Se
 
             default:
                 continuation.yield(translated)
+                yieldSequenceIfNeeded(sequenceNumber)
                 return .continued
             }
         }
@@ -840,6 +1069,7 @@ private final class SSEDelegate: NSObject, URLSessionDataDelegate, @unchecked Se
                 accumulatedText = fullText
                 emittedAnyOutput = true
             }
+            yieldSequenceIfNeeded(sequenceNumber)
             return .continued
 
         case "response.queued",
@@ -850,6 +1080,7 @@ private final class SSEDelegate: NSObject, URLSessionDataDelegate, @unchecked Se
              "response.content_part.done",
              "response.reasoning_summary_part.added",
              "response.reasoning_summary_part.done":
+            yieldSequenceIfNeeded(sequenceNumber)
             return .continued
 
         default:
@@ -888,6 +1119,27 @@ private final class SSEDelegate: NSObject, URLSessionDataDelegate, @unchecked Se
             session?.invalidateAndCancel()
             return true
 
+        case .terminalIncomplete(let message):
+            lock.lock()
+            let alreadyFinished = finished
+            finished = true
+            lock.unlock()
+
+            guard !alreadyFinished else { return true }
+
+            if thinkingActive {
+                thinkingActive = false
+                continuation.yield(.thinkingFinished)
+            }
+
+            let thinking: String? = accumulatedThinking.isEmpty ? nil : accumulatedThinking
+            let filePathAnns: [FilePathAnnotation]? = accumulatedFilePathAnnotations.isEmpty ? nil : accumulatedFilePathAnnotations
+            continuation.yield(.incomplete(accumulatedText, thinking, filePathAnns, message))
+            continuation.finish()
+            task?.cancel()
+            session?.invalidateAndCancel()
+            return true
+
         case .terminalError:
             lock.lock()
             let alreadyFinished = finished
@@ -917,5 +1169,10 @@ private final class SSEDelegate: NSObject, URLSessionDataDelegate, @unchecked Se
         guard !alreadyFinished else { return }
         continuation.yield(.error(error))
         continuation.finish()
+    }
+
+    private func yieldSequenceIfNeeded(_ sequenceNumber: Int?) {
+        guard let sequenceNumber else { return }
+        continuation.yield(.sequenceUpdate(sequenceNumber))
     }
 }

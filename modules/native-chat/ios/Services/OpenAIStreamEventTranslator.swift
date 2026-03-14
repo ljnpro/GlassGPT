@@ -2,6 +2,28 @@ import Foundation
 
 enum OpenAIStreamEventTranslator {
 
+    static func extractSequenceNumber(from data: [String: Any]) -> Int? {
+        if let value = data["sequence_number"] as? Int {
+            return value
+        }
+
+        if let value = data["sequence_number"] as? NSNumber {
+            return value.intValue
+        }
+
+        if let response = data["response"] as? [String: Any],
+           let value = response["sequence_number"] as? Int {
+            return value
+        }
+
+        if let response = data["response"] as? [String: Any],
+           let value = response["sequence_number"] as? NSNumber {
+            return value.intValue
+        }
+
+        return nil
+    }
+
     static func translate(eventType: String, data: [String: Any]) -> StreamEvent? {
         switch eventType {
         case "response.created":
@@ -132,12 +154,20 @@ enum OpenAIStreamEventTranslator {
 
             return nil
 
-        case "response.completed", "response.incomplete":
+        case "response.completed":
             let response = data["response"] as? [String: Any] ?? data
             let text = extractOutputText(from: response) ?? ""
             let thinking = extractReasoningText(from: response)
             let filePathAnnotations = extractFilePathAnnotations(from: response)
             return .completed(text, thinking, filePathAnnotations)
+
+        case "response.incomplete":
+            let response = data["response"] as? [String: Any] ?? data
+            let text = extractOutputText(from: response) ?? ""
+            let thinking = extractReasoningText(from: response)
+            let filePathAnnotations = extractFilePathAnnotations(from: response)
+            let message = extractErrorMessage(from: response)
+            return .incomplete(text, thinking, filePathAnnotations, message)
 
         case "response.failed":
             let response = data["response"] as? [String: Any] ?? data

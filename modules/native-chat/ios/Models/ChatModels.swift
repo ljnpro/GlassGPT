@@ -29,8 +29,8 @@ enum ModelType: String, CaseIterable, Identifiable, Codable, Sendable {
     /// Default reasoning effort for this model
     var defaultEffort: ReasoningEffort {
         switch self {
-        case .gpt5_4: return .medium
-        case .gpt5_4_pro: return .high
+        case .gpt5_4: return .high
+        case .gpt5_4_pro: return .xhigh
         }
     }
 }
@@ -59,6 +59,22 @@ enum ReasoningEffort: String, CaseIterable, Identifiable, Codable, Sendable {
     /// The value sent to the API (xhigh maps to the API string)
     var apiValue: String {
         rawValue
+    }
+}
+
+// MARK: - Service Tier
+
+enum ServiceTier: String, CaseIterable, Identifiable, Codable, Sendable {
+    case standard = "default"
+    case flex
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .standard: return "Standard"
+        case .flex: return "Flex"
+        }
     }
 }
 

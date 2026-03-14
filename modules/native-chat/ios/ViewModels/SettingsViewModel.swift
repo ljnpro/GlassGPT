@@ -12,6 +12,15 @@ enum CloudflareHealthStatus: Equatable {
 @MainActor
 final class SettingsViewModel {
 
+    private enum StorageKeys {
+        static let defaultModel = "defaultModel"
+        static let defaultEffort = "defaultEffort"
+        static let defaultBackgroundModeEnabled = "defaultBackgroundModeEnabled"
+        static let defaultServiceTier = "defaultServiceTier"
+        static let appTheme = "appTheme"
+        static let hapticEnabled = "hapticEnabled"
+    }
+
     // MARK: - State
 
     var apiKey: String = ""
@@ -24,30 +33,52 @@ final class SettingsViewModel {
 
     // MARK: - Persisted Settings (stored properties for @Observable tracking)
 
-    var defaultModel: ModelType {
+    private var defaultModel: ModelType {
         didSet {
-            UserDefaults.standard.set(defaultModel.rawValue, forKey: "defaultModel")
+            UserDefaults.standard.set(defaultModel.rawValue, forKey: StorageKeys.defaultModel)
             if !defaultModel.availableEfforts.contains(defaultEffort) {
                 defaultEffort = defaultModel.defaultEffort
             }
         }
     }
 
+    var defaultProModeEnabled: Bool {
+        get { defaultModel == .gpt5_4_pro }
+        set { defaultModel = newValue ? .gpt5_4_pro : .gpt5_4 }
+    }
+
     var defaultEffort: ReasoningEffort {
         didSet {
-            UserDefaults.standard.set(defaultEffort.rawValue, forKey: "defaultEffort")
+            UserDefaults.standard.set(defaultEffort.rawValue, forKey: StorageKeys.defaultEffort)
         }
+    }
+
+    var defaultBackgroundModeEnabled: Bool {
+        didSet {
+            UserDefaults.standard.set(defaultBackgroundModeEnabled, forKey: StorageKeys.defaultBackgroundModeEnabled)
+        }
+    }
+
+    private var defaultServiceTier: ServiceTier {
+        didSet {
+            UserDefaults.standard.set(defaultServiceTier.rawValue, forKey: StorageKeys.defaultServiceTier)
+        }
+    }
+
+    var defaultFlexModeEnabled: Bool {
+        get { defaultServiceTier == .flex }
+        set { defaultServiceTier = newValue ? .flex : .standard }
     }
 
     var appTheme: AppTheme {
         didSet {
-            UserDefaults.standard.set(appTheme.rawValue, forKey: "appTheme")
+            UserDefaults.standard.set(appTheme.rawValue, forKey: StorageKeys.appTheme)
         }
     }
 
     var hapticEnabled: Bool {
         didSet {
-            UserDefaults.standard.set(hapticEnabled, forKey: "hapticEnabled")
+            UserDefaults.standard.set(hapticEnabled, forKey: StorageKeys.hapticEnabled)
         }
     }
 
@@ -76,28 +107,41 @@ final class SettingsViewModel {
     // MARK: - Init
 
     init() {
-        if let raw = UserDefaults.standard.string(forKey: "defaultModel"),
+        if let raw = UserDefaults.standard.string(forKey: StorageKeys.defaultModel),
            let model = ModelType(rawValue: raw) {
             self.defaultModel = model
         } else {
-            self.defaultModel = .gpt5_4
+            self.defaultModel = .gpt5_4_pro
         }
 
-        if let raw = UserDefaults.standard.string(forKey: "defaultEffort"),
+        if let raw = UserDefaults.standard.string(forKey: StorageKeys.defaultEffort),
            let effort = ReasoningEffort(rawValue: raw) {
             self.defaultEffort = effort
         } else {
-            self.defaultEffort = .medium
+            self.defaultEffort = .xhigh
         }
 
-        if let raw = UserDefaults.standard.string(forKey: "appTheme"),
+        if let raw = UserDefaults.standard.object(forKey: StorageKeys.defaultBackgroundModeEnabled) as? Bool {
+            self.defaultBackgroundModeEnabled = raw
+        } else {
+            self.defaultBackgroundModeEnabled = false
+        }
+
+        if let raw = UserDefaults.standard.string(forKey: StorageKeys.defaultServiceTier),
+           let tier = ServiceTier(rawValue: raw) {
+            self.defaultServiceTier = tier
+        } else {
+            self.defaultServiceTier = .standard
+        }
+
+        if let raw = UserDefaults.standard.string(forKey: StorageKeys.appTheme),
            let theme = AppTheme(rawValue: raw) {
             self.appTheme = theme
         } else {
             self.appTheme = .system
         }
 
-        if let val = UserDefaults.standard.object(forKey: "hapticEnabled") as? Bool {
+        if let val = UserDefaults.standard.object(forKey: StorageKeys.hapticEnabled) as? Bool {
             self.hapticEnabled = val
         } else {
             self.hapticEnabled = true
