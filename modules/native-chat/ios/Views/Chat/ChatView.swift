@@ -528,6 +528,7 @@ private struct ChatBottomAnchorMaxYPreferenceKey: PreferenceKey {
 // MARK: - File Preview Item
 
 struct FilePreviewItem: Identifiable {
-    let id = UUID()
     let url: URL
+
+    var id: String { url.path }
 }
