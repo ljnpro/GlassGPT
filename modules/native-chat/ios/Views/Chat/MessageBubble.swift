@@ -141,7 +141,7 @@ struct MessageBubble: View {
                 }
 
                 // Incomplete message indicator
-                if message.role == .assistant && (!message.isComplete || showsRecoveryIndicator) {
+                if message.role == .assistant && showsRecoveryIndicator {
                     HStack(spacing: 4) {
                         ProgressView()
                             .controlSize(.mini)

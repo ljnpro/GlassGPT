@@ -6,6 +6,13 @@ import UIKit
 @MainActor
 final class ChatViewModel {
 
+    private enum RecoveryPhase: Equatable {
+        case idle
+        case checkingStatus
+        case streamResuming
+        case pollingTerminal
+    }
+
     @MainActor
     private final class ResponseSession {
         let messageID: UUID
@@ -26,7 +33,7 @@ final class ChatViewModel {
         var responseId: String?
 
         var isStreaming = false
-        var isRecovering = false
+        var recoveryPhase: RecoveryPhase = .idle
         var isThinking = false
         var activeStreamID = UUID()
         var lastDraftSaveTime: Date = .distantPast
@@ -140,6 +147,7 @@ final class ChatViewModel {
     private var isApplyingStoredConversationConfiguration = false
     private var didCompleteLaunchBootstrap = false
     private var visibleSessionMessageID: UUID?
+    private var visibleRecoveryPhase: RecoveryPhase = .idle
     private var activeResponseSessions: [UUID: ResponseSession] = [:]
 
     // Background task
@@ -514,7 +522,7 @@ final class ChatViewModel {
         let streamID = UUID()
         session.activeStreamID = streamID
         session.isStreaming = true
-        session.isRecovering = false
+        setRecoveryPhase(.idle, for: session)
         syncVisibleState(from: session)
 
         session.task?.cancel()
@@ -600,7 +608,7 @@ final class ChatViewModel {
 
             if let responseId = pendingRecoveryResponseId {
                 session.isStreaming = false
-                session.isRecovering = true
+                setRecoveryPhase(.checkingStatus, for: session)
                 if self.visibleSessionMessageID == session.messageID,
                    let pendingRecoveryError,
                    !pendingRecoveryError.isEmpty {
@@ -619,7 +627,7 @@ final class ChatViewModel {
             if receivedConnectionLost {
                 if let responseId = session.responseId {
                     session.isStreaming = false
-                    session.isRecovering = true
+                    setRecoveryPhase(.checkingStatus, for: session)
                     self.syncVisibleState(from: session)
                     self.recoverResponse(
                         messageId: session.messageID,
@@ -670,7 +678,7 @@ final class ChatViewModel {
                 if let responseId = session.responseId {
                     self.saveSessionNow(session)
                     session.isStreaming = false
-                    session.isRecovering = true
+                    setRecoveryPhase(.checkingStatus, for: session)
                     self.syncVisibleState(from: session)
                     self.recoverResponse(
                         messageId: session.messageID,
@@ -713,7 +721,7 @@ final class ChatViewModel {
     private func finalizeDraft() {
         guard let session = currentVisibleSession else {
             clearLiveGenerationState(clearDraft: true)
-            isRecovering = false
+            setVisibleRecoveryPhase(.idle)
             return
         }
 
@@ -770,7 +778,7 @@ final class ChatViewModel {
         }
 
         session.responseId = responseId
-        session.isRecovering = true
+        setRecoveryPhase(.checkingStatus, for: session)
         session.isStreaming = false
         session.isThinking = false
 
@@ -855,7 +863,7 @@ final class ChatViewModel {
     ) async {
         let streamID = UUID()
         session.activeStreamID = streamID
-        session.isRecovering = true
+        setRecoveryPhase(.streamResuming, for: session)
         session.isStreaming = true
         session.isThinking = false
         syncVisibleState(from: session)
@@ -952,6 +960,7 @@ final class ChatViewModel {
 
     private func pollResponseUntilTerminal(session: ResponseSession, responseId: String) async {
         guard !apiKey.isEmpty else { return }
+        setRecoveryPhase(.pollingTerminal, for: session)
 
         let key = apiKey
         var attempts = 0
@@ -1181,7 +1190,7 @@ final class ChatViewModel {
             registerSession(session, visible: true)
             session.isStreaming = true
             session.isThinking = true
-            session.isRecovering = true
+            setRecoveryPhase(.idle, for: session)
             syncVisibleState(from: session)
             errorMessage = nil
 
@@ -1311,7 +1320,7 @@ final class ChatViewModel {
             }
         }
 
-        isRecovering = false
+        setVisibleRecoveryPhase(.idle)
         endBackgroundTask()
         HapticService.shared.impact(.medium)
 
@@ -1342,7 +1351,7 @@ final class ChatViewModel {
         selectedImageData = nil
         pendingAttachments = []
         isThinking = false
-        isRecovering = false
+        setVisibleRecoveryPhase(.idle)
         draftMessage = nil
         activeToolCalls = []
         liveCitations = []
@@ -1423,7 +1432,7 @@ final class ChatViewModel {
         currentThinkingText = ""
         errorMessage = nil
         isThinking = false
-        isRecovering = false
+        setVisibleRecoveryPhase(.idle)
         draftMessage = nil
         activeToolCalls = []
         liveCitations = []
@@ -1611,6 +1620,18 @@ final class ChatViewModel {
         errorMessage = nil
     }
 
+    private func setVisibleRecoveryPhase(_ phase: RecoveryPhase) {
+        visibleRecoveryPhase = phase
+        isRecovering = phase == .streamResuming
+    }
+
+    private func setRecoveryPhase(_ phase: RecoveryPhase, for session: ResponseSession) {
+        session.recoveryPhase = phase
+        if visibleSessionMessageID == session.messageID {
+            setVisibleRecoveryPhase(phase)
+        }
+    }
+
     private func syncVisibleState(from session: ResponseSession) {
         guard visibleSessionMessageID == session.messageID else { return }
 
@@ -1625,7 +1646,7 @@ final class ChatViewModel {
         activeRequestUsesBackgroundMode = session.requestUsesBackgroundMode
         activeRequestServiceTier = session.requestServiceTier
         isStreaming = session.isStreaming
-        isRecovering = session.isRecovering
+        setVisibleRecoveryPhase(session.recoveryPhase)
         isThinking = session.isThinking
 
         if let message = findMessage(byId: session.messageID) {
@@ -1690,6 +1711,7 @@ final class ChatViewModel {
         try? modelContext.save()
 
         let finishedConversation = message.conversation
+        let wasVisible = visibleSessionMessageID == session.messageID
 
         removeSession(session)
 
@@ -1701,7 +1723,7 @@ final class ChatViewModel {
             }
         }
 
-        if visibleSessionMessageID == nil || visibleSessionMessageID == session.messageID {
+        if wasVisible {
             HapticService.shared.notify(.success)
         }
     }
@@ -1943,6 +1965,10 @@ final class ChatViewModel {
     }
 
     private func upsertMessage(_ message: Message) {
+        guard message.conversation?.id == currentConversation?.id else {
+            return
+        }
+
         if let idx = messages.firstIndex(where: { $0.id == message.id }) {
             messages[idx] = message
         } else {
@@ -1956,6 +1982,7 @@ final class ChatViewModel {
         currentThinkingText = ""
         isStreaming = false
         isThinking = false
+        setVisibleRecoveryPhase(.idle)
         activeToolCalls = []
         liveCitations = []
         liveFilePathAnnotations = []
@@ -1979,12 +2006,12 @@ final class ChatViewModel {
             session.service.cancelStream()
             session.task?.cancel()
             session.isStreaming = false
-            session.isRecovering = false
+            setRecoveryPhase(.idle, for: session)
             session.isThinking = false
 
             guard let message = findMessage(byId: session.messageID) else { continue }
 
-            if session.requestUsesBackgroundMode, session.responseId != nil {
+            if session.responseId != nil {
                 message.isComplete = false
                 message.conversation?.updatedAt = .now
                 upsertMessage(message)
@@ -2079,7 +2106,7 @@ final class ChatViewModel {
             return session.currentText
         }
 
-        if !currentStreamingText.isEmpty {
+        if message.id == visibleSessionMessageID, !currentStreamingText.isEmpty {
             return currentStreamingText
         }
 
@@ -2091,7 +2118,11 @@ final class ChatViewModel {
             return session.currentThinking
         }
 
-        return !currentThinkingText.isEmpty ? currentThinkingText : message.thinking
+        if message.id == visibleSessionMessageID, !currentThinkingText.isEmpty {
+            return currentThinkingText
+        }
+
+        return message.thinking
     }
 
     private func interruptedResponseFallbackText(for message: Message, session: ResponseSession? = nil) -> String {
