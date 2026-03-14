@@ -125,7 +125,7 @@ struct ModelSelectorSheet: View {
             reasoningControl
         }
         .frame(maxWidth: metrics.sheetMaxWidth)
-        .frame(maxWidth: .infinity)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .padding(.horizontal, metrics.contentHorizontalPadding)
         .padding(.top, metrics.contentVerticalPadding)
         .padding(.bottom, metrics.contentVerticalPadding)
