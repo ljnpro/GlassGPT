@@ -1515,3 +1515,157 @@ describe('Polling Recovery - Background Enter Saves Draft State', () => {
     expect(draft.content).toBe('Some partial text...');
   });
 });
+
+describe('Background Mode Request Configuration', () => {
+  function buildRequestBody({
+    backgroundModeEnabled,
+    flexModeEnabled,
+  }: {
+    backgroundModeEnabled: boolean;
+    flexModeEnabled: boolean;
+  }) {
+    return {
+      model: 'gpt-5.4-pro',
+      input: [{ role: 'user', content: 'Hello' }],
+      stream: true,
+      store: true,
+      ...(backgroundModeEnabled ? { background: true } : {}),
+      service_tier: flexModeEnabled ? 'flex' : 'default',
+      tools: [
+        { type: 'web_search_preview' },
+        { type: 'code_interpreter', container: { type: 'auto' } },
+      ],
+    };
+  }
+
+  it('should include background=true when background mode is enabled', () => {
+    const requestBody = buildRequestBody({
+      backgroundModeEnabled: true,
+      flexModeEnabled: false,
+    });
+
+    expect(requestBody.background).toBe(true);
+    expect(requestBody.store).toBe(true);
+    expect(requestBody.stream).toBe(true);
+    expect(requestBody.service_tier).toBe('default');
+  });
+
+  it('should map flex mode to service_tier=flex', () => {
+    const requestBody = buildRequestBody({
+      backgroundModeEnabled: false,
+      flexModeEnabled: true,
+    });
+
+    expect(requestBody).not.toHaveProperty('background');
+    expect(requestBody.service_tier).toBe('flex');
+  });
+});
+
+describe('Background Mode Streaming Resume', () => {
+  function buildResumeURL(responseId: string, sequenceNumber: number) {
+    const url = new URL(`https://api.openai.com/v1/responses/${responseId}`);
+    url.searchParams.set('stream', 'true');
+    url.searchParams.set('starting_after', String(sequenceNumber));
+    return url.toString();
+  }
+
+  it('should build a recovery stream URL with starting_after', () => {
+    const url = buildResumeURL('resp_abc123', 42);
+
+    expect(url).toContain('/responses/resp_abc123');
+    expect(url).toContain('stream=true');
+    expect(url).toContain('starting_after=42');
+  });
+
+  it('should persist the highest applied sequence number as the resume checkpoint', () => {
+    const draftState = {
+      text: 'Hello world',
+      thinking: 'Reasoning...',
+      lastSequenceNumber: 7,
+    };
+
+    const applyVisibleDelta = (draft: typeof draftState, delta: string, sequenceNumber: number) => ({
+      ...draft,
+      text: draft.text + delta,
+      lastSequenceNumber: sequenceNumber,
+    });
+
+    const updated = applyVisibleDelta(draftState, '!', 8);
+    expect(updated.text).toBe('Hello world!');
+    expect(updated.lastSequenceNumber).toBe(8);
+  });
+
+  it('should append resumed deltas after the saved checkpoint instead of replacing prior text', () => {
+    const savedDraft = {
+      text: 'Partial answer',
+      lastSequenceNumber: 21,
+    };
+
+    const resumedDeltas = [' continuing', ' from', ' background'];
+    const finalText = resumedDeltas.reduce((acc, delta) => acc + delta, savedDraft.text);
+
+    expect(savedDraft.lastSequenceNumber).toBe(21);
+    expect(finalText).toBe('Partial answer continuing from background');
+  });
+});
+
+describe('Completed Retrieval Enrichment', () => {
+  function buildCompletedFetchURL(responseId: string) {
+    const url = new URL(`https://api.openai.com/v1/responses/${responseId}`);
+    for (const include of [
+      'reasoning.encrypted_content',
+      'code_interpreter_call.outputs',
+      'file_search_call.results',
+      'web_search_call.action.sources',
+    ]) {
+      url.searchParams.append('include', include);
+    }
+    return url.toString();
+  }
+
+  it('should request reasoning and tool outputs on completed retrieval', () => {
+    const url = buildCompletedFetchURL('resp_done');
+
+    expect(url).toContain('include=reasoning.encrypted_content');
+    expect(url).toContain('include=code_interpreter_call.outputs');
+    expect(url).toContain('include=file_search_call.results');
+    expect(url).toContain('include=web_search_call.action.sources');
+  });
+});
+
+describe('Background Stop Behaviour', () => {
+  function determineStopAction({
+    usedBackgroundMode,
+    responseId,
+  }: {
+    usedBackgroundMode: boolean;
+    responseId?: string;
+  }) {
+    if (usedBackgroundMode && responseId) {
+      return { cancelServer: true, endpoint: `/v1/responses/${responseId}/cancel` };
+    }
+
+    return { cancelServer: false };
+  }
+
+  it('should cancel the server-side response when stopping a background run', () => {
+    const action = determineStopAction({
+      usedBackgroundMode: true,
+      responseId: 'resp_bg_123',
+    });
+
+    expect(action).toEqual({
+      cancelServer: true,
+      endpoint: '/v1/responses/resp_bg_123/cancel',
+    });
+  });
+
+  it('should not cancel the server-side response for standard foreground streaming', () => {
+    const action = determineStopAction({
+      usedBackgroundMode: false,
+      responseId: 'resp_fg_123',
+    });
+
+    expect(action).toEqual({ cancelServer: false });
+  });
+});

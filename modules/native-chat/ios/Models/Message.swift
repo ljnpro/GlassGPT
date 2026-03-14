@@ -24,6 +24,12 @@ final class Message {
     /// Highest OpenAI sequence_number acknowledged by the iOS client.
     var relayLastSequenceNumber: Int?
 
+    /// Highest OpenAI sequence_number represented by the persisted draft state.
+    var lastSequenceNumber: Int?
+
+    /// Whether the request was started with OpenAI background mode enabled.
+    var usedBackgroundMode: Bool
+
     /// Whether this message has been fully received.
     var isComplete: Bool
 
@@ -51,6 +57,8 @@ final class Message {
         relayRunId: String? = nil,
         relayResumeToken: String? = nil,
         relayLastSequenceNumber: Int? = nil,
+        lastSequenceNumber: Int? = nil,
+        usedBackgroundMode: Bool = false,
         isComplete: Bool = true,
         annotations: [URLCitation]? = nil,
         toolCalls: [ToolCallInfo]? = nil,
@@ -68,6 +76,8 @@ final class Message {
         self.relayRunId = relayRunId
         self.relayResumeToken = relayResumeToken
         self.relayLastSequenceNumber = relayLastSequenceNumber
+        self.lastSequenceNumber = lastSequenceNumber
+        self.usedBackgroundMode = usedBackgroundMode
         self.isComplete = isComplete
         self.annotationsData = Self.encode(annotations)
         self.toolCallsData = Self.encode(toolCalls)
