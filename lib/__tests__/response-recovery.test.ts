@@ -1613,12 +1613,11 @@ describe('Completed Retrieval Enrichment', () => {
   function buildCompletedFetchURL(responseId: string) {
     const url = new URL(`https://api.openai.com/v1/responses/${responseId}`);
     for (const include of [
-      'reasoning.encrypted_content',
       'code_interpreter_call.outputs',
       'file_search_call.results',
       'web_search_call.action.sources',
     ]) {
-      url.searchParams.append('include', include);
+      url.searchParams.append('include[]', include);
     }
     return url.toString();
   }
@@ -1626,10 +1625,10 @@ describe('Completed Retrieval Enrichment', () => {
   it('should request reasoning and tool outputs on completed retrieval', () => {
     const url = buildCompletedFetchURL('resp_done');
 
-    expect(url).toContain('include=reasoning.encrypted_content');
-    expect(url).toContain('include=code_interpreter_call.outputs');
-    expect(url).toContain('include=file_search_call.results');
-    expect(url).toContain('include=web_search_call.action.sources');
+    expect(url).toContain('include%5B%5D=code_interpreter_call.outputs');
+    expect(url).toContain('include%5B%5D=file_search_call.results');
+    expect(url).toContain('include%5B%5D=web_search_call.action.sources');
+    expect(url).not.toContain('reasoning.encrypted_content');
   });
 });
 
@@ -1667,5 +1666,288 @@ describe('Background Stop Behaviour', () => {
     });
 
     expect(action).toEqual({ cancelServer: false });
+  });
+});
+
+describe('Background Navigation Behaviour', () => {
+  function determineNavigationAction({
+    isStreaming,
+    usedBackgroundMode,
+    responseId,
+  }: {
+    isStreaming: boolean;
+    usedBackgroundMode: boolean;
+    responseId?: string;
+  }) {
+    if (isStreaming && usedBackgroundMode && responseId) {
+      return 'detach';
+    }
+
+    if (isStreaming) {
+      return 'stop';
+    }
+
+    return 'noop';
+  }
+
+  it('should detach instead of cancelling when leaving a running background response', () => {
+    expect(determineNavigationAction({
+      isStreaming: true,
+      usedBackgroundMode: true,
+      responseId: 'resp_bg',
+    })).toBe('detach');
+  });
+
+  it('should still stop non-background streaming when leaving the conversation', () => {
+    expect(determineNavigationAction({
+      isStreaming: true,
+      usedBackgroundMode: false,
+      responseId: 'resp_sync',
+    })).toBe('stop');
+  });
+});
+
+describe('Gateway Recovery Fallback', () => {
+  function shouldRetryRecoveryDirectly({
+    gatewayEnabled,
+    useDirectEndpoint,
+    receivedAnyRecoveryEvent,
+    gatewayResumeTimedOut,
+  }: {
+    gatewayEnabled: boolean;
+    useDirectEndpoint: boolean;
+    receivedAnyRecoveryEvent: boolean;
+    gatewayResumeTimedOut: boolean;
+  }) {
+    return gatewayEnabled
+      && !useDirectEndpoint
+      && (gatewayResumeTimedOut || !receivedAnyRecoveryEvent);
+  }
+
+  it('should fall back to the direct OpenAI endpoint when gateway recovery stalls', () => {
+    expect(shouldRetryRecoveryDirectly({
+      gatewayEnabled: true,
+      useDirectEndpoint: false,
+      receivedAnyRecoveryEvent: false,
+      gatewayResumeTimedOut: true,
+    })).toBe(true);
+  });
+
+  it('should not fall back again after already switching to direct recovery', () => {
+    expect(shouldRetryRecoveryDirectly({
+      gatewayEnabled: true,
+      useDirectEndpoint: true,
+      receivedAnyRecoveryEvent: false,
+      gatewayResumeTimedOut: true,
+    })).toBe(false);
+  });
+});
+
+describe('Recovery Error Handling', () => {
+  function shouldFinishRecoveryImmediately(statusCode: number) {
+    return statusCode === 404;
+  }
+
+  it('should stop retrying when the response is no longer available', () => {
+    expect(shouldFinishRecoveryImmediately(404)).toBe(true);
+  });
+
+  it('should keep retrying transient recovery failures', () => {
+    expect(shouldFinishRecoveryImmediately(500)).toBe(false);
+    expect(shouldFinishRecoveryImmediately(429)).toBe(false);
+  });
+});
+
+describe('Conversation Defaults Isolation', () => {
+  function resolveConversationConfiguration({
+    restoredConversation,
+    defaults,
+  }: {
+    restoredConversation?: {
+      model: string;
+      reasoningEffort: string;
+      backgroundModeEnabled: boolean;
+      serviceTier: string;
+    };
+    defaults: {
+      model: string;
+      reasoningEffort: string;
+      backgroundModeEnabled: boolean;
+      serviceTier: string;
+    };
+  }) {
+    return restoredConversation ?? defaults;
+  }
+
+  it('should keep a restored conversation configuration instead of replacing it with defaults', () => {
+    const resolved = resolveConversationConfiguration({
+      restoredConversation: {
+        model: 'gpt-5.4',
+        reasoningEffort: 'medium',
+        backgroundModeEnabled: true,
+        serviceTier: 'flex',
+      },
+      defaults: {
+        model: 'gpt-5.4-pro',
+        reasoningEffort: 'xhigh',
+        backgroundModeEnabled: false,
+        serviceTier: 'default',
+      },
+    });
+
+    expect(resolved).toEqual({
+      model: 'gpt-5.4',
+      reasoningEffort: 'medium',
+      backgroundModeEnabled: true,
+      serviceTier: 'flex',
+    });
+  });
+});
+
+describe('Recovery Path Selection', () => {
+  function chooseRecoveryAction({
+    status,
+    preferStreamingResume,
+    usedBackgroundMode,
+    lastSequenceNumber,
+  }: {
+    status: 'queued' | 'in_progress' | 'completed' | 'failed' | 'incomplete' | 'unknown';
+    preferStreamingResume: boolean;
+    usedBackgroundMode: boolean;
+    lastSequenceNumber?: number;
+  }) {
+    if (status === 'completed') {
+      return 'apply-completed';
+    }
+
+    if (status === 'failed' || status === 'incomplete' || status === 'unknown') {
+      return 'apply-terminal';
+    }
+
+    if (preferStreamingResume && usedBackgroundMode && typeof lastSequenceNumber === 'number') {
+      return 'resume-stream';
+    }
+
+    return 'poll';
+  }
+
+  it('should resume streaming only for background responses with a saved checkpoint', () => {
+    expect(chooseRecoveryAction({
+      status: 'in_progress',
+      preferStreamingResume: true,
+      usedBackgroundMode: true,
+      lastSequenceNumber: 42,
+    })).toBe('resume-stream');
+  });
+
+  it('should fall back to polling when no checkpoint exists', () => {
+    expect(chooseRecoveryAction({
+      status: 'in_progress',
+      preferStreamingResume: true,
+      usedBackgroundMode: true,
+    })).toBe('poll');
+  });
+
+  it('should apply the completed result immediately when the server run has finished', () => {
+    expect(chooseRecoveryAction({
+      status: 'completed',
+      preferStreamingResume: true,
+      usedBackgroundMode: true,
+      lastSequenceNumber: 42,
+    })).toBe('apply-completed');
+  });
+});
+
+describe('Incomplete Draft Visibility', () => {
+  function shouldHideMessage({
+    role,
+    isComplete,
+    responseId,
+    content,
+    thinking,
+    toolCalls,
+    annotations,
+    filePathAnnotations,
+  }: {
+    role: 'user' | 'assistant';
+    isComplete: boolean;
+    responseId?: string;
+    content?: string;
+    thinking?: string;
+    toolCalls?: number;
+    annotations?: number;
+    filePathAnnotations?: number;
+  }) {
+    if (role !== 'assistant' || isComplete) {
+      return false;
+    }
+
+    if (responseId) {
+      return false;
+    }
+
+    if ((content ?? '').trim().length > 0) {
+      return false;
+    }
+
+    if ((thinking ?? '').trim().length > 0) {
+      return false;
+    }
+
+    if ((toolCalls ?? 0) > 0 || (annotations ?? 0) > 0 || (filePathAnnotations ?? 0) > 0) {
+      return false;
+    }
+
+    return true;
+  }
+
+  it('should keep response-backed incomplete drafts visible even before text arrives', () => {
+    expect(shouldHideMessage({
+      role: 'assistant',
+      isComplete: false,
+      responseId: 'resp_bg',
+      content: '',
+    })).toBe(false);
+  });
+
+  it('should hide only truly empty assistant placeholders without a response id', () => {
+    expect(shouldHideMessage({
+      role: 'assistant',
+      isComplete: false,
+      content: '',
+      thinking: '',
+      toolCalls: 0,
+      annotations: 0,
+      filePathAnnotations: 0,
+    })).toBe(true);
+  });
+});
+
+describe('Interrupted Synchronous Recovery Messaging', () => {
+  function interruptedResponseFallbackText(currentText: string, storedText: string) {
+    const interruptionNotice = 'Response interrupted because the app was closed before completion.';
+    const baseText = (currentText || storedText).trim();
+
+    if (!baseText) {
+      return interruptionNotice;
+    }
+
+    if (baseText.includes(interruptionNotice)) {
+      return baseText;
+    }
+
+    return `${baseText}\n\n${interruptionNotice}`;
+  }
+
+  it('should append an interruption notice to partial content', () => {
+    expect(interruptedResponseFallbackText('Partial answer', '')).toBe(
+      'Partial answer\n\nResponse interrupted because the app was closed before completion.',
+    );
+  });
+
+  it('should use only the interruption notice when no partial text exists', () => {
+    expect(interruptedResponseFallbackText('', '')).toBe(
+      'Response interrupted because the app was closed before completion.',
+    );
   });
 });

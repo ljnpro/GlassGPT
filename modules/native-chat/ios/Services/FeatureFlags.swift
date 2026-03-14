@@ -36,6 +36,10 @@ enum FeatureFlags {
         useCloudflareGateway ? cloudflareGatewayBaseURL : defaultOpenAIBaseURL
     }
 
+    static var directOpenAIBaseURL: String {
+        defaultOpenAIBaseURL
+    }
+
     static var isCloudflareConfigured: Bool {
         useCloudflareGateway
     }
