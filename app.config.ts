@@ -31,7 +31,7 @@ const env = {
 const config: ExpoConfig = {
   name: env.appName,
   slug: env.appSlug,
-  version: "2.1.21",
+  version: "2.1.22",
   orientation: "portrait",
   icon: "./assets/images/icon.png",
   scheme: env.scheme,
@@ -45,6 +45,8 @@ const config: ExpoConfig = {
       UIDesignRequiresCompatibility: false,
       NSPhotoLibraryUsageDescription:
         "Allow $(PRODUCT_NAME) to access your photo library so you can attach images to chats.",
+      NSPhotoLibraryAddUsageDescription:
+        "Allow $(PRODUCT_NAME) to save generated images to your photo library.",
     },
   },
   android: {

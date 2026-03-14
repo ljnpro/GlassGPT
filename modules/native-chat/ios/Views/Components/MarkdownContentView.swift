@@ -482,7 +482,8 @@ private struct RichTextView: View {
         let filename = (pathOnly as NSString).lastPathComponent
         if !filename.isEmpty {
             if let match = filePathAnnotations.first(where: {
-                ($0.sandboxPath as NSString).lastPathComponent == filename
+                ($0.sandboxPath as NSString).lastPathComponent == filename ||
+                $0.filename == filename
             }) {
                 return match
             }
