@@ -83,7 +83,7 @@ struct ChatView: View {
                     ),
                     reasoningEffort: $viewModel.reasoningEffort
                 )
-                .presentationSizing(.fitted)
+                .presentationSizing(.form)
                 .presentationDragIndicator(.visible)
                 .presentationCornerRadius(modelSelectorSheetCornerRadius)
             }
