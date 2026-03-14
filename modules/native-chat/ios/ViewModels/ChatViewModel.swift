@@ -123,6 +123,20 @@ final class ChatViewModel {
         set { selectedModel = newValue ? .gpt5_4_pro : .gpt5_4 }
     }
 
+    var liveDraftMessageID: UUID? {
+        guard let draft = draftMessage,
+              messages.contains(where: { $0.id == draft.id })
+        else {
+            return nil
+        }
+
+        return draft.id
+    }
+
+    var shouldShowDetachedStreamingBubble: Bool {
+        isStreaming && liveDraftMessageID == nil
+    }
+
     var flexModeEnabled: Bool {
         get { serviceTier == .flex }
         set { serviceTier = newValue ? .flex : .standard }

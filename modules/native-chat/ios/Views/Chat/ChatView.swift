@@ -4,11 +4,18 @@ import UIKit
 
 struct ChatView: View {
     @Bindable var viewModel: ChatViewModel
-    @State private var scrollProxy: ScrollViewProxy?
     @State private var showPhotoPicker = false
     @State private var selectedPhotoItem: PhotosPickerItem?
     @State private var showDocumentPicker = false
     @State private var streamingThinkingExpanded: Bool? = true
+    @State private var shouldFollowLiveOutput = true
+    @State private var isNearBottom = true
+    @State private var scrollViewportMaxY: CGFloat = 0
+    @State private var bottomAnchorMaxY: CGFloat = 0
+
+    private let autoFollowThreshold: CGFloat = 96
+    private let sheetCornerRadiusPhone: CGFloat = 32
+    private let sheetCornerRadiusPad: CGFloat = 38
 
     var body: some View {
         NavigationStack {
@@ -76,9 +83,9 @@ struct ChatView: View {
                     ),
                     reasoningEffort: $viewModel.reasoningEffort
                 )
-                .presentationDetents([.height(430)])
+                .presentationSizing(.fitted)
                 .presentationDragIndicator(.visible)
-                .presentationCornerRadius(24)
+                .presentationCornerRadius(modelSelectorSheetCornerRadius)
             }
             .sheet(item: filePreviewBinding) { previewItem in
                 FilePreviewController(fileURL: previewItem.url)
@@ -147,71 +154,118 @@ struct ChatView: View {
             emptyState
         } else {
             ScrollViewReader { proxy in
-                ScrollView {
-                    LazyVStack(spacing: 16) {
-                        ForEach(viewModel.messages) { message in
-                            MessageBubble(
-                                message: message,
-                                onRegenerate: message.role == .assistant ? {
-                                    viewModel.regenerateMessage(message)
-                                } : nil,
-                                onSandboxLinkTap: message.role == .assistant ? { sandboxURL, annotation in
-                                    viewModel.handleSandboxLinkTap(sandboxURL: sandboxURL, annotation: annotation)
-                                } : nil
-                            )
-                            .id(message.id)
-                        }
-
-                        // Streaming message
-                        if viewModel.isStreaming {
-                            streamingBubble
-                                .id("streaming")
-                        }
-                        // Reset thinking expanded state when a new stream starts
-                        EmptyView()
-                            .onChange(of: viewModel.isStreaming) { _, newValue in
-                                if newValue {
-                                    streamingThinkingExpanded = true
-                                }
-                            }
-
-                        // Error message
-                        if let error = viewModel.errorMessage {
-                            errorBanner(error)
-                        }
-
-                        // Anchor
-                        Color.clear.frame(height: 1)
-                            .id("bottom")
-                    }
-                    .padding(.horizontal, 16)
-                    .padding(.top, 8)
-                    .padding(.bottom, 4)
-                }
-                .scrollDismissesKeyboard(.interactively)
-                .onAppear { scrollProxy = proxy }
-                .onChange(of: viewModel.currentStreamingText) { _, _ in
-                    withAnimation(.easeOut(duration: 0.15)) {
-                        proxy.scrollTo("bottom", anchor: .bottom)
-                    }
-                }
-                .onChange(of: viewModel.currentThinkingText) { _, _ in
-                    withAnimation(.easeOut(duration: 0.15)) {
-                        proxy.scrollTo("bottom", anchor: .bottom)
-                    }
-                }
-                .onChange(of: viewModel.messages.count) { _, _ in
-                    withAnimation(.easeOut(duration: 0.2)) {
-                        proxy.scrollTo("bottom", anchor: .bottom)
-                    }
-                }
-                .onChange(of: viewModel.activeToolCalls.count) { _, _ in
-                    withAnimation(.easeOut(duration: 0.15)) {
-                        proxy.scrollTo("bottom", anchor: .bottom)
-                    }
-                }
+                chatScrollView(proxy)
             }
         }
+    }
+
+    private func chatScrollView(_ proxy: ScrollViewProxy) -> some View {
+        ScrollView {
+            LazyVStack(spacing: 16) {
+                ForEach(viewModel.messages) { message in
+                    messageRow(for: message)
+                }
+
+                if viewModel.shouldShowDetachedStreamingBubble {
+                    streamingBubble
+                        .id("streaming")
+                }
+
+                if let error = viewModel.errorMessage {
+                    errorBanner(error)
+                }
+
+                Color.clear.frame(height: 1)
+                    .background {
+                        GeometryReader { geometry in
+                            Color.clear
+                                .preference(
+                                    key: ChatBottomAnchorMaxYPreferenceKey.self,
+                                    value: geometry.frame(in: .global).maxY
+                                )
+                        }
+                    }
+                    .id("bottom")
+            }
+            .padding(.horizontal, 16)
+            .padding(.top, 8)
+            .padding(.bottom, 4)
+        }
+        .background {
+            GeometryReader { geometry in
+                Color.clear
+                    .preference(
+                        key: ChatViewportMaxYPreferenceKey.self,
+                        value: geometry.frame(in: .global).maxY
+                    )
+            }
+        }
+        .scrollDismissesKeyboard(.interactively)
+        .simultaneousGesture(
+            DragGesture()
+                .onChanged { _ in
+                    if !isNearBottom {
+                        shouldFollowLiveOutput = false
+                    }
+                }
+                .onEnded { _ in
+                    shouldFollowLiveOutput = isNearBottom
+                }
+        )
+        .onPreferenceChange(ChatViewportMaxYPreferenceKey.self) { value in
+            scrollViewportMaxY = value
+            updateBottomFollowState()
+        }
+        .onPreferenceChange(ChatBottomAnchorMaxYPreferenceKey.self) { value in
+            bottomAnchorMaxY = value
+            updateBottomFollowState()
+        }
+        .onChange(of: viewModel.currentStreamingText) { _, _ in
+            scrollToLiveTargetIfNeeded(proxy, animated: true)
+        }
+        .onChange(of: viewModel.currentThinkingText) { _, _ in
+            scrollToLiveTargetIfNeeded(proxy, animated: true)
+        }
+        .onChange(of: viewModel.messages.count) { _, _ in
+            scrollToLiveTargetIfNeeded(proxy, animated: true)
+        }
+        .onChange(of: viewModel.activeToolCalls.count) { _, _ in
+            scrollToLiveTargetIfNeeded(proxy, animated: true)
+        }
+        .onChange(of: viewModel.isStreaming) { _, newValue in
+            if newValue {
+                streamingThinkingExpanded = true
+                shouldFollowLiveOutput = true
+                scrollToLiveTargetIfNeeded(proxy, animated: false)
+            }
+        }
+        .onChange(of: viewModel.isRecovering) { _, newValue in
+            if newValue {
+                shouldFollowLiveOutput = true
+                scrollToLiveTargetIfNeeded(proxy, animated: false)
+            }
+        }
+    }
+
+    private func messageRow(for message: Message) -> some View {
+        let isLiveDraft = viewModel.liveDraftMessageID == message.id
+
+        return MessageBubble(
+            message: message,
+            onRegenerate: message.role == .assistant ? {
+                viewModel.regenerateMessage(message)
+            } : nil,
+            liveContent: isLiveDraft ? viewModel.currentStreamingText : nil,
+            liveThinking: isLiveDraft ? viewModel.currentThinkingText : nil,
+            activeToolCalls: isLiveDraft ? viewModel.activeToolCalls : [],
+            liveCitations: isLiveDraft ? viewModel.liveCitations : [],
+            liveFilePathAnnotations: isLiveDraft ? viewModel.liveFilePathAnnotations : [],
+            showsRecoveryIndicator: isLiveDraft && viewModel.isRecovering,
+            onSandboxLinkTap: message.role == .assistant ? { sandboxURL, annotation in
+                viewModel.handleSandboxLinkTap(sandboxURL: sandboxURL, annotation: annotation)
+            } : nil
+        )
+        .id(message.id)
     }
 
     // MARK: - Restoring Overlay
@@ -369,7 +423,7 @@ struct ChatView: View {
                     .fill(.ultraThinMaterial)
             }
             .glassEffect(.regular.interactive(), in: RoundedRectangle(cornerRadius: 20))
-            .frame(maxWidth: UIScreen.main.bounds.width * 0.85, alignment: .leading)
+            .frame(maxWidth: assistantBubbleMaxWidth, alignment: .leading)
 
             Spacer(minLength: 40)
         }
@@ -391,6 +445,65 @@ struct ChatView: View {
                 .fill(.ultraThinMaterial)
         }
         .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 12))
+    }
+}
+
+private extension ChatView {
+    var modelSelectorSheetCornerRadius: CGFloat {
+        UIDevice.current.userInterfaceIdiom == .pad ? sheetCornerRadiusPad : sheetCornerRadiusPhone
+    }
+
+    var assistantBubbleMaxWidth: CGFloat {
+        UIDevice.current.userInterfaceIdiom == .pad ? 680 : 520
+    }
+
+    func updateBottomFollowState() {
+        guard scrollViewportMaxY > 0 else { return }
+
+        let distanceToBottom = bottomAnchorMaxY - scrollViewportMaxY
+        let nextIsNearBottom = distanceToBottom <= autoFollowThreshold
+
+        if nextIsNearBottom != isNearBottom {
+            isNearBottom = nextIsNearBottom
+        }
+
+        if nextIsNearBottom {
+            shouldFollowLiveOutput = true
+        }
+    }
+
+    func scrollToLiveTargetIfNeeded(_ proxy: ScrollViewProxy, animated: Bool) {
+        guard shouldFollowLiveOutput || isNearBottom else { return }
+
+        let scrollAction = {
+            if let liveDraftMessageID = viewModel.liveDraftMessageID {
+                proxy.scrollTo(liveDraftMessageID, anchor: .bottom)
+            } else {
+                proxy.scrollTo("bottom", anchor: .bottom)
+            }
+        }
+
+        if animated {
+            withAnimation(.easeOut(duration: 0.18), scrollAction)
+        } else {
+            scrollAction()
+        }
+    }
+}
+
+private struct ChatViewportMaxYPreferenceKey: PreferenceKey {
+    static let defaultValue: CGFloat = 0
+
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = nextValue()
+    }
+}
+
+private struct ChatBottomAnchorMaxYPreferenceKey: PreferenceKey {
+    static let defaultValue: CGFloat = 0
+
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = nextValue()
     }
 }
 

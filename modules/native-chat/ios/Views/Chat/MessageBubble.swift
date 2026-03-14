@@ -7,12 +7,62 @@ struct MessageBubble: View {
     let message: Message
     var onRegenerate: (() -> Void)?
 
-    // Live tool call state (passed from ChatView during streaming)
+    // Live assistant state overrides (passed from ChatView during streaming/recovery)
+    var liveContent: String?
+    var liveThinking: String?
     var activeToolCalls: [ToolCallInfo] = []
     var liveCitations: [URLCitation] = []
+    var liveFilePathAnnotations: [FilePathAnnotation] = []
+    var showsRecoveryIndicator: Bool = false
 
     // File preview handler
     var onSandboxLinkTap: ((String, FilePathAnnotation?) -> Void)?
+
+    private var displayedContent: String {
+        if let liveContent, !liveContent.isEmpty {
+            return liveContent
+        }
+        return message.content
+    }
+
+    private var displayedThinking: String? {
+        if let liveThinking, !liveThinking.isEmpty {
+            return liveThinking
+        }
+        return message.thinking
+    }
+
+    private var displayedToolCalls: [ToolCallInfo] {
+        activeToolCalls.isEmpty ? message.toolCalls : activeToolCalls
+    }
+
+    private var displayedCitations: [URLCitation] {
+        liveCitations.isEmpty ? message.annotations : liveCitations
+    }
+
+    private var displayedFilePathAnnotations: [FilePathAnnotation] {
+        liveFilePathAnnotations.isEmpty ? message.filePathAnnotations : liveFilePathAnnotations
+    }
+
+    private var isDisplayingLiveAssistantState: Bool {
+        message.role == .assistant && (
+            (liveContent?.isEmpty == false) ||
+            (liveThinking?.isEmpty == false) ||
+            !activeToolCalls.isEmpty ||
+            !liveCitations.isEmpty ||
+            !liveFilePathAnnotations.isEmpty ||
+            showsRecoveryIndicator
+        )
+    }
+
+    private var bubbleMaxWidth: CGFloat {
+        switch UIDevice.current.userInterfaceIdiom {
+        case .pad:
+            return 680
+        default:
+            return 520
+        }
+    }
 
     var body: some View {
         HStack(alignment: .top) {
@@ -22,8 +72,8 @@ struct MessageBubble: View {
 
             VStack(alignment: message.role == .user ? .trailing : .leading, spacing: 8) {
                 // Thinking/reasoning (collapsible, completed — starts collapsed)
-                if message.role == .assistant, let thinking = message.thinking, !thinking.isEmpty {
-                    ThinkingView(text: thinking, isLive: false)
+                if message.role == .assistant, let thinking = displayedThinking, !thinking.isEmpty {
+                    ThinkingView(text: thinking, isLive: isDisplayingLiveAssistantState)
                 }
 
                 // File attachments (user messages) — aligned right
@@ -49,19 +99,19 @@ struct MessageBubble: View {
                 // Active tool call indicators (during streaming) — deduplicated
                 if message.role == .assistant {
                     // Only show ONE web search indicator, regardless of how many web search calls are active
-                    let hasActiveWebSearch = activeToolCalls.contains { $0.type == .webSearch && $0.status != .completed }
+                    let hasActiveWebSearch = displayedToolCalls.contains { $0.type == .webSearch && $0.status != .completed }
                     if hasActiveWebSearch {
                         WebSearchIndicator()
                     }
 
                     // Only show ONE code interpreter indicator
-                    let hasActiveCodeInterpreter = activeToolCalls.contains { $0.type == .codeInterpreter && $0.status != .completed }
+                    let hasActiveCodeInterpreter = displayedToolCalls.contains { $0.type == .codeInterpreter && $0.status != .completed }
                     if hasActiveCodeInterpreter {
                         CodeInterpreterIndicator()
                     }
 
                     // Only show ONE file search indicator
-                    let hasActiveFileSearch = activeToolCalls.contains { $0.type == .fileSearch && $0.status != .completed }
+                    let hasActiveFileSearch = displayedToolCalls.contains { $0.type == .fileSearch && $0.status != .completed }
                     if hasActiveFileSearch {
                         FileSearchIndicator()
                     }
@@ -69,14 +119,14 @@ struct MessageBubble: View {
 
                 // Completed tool call results (persisted in message)
                 if message.role == .assistant {
-                    let codeInterpreterCalls = message.toolCalls.filter { $0.type == .codeInterpreter }
+                    let codeInterpreterCalls = displayedToolCalls.filter { $0.type == .codeInterpreter }
                     ForEach(codeInterpreterCalls) { toolCall in
                         CodeInterpreterResultView(toolCall: toolCall)
                     }
                 }
 
                 // Message content - only show if non-empty
-                let trimmedContent = message.content.trimmingCharacters(in: .whitespacesAndNewlines)
+                let trimmedContent = displayedContent.trimmingCharacters(in: .whitespacesAndNewlines)
                 if !trimmedContent.isEmpty {
                     if message.role == .user {
                         userBubble
@@ -87,12 +137,11 @@ struct MessageBubble: View {
 
                 // Citations (from web search)
                 if message.role == .assistant {
-                    let allCitations = message.annotations.isEmpty ? liveCitations : message.annotations
-                    CitationLinksView(citations: allCitations)
+                    CitationLinksView(citations: displayedCitations)
                 }
 
                 // Incomplete message indicator
-                if message.role == .assistant && !message.isComplete {
+                if message.role == .assistant && (!message.isComplete || showsRecoveryIndicator) {
                     HStack(spacing: 4) {
                         ProgressView()
                             .controlSize(.mini)
@@ -102,8 +151,10 @@ struct MessageBubble: View {
                     }
                 }
             }
-            .frame(maxWidth: UIScreen.main.bounds.width * 0.85,
-                   alignment: message.role == .user ? .trailing : .leading)
+            .frame(
+                maxWidth: bubbleMaxWidth,
+                alignment: message.role == .user ? .trailing : .leading
+            )
 
             if message.role == .assistant {
                 Spacer(minLength: 40)
@@ -115,7 +166,7 @@ struct MessageBubble: View {
     // MARK: - User Bubble
 
     private var userBubble: some View {
-        Text(message.content)
+        Text(displayedContent)
             .font(.body)
             .padding(12)
             .foregroundStyle(.white)
@@ -131,8 +182,8 @@ struct MessageBubble: View {
     private var assistantBubble: some View {
         VStack(alignment: .leading) {
             MarkdownContentView(
-                text: message.content,
-                filePathAnnotations: message.filePathAnnotations,
+                text: displayedContent,
+                filePathAnnotations: displayedFilePathAnnotations,
                 onSandboxLinkTap: onSandboxLinkTap
             )
         }
@@ -164,20 +215,20 @@ struct MessageBubble: View {
     /// Lightweight, pure-SwiftUI preview for the context menu.
     private var assistantPreview: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(message.content.prefix(1500))
+            Text(displayedContent.prefix(1500))
                 .font(.body)
                 .foregroundStyle(.primary)
                 .lineLimit(nil)
                 .fixedSize(horizontal: false, vertical: true)
 
-            if message.content.count > 1500 {
+            if displayedContent.count > 1500 {
                 Text("…")
                     .font(.body)
                     .foregroundStyle(.secondary)
             }
         }
         .padding(16)
-        .frame(maxWidth: UIScreen.main.bounds.width * 0.85, alignment: .leading)
+        .frame(maxWidth: bubbleMaxWidth, alignment: .leading)
         .background {
             RoundedRectangle(cornerRadius: 20)
                 .fill(.regularMaterial)
@@ -188,7 +239,7 @@ struct MessageBubble: View {
 
     private var copyButton: some View {
         Button {
-            UIPasteboard.general.string = message.content
+            UIPasteboard.general.string = displayedContent
             HapticService.shared.impact(.light)
         } label: {
             Label("Copy Text", systemImage: "doc.on.doc")
@@ -196,7 +247,7 @@ struct MessageBubble: View {
     }
 
     private var shareButton: some View {
-        ShareLink(item: message.content) {
+        ShareLink(item: displayedContent) {
             Label("Share", systemImage: "square.and.arrow.up")
         }
     }
