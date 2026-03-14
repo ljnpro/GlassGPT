@@ -6,6 +6,58 @@ import UIKit
 @MainActor
 final class ChatViewModel {
 
+    @MainActor
+    private final class ResponseSession {
+        let messageID: UUID
+        let conversationID: UUID
+        let service = OpenAIService()
+        let requestMessages: [APIMessage]?
+        let requestModel: ModelType
+        let requestEffort: ReasoningEffort
+        let requestUsesBackgroundMode: Bool
+        let requestServiceTier: ServiceTier
+
+        var currentText: String
+        var currentThinking: String
+        var toolCalls: [ToolCallInfo]
+        var citations: [URLCitation]
+        var filePathAnnotations: [FilePathAnnotation]
+        var lastSequenceNumber: Int?
+        var responseId: String?
+
+        var isStreaming = false
+        var isRecovering = false
+        var isThinking = false
+        var activeStreamID = UUID()
+        var lastDraftSaveTime: Date = .distantPast
+        var task: Task<Void, Never>?
+
+        init(
+            message: Message,
+            conversationID: UUID,
+            requestMessages: [APIMessage]? = nil,
+            requestModel: ModelType,
+            requestEffort: ReasoningEffort,
+            requestUsesBackgroundMode: Bool,
+            requestServiceTier: ServiceTier
+        ) {
+            self.messageID = message.id
+            self.conversationID = conversationID
+            self.requestMessages = requestMessages
+            self.requestModel = requestModel
+            self.requestEffort = requestEffort
+            self.requestUsesBackgroundMode = requestUsesBackgroundMode
+            self.requestServiceTier = requestServiceTier
+            self.currentText = message.content
+            self.currentThinking = message.thinking ?? ""
+            self.toolCalls = message.toolCalls
+            self.citations = message.annotations
+            self.filePathAnnotations = message.filePathAnnotations
+            self.lastSequenceNumber = message.lastSequenceNumber
+            self.responseId = message.responseId
+        }
+    }
+
     private enum StorageKeys {
         static let defaultModel = "defaultModel"
         static let defaultEffort = "defaultEffort"
@@ -78,12 +130,8 @@ final class ChatViewModel {
     private let keychainService = KeychainService()
     private var modelContext: ModelContext
 
-    // Stream invalidation token
-    private var activeStreamID = UUID()
-
-    // Draft message for real-time persistence during streaming
+    // Visible live session state
     private var draftMessage: Message?
-    private var lastDraftSaveTime: Date = .distantPast
     private var lastSequenceNumber: Int?
     private var activeRequestModel: ModelType?
     private var activeRequestEffort: ReasoningEffort?
@@ -91,14 +139,11 @@ final class ChatViewModel {
     private var activeRequestServiceTier: ServiceTier = .standard
     private var isApplyingStoredConversationConfiguration = false
     private var didCompleteLaunchBootstrap = false
+    private var visibleSessionMessageID: UUID?
+    private var activeResponseSessions: [UUID: ResponseSession] = [:]
 
     // Background task
     private var backgroundTaskID: UIBackgroundTaskIdentifier = .invalid
-
-    // Recovery task
-    private var recoveryTask: Task<Void, Never>?
-    private var activeRecoveryMessageID: UUID?
-    private var activeRecoveryResponseID: String?
 
     // MARK: - Init
 
@@ -123,14 +168,19 @@ final class ChatViewModel {
         set { selectedModel = newValue ? .gpt5_4_pro : .gpt5_4 }
     }
 
+    private var currentVisibleSession: ResponseSession? {
+        guard let visibleSessionMessageID else { return nil }
+        return activeResponseSessions[visibleSessionMessageID]
+    }
+
     var liveDraftMessageID: UUID? {
-        guard let draft = draftMessage,
-              messages.contains(where: { $0.id == draft.id })
+        guard let visibleSessionMessageID,
+              messages.contains(where: { $0.id == visibleSessionMessageID })
         else {
             return nil
         }
 
-        return draft.id
+        return visibleSessionMessageID
     }
 
     var shouldShowDetachedStreamingBubble: Bool {
@@ -177,39 +227,15 @@ final class ChatViewModel {
     }
 
     private func handleEnterBackground() {
-        if isStreaming {
-            saveDraftNow()
+        if !activeResponseSessions.isEmpty {
+            for session in activeResponseSessions.values {
+                saveSessionNow(session)
+            }
 
             backgroundTaskID = UIApplication.shared.beginBackgroundTask(withName: "StreamCompletion") { [weak self] in
                 Task { @MainActor in
                     guard let self = self else { return }
-
-                    self.saveDraftNow()
-
-                    self.activeStreamID = UUID()
-                    self.openAIService.cancelStream()
-
-                    if let draft = self.draftMessage {
-                        if draft.usedBackgroundMode {
-                            draft.isComplete = false
-                            draft.conversation?.updatedAt = .now
-                            self.upsertMessage(draft)
-                            try? self.modelContext.save()
-                        } else {
-                            if draft.content.isEmpty {
-                                draft.content = "[Response interrupted. Please try again.]"
-                                draft.thinking = nil
-                            }
-                            draft.isComplete = true
-                            draft.conversation?.updatedAt = .now
-                            self.upsertMessage(draft)
-                            try? self.modelContext.save()
-                        }
-                    }
-
-                    self.clearLiveGenerationState(clearDraft: false)
-                    self.isRecovering = false
-
+                    self.suspendActiveSessionsForAppBackground()
                     self.endBackgroundTask()
                 }
             }
@@ -229,56 +255,19 @@ final class ChatViewModel {
     }
 
     private func handleDidEnterBackground() {
-        guard isStreaming else { return }
-        _ = detachBackgroundResponseIfPossible(reason: "background")
+        guard !activeResponseSessions.isEmpty else { return }
+        suspendActiveSessionsForAppBackground()
     }
 
     private func handleReturnToForeground() {
         guard didCompleteLaunchBootstrap else { return }
 
         endBackgroundTask()
-
-        if isStreaming {
-            #if DEBUG
-            print("[Foreground] Cancelling stale stream and attempting recovery")
-            #endif
-
-            activeStreamID = UUID()
-            openAIService.cancelStream()
-            saveDraftNow()
-            clearLiveGenerationState(clearDraft: false)
-        }
-
-        if let draft = activeIncompleteAssistantDraft() {
-            if let responseId = draft.responseId,
-               isRecoveryInFlight(for: draft.id, responseId: responseId) {
-                restoreDraftState(from: draft)
-                return
-            }
-
-            recoveryTask?.cancel()
-            recoveryTask = nil
-
-            restoreDraftState(from: draft)
-
-            if let responseId = draft.responseId {
-                recoverResponse(messageId: draft.id, responseId: responseId, preferStreamingResume: draft.usedBackgroundMode)
-                return
-            }
-
-            if !draft.content.isEmpty {
-                finalizeDraftAsPartial()
-                return
-            }
-
-            removeEmptyDraft()
-        }
-
-        recoveryTask?.cancel()
-        recoveryTask = nil
+        refreshVisibleBindingForCurrentConversation()
 
         Task { @MainActor in
-            await recoverIncompleteMessagesInCurrentConversation()
+            await self.recoverIncompleteMessagesInCurrentConversation()
+            await self.recoverIncompleteMessages()
         }
     }
 
@@ -475,20 +464,16 @@ final class ChatViewModel {
         draft.conversation = currentConversation
         currentConversation?.messages.append(draft)
         try? modelContext.save()
-        draftMessage = draft
 
-        isStreaming = true
-        isThinking = false
-        currentStreamingText = ""
-        currentThinkingText = ""
-        activeToolCalls = []
-        liveCitations = []
-        liveFilePathAnnotations = []
-        lastSequenceNumber = nil
-        activeRequestModel = selectedModel
-        activeRequestEffort = reasoningEffort
-        activeRequestUsesBackgroundMode = backgroundModeEnabled
-        activeRequestServiceTier = serviceTier
+        guard let session = makeStreamingSession(for: draft) else {
+            errorMessage = "Failed to start response session."
+            return
+        }
+
+        registerSession(session, visible: true)
+        session.isStreaming = true
+        session.isThinking = false
+        syncVisibleState(from: session)
 
         HapticService.shared.impact(.light)
 
@@ -500,11 +485,11 @@ final class ChatViewModel {
                     try? modelContext.save()
                 }
                 pendingAttachments = []
-                startStreamingRequest()
+                self.startStreamingRequest(for: session)
             }
         } else {
             pendingAttachments = []
-            startStreamingRequest()
+            startStreamingRequest(for: session)
         }
     }
 
@@ -514,39 +499,33 @@ final class ChatViewModel {
     private static let reconnectBaseDelay: UInt64 = 1_000_000_000
 
     private func startStreamingRequest(reconnectAttempt: Int = 0) {
-        startDirectStreamingRequest(reconnectAttempt: reconnectAttempt)
+        guard let session = currentVisibleSession else { return }
+        startStreamingRequest(for: session, reconnectAttempt: reconnectAttempt)
     }
 
-    private func startDirectStreamingRequest(reconnectAttempt: Int = 0) {
+    private func startStreamingRequest(for session: ResponseSession, reconnectAttempt: Int = 0) {
+        startDirectStreamingRequest(for: session, reconnectAttempt: reconnectAttempt)
+    }
+
+    private func startDirectStreamingRequest(for session: ResponseSession, reconnectAttempt: Int = 0) {
+        guard let requestMessages = session.requestMessages else { return }
+
         let requestAPIKey = apiKey
-        let requestModel = activeRequestModel ?? selectedModel
-        let requestEffort = activeRequestEffort ?? reasoningEffort
-        let requestBackgroundMode = activeRequestUsesBackgroundMode
-        let requestServiceTier = activeRequestServiceTier
-
-        let requestMessages = messages
-            .filter { $0.isComplete || $0.role == .user }
-            .sorted(by: { $0.createdAt < $1.createdAt })
-            .map {
-                APIMessage(
-                    role: $0.role,
-                    content: $0.content,
-                    imageData: $0.imageData,
-                    fileAttachments: $0.fileAttachments
-                )
-            }
-
         let streamID = UUID()
-        activeStreamID = streamID
+        session.activeStreamID = streamID
+        session.isStreaming = true
+        session.isRecovering = false
+        syncVisibleState(from: session)
 
-        Task { @MainActor in
-            let stream = openAIService.streamChat(
+        session.task?.cancel()
+        session.task = Task { @MainActor in
+            let stream = session.service.streamChat(
                 apiKey: requestAPIKey,
                 messages: requestMessages,
-                model: requestModel,
-                reasoningEffort: requestEffort,
-                backgroundModeEnabled: requestBackgroundMode,
-                serviceTier: requestServiceTier
+                model: session.requestModel,
+                reasoningEffort: session.requestEffort,
+                backgroundModeEnabled: session.requestUsesBackgroundMode,
+                serviceTier: session.requestServiceTier
             )
 
             var receivedConnectionLost = false
@@ -555,82 +534,99 @@ final class ChatViewModel {
             var pendingRecoveryError: String?
 
             for await event in stream {
-                guard activeStreamID == streamID else { break }
+                guard self.isSessionActive(session), session.activeStreamID == streamID else { break }
 
-                switch applyStreamEvent(event, animated: true) {
+                switch self.applyStreamEvent(event, to: session, animated: self.visibleSessionMessageID == session.messageID) {
                 case .continued:
                     break
 
                 case .terminalCompleted:
                     didReceiveCompletedEvent = true
-                    finalizeDraft()
+                    self.finalizeSession(session)
 
                 case .terminalIncomplete(let message):
                     pendingRecoveryError = message ?? "Response was incomplete."
-                    saveDraftNow()
-                    if let responseId = draftMessage?.responseId {
+                    self.saveSessionNow(session)
+                    if let responseId = session.responseId {
                         pendingRecoveryResponseId = responseId
-                    } else if !currentStreamingText.isEmpty {
-                        finalizeDraftAsPartial()
-                    } else {
-                        removeEmptyDraft()
+                    } else if !session.currentText.isEmpty {
+                        self.finalizeSessionAsPartial(session)
+                    } else if let message = self.findMessage(byId: session.messageID) {
+                        self.removeEmptyMessage(message, for: session)
                     }
 
                 case .connectionLost:
                     receivedConnectionLost = true
-                    saveDraftNow()
+                    self.saveSessionNow(session)
                     #if DEBUG
-                    print("[VM] Connection lost")
+                    print("[VM] Connection lost for session \(session.messageID)")
                     #endif
 
                 case .error(let error):
-                    saveDraftNow()
+                    self.saveSessionNow(session)
 
-                    if let responseId = draftMessage?.responseId {
+                    if let responseId = session.responseId {
                         pendingRecoveryResponseId = responseId
                         pendingRecoveryError = error.localizedDescription
                         #if DEBUG
                         print("[VM] Stream error, attempting recovery: \(error.localizedDescription)")
                         #endif
-                    } else if !currentStreamingText.isEmpty {
-                        finalizeDraftAsPartial()
-                        errorMessage = error.localizedDescription
-                        HapticService.shared.notify(.error)
-                    } else {
-                        removeEmptyDraft()
-                        errorMessage = error.localizedDescription
-                        clearLiveGenerationState(clearDraft: true)
-                        HapticService.shared.notify(.error)
+                    } else if !session.currentText.isEmpty {
+                        self.finalizeSessionAsPartial(session)
+                        if self.visibleSessionMessageID == session.messageID {
+                            self.errorMessage = error.localizedDescription
+                            HapticService.shared.notify(.error)
+                        }
+                    } else if let message = self.findMessage(byId: session.messageID) {
+                        self.removeEmptyMessage(message, for: session)
+                        if self.visibleSessionMessageID == session.messageID {
+                            self.errorMessage = error.localizedDescription
+                            self.clearLiveGenerationState(clearDraft: true)
+                            HapticService.shared.notify(.error)
+                        }
                     }
                 }
             }
 
-            guard activeStreamID == streamID else {
-                endBackgroundTask()
+            guard self.isSessionActive(session), session.activeStreamID == streamID else {
+                self.endBackgroundTask()
                 return
             }
 
             if didReceiveCompletedEvent {
-                endBackgroundTask()
+                self.endBackgroundTask()
                 return
             }
 
-            if let responseId = pendingRecoveryResponseId,
-               let draft = draftMessage {
-                clearLiveGenerationState(clearDraft: false)
-                if let pendingRecoveryError, !pendingRecoveryError.isEmpty {
-                    errorMessage = pendingRecoveryError
+            if let responseId = pendingRecoveryResponseId {
+                session.isStreaming = false
+                session.isRecovering = true
+                if self.visibleSessionMessageID == session.messageID,
+                   let pendingRecoveryError,
+                   !pendingRecoveryError.isEmpty {
+                    self.errorMessage = pendingRecoveryError
                 }
-                recoverResponse(messageId: draft.id, responseId: responseId, preferStreamingResume: draft.usedBackgroundMode)
-                endBackgroundTask()
+                self.syncVisibleState(from: session)
+                self.recoverResponse(
+                    messageId: session.messageID,
+                    responseId: responseId,
+                    preferStreamingResume: session.requestUsesBackgroundMode
+                )
+                self.endBackgroundTask()
                 return
             }
 
             if receivedConnectionLost {
-                if let draft = draftMessage, let responseId = draft.responseId {
-                    clearLiveGenerationState(clearDraft: false)
-                    recoverResponse(messageId: draft.id, responseId: responseId, preferStreamingResume: draft.usedBackgroundMode)
-                    endBackgroundTask()
+                if let responseId = session.responseId {
+                    session.isStreaming = false
+                    session.isRecovering = true
+                    self.syncVisibleState(from: session)
+                    self.recoverResponse(
+                        messageId: session.messageID,
+                        responseId: responseId,
+                        preferStreamingResume: session.requestUsesBackgroundMode
+                    )
+                    self.endBackgroundTask()
                     return
                 }
 
@@ -644,219 +640,174 @@ final class ChatViewModel {
 
                     try? await Task.sleep(nanoseconds: delay)
 
-                    guard activeStreamID == streamID else {
-                        endBackgroundTask()
+                    guard self.isSessionActive(session), session.activeStreamID == streamID else {
+                        self.endBackgroundTask()
                         return
                     }
 
                     HapticService.shared.impact(.light)
-                    startDirectStreamingRequest(reconnectAttempt: nextAttempt)
-                    endBackgroundTask()
+                    self.startDirectStreamingRequest(for: session, reconnectAttempt: nextAttempt)
+                    self.endBackgroundTask()
                     return
                 }
 
-                if !currentStreamingText.isEmpty {
-                    finalizeDraftAsPartial()
-                } else {
-                    removeEmptyDraft()
-                    errorMessage = "Connection lost. Please check your network and try again."
-                    clearLiveGenerationState(clearDraft: true)
-                    HapticService.shared.notify(.error)
+                if !session.currentText.isEmpty {
+                    self.finalizeSessionAsPartial(session)
+                } else if let message = self.findMessage(byId: session.messageID) {
+                    self.removeEmptyMessage(message, for: session)
+                    if self.visibleSessionMessageID == session.messageID {
+                        self.errorMessage = "Connection lost. Please check your network and try again."
+                        self.clearLiveGenerationState(clearDraft: true)
+                        HapticService.shared.notify(.error)
+                    }
                 }
 
-                endBackgroundTask()
+                self.endBackgroundTask()
                 return
             }
 
-            if isStreaming {
-                if let draft = draftMessage, let responseId = draft.responseId {
-                    saveDraftNow()
-                    clearLiveGenerationState(clearDraft: false)
-                    recoverResponse(messageId: draft.id, responseId: responseId, preferStreamingResume: draft.usedBackgroundMode)
-                } else if !currentStreamingText.isEmpty {
-                    finalizeDraftAsPartial()
-                } else {
-                    removeEmptyDraft()
-                    clearLiveGenerationState(clearDraft: true)
+            if session.isStreaming {
+                if let responseId = session.responseId {
+                    self.saveSessionNow(session)
+                    session.isStreaming = false
+                    session.isRecovering = true
+                    self.syncVisibleState(from: session)
+                    self.recoverResponse(
+                        messageId: session.messageID,
+                        responseId: responseId,
+                        preferStreamingResume: session.requestUsesBackgroundMode
+                    )
+                } else if !session.currentText.isEmpty {
+                    self.finalizeSessionAsPartial(session)
+                } else if let message = self.findMessage(byId: session.messageID) {
+                    self.removeEmptyMessage(message, for: session)
+                    if self.visibleSessionMessageID == session.messageID {
+                        self.clearLiveGenerationState(clearDraft: true)
+                    }
                 }
             }
 
-            endBackgroundTask()
+            self.endBackgroundTask()
         }
     }
 
     // MARK: - Tool Call & Citation Persistence
 
     private func persistToolCallsAndCitations() {
-        saveDraftNow()
+        guard let session = currentVisibleSession else { return }
+        saveSessionNow(session)
     }
 
     // MARK: - Draft Persistence
 
     private func saveDraftIfNeeded() {
-        let now = Date()
-        let minimumInterval = activeRequestUsesBackgroundMode ? 0.25 : 2.0
-        guard now.timeIntervalSince(lastDraftSaveTime) >= minimumInterval else { return }
-        saveDraftNow()
+        guard let session = currentVisibleSession else { return }
+        saveSessionIfNeeded(session)
     }
 
     private func saveDraftNow() {
-        guard let draft = draftMessage else { return }
-        draft.content = currentStreamingText
-        draft.thinking = currentThinkingText.isEmpty ? nil : currentThinkingText
-        draft.toolCallsData = ToolCallInfo.encode(activeToolCalls)
-        draft.annotationsData = URLCitation.encode(liveCitations)
-        draft.filePathAnnotationsData = FilePathAnnotation.encode(liveFilePathAnnotations)
-        draft.lastSequenceNumber = lastSequenceNumber
-        draft.usedBackgroundMode = activeRequestUsesBackgroundMode
-        draft.conversation?.updatedAt = .now
-        lastDraftSaveTime = Date()
-        try? modelContext.save()
+        guard let session = currentVisibleSession else { return }
+        saveSessionNow(session)
     }
 
     private func finalizeDraft() {
-        guard let draft = draftMessage else {
+        guard let session = currentVisibleSession else {
             clearLiveGenerationState(clearDraft: true)
             isRecovering = false
             return
         }
 
-        let finalText = currentStreamingText
-        let finalThinking = currentThinkingText.isEmpty ? nil : currentThinkingText
-
-        if finalText.isEmpty {
-            removeEmptyDraft()
-            clearLiveGenerationState(clearDraft: true)
-            isRecovering = false
-            return
-        }
-
-        draft.content = finalText
-        draft.thinking = finalThinking
-        draft.isComplete = true
-        draft.lastSequenceNumber = nil
-        draft.conversation?.updatedAt = .now
-
-        // Persist file path annotations
-        if !liveFilePathAnnotations.isEmpty {
-            draft.filePathAnnotationsData = FilePathAnnotation.encode(liveFilePathAnnotations)
-        }
-
-        upsertMessage(draft)
-        try? modelContext.save()
-
-        clearLiveGenerationState(clearDraft: true)
-        isRecovering = false
-
-        if currentConversation?.title == "New Chat" && messages.count >= 2 {
-            Task { @MainActor in
-                await generateTitle()
-            }
-        }
-
-        HapticService.shared.notify(.success)
+        finalizeSession(session)
     }
 
     private func finalizeDraftAsPartial() {
-        guard let draft = draftMessage else { return }
-
-        let finalText = currentStreamingText.isEmpty ? draft.content : currentStreamingText
-        let finalThinking = currentThinkingText.isEmpty ? draft.thinking : currentThinkingText
-
-        draft.content = finalText.isEmpty ? "[Response interrupted. Please try again.]" : finalText
-        draft.thinking = finalThinking
-        draft.isComplete = true
-        draft.lastSequenceNumber = nil
-        draft.conversation?.updatedAt = .now
-
-        if !liveFilePathAnnotations.isEmpty {
-            draft.filePathAnnotationsData = FilePathAnnotation.encode(liveFilePathAnnotations)
-        }
-
-        upsertMessage(draft)
-        try? modelContext.save()
-
-        clearLiveGenerationState(clearDraft: true)
-        isRecovering = false
+        guard let session = currentVisibleSession else { return }
+        finalizeSessionAsPartial(session)
     }
 
     private func removeEmptyDraft() {
-        guard let draft = draftMessage else { return }
-
-        if let conversation = draft.conversation,
-           let idx = conversation.messages.firstIndex(where: { $0.id == draft.id }) {
-            conversation.messages.remove(at: idx)
+        guard
+            let session = currentVisibleSession,
+            let draft = draftMessage
+        else {
+            return
         }
 
-        modelContext.delete(draft)
-        try? modelContext.save()
-        draftMessage = nil
+        removeEmptyMessage(draft, for: session)
     }
 
     // MARK: - Recovery
 
-    private func recoverResponse(messageId: UUID, responseId: String, preferStreamingResume: Bool) {
+    private func recoverResponse(
+        messageId: UUID,
+        responseId: String,
+        preferStreamingResume: Bool,
+        visible: Bool = false
+    ) {
         guard !apiKey.isEmpty else {
-            isRecovering = false
             return
         }
 
-        if isRecoveryInFlight(for: messageId, responseId: responseId) {
+        guard let message = findMessage(byId: messageId) else { return }
+
+        let session: ResponseSession
+        if let existing = activeResponseSessions[messageId] {
+            session = existing
+        } else if let created = makeRecoverySession(for: message) {
+            session = created
+            registerSession(created, visible: visible)
+        } else {
             return
         }
 
-        recoveryTask?.cancel()
-        errorMessage = nil
-        isRecovering = true
-        isStreaming = false
-        isThinking = false
-        activeRecoveryMessageID = messageId
-        activeRecoveryResponseID = responseId
-
-        if let message = findMessage(byId: messageId),
-           !message.content.isEmpty,
-           !messages.contains(where: { $0.id == messageId }) {
-            upsertMessage(message)
-        }
-
-        let key = apiKey
-        let service = openAIService
-        let msgId = messageId
-        let respId = responseId
-
-        recoveryTask = Task { @MainActor in
-            defer {
-                if self.activeRecoveryMessageID == msgId && self.activeRecoveryResponseID == respId {
-                    self.activeRecoveryMessageID = nil
-                    self.activeRecoveryResponseID = nil
-                }
-                self.isRecovering = false
-                self.isStreaming = false
-                self.isThinking = false
+        if isSessionActive(session),
+           session.task != nil,
+           session.responseId == responseId {
+            if visible {
+                bindVisibleSession(messageID: messageId)
             }
+            return
+        }
 
-            guard let message = self.findMessage(byId: msgId) else { return }
+        session.responseId = responseId
+        session.isRecovering = true
+        session.isStreaming = false
+        session.isThinking = false
+
+        if visible {
+            errorMessage = nil
+            bindVisibleSession(messageID: messageId)
+        }
+
+        session.task?.cancel()
+
+        session.task = Task { @MainActor in
+            guard self.isSessionActive(session) else { return }
 
             do {
-                let result = try await service.fetchResponse(responseId: respId, apiKey: key)
+                let result = try await session.service.fetchResponse(responseId: responseId, apiKey: self.apiKey)
 
                 switch result.status {
                 case .completed:
                     self.finishRecovery(
                         for: message,
+                        session: session,
                         result: result,
-                        fallbackText: self.recoveryFallbackText(for: message),
-                        fallbackThinking: self.recoveryFallbackThinking(for: message)
+                        fallbackText: self.recoveryFallbackText(for: message, session: session),
+                        fallbackThinking: self.recoveryFallbackThinking(for: message, session: session)
                     )
                     return
 
                 case .failed, .incomplete, .unknown:
-                    self.errorMessage = result.errorMessage ?? "Response did not complete."
+                    if visible {
+                        self.errorMessage = result.errorMessage ?? "Response did not complete."
+                    }
                     self.finishRecovery(
                         for: message,
+                        session: session,
                         result: result,
-                        fallbackText: self.recoveryFallbackText(for: message),
-                        fallbackThinking: self.recoveryFallbackThinking(for: message)
+                        fallbackText: self.recoveryFallbackText(for: message, session: session),
+                        fallbackThinking: self.recoveryFallbackThinking(for: message, session: session)
                     )
                     return
 
@@ -864,48 +815,52 @@ final class ChatViewModel {
                     if preferStreamingResume,
                        message.usedBackgroundMode,
                        let lastSeq = message.lastSequenceNumber {
-                        await self.startStreamingRecovery(messageId: msgId, responseId: respId, lastSeq: lastSeq, apiKey: key)
+                        await self.startStreamingRecovery(
+                            session: session,
+                            responseId: responseId,
+                            lastSeq: lastSeq,
+                            apiKey: self.apiKey
+                        )
                         return
                     }
 
-                    await self.pollResponseUntilTerminal(messageId: msgId, responseId: respId)
+                    await self.pollResponseUntilTerminal(session: session, responseId: responseId)
                     return
                 }
             } catch {
                 if self.handleUnrecoverableRecoveryError(
                     error,
                     for: message,
-                    responseId: respId
+                    responseId: responseId,
+                    session: session,
+                    visible: visible
                 ) {
                     return
                 }
 
                 #if DEBUG
-                print("[Recovery] Status fetch failed for \(respId): \(error.localizedDescription)")
+                print("[Recovery] Status fetch failed for \(responseId): \(error.localizedDescription)")
                 #endif
-                await self.pollResponseUntilTerminal(messageId: msgId, responseId: respId)
+                await self.pollResponseUntilTerminal(session: session, responseId: responseId)
             }
         }
     }
 
     private func startStreamingRecovery(
-        messageId: UUID,
+        session: ResponseSession,
         responseId: String,
         lastSeq: Int,
         apiKey: String,
         useDirectEndpoint: Bool = false
     ) async {
-        guard let message = findMessage(byId: messageId) else { return }
-
-        restoreDraftState(from: message)
-        isRecovering = true
-        isStreaming = true
-        activeRequestUsesBackgroundMode = true
-
         let streamID = UUID()
-        activeStreamID = streamID
+        session.activeStreamID = streamID
+        session.isRecovering = true
+        session.isStreaming = true
+        session.isThinking = false
+        syncVisibleState(from: session)
 
-        let stream = openAIService.streamRecovery(
+        let stream = session.service.streamRecovery(
             responseId: responseId,
             startingAfter: lastSeq,
             apiKey: apiKey,
@@ -924,50 +879,55 @@ final class ChatViewModel {
             return Task { @MainActor in
                 try? await Task.sleep(nanoseconds: 4_000_000_000)
 
-                guard self.activeStreamID == streamID, !receivedAnyRecoveryEvent else {
+                guard self.isSessionActive(session), session.activeStreamID == streamID, !receivedAnyRecoveryEvent else {
                     return
                 }
 
                 gatewayResumeTimedOut = true
-                self.openAIService.cancelStream()
+                session.service.cancelStream()
             }
         }()
         defer { gatewayFallbackTask?.cancel() }
 
         for await event in stream {
-            guard activeStreamID == streamID else { return }
+            guard isSessionActive(session), session.activeStreamID == streamID else { return }
             receivedAnyRecoveryEvent = true
             gatewayFallbackTask?.cancel()
 
-            switch applyStreamEvent(event, animated: false) {
+            switch applyStreamEvent(event, to: session, animated: visibleSessionMessageID == session.messageID) {
             case .continued:
                 break
 
             case .terminalCompleted:
                 finishedFromStream = true
-                finalizeDraft()
+                finalizeSession(session)
 
             case .terminalIncomplete(let message):
-                errorMessage = message ?? "Response did not complete."
-                saveDraftNow()
+                if visibleSessionMessageID == session.messageID {
+                    errorMessage = message ?? "Response did not complete."
+                }
+                saveSessionNow(session)
                 encounteredRecoverableFailure = true
 
             case .connectionLost:
-                saveDraftNow()
+                saveSessionNow(session)
                 encounteredRecoverableFailure = true
 
             case .error(let error):
-                errorMessage = error.localizedDescription
-                saveDraftNow()
+                if visibleSessionMessageID == session.messageID {
+                    errorMessage = error.localizedDescription
+                }
+                saveSessionNow(session)
                 encounteredRecoverableFailure = true
             }
         }
 
-        guard activeStreamID == streamID else { return }
+        guard isSessionActive(session), session.activeStreamID == streamID else { return }
         guard !finishedFromStream else { return }
         guard !Task.isCancelled else { return }
 
-        clearLiveGenerationState(clearDraft: false)
+        session.isStreaming = false
+        syncVisibleState(from: session)
 
         if FeatureFlags.useCloudflareGateway,
            !useDirectEndpoint,
@@ -976,7 +936,7 @@ final class ChatViewModel {
             print("[Recovery] Gateway resume stalled for \(responseId); retrying direct")
             #endif
             await startStreamingRecovery(
-                messageId: messageId,
+                session: session,
                 responseId: responseId,
                 lastSeq: lastSeq,
                 apiKey: apiKey,
@@ -985,12 +945,12 @@ final class ChatViewModel {
             return
         }
 
-        if encounteredRecoverableFailure || draftMessage?.responseId != nil {
-            await pollResponseUntilTerminal(messageId: messageId, responseId: responseId)
+        if encounteredRecoverableFailure || session.responseId != nil {
+            await pollResponseUntilTerminal(session: session, responseId: responseId)
         }
     }
 
-    private func pollResponseUntilTerminal(messageId: UUID, responseId: String) async {
+    private func pollResponseUntilTerminal(session: ResponseSession, responseId: String) async {
         guard !apiKey.isEmpty else { return }
 
         let key = apiKey
@@ -1003,7 +963,7 @@ final class ChatViewModel {
             attempts += 1
 
             do {
-                let result = try await openAIService.fetchResponse(responseId: responseId, apiKey: key)
+                let result = try await session.service.fetchResponse(responseId: responseId, apiKey: key)
                 lastResult = result
 
                 switch result.status {
@@ -1017,22 +977,31 @@ final class ChatViewModel {
                     continue
 
                 case .completed, .incomplete, .failed, .unknown:
-                    if let message = findMessage(byId: messageId) {
+                    if let message = findMessage(byId: session.messageID) {
                         if result.status == .failed || result.status == .incomplete {
-                            errorMessage = result.errorMessage ?? "Response did not complete."
+                            if visibleSessionMessageID == session.messageID {
+                                errorMessage = result.errorMessage ?? "Response did not complete."
+                            }
                         }
                         finishRecovery(
                             for: message,
+                            session: session,
                             result: result,
-                            fallbackText: recoveryFallbackText(for: message),
-                            fallbackThinking: recoveryFallbackThinking(for: message)
+                            fallbackText: recoveryFallbackText(for: message, session: session),
+                            fallbackThinking: recoveryFallbackThinking(for: message, session: session)
                         )
                     }
                     return
                 }
             } catch {
-                if let message = findMessage(byId: messageId),
-                   handleUnrecoverableRecoveryError(error, for: message, responseId: responseId) {
+                if let message = findMessage(byId: session.messageID),
+                   handleUnrecoverableRecoveryError(
+                    error,
+                    for: message,
+                    responseId: responseId,
+                    session: session,
+                    visible: visibleSessionMessageID == session.messageID
+                   ) {
                     return
                 }
 
@@ -1048,15 +1017,18 @@ final class ChatViewModel {
 
         guard !Task.isCancelled else { return }
 
-        if let message = findMessage(byId: messageId) {
-            if let lastError, !lastError.isEmpty {
+        if let message = findMessage(byId: session.messageID) {
+            if visibleSessionMessageID == session.messageID,
+               let lastError,
+               !lastError.isEmpty {
                 errorMessage = lastError
             }
             finishRecovery(
                 for: message,
+                session: session,
                 result: lastResult,
-                fallbackText: recoveryFallbackText(for: message),
-                fallbackThinking: recoveryFallbackThinking(for: message)
+                fallbackText: recoveryFallbackText(for: message, session: session),
+                fallbackThinking: recoveryFallbackThinking(for: message, session: session)
             )
         }
 
@@ -1088,12 +1060,9 @@ final class ChatViewModel {
         print("[Recovery] Found \(incompleteMessages.count) incomplete message(s) to recover")
         #endif
 
-        isRecovering = true
-        defer { isRecovering = false }
-
         for message in incompleteMessages {
             guard let responseId = message.responseId else { continue }
-            await recoverSingleMessage(message: message, responseId: responseId)
+            recoverSingleMessage(message: message, responseId: responseId, visible: false)
         }
     }
 
@@ -1203,28 +1172,24 @@ final class ChatViewModel {
             newDraft.conversation = currentConversation
             currentConversation?.messages.append(newDraft)
             try? modelContext.save()
-            draftMessage = newDraft
 
-            isStreaming = true
-            isThinking = true
-            isRecovering = true
-            currentStreamingText = ""
-            currentThinkingText = ""
-            activeToolCalls = []
-            liveCitations = []
-            liveFilePathAnnotations = []
-            lastSequenceNumber = nil
-            activeRequestModel = selectedModel
-            activeRequestEffort = reasoningEffort
-            activeRequestUsesBackgroundMode = backgroundModeEnabled
-            activeRequestServiceTier = serviceTier
+            guard let session = makeStreamingSession(for: newDraft) else {
+                errorMessage = "Failed to restart orphaned draft."
+                return
+            }
+
+            registerSession(session, visible: true)
+            session.isStreaming = true
+            session.isThinking = true
+            session.isRecovering = true
+            syncVisibleState(from: session)
             errorMessage = nil
 
             #if DEBUG
             print("[Recovery] Starting resend stream for conversation: \(conversation.title), messages count: \(messages.count)")
             #endif
 
-            startStreamingRequest()
+            startStreamingRequest(for: session)
             return
         }
     }
@@ -1246,70 +1211,24 @@ final class ChatViewModel {
             recoverResponse(
                 messageId: activeMessage.id,
                 responseId: responseId,
-                preferStreamingResume: activeMessage.usedBackgroundMode
+                preferStreamingResume: activeMessage.usedBackgroundMode,
+                visible: true
             )
         }
 
         for message in sortedMessages.dropLast() {
             guard let responseId = message.responseId else { continue }
-            await recoverSingleMessage(message: message, responseId: responseId)
+            recoverSingleMessage(message: message, responseId: responseId, visible: false)
         }
     }
 
-    private func recoverSingleMessage(message: Message, responseId: String) async {
-        let key = apiKey
-        var attempts = 0
-        let maxAttempts = 180
-        var lastResult: OpenAIResponseFetchResult?
-
-        while !Task.isCancelled && attempts < maxAttempts {
-            attempts += 1
-
-            do {
-                let result = try await openAIService.fetchResponse(responseId: responseId, apiKey: key)
-                lastResult = result
-
-                switch result.status {
-                case .queued, .inProgress:
-                    try? await Task.sleep(nanoseconds: 2_000_000_000)
-                    continue
-
-                case .completed, .incomplete, .failed, .unknown:
-                    applyRecoveredResult(
-                        result,
-                        to: message,
-                        fallbackText: message.content,
-                        fallbackThinking: message.thinking
-                    )
-                    try? modelContext.save()
-                    upsertMessage(message)
-
-                    #if DEBUG
-                    print("[Recovery] Recovered message \(message.id) with status \(result.status.rawValue)")
-                    #endif
-                    return
-                }
-
-            } catch {
-                if handleUnrecoverableRecoveryError(error, for: message, responseId: responseId) {
-                    return
-                }
-
-                let delay: UInt64 = attempts < 10 ? 2_000_000_000 : 3_000_000_000
-                try? await Task.sleep(nanoseconds: delay)
-            }
-        }
-
-        guard !Task.isCancelled else { return }
-
-        applyRecoveredResult(
-            lastResult,
-            to: message,
-            fallbackText: message.content,
-            fallbackThinking: message.thinking
+    private func recoverSingleMessage(message: Message, responseId: String, visible: Bool) {
+        recoverResponse(
+            messageId: message.id,
+            responseId: responseId,
+            preferStreamingResume: message.usedBackgroundMode,
+            visible: visible
         )
-        try? modelContext.save()
-        upsertMessage(message)
     }
 
     private func findMessage(byId id: UUID) -> Message? {
@@ -1330,7 +1249,7 @@ final class ChatViewModel {
     @discardableResult
     private func detachBackgroundResponseIfPossible(reason: String) -> Bool {
         guard
-            isStreaming,
+            let session = currentVisibleSession,
             let draft = draftMessage,
             draft.usedBackgroundMode,
             draft.responseId != nil
@@ -1338,19 +1257,9 @@ final class ChatViewModel {
             return false
         }
 
-        saveDraftNow()
-        activeStreamID = UUID()
-        openAIService.cancelStream()
-        recoveryTask?.cancel()
+        saveSessionNow(session)
         errorMessage = nil
-
-        draft.isComplete = false
-        draft.conversation?.updatedAt = .now
-        upsertMessage(draft)
-        try? modelContext.save()
-
-        clearLiveGenerationState(clearDraft: true)
-        isRecovering = false
+        detachVisibleSessionBinding()
         endBackgroundTask()
 
         #if DEBUG
@@ -1363,45 +1272,43 @@ final class ChatViewModel {
     // MARK: - Stop Generation
 
     func stopGeneration(savePartial: Bool = true) {
+        guard let session = currentVisibleSession else { return }
+
         let pendingBackgroundCancellation: (responseId: String, messageId: UUID)? = {
             guard
-                let draft = draftMessage,
-                draft.usedBackgroundMode,
-                let responseId = draft.responseId
+                session.requestUsesBackgroundMode,
+                let responseId = session.responseId
             else {
                 return nil
             }
 
-            return (responseId, draft.id)
+            return (responseId, session.messageID)
         }()
 
-        activeStreamID = UUID()
-        openAIService.cancelStream()
-        recoveryTask?.cancel()
+        session.activeStreamID = UUID()
+        session.service.cancelStream()
+        session.task?.cancel()
         errorMessage = nil
 
-        if savePartial && !currentStreamingText.isEmpty {
+        if savePartial && !session.currentText.isEmpty {
             persistToolCallsAndCitations()
-            finalizeDraft()
-        } else if let draft = draftMessage {
-            if !currentStreamingText.isEmpty {
-                draft.content = currentStreamingText
+            finalizeSession(session)
+        } else if let draft = findMessage(byId: session.messageID) {
+            if !session.currentText.isEmpty {
+                draft.content = session.currentText
             }
-            if !currentThinkingText.isEmpty {
-                draft.thinking = currentThinkingText
+            if !session.currentThinking.isEmpty {
+                draft.thinking = session.currentThinking
             }
             if !draft.content.isEmpty {
                 draft.isComplete = true
+                draft.lastSequenceNumber = nil
                 try? modelContext.save()
                 upsertMessage(draft)
-                clearLiveGenerationState(clearDraft: true)
+                removeSession(session)
             } else {
-                removeEmptyDraft()
-                clearLiveGenerationState(clearDraft: true)
+                removeEmptyMessage(draft, for: session)
             }
-        } else {
-            removeEmptyDraft()
-            clearLiveGenerationState(clearDraft: true)
         }
 
         isRecovering = false
@@ -1421,14 +1328,11 @@ final class ChatViewModel {
     // MARK: - New Chat
 
     func startNewChat() {
-        if isStreaming {
-            if !detachBackgroundResponseIfPossible(reason: "new-chat") {
-                stopGeneration(savePartial: true)
-            }
+        if let session = currentVisibleSession {
+            saveSessionNow(session)
         }
 
-        recoveryTask?.cancel()
-
+        detachVisibleSessionBinding()
         currentConversation = nil
         messages = []
         currentStreamingText = ""
@@ -1486,37 +1390,30 @@ final class ChatViewModel {
         draft.conversation = currentConversation
         currentConversation?.messages.append(draft)
         try? modelContext.save()
-        draftMessage = draft
 
-        isStreaming = true
-        isThinking = false
-        currentStreamingText = ""
-        currentThinkingText = ""
-        activeToolCalls = []
-        liveCitations = []
-        liveFilePathAnnotations = []
-        lastSequenceNumber = nil
-        activeRequestModel = selectedModel
-        activeRequestEffort = reasoningEffort
-        activeRequestUsesBackgroundMode = backgroundModeEnabled
-        activeRequestServiceTier = serviceTier
+        guard let session = makeStreamingSession(for: draft) else {
+            errorMessage = "Failed to start response session."
+            return
+        }
+
+        registerSession(session, visible: true)
+        session.isStreaming = true
+        session.isThinking = false
+        syncVisibleState(from: session)
 
         HapticService.shared.impact(.medium)
 
-        startStreamingRequest()
+        startStreamingRequest(for: session)
     }
 
     // MARK: - Load Conversation
 
     func loadConversation(_ conversation: Conversation) {
-        if isStreaming {
-            if !detachBackgroundResponseIfPossible(reason: "switch-conversation") {
-                stopGeneration(savePartial: true)
-            }
+        if let session = currentVisibleSession {
+            saveSessionNow(session)
         }
 
-        recoveryTask?.cancel()
-
+        detachVisibleSessionBinding()
         currentConversation = conversation
         messages = visibleMessages(for: conversation)
 
@@ -1536,6 +1433,8 @@ final class ChatViewModel {
         pendingAttachments = []
         filePreviewURL = nil
         fileDownloadError = nil
+
+        refreshVisibleBindingForCurrentConversation()
 
         Task { @MainActor in
             await recoverIncompleteMessagesInCurrentConversation()
@@ -1604,6 +1503,303 @@ final class ChatViewModel {
                 print("[Title] Failed to generate title: \(error.localizedDescription)")
                 #endif
             }
+        }
+    }
+
+    // MARK: - Session Management
+
+    private func sessionRequestConfiguration(for conversation: Conversation?) -> (ModelType, ReasoningEffort, ServiceTier) {
+        guard let conversation else {
+            let effort = selectedModel.availableEfforts.contains(reasoningEffort) ? reasoningEffort : selectedModel.defaultEffort
+            return (selectedModel, effort, serviceTier)
+        }
+
+        let model = ModelType(rawValue: conversation.model) ?? .gpt5_4
+        let storedEffort = ReasoningEffort(rawValue: conversation.reasoningEffort) ?? .high
+        let resolvedEffort = model.availableEfforts.contains(storedEffort) ? storedEffort : model.defaultEffort
+        let resolvedTier = ServiceTier(rawValue: conversation.serviceTierRawValue) ?? .standard
+        return (model, resolvedEffort, resolvedTier)
+    }
+
+    private func buildRequestMessages(for conversation: Conversation, excludingDraft draftID: UUID) -> [APIMessage] {
+        conversation.messages
+            .filter { $0.id != draftID && ($0.isComplete || $0.role == .user) }
+            .sorted(by: { $0.createdAt < $1.createdAt })
+            .map {
+                APIMessage(
+                    role: $0.role,
+                    content: $0.content,
+                    imageData: $0.imageData,
+                    fileAttachments: $0.fileAttachments
+                )
+            }
+    }
+
+    private func makeStreamingSession(for draft: Message) -> ResponseSession? {
+        guard let conversation = draft.conversation else { return nil }
+        let requestMessages = buildRequestMessages(for: conversation, excludingDraft: draft.id)
+        let configuration = sessionRequestConfiguration(for: conversation)
+
+        return ResponseSession(
+            message: draft,
+            conversationID: conversation.id,
+            requestMessages: requestMessages,
+            requestModel: configuration.0,
+            requestEffort: configuration.1,
+            requestUsesBackgroundMode: conversation.backgroundModeEnabled,
+            requestServiceTier: configuration.2
+        )
+    }
+
+    private func makeRecoverySession(for message: Message) -> ResponseSession? {
+        guard let conversation = message.conversation else { return nil }
+        let configuration = sessionRequestConfiguration(for: conversation)
+
+        return ResponseSession(
+            message: message,
+            conversationID: conversation.id,
+            requestMessages: nil,
+            requestModel: configuration.0,
+            requestEffort: configuration.1,
+            requestUsesBackgroundMode: message.usedBackgroundMode,
+            requestServiceTier: configuration.2
+        )
+    }
+
+    private func registerSession(_ session: ResponseSession, visible: Bool) {
+        if let existing = activeResponseSessions[session.messageID], existing !== session {
+            existing.task?.cancel()
+            existing.service.cancelStream()
+        }
+
+        activeResponseSessions[session.messageID] = session
+
+        if visible {
+            bindVisibleSession(messageID: session.messageID)
+        } else if visibleSessionMessageID == session.messageID {
+            syncVisibleState(from: session)
+        }
+    }
+
+    private func isSessionActive(_ session: ResponseSession) -> Bool {
+        activeResponseSessions[session.messageID] === session
+    }
+
+    private func bindVisibleSession(messageID: UUID?) {
+        visibleSessionMessageID = messageID
+
+        guard
+            let messageID,
+            let session = activeResponseSessions[messageID],
+            let message = findMessage(byId: messageID),
+            currentConversation?.id == session.conversationID
+        else {
+            draftMessage = nil
+            clearLiveGenerationState(clearDraft: false)
+            return
+        }
+
+        draftMessage = message
+        syncVisibleState(from: session)
+        upsertMessage(message)
+    }
+
+    private func detachVisibleSessionBinding() {
+        visibleSessionMessageID = nil
+        draftMessage = nil
+        clearLiveGenerationState(clearDraft: false)
+        errorMessage = nil
+    }
+
+    private func syncVisibleState(from session: ResponseSession) {
+        guard visibleSessionMessageID == session.messageID else { return }
+
+        currentStreamingText = session.currentText
+        currentThinkingText = session.currentThinking
+        activeToolCalls = session.toolCalls
+        liveCitations = session.citations
+        liveFilePathAnnotations = session.filePathAnnotations
+        lastSequenceNumber = session.lastSequenceNumber
+        activeRequestModel = session.requestModel
+        activeRequestEffort = session.requestEffort
+        activeRequestUsesBackgroundMode = session.requestUsesBackgroundMode
+        activeRequestServiceTier = session.requestServiceTier
+        isStreaming = session.isStreaming
+        isRecovering = session.isRecovering
+        isThinking = session.isThinking
+
+        if let message = findMessage(byId: session.messageID) {
+            draftMessage = message
+        }
+    }
+
+    private func saveSessionIfNeeded(_ session: ResponseSession) {
+        let now = Date()
+        let minimumInterval = session.requestUsesBackgroundMode ? 0.25 : 2.0
+        guard now.timeIntervalSince(session.lastDraftSaveTime) >= minimumInterval else { return }
+        saveSessionNow(session)
+    }
+
+    private func saveSessionNow(_ session: ResponseSession) {
+        guard let message = findMessage(byId: session.messageID) else { return }
+
+        message.content = session.currentText
+        message.thinking = session.currentThinking.isEmpty ? nil : session.currentThinking
+        message.toolCallsData = ToolCallInfo.encode(session.toolCalls)
+        message.annotationsData = URLCitation.encode(session.citations)
+        message.filePathAnnotationsData = FilePathAnnotation.encode(session.filePathAnnotations)
+        message.lastSequenceNumber = session.lastSequenceNumber
+        message.responseId = session.responseId
+        message.usedBackgroundMode = session.requestUsesBackgroundMode
+        message.conversation?.updatedAt = .now
+        session.lastDraftSaveTime = Date()
+
+        try? modelContext.save()
+
+        if message.conversation?.id == currentConversation?.id {
+            upsertMessage(message)
+        }
+
+        syncVisibleState(from: session)
+    }
+
+    private func finalizeSession(_ session: ResponseSession) {
+        guard let message = findMessage(byId: session.messageID) else {
+            removeSession(session)
+            return
+        }
+
+        let finalText = session.currentText
+        let finalThinking = session.currentThinking.isEmpty ? nil : session.currentThinking
+
+        if finalText.isEmpty {
+            removeEmptyMessage(message, for: session)
+            return
+        }
+
+        message.content = finalText
+        message.thinking = finalThinking
+        message.toolCallsData = ToolCallInfo.encode(session.toolCalls)
+        message.annotationsData = URLCitation.encode(session.citations)
+        message.filePathAnnotationsData = FilePathAnnotation.encode(session.filePathAnnotations)
+        message.isComplete = true
+        message.lastSequenceNumber = nil
+        message.responseId = session.responseId
+        message.conversation?.updatedAt = .now
+        upsertMessage(message)
+        try? modelContext.save()
+
+        let finishedConversation = message.conversation
+
+        removeSession(session)
+
+        if let finishedConversation,
+           finishedConversation.title == "New Chat",
+           finishedConversation.messages.count >= 2 {
+            Task { @MainActor in
+                await self.generateTitleIfNeeded(for: finishedConversation)
+            }
+        }
+
+        if visibleSessionMessageID == nil || visibleSessionMessageID == session.messageID {
+            HapticService.shared.notify(.success)
+        }
+    }
+
+    private func finalizeSessionAsPartial(_ session: ResponseSession) {
+        guard let message = findMessage(byId: session.messageID) else {
+            removeSession(session)
+            return
+        }
+
+        let finalText = session.currentText.isEmpty ? message.content : session.currentText
+        let finalThinking = session.currentThinking.isEmpty ? message.thinking : session.currentThinking
+
+        message.content = finalText.isEmpty ? "[Response interrupted. Please try again.]" : finalText
+        message.thinking = finalThinking
+        message.toolCallsData = ToolCallInfo.encode(session.toolCalls)
+        message.annotationsData = URLCitation.encode(session.citations)
+        message.filePathAnnotationsData = FilePathAnnotation.encode(session.filePathAnnotations)
+        message.isComplete = true
+        message.lastSequenceNumber = nil
+        message.responseId = session.responseId
+        message.conversation?.updatedAt = .now
+        upsertMessage(message)
+        try? modelContext.save()
+
+        removeSession(session)
+    }
+
+    private func removeEmptyMessage(_ message: Message, for session: ResponseSession) {
+        if let conversation = message.conversation,
+           let idx = conversation.messages.firstIndex(where: { $0.id == message.id }) {
+            conversation.messages.remove(at: idx)
+        }
+
+        if let idx = messages.firstIndex(where: { $0.id == message.id }) {
+            messages.remove(at: idx)
+        }
+
+        modelContext.delete(message)
+        try? modelContext.save()
+        removeSession(session)
+    }
+
+    private func removeSession(_ session: ResponseSession) {
+        session.task?.cancel()
+        session.service.cancelStream()
+        activeResponseSessions.removeValue(forKey: session.messageID)
+
+        if visibleSessionMessageID == session.messageID {
+            refreshVisibleBindingForCurrentConversation()
+        }
+    }
+
+    private func refreshVisibleBindingForCurrentConversation() {
+        guard let conversation = currentConversation else {
+            detachVisibleSessionBinding()
+            return
+        }
+
+        let activeMessages = conversation.messages
+            .filter { $0.role == .assistant && !$0.isComplete }
+            .sorted(by: { $0.createdAt < $1.createdAt })
+
+        if let message = activeMessages.last(where: { activeResponseSessions[$0.id] != nil }) {
+            bindVisibleSession(messageID: message.id)
+            return
+        }
+
+        if let message = activeMessages.last {
+            visibleSessionMessageID = nil
+            clearLiveGenerationState(clearDraft: false)
+            draftMessage = message
+        } else {
+            detachVisibleSessionBinding()
+        }
+    }
+
+    private func generateTitleIfNeeded(for conversation: Conversation) async {
+        guard !apiKey.isEmpty else { return }
+        guard conversation.title == "New Chat", conversation.messages.count >= 2 else { return }
+
+        let preview = conversation.messages
+            .sorted { $0.createdAt < $1.createdAt }
+            .prefix(4)
+            .map { "\($0.roleRawValue): \($0.content.prefix(200))" }
+            .joined(separator: "\n")
+
+        do {
+            let title = try await openAIService.generateTitle(
+                for: preview,
+                apiKey: apiKey
+            )
+            conversation.title = title
+            try? modelContext.save()
+        } catch {
+            #if DEBUG
+            print("[Title] Failed to generate title: \(error.localizedDescription)")
+            #endif
         }
     }
 
@@ -1695,17 +1891,13 @@ final class ChatViewModel {
         return true
     }
 
-    private func isRecoveryInFlight(for messageId: UUID, responseId: String) -> Bool {
-        activeRecoveryMessageID == messageId &&
-        activeRecoveryResponseID == responseId &&
-        recoveryTask != nil
-    }
-
     @discardableResult
     private func handleUnrecoverableRecoveryError(
         _ error: Error,
         for message: Message,
-        responseId: String
+        responseId: String,
+        session: ResponseSession,
+        visible: Bool
     ) -> Bool {
         guard case let OpenAIServiceError.httpError(statusCode, responseBody) = error,
               statusCode == 404 else {
@@ -1715,11 +1907,15 @@ final class ChatViewModel {
         let fallbackText: String
 
         if message.usedBackgroundMode {
-            errorMessage = "This response is no longer resumable."
-            fallbackText = recoveryFallbackText(for: message)
+            if visible {
+                errorMessage = "This response is no longer resumable."
+            }
+            fallbackText = recoveryFallbackText(for: message, session: session)
         } else {
-            errorMessage = nil
-            fallbackText = interruptedResponseFallbackText(for: message)
+            if visible {
+                errorMessage = nil
+            }
+            fallbackText = interruptedResponseFallbackText(for: message, session: session)
         }
 
         #if DEBUG
@@ -1728,9 +1924,10 @@ final class ChatViewModel {
 
         finishRecovery(
             for: message,
+            session: session,
             result: nil,
             fallbackText: fallbackText,
-            fallbackThinking: recoveryFallbackThinking(for: message)
+            fallbackThinking: recoveryFallbackThinking(for: message, session: session)
         )
         return true
     }
@@ -1770,6 +1967,40 @@ final class ChatViewModel {
         if clearDraft {
             draftMessage = nil
         }
+    }
+
+    private func suspendActiveSessionsForAppBackground() {
+        let sessions = Array(activeResponseSessions.values)
+        guard !sessions.isEmpty else { return }
+
+        for session in sessions {
+            saveSessionNow(session)
+            session.activeStreamID = UUID()
+            session.service.cancelStream()
+            session.task?.cancel()
+            session.isStreaming = false
+            session.isRecovering = false
+            session.isThinking = false
+
+            guard let message = findMessage(byId: session.messageID) else { continue }
+
+            if session.requestUsesBackgroundMode, session.responseId != nil {
+                message.isComplete = false
+                message.conversation?.updatedAt = .now
+                upsertMessage(message)
+            } else {
+                message.content = interruptedResponseFallbackText(for: message, session: session)
+                message.thinking = session.currentThinking.isEmpty ? nil : session.currentThinking
+                message.isComplete = true
+                message.lastSequenceNumber = nil
+                message.conversation?.updatedAt = .now
+                upsertMessage(message)
+            }
+        }
+
+        try? modelContext.save()
+        activeResponseSessions.removeAll()
+        detachVisibleSessionBinding()
     }
 
     private func applyRecoveredResult(
@@ -1813,6 +2044,7 @@ final class ChatViewModel {
 
     private func finishRecovery(
         for message: Message,
+        session: ResponseSession,
         result: OpenAIResponseFetchResult?,
         fallbackText: String,
         fallbackThinking: String?
@@ -1827,32 +2059,44 @@ final class ChatViewModel {
         try? modelContext.save()
         upsertMessage(message)
 
-        if draftMessage?.id == message.id {
-            draftMessage = nil
-        }
+        let conversation = message.conversation
+        let wasVisible = visibleSessionMessageID == session.messageID
+        removeSession(session)
 
-        clearLiveGenerationState(clearDraft: false)
-
-        if currentConversation?.title == "New Chat" && messages.count >= 2 {
+        if let conversation {
             Task { @MainActor in
-                await generateTitle()
+                await self.generateTitleIfNeeded(for: conversation)
             }
         }
 
-        HapticService.shared.notify(.success)
+        if wasVisible {
+            HapticService.shared.notify(.success)
+        }
     }
 
-    private func recoveryFallbackText(for message: Message) -> String {
-        !currentStreamingText.isEmpty ? currentStreamingText : message.content
+    private func recoveryFallbackText(for message: Message, session: ResponseSession? = nil) -> String {
+        if let session, !session.currentText.isEmpty {
+            return session.currentText
+        }
+
+        if !currentStreamingText.isEmpty {
+            return currentStreamingText
+        }
+
+        return message.content
     }
 
-    private func recoveryFallbackThinking(for message: Message) -> String? {
-        !currentThinkingText.isEmpty ? currentThinkingText : message.thinking
+    private func recoveryFallbackThinking(for message: Message, session: ResponseSession? = nil) -> String? {
+        if let session, !session.currentThinking.isEmpty {
+            return session.currentThinking
+        }
+
+        return !currentThinkingText.isEmpty ? currentThinkingText : message.thinking
     }
 
-    private func interruptedResponseFallbackText(for message: Message) -> String {
+    private func interruptedResponseFallbackText(for message: Message, session: ResponseSession? = nil) -> String {
         let interruptionNotice = "Response interrupted because the app was closed before completion."
-        let baseText = recoveryFallbackText(for: message)
+        let baseText = recoveryFallbackText(for: message, session: session)
             .trimmingCharacters(in: .whitespacesAndNewlines)
 
         guard !baseText.isEmpty else {
@@ -1866,157 +2110,151 @@ final class ChatViewModel {
         return "\(baseText)\n\n\(interruptionNotice)"
     }
 
-    private func restoreDraftState(from message: Message) {
-        draftMessage = message
-        currentStreamingText = message.content
-        currentThinkingText = message.thinking ?? ""
-        activeToolCalls = message.toolCalls
-        liveCitations = message.annotations
-        liveFilePathAnnotations = message.filePathAnnotations
-        lastSequenceNumber = message.lastSequenceNumber
-        activeRequestUsesBackgroundMode = message.usedBackgroundMode
-        upsertMessage(message)
-    }
+    private func applyStreamEvent(_ event: StreamEvent, to session: ResponseSession, animated: Bool) -> StreamEventDisposition {
+        let shouldAnimate = animated && visibleSessionMessageID == session.messageID
 
-    private func applyStreamEvent(_ event: StreamEvent, animated: Bool) -> StreamEventDisposition {
         switch event {
         case .responseCreated(let responseId):
-            if let draft = draftMessage {
+            session.responseId = responseId
+            if let draft = findMessage(byId: session.messageID) {
                 draft.responseId = responseId
-                draft.usedBackgroundMode = activeRequestUsesBackgroundMode
+                draft.usedBackgroundMode = session.requestUsesBackgroundMode
                 try? modelContext.save()
+                upsertMessage(draft)
                 #if DEBUG
                 print("[VM] Saved responseId: \(responseId)")
                 #endif
             }
+            syncVisibleState(from: session)
             return .continued
 
         case .sequenceUpdate(let sequence):
-            if let lastSequenceNumber {
-                self.lastSequenceNumber = max(lastSequenceNumber, sequence)
+            if let lastSequenceNumber = session.lastSequenceNumber {
+                session.lastSequenceNumber = max(lastSequenceNumber, sequence)
             } else {
-                self.lastSequenceNumber = sequence
+                session.lastSequenceNumber = sequence
             }
-            saveDraftIfNeeded()
+            saveSessionIfNeeded(session)
             return .continued
 
         case .textDelta(let delta):
-            if isThinking {
-                withAnimation(.easeOut(duration: 0.2)) {
-                    isThinking = false
+            if session.isThinking {
+                animateIfNeeded(shouldAnimate, animation: .easeOut(duration: 0.2)) {
+                    session.isThinking = false
                 }
             }
-            currentStreamingText += delta
-            saveDraftIfNeeded()
+            session.currentText += delta
+            saveSessionIfNeeded(session)
             return .continued
 
         case .thinkingDelta(let delta):
-            currentThinkingText += delta
-            saveDraftIfNeeded()
+            session.currentThinking += delta
+            saveSessionIfNeeded(session)
             return .continued
 
         case .thinkingStarted:
-            withAnimation(.easeIn(duration: 0.2)) {
-                isThinking = true
+            animateIfNeeded(shouldAnimate, animation: .easeIn(duration: 0.2)) {
+                session.isThinking = true
             }
+            syncVisibleState(from: session)
             return .continued
 
         case .thinkingFinished:
-            withAnimation(.easeOut(duration: 0.2)) {
-                isThinking = false
+            animateIfNeeded(shouldAnimate, animation: .easeOut(duration: 0.2)) {
+                session.isThinking = false
             }
-            saveDraftNow()
+            saveSessionNow(session)
             return .continued
 
         case .webSearchStarted(let callId):
-            startToolCallIfNeeded(id: callId, type: .webSearch, animated: animated)
-            saveDraftIfNeeded()
+            startToolCallIfNeeded(in: session, id: callId, type: .webSearch, animated: shouldAnimate)
+            saveSessionIfNeeded(session)
             return .continued
 
         case .webSearchSearching(let callId):
-            setToolCallStatus(callId, status: .searching, animated: animated)
-            saveDraftIfNeeded()
+            setToolCallStatus(in: session, callId, status: .searching, animated: shouldAnimate)
+            saveSessionIfNeeded(session)
             return .continued
 
         case .webSearchCompleted(let callId):
-            setToolCallStatus(callId, status: .completed, animated: animated)
-            saveDraftIfNeeded()
+            setToolCallStatus(in: session, callId, status: .completed, animated: shouldAnimate)
+            saveSessionIfNeeded(session)
             return .continued
 
         case .codeInterpreterStarted(let callId):
-            startToolCallIfNeeded(id: callId, type: .codeInterpreter, animated: animated)
-            saveDraftIfNeeded()
+            startToolCallIfNeeded(in: session, id: callId, type: .codeInterpreter, animated: shouldAnimate)
+            saveSessionIfNeeded(session)
             return .continued
 
         case .codeInterpreterInterpreting(let callId):
-            setToolCallStatus(callId, status: .interpreting, animated: animated)
-            saveDraftIfNeeded()
+            setToolCallStatus(in: session, callId, status: .interpreting, animated: shouldAnimate)
+            saveSessionIfNeeded(session)
             return .continued
 
         case .codeInterpreterCodeDelta(let callId, let codeDelta):
-            appendToolCodeDelta(callId, delta: codeDelta)
-            saveDraftIfNeeded()
+            appendToolCodeDelta(in: session, callId, delta: codeDelta)
+            saveSessionIfNeeded(session)
             return .continued
 
         case .codeInterpreterCodeDone(let callId, let fullCode):
-            setToolCode(callId, code: fullCode)
-            saveDraftIfNeeded()
+            setToolCode(in: session, callId, code: fullCode)
+            saveSessionIfNeeded(session)
             return .continued
 
         case .codeInterpreterCompleted(let callId):
-            setToolCallStatus(callId, status: .completed, animated: animated)
-            saveDraftIfNeeded()
+            setToolCallStatus(in: session, callId, status: .completed, animated: shouldAnimate)
+            saveSessionIfNeeded(session)
             return .continued
 
         case .fileSearchStarted(let callId):
-            startToolCallIfNeeded(id: callId, type: .fileSearch, animated: animated)
-            saveDraftIfNeeded()
+            startToolCallIfNeeded(in: session, id: callId, type: .fileSearch, animated: shouldAnimate)
+            saveSessionIfNeeded(session)
             return .continued
 
         case .fileSearchSearching(let callId):
-            setToolCallStatus(callId, status: .fileSearching, animated: animated)
-            saveDraftIfNeeded()
+            setToolCallStatus(in: session, callId, status: .fileSearching, animated: shouldAnimate)
+            saveSessionIfNeeded(session)
             return .continued
 
         case .fileSearchCompleted(let callId):
-            setToolCallStatus(callId, status: .completed, animated: animated)
-            saveDraftIfNeeded()
+            setToolCallStatus(in: session, callId, status: .completed, animated: shouldAnimate)
+            saveSessionIfNeeded(session)
             return .continued
 
         case .annotationAdded(let citation):
-            addLiveCitationIfNeeded(citation, animated: animated)
-            saveDraftIfNeeded()
+            addLiveCitationIfNeeded(in: session, citation, animated: shouldAnimate)
+            saveSessionIfNeeded(session)
             return .continued
 
         case .filePathAnnotationAdded(let annotation):
-            addLiveFilePathAnnotationIfNeeded(annotation, animated: animated)
-            saveDraftIfNeeded()
+            addLiveFilePathAnnotationIfNeeded(in: session, annotation, animated: shouldAnimate)
+            saveSessionIfNeeded(session)
             return .continued
 
         case .completed(let fullText, let fullThinking, let filePathAnns):
             if !fullText.isEmpty {
-                currentStreamingText = fullText
+                session.currentText = fullText
             }
             if let fullThinking, !fullThinking.isEmpty {
-                currentThinkingText = fullThinking
+                session.currentThinking = fullThinking
             }
             if let filePathAnns, !filePathAnns.isEmpty {
-                liveFilePathAnnotations = filePathAnns
+                session.filePathAnnotations = filePathAnns
             }
-            saveDraftNow()
+            saveSessionNow(session)
             return .terminalCompleted
 
         case .incomplete(let fullText, let fullThinking, let filePathAnns, let message):
             if !fullText.isEmpty {
-                currentStreamingText = fullText
+                session.currentText = fullText
             }
             if let fullThinking, !fullThinking.isEmpty {
-                currentThinkingText = fullThinking
+                session.currentThinking = fullThinking
             }
             if let filePathAnns, !filePathAnns.isEmpty {
-                liveFilePathAnnotations = filePathAnns
+                session.filePathAnnotations = filePathAnns
             }
-            saveDraftNow()
+            saveSessionNow(session)
             return .terminalIncomplete(message)
 
         case .connectionLost:
@@ -2043,7 +2281,11 @@ final class ChatViewModel {
 
             switch result.status {
             case .queued, .inProgress:
-                await pollResponseUntilTerminal(messageId: messageId, responseId: responseId)
+                if let message = findMessage(byId: messageId),
+                   let session = makeRecoverySession(for: message) {
+                    registerSession(session, visible: false)
+                    await pollResponseUntilTerminal(session: session, responseId: responseId)
+                }
 
             case .completed, .incomplete, .failed, .unknown:
                 guard let message = findMessage(byId: messageId) else { return }
@@ -2101,58 +2343,64 @@ final class ChatViewModel {
         }
     }
 
-    private func startToolCallIfNeeded(id: String, type: ToolCallType, animated: Bool) {
-        guard !activeToolCalls.contains(where: { $0.id == id }) else { return }
+    private func startToolCallIfNeeded(in session: ResponseSession, id: String, type: ToolCallType, animated: Bool) {
+        guard !session.toolCalls.contains(where: { $0.id == id }) else { return }
 
         let insert = {
-            self.activeToolCalls.append(
+            session.toolCalls.append(
                 ToolCallInfo(
                     id: id,
                     type: type,
                     status: .inProgress
                 )
             )
+            self.syncVisibleState(from: session)
         }
 
         animateIfNeeded(animated, animation: .spring(duration: 0.3), insert)
     }
 
-    private func setToolCallStatus(_ id: String, status: ToolCallStatus, animated: Bool) {
-        guard let idx = activeToolCalls.firstIndex(where: { $0.id == id }) else { return }
+    private func setToolCallStatus(in session: ResponseSession, _ id: String, status: ToolCallStatus, animated: Bool) {
+        guard let idx = session.toolCalls.firstIndex(where: { $0.id == id }) else { return }
 
         let update = {
-            self.activeToolCalls[idx].status = status
+            session.toolCalls[idx].status = status
+            self.syncVisibleState(from: session)
         }
 
         animateIfNeeded(animated, animation: .easeInOut(duration: 0.2), update)
     }
 
-    private func appendToolCodeDelta(_ id: String, delta: String) {
-        guard let idx = activeToolCalls.firstIndex(where: { $0.id == id }) else { return }
-        let existing = activeToolCalls[idx].code ?? ""
-        activeToolCalls[idx].code = existing + delta
+    private func appendToolCodeDelta(in session: ResponseSession, _ id: String, delta: String) {
+        guard let idx = session.toolCalls.firstIndex(where: { $0.id == id }) else { return }
+        let existing = session.toolCalls[idx].code ?? ""
+        session.toolCalls[idx].code = existing + delta
+        syncVisibleState(from: session)
     }
 
-    private func setToolCode(_ id: String, code: String) {
-        guard let idx = activeToolCalls.firstIndex(where: { $0.id == id }) else { return }
-        activeToolCalls[idx].code = code
+    private func setToolCode(in session: ResponseSession, _ id: String, code: String) {
+        guard let idx = session.toolCalls.firstIndex(where: { $0.id == id }) else { return }
+        session.toolCalls[idx].code = code
+        syncVisibleState(from: session)
     }
 
-    private func addLiveCitationIfNeeded(_ citation: URLCitation, animated: Bool) {
-        guard !liveCitations.contains(where: { $0.id == citation.id }) else { return }
+    private func addLiveCitationIfNeeded(in session: ResponseSession, _ citation: URLCitation, animated: Bool) {
+        guard !session.citations.contains(where: { $0.id == citation.id }) else { return }
 
         let insert = {
-            self.liveCitations.append(citation)
+            session.citations.append(citation)
+            self.syncVisibleState(from: session)
         }
 
         animateIfNeeded(animated, animation: .easeInOut(duration: 0.2), insert)
     }
 
-    private func addLiveFilePathAnnotationIfNeeded(_ annotation: FilePathAnnotation, animated: Bool) {
-        guard !liveFilePathAnnotations.contains(where: { $0.fileId == annotation.fileId }) else { return }
+    private func addLiveFilePathAnnotationIfNeeded(in session: ResponseSession, _ annotation: FilePathAnnotation, animated: Bool) {
+        guard !session.filePathAnnotations.contains(where: { $0.fileId == annotation.fileId }) else { return }
 
         let insert = {
-            self.liveFilePathAnnotations.append(annotation)
+            session.filePathAnnotations.append(annotation)
+            self.syncVisibleState(from: session)
         }
 
         animateIfNeeded(animated, animation: .easeInOut(duration: 0.2), insert)
