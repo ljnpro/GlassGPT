@@ -2080,3 +2080,178 @@ describe('Interrupted Synchronous Recovery Messaging', () => {
     );
   });
 });
+
+describe('Concurrent Conversation Session Logic', () => {
+  interface SessionDescriptor {
+    messageId: string;
+    conversationId: string;
+    isStreaming: boolean;
+    createdAt: number;
+  }
+
+  function resolveVisibleSessionAfterConversationSwitch(input: {
+    activeSessions: SessionDescriptor[];
+    nextConversationId: string;
+  }) {
+    const continuedStreamingSessionIds = input.activeSessions
+      .filter((session) => session.isStreaming)
+      .map((session) => session.messageId);
+
+    const visibleSession = input.activeSessions
+      .filter((session) => session.conversationId === input.nextConversationId)
+      .sort((a, b) => a.createdAt - b.createdAt)
+      .at(-1) ?? null;
+
+    return {
+      continuedStreamingSessionIds,
+      visibleSessionMessageId: visibleSession?.messageId ?? null,
+    };
+  }
+
+  it('should keep the previous conversation session alive when the user opens a new chat', () => {
+    const result = resolveVisibleSessionAfterConversationSwitch({
+      activeSessions: [
+        {
+          messageId: 'msg_old_stream',
+          conversationId: 'conv_old',
+          isStreaming: true,
+          createdAt: 1,
+        },
+      ],
+      nextConversationId: 'conv_new',
+    });
+
+    expect(result.continuedStreamingSessionIds).toContain('msg_old_stream');
+    expect(result.visibleSessionMessageId).toBeNull();
+  });
+
+  it('should rebind the visible stream when the user reopens a history conversation with an active session', () => {
+    const result = resolveVisibleSessionAfterConversationSwitch({
+      activeSessions: [
+        {
+          messageId: 'msg_hidden_stream',
+          conversationId: 'conv_history',
+          isStreaming: true,
+          createdAt: 2,
+        },
+        {
+          messageId: 'msg_other_stream',
+          conversationId: 'conv_other',
+          isStreaming: true,
+          createdAt: 3,
+        },
+      ],
+      nextConversationId: 'conv_history',
+    });
+
+    expect(result.continuedStreamingSessionIds).toEqual(
+      expect.arrayContaining(['msg_hidden_stream', 'msg_other_stream']),
+    );
+    expect(result.visibleSessionMessageId).toBe('msg_hidden_stream');
+  });
+});
+
+describe('Launch Recovery Planning', () => {
+  interface RecoveryMessage {
+    id: string;
+    conversationId: string;
+    createdAt: number;
+    isComplete: boolean;
+    responseId?: string;
+    usedBackgroundMode: boolean;
+    lastSequenceNumber?: number | null;
+  }
+
+  function planRecoverySessions(input: {
+    currentConversationId: string | null;
+    messages: RecoveryMessage[];
+  }) {
+    const latestIncompleteIds = new Map<string, string>();
+
+    for (const message of input.messages) {
+      if (message.isComplete || message.responseId == null) {
+        continue;
+      }
+
+      const current = latestIncompleteIds.get(message.conversationId);
+      if (!current) {
+        latestIncompleteIds.set(message.conversationId, message.id);
+        continue;
+      }
+
+      const existing = input.messages.find((candidate) => candidate.id === current);
+      if (existing && existing.createdAt < message.createdAt) {
+        latestIncompleteIds.set(message.conversationId, message.id);
+      }
+    }
+
+    return input.messages
+      .filter((message) => !message.isComplete && message.responseId != null)
+      .map((message) => ({
+        messageId: message.id,
+        visibility:
+          input.currentConversationId === message.conversationId &&
+          latestIncompleteIds.get(message.conversationId) === message.id
+            ? 'visible'
+            : 'hidden',
+        strategy:
+          message.usedBackgroundMode && message.lastSequenceNumber != null
+            ? 'streamResume'
+            : 'poll',
+      }));
+  }
+
+  it('should use visible streaming recovery for the newest incomplete background-mode message in the current conversation', () => {
+    const plan = planRecoverySessions({
+      currentConversationId: 'conv_current',
+      messages: [
+        {
+          id: 'msg_old',
+          conversationId: 'conv_current',
+          createdAt: 1,
+          isComplete: false,
+          responseId: 'resp_old',
+          usedBackgroundMode: true,
+          lastSequenceNumber: 10,
+        },
+        {
+          id: 'msg_new',
+          conversationId: 'conv_current',
+          createdAt: 2,
+          isComplete: false,
+          responseId: 'resp_new',
+          usedBackgroundMode: true,
+          lastSequenceNumber: 22,
+        },
+      ],
+    });
+
+    expect(plan).toEqual(
+      expect.arrayContaining([
+        { messageId: 'msg_old', visibility: 'hidden', strategy: 'streamResume' },
+        { messageId: 'msg_new', visibility: 'visible', strategy: 'streamResume' },
+      ]),
+    );
+  });
+
+  it('should use hidden polling recovery for background-off history conversations after relaunch', () => {
+    const plan = planRecoverySessions({
+      currentConversationId: 'conv_current',
+      messages: [
+        {
+          id: 'msg_history',
+          conversationId: 'conv_history',
+          createdAt: 3,
+          isComplete: false,
+          responseId: 'resp_history',
+          usedBackgroundMode: false,
+          lastSequenceNumber: 18,
+        },
+      ],
+    });
+
+    expect(plan).toEqual([
+      { messageId: 'msg_history', visibility: 'hidden', strategy: 'poll' },
+    ]);
+  });
+});
