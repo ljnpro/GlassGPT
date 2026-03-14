@@ -145,6 +145,7 @@ enum OpenAIStreamEventTranslator {
                 return .filePathAnnotationAdded(
                     FilePathAnnotation(
                         fileId: fileId,
+                        containerId: annotation["container_id"] as? String,
                         sandboxPath: "",
                         filename: annotation["filename"] as? String,
                         startIndex: startIndex,
@@ -312,6 +313,7 @@ enum OpenAIStreamEventTranslator {
 
                         annotations.append(FilePathAnnotation(
                             fileId: fileId,
+                            containerId: ann["container_id"] as? String,
                             sandboxPath: sandboxPath,
                             filename: ann["filename"] as? String,
                             startIndex: startIndex,
