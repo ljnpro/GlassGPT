@@ -140,7 +140,7 @@ struct ChatView: View {
                             }
                             viewModel.selectedImageData = jpegData
                         } catch {
-                            print("Failed to load photo: \(error.localizedDescription)")
+                            Loggers.files.error("Failed to load photo: \(error.localizedDescription)")
                         }
                     }
                 }

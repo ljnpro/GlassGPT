@@ -1,0 +1,73 @@
+# 4.2 Parity Baseline
+
+This document records the `codex/stable-4.1` baseline that `codex/stable-4.2` must preserve.
+
+## Stable Baseline
+
+- Source branch: `codex/stable-4.1`
+- Refactor branch: `codex/stable-4.2`
+- Baseline app version: `4.0.29 (20165)`
+- App target: `GlassGPT`
+- Package target: `NativeChat`
+- Current package size: ~13k Swift LOC across 41 Swift files
+
+## Verified Build
+
+Last verified baseline command:
+
+```bash
+xcodebuild -project ios/GlassGPT.xcodeproj -scheme GlassGPT -destination 'generic/platform=iOS Simulator' build
+```
+
+Baseline result before 4.2 refactor:
+
+- Build status: succeeded
+- Existing warnings before 4.2 shell cleanup:
+  - `AppDelegate.swift`: `UIWindow(frame:)` deprecated on iOS 26
+  - `AppDelegate.swift`: `UIScreen.main` deprecated on iOS 26
+  - `AppDelegate.swift`: `UIApplication.OpenURLOptionsKey` deprecated on iOS 26
+  - `Info.plist`: `UIRequiresFullScreen` deprecated on iOS 26
+
+## User-Visible Invariants
+
+The following must remain unchanged unless a release blocker forces a deviation:
+
+- Three-tab structure: Chat, History, Settings
+- Empty-state layout and copy
+- Message bubble layout, colors, spacing, typography, and context menus
+- Composer layout, attachment affordances, and stop/send behavior
+- Model selector presentation and controls
+- File preview presentation, interaction model, and share behavior
+- History selection and deletion flows
+- Settings sections, toggles, pickers, labels, and validation flow
+- Streaming, recovery, and detached streaming bubble behavior
+- Generated image/document cache behavior
+- Cloudflare gateway behavior and defaults
+- Keychain API key storage behavior
+
+## Manual Acceptance Checklist
+
+Run this checklist against both `codex/stable-4.1` and `codex/stable-4.2` before release:
+
+1. Launch the app and confirm the initial empty state matches.
+2. Open Settings and confirm sections, ordering, labels, and controls match.
+3. Toggle theme, haptics, Cloudflare, Pro mode, Background mode, Flex mode, and confirm behavior matches.
+4. Start a new chat and confirm toolbar layout and model badge match.
+5. Send a text message and confirm user/assistant message presentation matches.
+6. Send an image attachment and confirm preview and send behavior match.
+7. Send a document attachment and confirm chip rendering and send behavior match.
+8. While streaming, confirm indicators, stop button, and live bubble behavior match.
+9. Force a recovery path and confirm recovery indicator, final output, and error handling match.
+10. Open History, select a conversation, delete one conversation, and delete all conversations.
+11. Open a generated file and confirm preview/share behavior matches.
+12. Clear image/document caches and confirm settings UI and results match.
+
+## Release Gates
+
+- `scripts/ci.sh` passes
+- `xcodebuild` build passes
+- package tests pass
+- manual parity checklist passes
+- Release archive/export succeeds
+- TestFlight upload succeeds
+- GitHub branch/tag push succeeds

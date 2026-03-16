@@ -11,16 +11,6 @@ enum CloudflareHealthStatus: Equatable {
 @Observable
 @MainActor
 final class SettingsViewModel {
-
-    private enum StorageKeys {
-        static let defaultModel = "defaultModel"
-        static let defaultEffort = "defaultEffort"
-        static let defaultBackgroundModeEnabled = "defaultBackgroundModeEnabled"
-        static let defaultServiceTier = "defaultServiceTier"
-        static let appTheme = "appTheme"
-        static let hapticEnabled = "hapticEnabled"
-    }
-
     // MARK: - State
 
     var apiKey: String = ""
@@ -39,7 +29,7 @@ final class SettingsViewModel {
 
     private var defaultModel: ModelType {
         didSet {
-            UserDefaults.standard.set(defaultModel.rawValue, forKey: StorageKeys.defaultModel)
+            settingsStore.defaultModel = defaultModel
             if !defaultModel.availableEfforts.contains(defaultEffort) {
                 defaultEffort = defaultModel.defaultEffort
             }
@@ -53,19 +43,19 @@ final class SettingsViewModel {
 
     var defaultEffort: ReasoningEffort {
         didSet {
-            UserDefaults.standard.set(defaultEffort.rawValue, forKey: StorageKeys.defaultEffort)
+            settingsStore.defaultEffort = defaultEffort
         }
     }
 
     var defaultBackgroundModeEnabled: Bool {
         didSet {
-            UserDefaults.standard.set(defaultBackgroundModeEnabled, forKey: StorageKeys.defaultBackgroundModeEnabled)
+            settingsStore.defaultBackgroundModeEnabled = defaultBackgroundModeEnabled
         }
     }
 
     private var defaultServiceTier: ServiceTier {
         didSet {
-            UserDefaults.standard.set(defaultServiceTier.rawValue, forKey: StorageKeys.defaultServiceTier)
+            settingsStore.defaultServiceTier = defaultServiceTier
         }
     }
 
@@ -76,13 +66,13 @@ final class SettingsViewModel {
 
     var appTheme: AppTheme {
         didSet {
-            UserDefaults.standard.set(appTheme.rawValue, forKey: StorageKeys.appTheme)
+            settingsStore.appTheme = appTheme
         }
     }
 
     var hapticEnabled: Bool {
         didSet {
-            UserDefaults.standard.set(hapticEnabled, forKey: StorageKeys.hapticEnabled)
+            settingsStore.hapticEnabled = hapticEnabled
         }
     }
 
@@ -121,7 +111,8 @@ final class SettingsViewModel {
 
     // MARK: - Dependencies
 
-    private let keychainService = KeychainService()
+    private let apiKeyStore: APIKeyStore
+    private let settingsStore: SettingsStore
     private let openAIService = OpenAIService()
     private static let byteCountFormatter: ByteCountFormatter = {
         let formatter = ByteCountFormatter()
@@ -131,49 +122,20 @@ final class SettingsViewModel {
 
     // MARK: - Init
 
-    init() {
-        if let raw = UserDefaults.standard.string(forKey: StorageKeys.defaultModel),
-           let model = ModelType(rawValue: raw) {
-            self.defaultModel = model
-        } else {
-            self.defaultModel = .gpt5_4_pro
-        }
-
-        if let raw = UserDefaults.standard.string(forKey: StorageKeys.defaultEffort),
-           let effort = ReasoningEffort(rawValue: raw) {
-            self.defaultEffort = effort
-        } else {
-            self.defaultEffort = .xhigh
-        }
-
-        if let raw = UserDefaults.standard.object(forKey: StorageKeys.defaultBackgroundModeEnabled) as? Bool {
-            self.defaultBackgroundModeEnabled = raw
-        } else {
-            self.defaultBackgroundModeEnabled = false
-        }
-
-        if let raw = UserDefaults.standard.string(forKey: StorageKeys.defaultServiceTier),
-           let tier = ServiceTier(rawValue: raw) {
-            self.defaultServiceTier = tier
-        } else {
-            self.defaultServiceTier = .standard
-        }
-
-        if let raw = UserDefaults.standard.string(forKey: StorageKeys.appTheme),
-           let theme = AppTheme(rawValue: raw) {
-            self.appTheme = theme
-        } else {
-            self.appTheme = .system
-        }
-
-        if let val = UserDefaults.standard.object(forKey: StorageKeys.hapticEnabled) as? Bool {
-            self.hapticEnabled = val
-        } else {
-            self.hapticEnabled = true
-        }
-
-        self.cloudflareEnabled = FeatureFlags.useCloudflareGateway
-        self.apiKey = keychainService.loadAPIKey() ?? ""
+    init(
+        settingsStore: SettingsStore = .shared,
+        apiKeyStore: APIKeyStore = .shared
+    ) {
+        self.settingsStore = settingsStore
+        self.apiKeyStore = apiKeyStore
+        self.defaultModel = settingsStore.defaultModel
+        self.defaultEffort = settingsStore.defaultEffort
+        self.defaultBackgroundModeEnabled = settingsStore.defaultBackgroundModeEnabled
+        self.defaultServiceTier = settingsStore.defaultServiceTier
+        self.appTheme = settingsStore.appTheme
+        self.hapticEnabled = settingsStore.hapticEnabled
+        self.cloudflareEnabled = settingsStore.cloudflareGatewayEnabled
+        self.apiKey = apiKeyStore.loadAPIKey() ?? ""
 
         if self.cloudflareEnabled {
             Task {
@@ -193,15 +155,19 @@ final class SettingsViewModel {
         let trimmedKey = apiKey.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedKey.isEmpty else { return }
 
-        try? keychainService.saveAPIKey(trimmedKey)
-        apiKey = trimmedKey
-        saveConfirmation = true
-        HapticService.shared.notify(.success)
+        do {
+            try apiKeyStore.saveAPIKey(trimmedKey)
+            apiKey = trimmedKey
+            saveConfirmation = true
+            HapticService.shared.notify(.success)
+        } catch {
+            Loggers.settings.error("Failed to save API key: \(error.localizedDescription)")
+        }
     }
 
     func clearAPIKey() {
         apiKey = ""
-        keychainService.deleteAPIKey()
+        apiKeyStore.deleteAPIKey()
         isAPIKeyValid = nil
         if cloudflareEnabled {
             cloudflareHealthStatus = .unknown
@@ -235,7 +201,7 @@ final class SettingsViewModel {
         if !typedKey.isEmpty {
             trimmedKey = typedKey
         } else {
-            trimmedKey = keychainService.loadAPIKey()?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            trimmedKey = apiKeyStore.loadAPIKey()?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         }
         guard !trimmedKey.isEmpty else {
             cloudflareHealthStatus = .error("No API key configured")

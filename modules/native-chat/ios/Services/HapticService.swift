@@ -8,7 +8,7 @@ struct HapticService: Sendable {
     private init() {}
 
     private var isEnabled: Bool {
-        UserDefaults.standard.object(forKey: "hapticEnabled") as? Bool ?? true
+        SettingsStore.shared.hapticEnabled
     }
 
     func impact(_ style: UIImpactFeedbackGenerator.FeedbackStyle = .medium) {
