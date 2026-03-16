@@ -266,10 +266,9 @@ final class ChatScrollContainerController: UIViewController, UIScrollViewDelegat
     }
 
     private func handleObservedContentSizeChange() {
-        guard layoutMode == .bottomAnchored else { return }
         guard scrollView.bounds.height > 1 else { return }
 
-        if shouldFollowBottom {
+        if layoutMode == .bottomAnchored && shouldFollowBottom {
             shouldPinToBottomOnNextLayout = true
         }
 
