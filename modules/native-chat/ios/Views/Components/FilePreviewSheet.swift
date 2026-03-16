@@ -54,6 +54,61 @@ struct FilePreviewSheet: View {
         case saving
     }
 
+    private struct PreviewActionButton<Label: View>: View {
+        let diameter: CGFloat
+        let isEnabled: Bool
+        let accessibilityLabel: String
+        let action: () -> Void
+        @ViewBuilder let label: () -> Label
+
+        @State private var isPressed = false
+
+        private var hitBounds: CGRect {
+            CGRect(x: 0, y: 0, width: diameter, height: diameter)
+        }
+
+        var body: some View {
+            label()
+                .frame(width: diameter, height: diameter)
+                .singleFrameGlassCircleControl(
+                    tintOpacity: 0.015,
+                    borderWidth: 0.78,
+                    darkBorderOpacity: 0.14,
+                    lightBorderOpacity: 0.08
+                )
+                .scaleEffect(isPressed ? 0.9 : 1)
+                .opacity(isEnabled ? (isPressed ? 0.8 : 1) : 0.62)
+                .animation(.spring(response: 0.18, dampingFraction: 0.82), value: isPressed)
+                .contentShape(Circle())
+                .gesture(
+                    DragGesture(minimumDistance: 0)
+                        .onChanged { value in
+                            guard isEnabled else { return }
+                            isPressed = hitBounds.contains(value.location)
+                        }
+                        .onEnded { value in
+                            let shouldTrigger = isEnabled && hitBounds.contains(value.location)
+                            withAnimation(.spring(response: 0.18, dampingFraction: 0.82)) {
+                                isPressed = false
+                            }
+
+                            guard shouldTrigger else { return }
+                            Task { @MainActor in
+                                try? await Task.sleep(nanoseconds: 55_000_000)
+                                action()
+                            }
+                        }
+                )
+                .accessibilityElement()
+                .accessibilityAddTraits(.isButton)
+                .accessibilityLabel(Text(accessibilityLabel))
+                .accessibilityAction {
+                    guard isEnabled else { return }
+                    action()
+                }
+        }
+    }
+
     private var fileURL: URL {
         previewItem.url
     }
@@ -367,30 +422,27 @@ struct FilePreviewSheet: View {
     }
 
     private var closeButton: some View {
-        Button {
-            guard !isDismissPending else { return }
-            onRequestDismiss()
-        } label: {
+        PreviewActionButton(
+            diameter: circularButtonDiameter,
+            isEnabled: !isDismissPending,
+            accessibilityLabel: "Close preview",
+            action: onRequestDismiss
+        ) {
             Image(systemName: "xmark")
                 .font(.system(size: closeIconSize, weight: .semibold))
                 .foregroundStyle(viewerPrimaryColor)
-                .frame(width: circularButtonDiameter, height: circularButtonDiameter)
-                .singleFrameGlassCircleControl(
-                    tintOpacity: 0.015,
-                    borderWidth: 0.78,
-                    darkBorderOpacity: 0.14,
-                    lightBorderOpacity: 0.08
-                )
         }
-        .buttonStyle(GlassPressButtonStyle(pressedScale: 0.9, pressedOpacity: 0.8))
-        .allowsHitTesting(!isDismissPending)
-        .accessibilityLabel("Close preview")
     }
 
     private var downloadButton: some View {
-        Button {
-            Task { await saveImageToPhotos() }
-        } label: {
+        PreviewActionButton(
+            diameter: circularButtonDiameter,
+            isEnabled: !isDismissPending && saveState != .saving && canSaveToPhotos,
+            accessibilityLabel: "Download to Photos",
+            action: {
+                Task { await saveImageToPhotos() }
+            }
+        ) {
             switch saveState {
             case .idle:
                 Image(systemName: "arrow.down.to.line")
@@ -402,60 +454,32 @@ struct FilePreviewSheet: View {
                     .tint(viewerPrimaryColor)
             }
         }
-        .frame(width: circularButtonDiameter, height: circularButtonDiameter)
-        .singleFrameGlassCircleControl(
-            tintOpacity: 0.015,
-            borderWidth: 0.78,
-            darkBorderOpacity: 0.14,
-            lightBorderOpacity: 0.08
-        )
-        .buttonStyle(GlassPressButtonStyle(pressedScale: 0.9, pressedOpacity: 0.8))
-        .accessibilityLabel("Download to Photos")
-        .allowsHitTesting(!isDismissPending)
-        .disabled(saveState == .saving || !canSaveToPhotos)
-        .opacity((saveState == .saving || !canSaveToPhotos) ? 0.62 : 1)
     }
 
     private var bottomShareButton: some View {
-        Button {
-            guard !isDismissPending else { return }
-            presentShareSheet()
-        } label: {
+        PreviewActionButton(
+            diameter: circularButtonDiameter,
+            isEnabled: !isDismissPending,
+            accessibilityLabel: "Share",
+            action: presentShareSheet
+        ) {
             Image(systemName: "square.and.arrow.up")
                 .font(.system(size: actionIconSize, weight: .semibold))
                 .foregroundStyle(viewerPrimaryColor)
-                .frame(width: circularButtonDiameter, height: circularButtonDiameter)
-                .singleFrameGlassCircleControl(
-                    tintOpacity: 0.015,
-                    borderWidth: 0.78,
-                    darkBorderOpacity: 0.14,
-                    lightBorderOpacity: 0.08
-                )
         }
-        .buttonStyle(GlassPressButtonStyle(pressedScale: 0.9, pressedOpacity: 0.8))
-        .accessibilityLabel("Share")
-        .allowsHitTesting(!isDismissPending)
     }
 
     private var pdfShareButton: some View {
-        Button {
-            guard !isDismissPending else { return }
-            presentShareSheet()
-        } label: {
+        PreviewActionButton(
+            diameter: circularButtonDiameter,
+            isEnabled: !isDismissPending,
+            accessibilityLabel: "Share",
+            action: presentShareSheet
+        ) {
             Image(systemName: "square.and.arrow.up")
                 .font(.system(size: actionIconSize, weight: .semibold))
                 .foregroundStyle(viewerPrimaryColor)
-                .frame(width: circularButtonDiameter, height: circularButtonDiameter)
-                .singleFrameGlassCircleControl(
-                    tintOpacity: 0.015,
-                    borderWidth: 0.78,
-                    darkBorderOpacity: 0.14,
-                    lightBorderOpacity: 0.08
-                )
         }
-        .buttonStyle(GlassPressButtonStyle(pressedScale: 0.9, pressedOpacity: 0.8))
-        .accessibilityLabel("Share")
-        .allowsHitTesting(!isDismissPending)
     }
 
     private var saveSuccessHUD: some View {
