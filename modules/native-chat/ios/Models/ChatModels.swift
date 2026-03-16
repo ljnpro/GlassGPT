@@ -112,13 +112,13 @@ enum MessageRole: String, Codable, CaseIterable, Identifiable, Sendable {
 
 // MARK: - Tool Call Types
 
-enum ToolCallType: String, Codable, Sendable {
+enum ToolCallType: String, Codable, Sendable, Equatable {
     case webSearch = "web_search"
     case codeInterpreter = "code_interpreter"
     case fileSearch = "file_search"
 }
 
-enum ToolCallStatus: String, Codable, Sendable {
+enum ToolCallStatus: String, Codable, Sendable, Equatable {
     case inProgress = "in_progress"
     case searching
     case interpreting
@@ -127,7 +127,7 @@ enum ToolCallStatus: String, Codable, Sendable {
 }
 
 /// Represents a tool call made by the model during response generation.
-struct ToolCallInfo: Codable, Sendable, Identifiable {
+struct ToolCallInfo: Codable, Sendable, Identifiable, Equatable {
     var id: String
     var type: ToolCallType
     var status: ToolCallStatus
@@ -151,7 +151,7 @@ struct ToolCallInfo: Codable, Sendable, Identifiable {
 // MARK: - URL Citation
 
 /// A citation from web search results, linking to a source URL.
-struct URLCitation: Codable, Sendable, Identifiable {
+struct URLCitation: Codable, Sendable, Identifiable, Equatable {
     var id: String { "\(startIndex)-\(endIndex)-\(url)" }
     var url: String
     var title: String
@@ -174,7 +174,7 @@ struct URLCitation: Codable, Sendable, Identifiable {
 // MARK: - File Path Annotation
 
 /// A file path annotation from code interpreter output, linking a sandbox path to a downloadable file_id.
-struct FilePathAnnotation: Codable, Sendable, Identifiable {
+struct FilePathAnnotation: Codable, Sendable, Identifiable, Equatable {
     var id: String { "\(startIndex)-\(endIndex)-\(fileId)" }
     var fileId: String
     var containerId: String?

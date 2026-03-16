@@ -16,11 +16,13 @@ struct ThinkingIndicator: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
-        .background {
-            Capsule()
-                .fill(.ultraThinMaterial)
-        }
-        .glassEffect(.regular, in: Capsule())
+        .singleSurfaceGlass(
+            cornerRadius: 999,
+            stableFillOpacity: 0.01,
+            borderWidth: 0.75,
+            darkBorderOpacity: 0.14,
+            lightBorderOpacity: 0.08
+        )
     }
 }
 
@@ -87,21 +89,19 @@ struct ThinkingView: View {
             // Expandable content — Markdown-rendered thinking text
             if isExpanded {
                 VStack(alignment: .leading, spacing: 4) {
-                    ThinkingMarkdownText(text: text)
+                    ThinkingMarkdownText(
+                        text: text,
+                        allowsSelection: !isLive
+                    )
                 }
                 .padding(.horizontal, 12)
                 .padding(.bottom, 10)
                 .transition(.opacity.combined(with: .move(edge: .top)))
             }
         }
-        .background {
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(.ultraThinMaterial)
-        }
-        .overlay {
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .strokeBorder(.quaternary, lineWidth: 0.5)
-        }
+        .modifier(
+            ThinkingSurfaceModifier(isLive: isLive)
+        )
         .onAppear {
             if !hasInitialized {
                 hasInitialized = true
@@ -120,10 +120,30 @@ struct ThinkingView: View {
     }
 }
 
+private struct ThinkingSurfaceModifier: ViewModifier {
+    let isLive: Bool
+
+    func body(content: Content) -> some View {
+        content
+            .background {
+                UIKitGlassBackgroundView(
+                    cornerRadius: 12,
+                    innerInset: 0,
+                    stableFillOpacity: isLive ? 0.014 : 0,
+                    showsBorder: true,
+                    borderWidth: 0.8,
+                    darkBorderOpacity: 0.15,
+                    lightBorderOpacity: 0.085
+                )
+            }
+    }
+}
+
 // MARK: - Thinking Markdown Text (renders bold, italic, code, etc.)
 
 private struct ThinkingMarkdownText: View {
     let text: String
+    var allowsSelection: Bool = true
 
     var body: some View {
         let attributed = robustMarkdownParse(text)
@@ -131,7 +151,9 @@ private struct ThinkingMarkdownText: View {
             .font(.caption)
             .foregroundStyle(.secondary)
             .lineLimit(nil)
-            .textSelection(.enabled)
+            .applyingIf(allowsSelection) { view in
+                view.textSelection(.enabled)
+            }
     }
 
     /// Robust Markdown parser: try Apple's parser first, fall back to manual

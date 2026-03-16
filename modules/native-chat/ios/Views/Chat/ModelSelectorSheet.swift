@@ -155,13 +155,12 @@ struct ModelSelectorSheet: View {
         .padding(.horizontal, metrics.contentHorizontalPadding)
         .padding(.top, metrics.contentVerticalPadding)
         .padding(.bottom, metrics.contentVerticalPadding)
-        .background {
-            RoundedRectangle(cornerRadius: metrics.panelCornerRadius, style: .continuous)
-                .fill(.thickMaterial)
-        }
-        .glassEffect(
-            .regular.interactive(),
-            in: RoundedRectangle(cornerRadius: metrics.panelCornerRadius, style: .continuous)
+        .singleSurfaceGlass(
+            cornerRadius: metrics.panelCornerRadius,
+            stableFillOpacity: 0.014,
+            borderWidth: 0.9,
+            darkBorderOpacity: 0.17,
+            lightBorderOpacity: 0.095
         )
         .shadow(color: .black.opacity(0.08), radius: 24, x: 0, y: 10)
     }
@@ -213,13 +212,12 @@ struct ModelSelectorSheet: View {
             }
         }
         .padding(metrics.rowHorizontalPadding)
-        .background {
-            RoundedRectangle(cornerRadius: metrics.cardCornerRadius, style: .continuous)
-                .fill(.ultraThinMaterial)
-        }
-        .glassEffect(
-            .regular.interactive(),
-            in: RoundedRectangle(cornerRadius: metrics.cardCornerRadius, style: .continuous)
+        .singleSurfaceGlass(
+            cornerRadius: metrics.cardCornerRadius,
+            stableFillOpacity: 0.012,
+            borderWidth: 0.8,
+            darkBorderOpacity: 0.15,
+            lightBorderOpacity: 0.085
         )
     }
 
@@ -238,7 +236,7 @@ struct ModelSelectorSheet: View {
 
             Spacer(minLength: 12)
 
-            Button("Done") { onDone() }
+            Button("Save") { onDone() }
                 .buttonStyle(.glassProminent)
         }
         .padding(.horizontal, 2)
@@ -270,13 +268,12 @@ struct ModelSelectorSheet: View {
                 isOn: $flexModeEnabled
             )
         }
-        .background {
-            RoundedRectangle(cornerRadius: metrics.cardCornerRadius, style: .continuous)
-                .fill(.ultraThinMaterial)
-        }
-        .glassEffect(
-            .regular.interactive(),
-            in: RoundedRectangle(cornerRadius: metrics.cardCornerRadius, style: .continuous)
+        .singleSurfaceGlass(
+            cornerRadius: metrics.cardCornerRadius,
+            stableFillOpacity: 0.012,
+            borderWidth: 0.8,
+            darkBorderOpacity: 0.15,
+            lightBorderOpacity: 0.085
         )
     }
 

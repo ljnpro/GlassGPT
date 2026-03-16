@@ -4,79 +4,107 @@ import UIKit
 
 struct ChatView: View {
     @Bindable var viewModel: ChatViewModel
+    @AppStorage("appTheme") private var appThemeRawValue: String = AppTheme.system.rawValue
     @State private var showPhotoPicker = false
     @State private var selectedPhotoItem: PhotosPickerItem?
     @State private var showDocumentPicker = false
+    @State private var isShowingModelSelector = false
+    @State private var composerResetToken = UUID()
+    @State private var modelSelectorDraft = ConversationConfiguration(
+        model: .gpt5_4,
+        reasoningEffort: .high,
+        backgroundModeEnabled: false,
+        serviceTier: .standard
+    )
+    @State private var scrollRequestID = UUID()
     @State private var streamingThinkingExpanded: Bool? = true
-    @State private var shouldFollowLiveOutput = true
-    @State private var isNearBottom = true
-    @State private var scrollViewportMaxY: CGFloat = 0
-    @State private var bottomAnchorMaxY: CGFloat = 0
+    @State private var isBlockingGeneratedPreviewTouches = false
+    @State private var generatedPreviewTouchShieldTask: Task<Void, Never>?
 
-    private let autoFollowThreshold: CGFloat = 96
+    private let generatedPreviewTouchShieldDuration: UInt64 = 500_000_000
+
+    private var selectedTheme: AppTheme {
+        AppTheme(rawValue: appThemeRawValue) ?? .system
+    }
+
+    private var modelSelectorInterfaceStyle: UIUserInterfaceStyle {
+        switch selectedTheme {
+        case .system:
+            return .unspecified
+        case .light:
+            return .light
+        case .dark:
+            return .dark
+        }
+    }
 
     var body: some View {
         NavigationStack {
             ZStack {
                 chatContent
 
-                // Restoring conversation overlay
                 if viewModel.isRestoringConversation {
                     restoringOverlay
                         .transition(.opacity)
                 }
 
-                // File download overlay
                 if viewModel.isDownloadingFile {
                     fileDownloadingOverlay
                         .transition(.opacity)
                 }
 
-                if viewModel.showModelSelector {
-                    modelSelectorOverlay
-                        .transition(.opacity)
-                        .zIndex(10)
+                if isBlockingGeneratedPreviewTouches {
+                    Color.black.opacity(0.001)
+                        .ignoresSafeArea()
+                        .contentShape(Rectangle())
+                        .accessibilityHidden(true)
+                        .zIndex(30)
                 }
             }
             .animation(.easeInOut(duration: 0.25), value: viewModel.isRestoringConversation)
             .animation(.easeInOut(duration: 0.2), value: viewModel.isDownloadingFile)
-            .animation(.easeOut(duration: 0.18), value: viewModel.showModelSelector)
-            .safeAreaInset(edge: .bottom, spacing: 0) {
-                MessageInputBar(
-                    text: $viewModel.inputText,
-                    isStreaming: viewModel.isStreaming,
-                    selectedImageData: $viewModel.selectedImageData,
-                    pendingAttachments: $viewModel.pendingAttachments,
-                    onSend: { viewModel.sendMessage() },
-                    onStop: { viewModel.stopGeneration() },
-                    onPickImage: { showPhotoPicker = true },
-                    onPickDocument: { showDocumentPicker = true },
-                    onRemoveAttachment: { attachment in
-                        viewModel.removePendingAttachment(attachment)
-                    }
-                )
-            }
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     ModelBadge(
                         model: viewModel.selectedModel,
                         effort: viewModel.reasoningEffort,
-                        onTap: { viewModel.showModelSelector.toggle() }
+                        onTap: { presentModelSelector() }
                     )
                     .fixedSize(horizontal: true, vertical: false)
+                    .allowsHitTesting(!isBlockingGeneratedPreviewTouches)
                 }
 
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("New Chat", systemImage: "square.and.pencil") {
-                        viewModel.startNewChat()
+                        startNewChat()
                     }
                     .buttonStyle(.glass)
+                    .allowsHitTesting(!isBlockingGeneratedPreviewTouches)
                 }
             }
             .toolbarBackgroundVisibility(.hidden, for: .navigationBar)
-            .sheet(item: filePreviewBinding) { previewItem in
-                FilePreviewSheet(fileURL: previewItem.url)
+            .sheet(item: sharedGeneratedFileBinding) { sharedItem in
+                ActivityViewController(activityItems: [sharedItem.url])
+            }
+            .overFullScreenCover(
+                isPresented: $isShowingModelSelector,
+                interfaceStyle: modelSelectorInterfaceStyle,
+                onDismiss: dismissModelSelector
+            ) {
+                modelSelectorPresentation
+            }
+            .fullScreenCover(item: generatedPreviewBinding) { previewItem in
+                FilePreviewSheet(
+                    previewItem: previewItem,
+                    onWillDismiss: beginGeneratedPreviewDismissal
+                )
+            }
+            .onChange(of: isGeneratedPreviewPresented) { _, isPresented in
+                handleGeneratedPreviewPresentationChange(isPresented)
+            }
+            .onChange(of: viewModel.currentConversation?.id) { _, _ in
+                composerResetToken = UUID()
             }
             .photosPicker(isPresented: $showPhotoPicker, selection: $selectedPhotoItem, matching: .images)
             .onChange(of: selectedPhotoItem) { _, newItem in
@@ -112,18 +140,46 @@ struct ChatView: View {
 
     // MARK: - File Preview Binding
 
-    private var filePreviewBinding: Binding<FilePreviewItem?> {
+    private var sharedGeneratedFileBinding: Binding<SharedGeneratedFileItem?> {
         Binding(
             get: {
-                if let url = viewModel.filePreviewURL {
-                    return FilePreviewItem(url: url)
-                }
-                return nil
+                viewModel.sharedGeneratedFileItem
             },
             set: { newValue in
-                viewModel.filePreviewURL = newValue?.url
+                if let newValue {
+                    viewModel.sharedGeneratedFileItem = newValue
+                } else {
+                    viewModel.sharedGeneratedFileItem = nil
+                }
             }
         )
+    }
+
+    private var generatedPreviewBinding: Binding<FilePreviewItem?> {
+        Binding(
+            get: {
+                guard let previewItem = viewModel.filePreviewItem else { return nil }
+                switch previewItem.kind {
+                case .generatedImage, .generatedPDF:
+                    return previewItem
+                }
+            },
+            set: { newValue in
+                if let newValue {
+                    viewModel.filePreviewItem = newValue
+                } else if viewModel.filePreviewItem != nil {
+                    viewModel.filePreviewItem = nil
+                }
+            }
+        )
+    }
+
+    private var isGeneratedPreviewPresented: Bool {
+        guard let kind = viewModel.filePreviewItem?.kind else { return false }
+        switch kind {
+        case .generatedImage, .generatedPDF:
+            return true
+        }
     }
 
     private var fileDownloadErrorBinding: Binding<Bool> {
@@ -137,101 +193,63 @@ struct ChatView: View {
 
     @ViewBuilder
     private var chatContent: some View {
-        if viewModel.messages.isEmpty && !viewModel.isStreaming && !viewModel.isRestoringConversation {
-            emptyState
-        } else {
-            ScrollViewReader { proxy in
-                chatScrollView(proxy)
+        ChatScrollContainer(
+            content: AnyView(chatMessagesContent),
+            composer: AnyView(messageInputBar),
+            layoutMode: showsEmptyState ? .centered : .bottomAnchored,
+            fixedBottomGap: 12,
+            conversationID: viewModel.currentConversation?.id,
+            scrollRequestID: scrollRequestID,
+            onBackgroundTap: dismissKeyboard
+        )
+    }
+
+    private var chatMessagesContent: some View {
+        Group {
+            if showsEmptyState {
+                emptyState
+                    .frame(maxWidth: .infinity)
+            } else {
+                VStack(spacing: 16) {
+                    ForEach(viewModel.messages) { message in
+                        messageRow(for: message)
+                    }
+
+                    if viewModel.shouldShowDetachedStreamingBubble {
+                        streamingBubble
+                    }
+
+                    if let error = viewModel.errorMessage {
+                        errorBanner(error)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .top)
+                .padding(.horizontal, 16)
+                .padding(.top, 8)
             }
         }
     }
 
-    private func chatScrollView(_ proxy: ScrollViewProxy) -> some View {
-        ScrollView {
-            LazyVStack(spacing: 16) {
-                ForEach(viewModel.messages) { message in
-                    messageRow(for: message)
+    private var messageInputBar: some View {
+        MessageInputBar(
+            resetToken: composerResetToken,
+            isStreaming: viewModel.isStreaming,
+            selectedImageData: $viewModel.selectedImageData,
+            pendingAttachments: $viewModel.pendingAttachments,
+            onSend: { text in
+                let didSend = viewModel.sendMessage(text: text)
+                if didSend {
+                    scrollRequestID = UUID()
                 }
-
-                if viewModel.shouldShowDetachedStreamingBubble {
-                    streamingBubble
-                        .id("streaming")
-                }
-
-                if let error = viewModel.errorMessage {
-                    errorBanner(error)
-                }
-
-                Color.clear.frame(height: 1)
-                    .background {
-                        GeometryReader { geometry in
-                            Color.clear
-                                .preference(
-                                    key: ChatBottomAnchorMaxYPreferenceKey.self,
-                                    value: geometry.frame(in: .global).maxY
-                                )
-                        }
-                    }
-                    .id("bottom")
+                return didSend
+            },
+            onStop: { viewModel.stopGeneration() },
+            onPickImage: { showPhotoPicker = true },
+            onPickDocument: { showDocumentPicker = true },
+            onRemoveAttachment: { attachment in
+                viewModel.removePendingAttachment(attachment)
             }
-            .padding(.horizontal, 16)
-            .padding(.top, 8)
-            .padding(.bottom, 4)
-        }
-        .background {
-            GeometryReader { geometry in
-                Color.clear
-                    .preference(
-                        key: ChatViewportMaxYPreferenceKey.self,
-                        value: geometry.frame(in: .global).maxY
-                    )
-            }
-        }
-        .scrollDismissesKeyboard(.interactively)
-        .simultaneousGesture(
-            DragGesture()
-                .onChanged { _ in
-                    if !isNearBottom {
-                        shouldFollowLiveOutput = false
-                    }
-                }
-                .onEnded { _ in
-                    shouldFollowLiveOutput = isNearBottom
-                }
         )
-        .onPreferenceChange(ChatViewportMaxYPreferenceKey.self) { value in
-            scrollViewportMaxY = value
-            updateBottomFollowState()
-        }
-        .onPreferenceChange(ChatBottomAnchorMaxYPreferenceKey.self) { value in
-            bottomAnchorMaxY = value
-            updateBottomFollowState()
-        }
-        .onChange(of: viewModel.currentStreamingText) { _, _ in
-            scrollToLiveTargetIfNeeded(proxy, animated: true)
-        }
-        .onChange(of: viewModel.currentThinkingText) { _, _ in
-            scrollToLiveTargetIfNeeded(proxy, animated: true)
-        }
-        .onChange(of: viewModel.messages.count) { _, _ in
-            scrollToLiveTargetIfNeeded(proxy, animated: true)
-        }
-        .onChange(of: viewModel.activeToolCalls.count) { _, _ in
-            scrollToLiveTargetIfNeeded(proxy, animated: true)
-        }
-        .onChange(of: viewModel.isStreaming) { _, newValue in
-            if newValue {
-                streamingThinkingExpanded = true
-                shouldFollowLiveOutput = true
-                scrollToLiveTargetIfNeeded(proxy, animated: false)
-            }
-        }
-        .onChange(of: viewModel.isRecovering) { _, newValue in
-            if newValue {
-                shouldFollowLiveOutput = true
-                scrollToLiveTargetIfNeeded(proxy, animated: false)
-            }
-        }
     }
 
     private func messageRow(for message: Message) -> some View {
@@ -252,6 +270,7 @@ struct ChatView: View {
                 viewModel.handleSandboxLinkTap(message: message, sandboxURL: sandboxURL, annotation: annotation)
             } : nil
         )
+        .equatable()
         .id(message.id)
     }
 
@@ -270,11 +289,13 @@ struct ChatView: View {
             }
             .padding(.horizontal, 20)
             .padding(.vertical, 12)
-            .background {
-                Capsule()
-                    .fill(.ultraThinMaterial)
-            }
-            .glassEffect(.regular, in: Capsule())
+            .singleSurfaceGlass(
+                cornerRadius: 999,
+                stableFillOpacity: 0.012,
+                borderWidth: 0.8,
+                darkBorderOpacity: 0.14,
+                lightBorderOpacity: 0.08
+            )
 
             Spacer()
         }
@@ -295,11 +316,13 @@ struct ChatView: View {
             }
             .padding(.horizontal, 20)
             .padding(.vertical, 12)
-            .background {
-                Capsule()
-                    .fill(.ultraThinMaterial)
-            }
-            .glassEffect(.regular, in: Capsule())
+            .singleSurfaceGlass(
+                cornerRadius: 999,
+                stableFillOpacity: 0.012,
+                borderWidth: 0.8,
+                darkBorderOpacity: 0.14,
+                lightBorderOpacity: 0.08
+            )
 
             Spacer()
         }
@@ -309,8 +332,6 @@ struct ChatView: View {
 
     private var emptyState: some View {
         VStack(spacing: 16) {
-            Spacer()
-
             Image(systemName: "bubble.left.and.bubble.right")
                 .font(.system(size: 56))
                 .foregroundStyle(.secondary)
@@ -325,130 +346,61 @@ struct ChatView: View {
                     .foregroundStyle(.orange)
                     .padding(.top, 8)
             }
-
-            Spacer()
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .contentShape(Rectangle())
-        .onTapGesture {
-            UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
-        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 24)
     }
 
-    private var modelSelectorOverlay: some View {
+    private var modelSelectorPresentation: some View {
         GeometryReader { geometry in
             let idiom = UIDevice.current.userInterfaceIdiom
             let horizontalInset = idiom == .pad ? 32.0 : 16.0
             let maxPanelWidth = idiom == .pad ? 680.0 : min(geometry.size.width - (horizontalInset * 2), 520.0)
-            let topInset = idiom == .pad ? 18.0 : 12.0
+            let topInset = idiom == .pad ? 76.0 : 60.0
 
             ZStack(alignment: .top) {
                 Color.black.opacity(0.08)
                     .ignoresSafeArea()
                     .contentShape(Rectangle())
                     .onTapGesture {
-                        viewModel.showModelSelector = false
+                        dismissModelSelector()
                     }
 
                 ModelSelectorSheet(
                     proModeEnabled: Binding(
-                        get: { viewModel.proModeEnabled },
-                        set: { viewModel.proModeEnabled = $0 }
+                        get: { modelSelectorDraft.proModeEnabled },
+                        set: { modelSelectorDraft.proModeEnabled = $0 }
                     ),
-                    backgroundModeEnabled: $viewModel.backgroundModeEnabled,
+                    backgroundModeEnabled: $modelSelectorDraft.backgroundModeEnabled,
                     flexModeEnabled: Binding(
-                        get: { viewModel.flexModeEnabled },
-                        set: { viewModel.flexModeEnabled = $0 }
+                        get: { modelSelectorDraft.flexModeEnabled },
+                        set: { modelSelectorDraft.flexModeEnabled = $0 }
                     ),
-                    reasoningEffort: $viewModel.reasoningEffort,
-                    onDone: { viewModel.showModelSelector = false }
+                    reasoningEffort: $modelSelectorDraft.reasoningEffort,
+                    onDone: commitModelSelectorAndDismiss
                 )
                 .frame(maxWidth: maxPanelWidth)
                 .padding(.top, topInset)
                 .padding(.horizontal, horizontalInset)
             }
         }
+        .preferredColorScheme(selectedTheme.colorScheme)
     }
 
     // MARK: - Streaming Bubble
 
     private var streamingBubble: some View {
-        HStack(alignment: .top) {
-            VStack(alignment: .leading, spacing: 8) {
-                // Active tool call indicators — DEDUPLICATED
-                // Only show ONE web search indicator, regardless of how many web search calls are active
-                let hasActiveWebSearch = viewModel.activeToolCalls.contains {
-                    $0.type == .webSearch && $0.status != .completed
-                }
-                if hasActiveWebSearch {
-                    WebSearchIndicator()
-                        .transition(.opacity.combined(with: .scale(scale: 0.95)))
-                }
-
-                // Only show ONE code interpreter indicator
-                let hasActiveCodeInterpreter = viewModel.activeToolCalls.contains {
-                    $0.type == .codeInterpreter && $0.status != .completed
-                }
-                if hasActiveCodeInterpreter {
-                    CodeInterpreterIndicator()
-                        .transition(.opacity.combined(with: .scale(scale: 0.95)))
-                }
-
-                // Only show ONE file search indicator
-                let hasActiveFileSearch = viewModel.activeToolCalls.contains {
-                    $0.type == .fileSearch && $0.status != .completed
-                }
-                if hasActiveFileSearch {
-                    FileSearchIndicator()
-                        .transition(.opacity.combined(with: .scale(scale: 0.95)))
-                }
-
-                // Completed code interpreter results (during streaming)
-                let completedCodeCalls = viewModel.activeToolCalls.filter {
-                    $0.type == .codeInterpreter && $0.status == .completed
-                }
-                ForEach(completedCodeCalls) { toolCall in
-                    CodeInterpreterResultView(toolCall: toolCall)
-                        .transition(.opacity.combined(with: .move(edge: .top)))
-                }
-
-                if viewModel.isThinking {
-                    ThinkingIndicator()
-                        .transition(.opacity.combined(with: .scale(scale: 0.95)))
-                }
-
-                // Live thinking text — collapsible, starts expanded during streaming
-                if !viewModel.currentThinkingText.isEmpty {
-                    ThinkingView(
-                        text: viewModel.currentThinkingText,
-                        isLive: viewModel.isThinking || viewModel.isStreaming,
-                        externalIsExpanded: $streamingThinkingExpanded
-                    )
-                    .transition(.opacity.combined(with: .move(edge: .top)))
-                }
-
-                if !viewModel.currentStreamingText.isEmpty {
-                    StreamingTextView(text: viewModel.currentStreamingText)
-                } else if !viewModel.isThinking && viewModel.currentThinkingText.isEmpty
-                            && viewModel.activeToolCalls.allSatisfy({ $0.status == .completed }) {
-                    TypingIndicator()
-                }
-
-                // Live citations during streaming
-                if !viewModel.liveCitations.isEmpty {
-                    CitationLinksView(citations: viewModel.liveCitations)
-                }
-            }
-            .padding(12)
-            .background {
-                RoundedRectangle(cornerRadius: 20)
-                    .fill(.ultraThinMaterial)
-            }
-            .glassEffect(.regular.interactive(), in: RoundedRectangle(cornerRadius: 20))
-            .frame(maxWidth: assistantBubbleMaxWidth, alignment: .leading)
-
-            Spacer(minLength: 40)
-        }
+        DetachedStreamingBubbleView(
+            activeToolCalls: viewModel.activeToolCalls,
+            currentThinkingText: viewModel.currentThinkingText,
+            currentStreamingText: viewModel.currentStreamingText,
+            isThinking: viewModel.isThinking,
+            isStreaming: viewModel.isStreaming,
+            liveCitations: viewModel.liveCitations,
+            streamingThinkingExpanded: $streamingThinkingExpanded,
+            assistantBubbleMaxWidth: assistantBubbleMaxWidth
+        )
+        .equatable()
     }
 
     // MARK: - Error Banner
@@ -462,73 +414,208 @@ struct ChatView: View {
                 .foregroundStyle(.secondary)
         }
         .padding(12)
-        .background {
-            RoundedRectangle(cornerRadius: 12)
-                .fill(.ultraThinMaterial)
+        .singleSurfaceGlass(
+            cornerRadius: 12,
+            stableFillOpacity: 0.01,
+            borderWidth: 0.75,
+            darkBorderOpacity: 0.14,
+            lightBorderOpacity: 0.08
+        )
+    }
+}
+
+private struct DetachedStreamingBubbleView: View, Equatable {
+    let activeToolCalls: [ToolCallInfo]
+    let currentThinkingText: String
+    let currentStreamingText: String
+    let isThinking: Bool
+    let isStreaming: Bool
+    let liveCitations: [URLCitation]
+    @Binding var streamingThinkingExpanded: Bool?
+    let assistantBubbleMaxWidth: CGFloat
+    private let renderKey: RenderKey
+
+    init(
+        activeToolCalls: [ToolCallInfo],
+        currentThinkingText: String,
+        currentStreamingText: String,
+        isThinking: Bool,
+        isStreaming: Bool,
+        liveCitations: [URLCitation],
+        streamingThinkingExpanded: Binding<Bool?>,
+        assistantBubbleMaxWidth: CGFloat
+    ) {
+        self.activeToolCalls = activeToolCalls
+        self.currentThinkingText = currentThinkingText
+        self.currentStreamingText = currentStreamingText
+        self.isThinking = isThinking
+        self.isStreaming = isStreaming
+        self.liveCitations = liveCitations
+        self._streamingThinkingExpanded = streamingThinkingExpanded
+        self.assistantBubbleMaxWidth = assistantBubbleMaxWidth
+        self.renderKey = RenderKey(
+            activeToolCalls: activeToolCalls,
+            currentThinkingText: currentThinkingText,
+            currentStreamingText: currentStreamingText,
+            isThinking: isThinking,
+            isStreaming: isStreaming,
+            liveCitations: liveCitations,
+            assistantBubbleMaxWidth: assistantBubbleMaxWidth
+        )
+    }
+
+    nonisolated static func == (lhs: DetachedStreamingBubbleView, rhs: DetachedStreamingBubbleView) -> Bool {
+        lhs.renderKey == rhs.renderKey
+    }
+
+    var body: some View {
+        HStack(alignment: .top) {
+            VStack(alignment: .leading, spacing: 8) {
+                let hasActiveWebSearch = activeToolCalls.contains {
+                    $0.type == .webSearch && $0.status != .completed
+                }
+                if hasActiveWebSearch {
+                    WebSearchIndicator()
+                        .transition(.opacity.combined(with: .scale(scale: 0.95)))
+                }
+
+                let hasActiveCodeInterpreter = activeToolCalls.contains {
+                    $0.type == .codeInterpreter && $0.status != .completed
+                }
+                if hasActiveCodeInterpreter {
+                    CodeInterpreterIndicator()
+                        .transition(.opacity.combined(with: .scale(scale: 0.95)))
+                }
+
+                let hasActiveFileSearch = activeToolCalls.contains {
+                    $0.type == .fileSearch && $0.status != .completed
+                }
+                if hasActiveFileSearch {
+                    FileSearchIndicator()
+                        .transition(.opacity.combined(with: .scale(scale: 0.95)))
+                }
+
+                let completedCodeCalls = activeToolCalls.filter {
+                    $0.type == .codeInterpreter && $0.status == .completed
+                }
+                ForEach(completedCodeCalls) { toolCall in
+                    CodeInterpreterResultView(toolCall: toolCall)
+                        .transition(.opacity.combined(with: .move(edge: .top)))
+                }
+
+                if isThinking {
+                    ThinkingIndicator()
+                        .transition(.opacity.combined(with: .scale(scale: 0.95)))
+                }
+
+                if !currentThinkingText.isEmpty {
+                    ThinkingView(
+                        text: currentThinkingText,
+                        isLive: isThinking || isStreaming,
+                        externalIsExpanded: $streamingThinkingExpanded
+                    )
+                    .transition(.opacity.combined(with: .move(edge: .top)))
+                }
+
+                if !currentStreamingText.isEmpty {
+                    StreamingTextView(
+                        text: currentStreamingText,
+                        allowsSelection: false
+                    )
+                } else if !isThinking && currentThinkingText.isEmpty
+                            && activeToolCalls.allSatisfy({ $0.status == .completed }) {
+                    TypingIndicator()
+                }
+
+                if !liveCitations.isEmpty {
+                    CitationLinksView(citations: liveCitations)
+                }
+            }
+            .padding(12)
+            .background {
+                UIKitGlassBackgroundView(
+                    cornerRadius: 20,
+                    innerInset: 0,
+                    stableFillOpacity: 0.012,
+                    showsBorder: true,
+                    borderWidth: 0.85,
+                    darkBorderOpacity: 0.16,
+                    lightBorderOpacity: 0.09
+                )
+            }
+            .frame(maxWidth: assistantBubbleMaxWidth, alignment: .leading)
+
+            Spacer(minLength: 40)
         }
-        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 12))
+    }
+}
+
+private extension DetachedStreamingBubbleView {
+    struct RenderKey: Equatable {
+        let activeToolCalls: [ToolCallInfo]
+        let currentThinkingText: String
+        let currentStreamingText: String
+        let isThinking: Bool
+        let isStreaming: Bool
+        let liveCitations: [URLCitation]
+        let assistantBubbleMaxWidth: CGFloat
     }
 }
 
 private extension ChatView {
+    var showsEmptyState: Bool {
+        viewModel.messages.isEmpty && !viewModel.isStreaming && !viewModel.isRestoringConversation
+    }
+
     var assistantBubbleMaxWidth: CGFloat {
         UIDevice.current.userInterfaceIdiom == .pad ? 680 : 520
     }
 
-    func updateBottomFollowState() {
-        guard scrollViewportMaxY > 0 else { return }
-
-        let distanceToBottom = bottomAnchorMaxY - scrollViewportMaxY
-        let nextIsNearBottom = distanceToBottom <= autoFollowThreshold
-
-        if nextIsNearBottom != isNearBottom {
-            isNearBottom = nextIsNearBottom
-        }
-
-        if nextIsNearBottom {
-            shouldFollowLiveOutput = true
-        }
+    func dismissKeyboard() {
+        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
     }
 
-    func scrollToLiveTargetIfNeeded(_ proxy: ScrollViewProxy, animated: Bool) {
-        guard shouldFollowLiveOutput || isNearBottom else { return }
+    func handleGeneratedPreviewPresentationChange(_ isPresented: Bool) {
+        generatedPreviewTouchShieldTask?.cancel()
+        generatedPreviewTouchShieldTask = nil
 
-        let scrollAction = {
-            if let liveDraftMessageID = viewModel.liveDraftMessageID {
-                proxy.scrollTo(liveDraftMessageID, anchor: .bottom)
-            } else {
-                proxy.scrollTo("bottom", anchor: .bottom)
-            }
+        if isPresented {
+            isBlockingGeneratedPreviewTouches = true
+            return
         }
 
-        if animated {
-            withAnimation(.easeOut(duration: 0.18), scrollAction)
-        } else {
-            scrollAction()
+        guard isBlockingGeneratedPreviewTouches else { return }
+
+        generatedPreviewTouchShieldTask = Task { @MainActor in
+            try? await Task.sleep(nanoseconds: generatedPreviewTouchShieldDuration)
+            isBlockingGeneratedPreviewTouches = false
+            generatedPreviewTouchShieldTask = nil
         }
     }
-}
 
-private struct ChatViewportMaxYPreferenceKey: PreferenceKey {
-    static let defaultValue: CGFloat = 0
-
-    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
-        value = nextValue()
+    func beginGeneratedPreviewDismissal() {
+        generatedPreviewTouchShieldTask?.cancel()
+        generatedPreviewTouchShieldTask = nil
+        isBlockingGeneratedPreviewTouches = true
     }
-}
 
-private struct ChatBottomAnchorMaxYPreferenceKey: PreferenceKey {
-    static let defaultValue: CGFloat = 0
-
-    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
-        value = nextValue()
+    func presentModelSelector() {
+        dismissKeyboard()
+        modelSelectorDraft = viewModel.conversationConfiguration
+        isShowingModelSelector = true
     }
-}
 
-// MARK: - File Preview Item
+    func startNewChat() {
+        composerResetToken = UUID()
+        viewModel.startNewChat()
+    }
 
-struct FilePreviewItem: Identifiable {
-    let url: URL
+    func dismissModelSelector() {
+        isShowingModelSelector = false
+    }
 
-    var id: String { url.path }
+    func commitModelSelectorAndDismiss() {
+        viewModel.applyConversationConfiguration(modelSelectorDraft)
+        dismissModelSelector()
+    }
 }

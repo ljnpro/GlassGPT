@@ -29,8 +29,13 @@ struct HistoryRow: View {
                     .foregroundStyle(.secondary)
                     .padding(.horizontal, 6)
                     .padding(.vertical, 3)
-                    .background(.ultraThinMaterial, in: Capsule())
-                    .glassEffect(.regular, in: Capsule())
+                    .singleSurfaceGlass(
+                        cornerRadius: 999,
+                        stableFillOpacity: 0.01,
+                        borderWidth: 0.7,
+                        darkBorderOpacity: 0.14,
+                        lightBorderOpacity: 0.08
+                    )
             }
         }
         .padding(.vertical, 6)
