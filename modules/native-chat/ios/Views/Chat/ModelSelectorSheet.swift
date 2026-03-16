@@ -24,7 +24,14 @@ struct ModelBadge: View {
             .fixedSize(horizontal: true, vertical: false)
         }
         .buttonStyle(.plain)
-        .glassEffect(.regular, in: .capsule)
+        .singleSurfaceGlass(
+            cornerRadius: 999,
+            stableFillOpacity: 0.012,
+            tintOpacity: 0.022,
+            borderWidth: 0.8,
+            darkBorderOpacity: 0.14,
+            lightBorderOpacity: 0.08
+        )
     }
 
     private var badgeText: String {
@@ -158,6 +165,7 @@ struct ModelSelectorSheet: View {
         .singleSurfaceGlass(
             cornerRadius: metrics.panelCornerRadius,
             stableFillOpacity: 0.014,
+            tintOpacity: 0.026,
             borderWidth: 0.9,
             darkBorderOpacity: 0.17,
             lightBorderOpacity: 0.095
@@ -215,6 +223,7 @@ struct ModelSelectorSheet: View {
         .singleSurfaceGlass(
             cornerRadius: metrics.cardCornerRadius,
             stableFillOpacity: 0.012,
+            tintOpacity: 0.022,
             borderWidth: 0.8,
             darkBorderOpacity: 0.15,
             lightBorderOpacity: 0.085
@@ -271,6 +280,7 @@ struct ModelSelectorSheet: View {
         .singleSurfaceGlass(
             cornerRadius: metrics.cardCornerRadius,
             stableFillOpacity: 0.012,
+            tintOpacity: 0.022,
             borderWidth: 0.8,
             darkBorderOpacity: 0.15,
             lightBorderOpacity: 0.085

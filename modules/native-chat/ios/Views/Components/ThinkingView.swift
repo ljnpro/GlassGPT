@@ -125,17 +125,14 @@ private struct ThinkingSurfaceModifier: ViewModifier {
 
     func body(content: Content) -> some View {
         content
-            .background {
-                UIKitGlassBackgroundView(
-                    cornerRadius: 12,
-                    innerInset: 0,
-                    stableFillOpacity: isLive ? 0.014 : 0,
-                    showsBorder: true,
-                    borderWidth: 0.8,
-                    darkBorderOpacity: 0.15,
-                    lightBorderOpacity: 0.085
-                )
-            }
+            .singleSurfaceGlass(
+                cornerRadius: 12,
+                stableFillOpacity: isLive ? 0.012 : 0.004,
+                tintOpacity: isLive ? 0.03 : 0.022,
+                borderWidth: 0.8,
+                darkBorderOpacity: 0.15,
+                lightBorderOpacity: 0.085
+            )
     }
 }
 
