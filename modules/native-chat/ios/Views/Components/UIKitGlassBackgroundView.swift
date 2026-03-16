@@ -133,8 +133,9 @@ struct GlassPressButtonStyle: ButtonStyle {
 
 @MainActor
 final class GlassBackgroundHostingView: UIView {
-    private let effectView = UIVisualEffectView()
-    private let stableFillView = UIView()
+    private let tileContainerView = UIView()
+    private var effectTileViews: [UIVisualEffectView] = []
+    private var stableFillTileViews: [UIView] = []
 
     private var cornerRadius: CGFloat
     private var innerInset: CGFloat
@@ -144,6 +145,8 @@ final class GlassBackgroundHostingView: UIView {
     private var borderWidth: CGFloat
     private var darkBorderOpacity: CGFloat
     private var lightBorderOpacity: CGFloat
+    private let maximumTileHeight: CGFloat = 420
+    private let tileSeamOverlap: CGFloat = 1.0 / max(UIScreen.main.scale, 1)
 
     init(
         cornerRadius: CGFloat,
@@ -185,20 +188,16 @@ final class GlassBackgroundHostingView: UIView {
     override func layoutSubviews() {
         super.layoutSubviews()
 
-        effectView.frame = bounds
-        applyCornerConfiguration(to: effectView, cornerRadius: cornerRadius)
-        effectView.layer.cornerRadius = cornerRadius
-        effectView.layer.cornerCurve = .continuous
-        effectView.layer.borderWidth = showsBorder ? borderWidth : 0
+        tileContainerView.frame = bounds
+        applyCornerConfiguration(to: tileContainerView, cornerRadius: cornerRadius)
+        tileContainerView.layer.cornerRadius = cornerRadius
+        tileContainerView.layer.cornerCurve = .continuous
 
-        let insetBounds = effectView.contentView.bounds.insetBy(dx: innerInset, dy: innerInset)
-        stableFillView.frame = insetBounds
-        applyCornerConfiguration(
-            to: stableFillView,
-            cornerRadius: max(cornerRadius - innerInset, 0)
-        )
-        stableFillView.layer.cornerRadius = max(cornerRadius - innerInset, 0)
-        stableFillView.layer.cornerCurve = .continuous
+        layer.cornerRadius = cornerRadius
+        layer.cornerCurve = .continuous
+        layer.borderWidth = showsBorder ? borderWidth : 0
+
+        layoutEffectTiles()
     }
 
     override func traitCollectionDidChange(_ previousTraitCollection: UITraitCollection?) {
@@ -235,14 +234,9 @@ final class GlassBackgroundHostingView: UIView {
         isUserInteractionEnabled = false
         clipsToBounds = false
 
-        effectView.clipsToBounds = true
-        effectView.isUserInteractionEnabled = false
-        effectView.contentView.backgroundColor = .clear
-        addSubview(effectView)
-
-        stableFillView.isUserInteractionEnabled = false
-        stableFillView.clipsToBounds = true
-        effectView.contentView.addSubview(stableFillView)
+        tileContainerView.isUserInteractionEnabled = false
+        tileContainerView.clipsToBounds = true
+        addSubview(tileContainerView)
     }
 
     private func applyCornerConfiguration(to view: UIView, cornerRadius: CGFloat) {
@@ -284,21 +278,95 @@ final class GlassBackgroundHostingView: UIView {
         let effect = UIGlassEffect(style: .regular)
         effect.isInteractive = false
         effect.tintColor = tintColor
-        effectView.effect = effect
 
-        if innerInset <= 0.001 {
-            effectView.contentView.backgroundColor = fillOpacity <= 0.001 ? .clear : fillColor
-            stableFillView.isHidden = true
-            stableFillView.backgroundColor = .clear
-        } else {
-            effectView.contentView.backgroundColor = .clear
-            stableFillView.isHidden = fillOpacity <= 0.001
-            stableFillView.backgroundColor = fillColor
-        }
-        effectView.layer.borderColor = (
+        let borderColor = (
             isDark
                 ? UIColor.white.withAlphaComponent(darkBorderOpacity)
                 : UIColor.black.withAlphaComponent(lightBorderOpacity)
         ).cgColor
+
+        layer.borderColor = borderColor
+
+        for effectView in effectTileViews {
+            effectView.effect = effect
+            effectView.contentView.backgroundColor = innerInset <= 0.001 && fillOpacity > 0.001
+                ? fillColor
+                : .clear
+        }
+
+        for stableFillView in stableFillTileViews {
+            stableFillView.isHidden = innerInset <= 0.001 || fillOpacity <= 0.001
+            stableFillView.backgroundColor = fillColor
+        }
+    }
+
+    private func layoutEffectTiles() {
+        let frames = effectTileFrames(for: tileContainerView.bounds)
+        syncTileCount(frames.count)
+
+        for (index, frame) in frames.enumerated() {
+            let effectView = effectTileViews[index]
+            effectView.frame = frame
+            effectView.layer.cornerRadius = 0
+            effectView.layer.cornerCurve = .continuous
+            effectView.clipsToBounds = true
+
+            let stableFillView = stableFillTileViews[index]
+            let insetBounds = effectView.bounds.insetBy(dx: innerInset, dy: innerInset)
+            stableFillView.frame = insetBounds
+            stableFillView.layer.cornerRadius = 0
+            stableFillView.layer.cornerCurve = .continuous
+            stableFillView.clipsToBounds = true
+        }
+    }
+
+    private func effectTileFrames(for bounds: CGRect) -> [CGRect] {
+        guard bounds.width > 0.5, bounds.height > 0.5 else { return [] }
+
+        if bounds.height <= maximumTileHeight {
+            return [bounds]
+        }
+
+        var frames: [CGRect] = []
+        var currentY: CGFloat = 0
+
+        while currentY < bounds.height - 0.5 {
+            let remainingHeight = bounds.height - currentY
+            let tileHeight = min(maximumTileHeight, remainingHeight)
+            let originY = max(currentY - (frames.isEmpty ? 0 : tileSeamOverlap), 0)
+            let extraBottomOverlap = remainingHeight > maximumTileHeight ? tileSeamOverlap : 0
+            let frame = CGRect(
+                x: 0,
+                y: originY,
+                width: bounds.width,
+                height: min(tileHeight + extraBottomOverlap + (frames.isEmpty ? 0 : tileSeamOverlap), bounds.height - originY)
+            )
+            frames.append(frame.integral)
+            currentY += tileHeight
+        }
+
+        return frames
+    }
+
+    private func syncTileCount(_ count: Int) {
+        while effectTileViews.count < count {
+            let effectView = UIVisualEffectView()
+            effectView.isUserInteractionEnabled = false
+            effectView.clipsToBounds = true
+            effectView.contentView.backgroundColor = .clear
+            tileContainerView.addSubview(effectView)
+            effectTileViews.append(effectView)
+
+            let stableFillView = UIView()
+            stableFillView.isUserInteractionEnabled = false
+            stableFillView.clipsToBounds = true
+            effectView.contentView.addSubview(stableFillView)
+            stableFillTileViews.append(stableFillView)
+        }
+
+        while effectTileViews.count > count {
+            effectTileViews.removeLast().removeFromSuperview()
+            stableFillTileViews.removeLast()
+        }
     }
 }

@@ -21,6 +21,7 @@ struct ChatView: View {
     @State private var isBlockingGeneratedPreviewTouches = false
     @State private var presentedGeneratedPreviewItem: FilePreviewItem?
     @State private var isGeneratedPreviewDismissPending = false
+    @State private var isShowingGeneratedPreview = false
     @State private var generatedPreviewDismissTask: Task<Void, Never>?
 
     private let generatedPreviewOverlayDismissDelay: UInt64 = 90_000_000
@@ -103,6 +104,23 @@ struct ChatView: View {
                 ) {
                     modelSelectorPresentation
                 }
+                .overFullScreenCover(
+                    isPresented: $isShowingGeneratedPreview,
+                    interfaceStyle: modelSelectorInterfaceStyle,
+                    onDismiss: handleGeneratedPreviewCoverDismiss
+                ) {
+                    if let previewItem = presentedGeneratedPreviewItem {
+                        FilePreviewSheet(
+                            previewItem: previewItem,
+                            isDismissPending: isGeneratedPreviewDismissPending,
+                            onBeginDismissInteraction: prepareGeneratedPreviewDismissal,
+                            onRequestDismiss: beginGeneratedPreviewDismissal
+                        )
+                    } else {
+                        Color.clear
+                            .ignoresSafeArea()
+                    }
+                }
                 .onChange(of: generatedPreviewCandidate?.id) { _, _ in
                     syncGeneratedPreviewPresentation()
                 }
@@ -147,6 +165,7 @@ struct ChatView: View {
                     isBlockingGeneratedPreviewTouches = false
                     presentedGeneratedPreviewItem = nil
                     isGeneratedPreviewDismissPending = false
+                    isShowingGeneratedPreview = false
                 }
                 .allowsHitTesting(presentedGeneratedPreviewItem == nil && !isBlockingGeneratedPreviewTouches)
             }
@@ -156,20 +175,6 @@ struct ChatView: View {
                     .contentShape(Rectangle())
                     .accessibilityHidden(true)
                     .zIndex(1500)
-            }
-            if let previewItem = presentedGeneratedPreviewItem {
-                FilePreviewSheet(
-                    previewItem: previewItem,
-                    isDismissPending: isGeneratedPreviewDismissPending,
-                    onRequestDismiss: beginGeneratedPreviewDismissal
-                )
-                .zIndex(2000)
-                .transition(
-                    .asymmetric(
-                        insertion: .opacity.combined(with: .scale(scale: 0.985)),
-                        removal: .opacity.combined(with: .scale(scale: 0.975))
-                    )
-                )
             }
         }
     }
@@ -596,43 +601,60 @@ private extension ChatView {
     func syncGeneratedPreviewPresentation() {
         guard let previewItem = generatedPreviewCandidate else {
             guard !isGeneratedPreviewDismissPending else { return }
-            withAnimation(.easeInOut(duration: 0.2)) {
-                presentedGeneratedPreviewItem = nil
-            }
+            isShowingGeneratedPreview = false
+            presentedGeneratedPreviewItem = nil
             isBlockingGeneratedPreviewTouches = false
             return
         }
 
         generatedPreviewDismissTask?.cancel()
         generatedPreviewDismissTask = nil
-        withAnimation(.easeInOut(duration: 0.2)) {
-            presentedGeneratedPreviewItem = previewItem
-        }
+        presentedGeneratedPreviewItem = previewItem
         isGeneratedPreviewDismissPending = false
-        if !isBlockingGeneratedPreviewTouches {
-            isBlockingGeneratedPreviewTouches = true
+        isBlockingGeneratedPreviewTouches = false
+        if !isShowingGeneratedPreview {
+            isShowingGeneratedPreview = true
         }
     }
 
-    func beginGeneratedPreviewDismissal() {
-        guard presentedGeneratedPreviewItem != nil, !isGeneratedPreviewDismissPending else { return }
-
+    func prepareGeneratedPreviewDismissal() {
+        guard presentedGeneratedPreviewItem != nil else { return }
+        guard !isGeneratedPreviewDismissPending else { return }
         generatedPreviewDismissTask?.cancel()
         generatedPreviewDismissTask = nil
         isGeneratedPreviewDismissPending = true
         isBlockingGeneratedPreviewTouches = true
+    }
+
+    func beginGeneratedPreviewDismissal() {
+        guard presentedGeneratedPreviewItem != nil else { return }
+        if !isGeneratedPreviewDismissPending {
+            prepareGeneratedPreviewDismissal()
+        }
+
         viewModel.filePreviewItem = nil
 
         generatedPreviewDismissTask = Task { @MainActor in
             try? await Task.sleep(nanoseconds: generatedPreviewOverlayDismissDelay)
-            withAnimation(.easeInOut(duration: 0.22)) {
-                presentedGeneratedPreviewItem = nil
-            }
+            isShowingGeneratedPreview = false
 
             try? await Task.sleep(nanoseconds: generatedPreviewTouchCooldownDuration)
+            presentedGeneratedPreviewItem = nil
             isBlockingGeneratedPreviewTouches = false
             isGeneratedPreviewDismissPending = false
             generatedPreviewDismissTask = nil
+        }
+    }
+
+    func handleGeneratedPreviewCoverDismiss() {
+        guard !isShowingGeneratedPreview else { return }
+
+        if !isGeneratedPreviewDismissPending {
+            presentedGeneratedPreviewItem = nil
+            isBlockingGeneratedPreviewTouches = false
+            generatedPreviewDismissTask?.cancel()
+            generatedPreviewDismissTask = nil
+            viewModel.filePreviewItem = nil
         }
     }
 
