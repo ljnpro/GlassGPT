@@ -30,6 +30,10 @@ final class SettingsViewModel {
 
     var cloudflareHealthStatus: CloudflareHealthStatus = .unknown
     var isCheckingCloudflareHealth: Bool = false
+    var generatedImageCacheSizeBytes: Int64 = 0
+    var generatedDocumentCacheSizeBytes: Int64 = 0
+    var isClearingImageCache: Bool = false
+    var isClearingDocumentCache: Bool = false
 
     // MARK: - Persisted Settings (stored properties for @Observable tracking)
 
@@ -99,10 +103,31 @@ final class SettingsViewModel {
         defaultModel.availableEfforts
     }
 
+    var generatedImageCacheSizeString: String {
+        Self.byteCountFormatter.string(fromByteCount: generatedImageCacheSizeBytes)
+    }
+
+    var generatedImageCacheLimitString: String {
+        Self.byteCountFormatter.string(fromByteCount: FileDownloadService.generatedImageCacheLimitBytes)
+    }
+
+    var generatedDocumentCacheSizeString: String {
+        Self.byteCountFormatter.string(fromByteCount: generatedDocumentCacheSizeBytes)
+    }
+
+    var generatedDocumentCacheLimitString: String {
+        Self.byteCountFormatter.string(fromByteCount: FileDownloadService.generatedDocumentCacheLimitBytes)
+    }
+
     // MARK: - Dependencies
 
     private let keychainService = KeychainService()
     private let openAIService = OpenAIService()
+    private static let byteCountFormatter: ByteCountFormatter = {
+        let formatter = ByteCountFormatter()
+        formatter.countStyle = .file
+        return formatter
+    }()
 
     // MARK: - Init
 
@@ -154,6 +179,11 @@ final class SettingsViewModel {
             Task {
                 await checkCloudflareHealth()
             }
+        }
+
+        Task {
+            await refreshGeneratedImageCacheSize()
+            await refreshGeneratedDocumentCacheSize()
         }
     }
 
@@ -249,6 +279,34 @@ final class SettingsViewModel {
         }
 
         isCheckingCloudflareHealth = false
+    }
+
+    func refreshGeneratedImageCacheSize() async {
+        generatedImageCacheSizeBytes = await FileDownloadService.shared.generatedImageCacheSize()
+    }
+
+    func refreshGeneratedDocumentCacheSize() async {
+        generatedDocumentCacheSizeBytes = await FileDownloadService.shared.generatedDocumentCacheSize()
+    }
+
+    func clearGeneratedImageCache() async {
+        guard !isClearingImageCache else { return }
+
+        isClearingImageCache = true
+        await FileDownloadService.shared.clearGeneratedImageCache()
+        generatedImageCacheSizeBytes = await FileDownloadService.shared.generatedImageCacheSize()
+        isClearingImageCache = false
+        HapticService.shared.impact(.medium)
+    }
+
+    func clearGeneratedDocumentCache() async {
+        guard !isClearingDocumentCache else { return }
+
+        isClearingDocumentCache = true
+        await FileDownloadService.shared.clearGeneratedDocumentCache()
+        generatedDocumentCacheSizeBytes = await FileDownloadService.shared.generatedDocumentCacheSize()
+        isClearingDocumentCache = false
+        HapticService.shared.impact(.medium)
     }
 
     // MARK: - Helpers

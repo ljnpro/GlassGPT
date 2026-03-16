@@ -1,172 +1,436 @@
 import ImageIO
+import PDFKit
 import Photos
 import SwiftUI
 import UIKit
-import UniformTypeIdentifiers
 
 struct FilePreviewSheet: View {
-    let fileURL: URL
+    let previewItem: FilePreviewItem
+    var onWillDismiss: () -> Void = {}
+
+    @AppStorage("appTheme") private var appThemeRawValue: String = AppTheme.system.rawValue
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.colorScheme) private var colorScheme
 
     @State private var saveState: SaveState = .idle
     @State private var saveError: String?
-    @State private var imagePreview: ImagePreviewPayload?
-    @State private var isLoadingPreview = true
+    @State private var imagePreviewState: ImagePreviewState = .loading
+    @State private var pdfPreviewState: PDFPreviewState = .loading
+    @State private var showSaveSuccessHUD = false
+    @State private var saveSuccessHUDToken = UUID()
     @State private var isShowingShareSheet = false
 
     private struct ImagePreviewPayload {
         let image: UIImage
         let data: Data
-        let contentType: UTType
+    }
+
+    private enum ImagePreviewState {
+        case loading
+        case image(ImagePreviewPayload)
+        case error(String)
     }
 
     private enum ImagePreviewLoadResult {
         case image(ImagePreviewPayload)
-        case notImage
+        case error(String)
+        case unavailable
+    }
+
+    private enum PDFPreviewState {
+        case loading
+        case document(PDFDocument)
+        case error(String)
+    }
+
+    private enum PDFPreviewLoadResult {
+        case document(PDFDocument)
+        case error(String)
         case unavailable
     }
 
     private enum SaveState: Equatable {
         case idle
         case saving
-        case saved
+    }
+
+    private var fileURL: URL {
+        previewItem.url
     }
 
     private var canSaveToPhotos: Bool {
-        imagePreview != nil
+        imagePreviewPayload != nil
     }
 
-    private var fileDisplayName: String {
-        let trimmed = fileURL.deletingPathExtension().lastPathComponent
-        return trimmed.isEmpty ? fileURL.lastPathComponent : trimmed
+    private var imagePreviewPayload: ImagePreviewPayload? {
+        if case .image(let payload) = imagePreviewState {
+            return payload
+        }
+        return nil
+    }
+
+    private var isDarkAppearance: Bool {
+        resolvedColorScheme == .dark
+    }
+
+    private var isPad: Bool {
+        UIDevice.current.userInterfaceIdiom == .pad
+    }
+
+    private var selectedTheme: AppTheme {
+        AppTheme(rawValue: appThemeRawValue) ?? .system
+    }
+
+    private var resolvedColorScheme: ColorScheme {
+        selectedTheme.colorScheme ?? colorScheme
+    }
+
+    private var viewerBackgroundColor: Color {
+        isDarkAppearance ? .black : .white
+    }
+
+    private var viewerPrimaryColor: Color {
+        isDarkAppearance ? .white : .black
+    }
+
+    private var viewerSecondaryColor: Color {
+        isDarkAppearance ? Color.white.opacity(0.72) : Color.black.opacity(0.58)
+    }
+
+    private var actionIconSize: CGFloat {
+        isPad ? 22 : 20
+    }
+
+    private var closeIconSize: CGFloat {
+        isPad ? 23 : 21
+    }
+
+    private var imageTopBarSideClearance: CGFloat {
+        isPad ? 116 : 104
+    }
+
+    private var pdfTopBarSideClearance: CGFloat {
+        isPad ? 176 : 156
+    }
+
+    private var bottomButtonControlSize: ControlSize {
+        .large
+    }
+
+    private var topButtonControlSize: ControlSize {
+        .large
     }
 
     var body: some View {
-        ZStack(alignment: .top) {
-            if let imagePreview {
-                imagePreviewView(imagePreview.image)
-            } else if isLoadingPreview {
-                loadingState
-            } else {
-                FilePreviewController(fileURL: fileURL)
-                    .ignoresSafeArea()
+        content
+            .preferredColorScheme(selectedTheme.colorScheme)
+            .task(id: previewItem.id) {
+                await loadPreview()
             }
+            .sheet(isPresented: $isShowingShareSheet) {
+                ActivityViewController(activityItems: [fileURL])
+            }
+            .alert("Save Failed", isPresented: saveErrorBinding) {
+                Button("OK", role: .cancel) {
+                    saveError = nil
+                }
+            } message: {
+                Text(saveError ?? "Unable to save this image to Photos.")
+            }
+    }
 
-            if imagePreview != nil {
-                headerActions
-                    .padding(.horizontal, 18)
-                    .padding(.top, 16)
+    @ViewBuilder
+    private var content: some View {
+        switch previewItem.kind {
+        case .generatedImage:
+            generatedImageViewer
+        case .generatedPDF:
+            generatedPDFViewer
+        }
+    }
+
+    private var generatedImageViewer: some View {
+        ZStack {
+            viewerBackgroundColor
+                .ignoresSafeArea()
+
+            GeometryReader { geometry in
+                generatedImageCanvas(in: geometry)
             }
         }
-        .task(id: fileURL) {
-            await loadImagePreview()
+        .safeAreaInset(edge: .top, spacing: 0) {
+            imageTopBar
+                .padding(.horizontal, 16)
+                .padding(.top, 8)
+                .padding(.bottom, 12)
         }
-        .sheet(isPresented: $isShowingShareSheet) {
-            ActivityViewController(activityItems: shareItems)
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            imageBottomBar
+                .padding(.horizontal, 16)
+                .padding(.top, 12)
+                .padding(.bottom, 8)
         }
-        .alert("Save Failed", isPresented: saveErrorBinding) {
-            Button("OK", role: .cancel) {
-                saveError = nil
+        .overlay {
+            GeometryReader { geometry in
+                if showSaveSuccessHUD {
+                    saveSuccessHUD
+                        .padding(.bottom, geometry.safeAreaInsets.bottom + 72)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                }
             }
-        } message: {
-            Text(saveError ?? "Unable to save this image to Photos.")
+            .allowsHitTesting(false)
+        }
+    }
+
+    private var generatedPDFViewer: some View {
+        ZStack {
+            viewerBackgroundColor
+                .ignoresSafeArea()
+
+            GeometryReader { geometry in
+                generatedPDFCanvas(in: geometry)
+            }
+        }
+        .safeAreaInset(edge: .top, spacing: 0) {
+            pdfTopBar
+                .padding(.horizontal, 16)
+                .padding(.top, 8)
+                .padding(.bottom, 12)
         }
     }
 
     @ViewBuilder
-    private func imagePreviewView(_ image: UIImage) -> some View {
-        GeometryReader { geometry in
-            ScrollView([.horizontal, .vertical], showsIndicators: false) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 28, style: .continuous)
-                        .fill(Color(uiColor: .tertiarySystemBackground))
-                        .overlay {
-                            RoundedRectangle(cornerRadius: 28, style: .continuous)
-                                .strokeBorder(Color.primary.opacity(0.05), lineWidth: 1)
-                        }
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 18)
-
-                    Image(uiImage: image)
-                        .resizable()
-                        .interpolation(.high)
-                        .antialiased(true)
-                        .scaledToFit()
-                        .frame(
-                            maxWidth: geometry.size.width - 28,
-                            maxHeight: geometry.size.height - 120
-                        )
-                }
-                .frame(
-                    minWidth: geometry.size.width,
-                    minHeight: geometry.size.height
-                )
-                .padding(.top, 64)
-                .padding(.bottom, 24)
+    private func generatedImageCanvas(in geometry: GeometryProxy) -> some View {
+        switch imagePreviewState {
+        case .loading:
+            viewerStateContainer {
+                ProgressView()
+                    .controlSize(.regular)
+                    .tint(viewerPrimaryColor)
             }
-            .background(Color(uiColor: .secondarySystemBackground))
+        case .image(let payload):
+            imagePreviewView(payload.image, in: geometry)
+        case .error(let message):
+            viewerStateContainer {
+                VStack(spacing: 14) {
+                    Image(systemName: "photo.badge.exclamationmark")
+                        .font(.system(size: 40, weight: .regular))
+                        .foregroundStyle(viewerSecondaryColor)
+
+                    Text(message)
+                        .font(.body)
+                        .foregroundStyle(viewerSecondaryColor)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 32)
+                }
+            }
         }
-        .ignoresSafeArea()
     }
 
-    private var loadingState: some View {
-        ZStack {
-            Color(uiColor: .secondarySystemBackground)
-            ProgressView()
-                .controlSize(.regular)
+    @ViewBuilder
+    private func generatedPDFCanvas(in geometry: GeometryProxy) -> some View {
+        switch pdfPreviewState {
+        case .loading:
+            viewerStateContainer {
+                ProgressView()
+                    .controlSize(.regular)
+                    .tint(viewerPrimaryColor)
+            }
+        case .document(let document):
+            pdfPreviewView(document, in: geometry)
+        case .error(let message):
+            viewerStateContainer {
+                VStack(spacing: 14) {
+                    Image(systemName: "doc.richtext")
+                        .font(.system(size: 40, weight: .regular))
+                        .foregroundStyle(viewerSecondaryColor)
+
+                    Text(message)
+                        .font(.body)
+                        .foregroundStyle(viewerSecondaryColor)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 32)
+                }
+            }
         }
-        .ignoresSafeArea()
     }
 
-    private var headerActions: some View {
-        ZStack {
-            Text(fileDisplayName)
-                .font(.headline.weight(.semibold))
-                .foregroundStyle(.primary)
-                .lineLimit(1)
-                .padding(.horizontal, 120)
+    private func imagePreviewView(_ image: UIImage, in geometry: GeometryProxy) -> some View {
+        let verticalPadding: CGFloat = isPad ? 24 : 16
+        let availableHeight = max(geometry.size.height - (verticalPadding * 2), 1)
+        let horizontalPadding: CGFloat = isPad ? 32 : 16
+        let availableWidth = max(geometry.size.width - (horizontalPadding * 2), 1)
+        let maxImageWidth = isPad ? min(availableWidth, geometry.size.width * 0.74) : availableWidth
 
-            HStack(spacing: 8) {
+        return ScrollView([.horizontal, .vertical], showsIndicators: false) {
+            VStack(spacing: 0) {
                 Spacer(minLength: 0)
+                Image(uiImage: image)
+                    .resizable()
+                    .interpolation(.high)
+                    .antialiased(true)
+                    .scaledToFit()
+                    .frame(maxWidth: maxImageWidth, maxHeight: availableHeight)
+                    .frame(
+                        maxWidth: .infinity,
+                        minHeight: availableHeight,
+                        maxHeight: availableHeight,
+                        alignment: .center
+                    )
+                    .padding(.horizontal, horizontalPadding)
+                    .padding(.vertical, verticalPadding)
+                Spacer(minLength: 0)
+            }
+            .frame(minWidth: geometry.size.width, minHeight: geometry.size.height)
+        }
+    }
 
-                if canSaveToPhotos {
-                    Button {
-                        Task { await saveImageToPhotos() }
-                    } label: {
-                        Group {
-                            switch saveState {
-                            case .idle:
-                                Image(systemName: "arrow.down.to.line")
-                                    .font(.system(size: 15, weight: .semibold))
-                            case .saving:
-                                ProgressView()
-                                    .controlSize(.small)
-                            case .saved:
-                                Image(systemName: "checkmark")
-                                    .font(.system(size: 15, weight: .bold))
-                            }
-                        }
-                        .frame(width: 36, height: 36)
-                    }
-                    .buttonStyle(.glass)
-                    .accessibilityLabel(saveState == .saved ? "Saved to Photos" : "Save to Photos")
-                    .disabled(saveState == .saving)
-                }
+    private func pdfPreviewView(_ document: PDFDocument, in geometry: GeometryProxy) -> some View {
+        let horizontalPadding: CGFloat = isPad ? 24 : 8
+        let verticalPadding: CGFloat = isPad ? 20 : 8
+        let availableWidth = max(geometry.size.width - (horizontalPadding * 2), 1)
+        let maxViewerWidth = isPad ? min(availableWidth, geometry.size.width * 0.72) : availableWidth
 
-                Button {
-                    isShowingShareSheet = true
-                } label: {
-                    Image(systemName: "square.and.arrow.up")
-                        .font(.system(size: 16, weight: .semibold))
-                        .frame(width: 36, height: 36)
-                }
-                .buttonStyle(.glass)
-                .accessibilityLabel("Share")
+        return GeneratedPDFView(document: document, isDarkAppearance: isDarkAppearance)
+            .frame(maxWidth: maxViewerWidth)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .padding(.horizontal, horizontalPadding)
+            .padding(.vertical, verticalPadding)
+    }
+
+    private func viewerStateContainer<Content: View>(@ViewBuilder content: () -> Content) -> some View {
+        content()
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+    }
+
+    private var imageTopBar: some View {
+        ZStack {
+            titleText
+                .padding(.horizontal, imageTopBarSideClearance)
+
+            HStack(spacing: 0) {
+                Spacer()
+                closeButton
             }
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 10)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
-        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .frame(maxWidth: .infinity)
+    }
+
+    private var pdfTopBar: some View {
+        ZStack {
+            titleText
+                .padding(.horizontal, pdfTopBarSideClearance)
+
+            HStack(spacing: 0) {
+                pdfShareButton
+                Spacer()
+                closeButton
+            }
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    private var titleText: some View {
+        Text(previewItem.viewerFilename)
+            .font(.system(size: isPad ? 20 : 18, weight: .semibold))
+            .foregroundStyle(viewerPrimaryColor)
+            .lineLimit(1)
+            .minimumScaleFactor(0.7)
+            .allowsTightening(true)
+            .truncationMode(.middle)
+    }
+
+    private var imageBottomBar: some View {
+        HStack {
+            downloadButton
+
+            Spacer(minLength: 0)
+
+            bottomShareButton
+        }
+    }
+
+    private var closeButton: some View {
+        Button {
+            onWillDismiss()
+            dismiss()
+        } label: {
+            Image(systemName: "xmark")
+                .font(.system(size: closeIconSize, weight: .semibold))
+                .frame(width: closeIconSize, height: closeIconSize)
+        }
+        .buttonStyle(.glass)
+        .buttonBorderShape(.circle)
+        .controlSize(topButtonControlSize)
+        .accessibilityLabel("Close preview")
+    }
+
+    private var downloadButton: some View {
+        Button {
+            Task { await saveImageToPhotos() }
+        } label: {
+            switch saveState {
+            case .idle:
+                Image(systemName: "arrow.down.to.line")
+                    .font(.system(size: actionIconSize, weight: .semibold))
+                    .frame(width: actionIconSize, height: actionIconSize)
+            case .saving:
+                ProgressView()
+                    .controlSize(.small)
+                    .tint(viewerPrimaryColor)
+                    .frame(width: actionIconSize, height: actionIconSize)
+            }
+        }
+        .buttonStyle(.glass)
+        .buttonBorderShape(.circle)
+        .controlSize(bottomButtonControlSize)
+        .accessibilityLabel("Download to Photos")
+        .disabled(saveState == .saving || !canSaveToPhotos)
+        .opacity((saveState == .saving || !canSaveToPhotos) ? 0.62 : 1)
+    }
+
+    private var bottomShareButton: some View {
+        Button {
+            presentShareSheet()
+        } label: {
+            Image(systemName: "square.and.arrow.up")
+                .font(.system(size: actionIconSize, weight: .semibold))
+                .frame(width: actionIconSize, height: actionIconSize)
+        }
+        .buttonStyle(.glass)
+        .buttonBorderShape(.circle)
+        .controlSize(bottomButtonControlSize)
+        .accessibilityLabel("Share")
+    }
+
+    private var pdfShareButton: some View {
+        Button {
+            presentShareSheet()
+        } label: {
+            Image(systemName: "square.and.arrow.up")
+                .font(.system(size: actionIconSize, weight: .semibold))
+                .frame(width: actionIconSize, height: actionIconSize)
+        }
+        .buttonStyle(.glass)
+        .buttonBorderShape(.circle)
+        .controlSize(topButtonControlSize)
+        .accessibilityLabel("Share")
+    }
+
+    private var saveSuccessHUD: some View {
+        Label("Saved to Photos", systemImage: "checkmark.circle.fill")
+            .font(.system(size: 14, weight: .semibold))
+            .foregroundStyle(viewerPrimaryColor)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
+            .singleSurfaceGlass(
+                cornerRadius: 999,
+                stableFillOpacity: 0.012,
+                borderWidth: 0.8,
+                darkBorderOpacity: 0.14,
+                lightBorderOpacity: 0.08
+            )
     }
 
     private var saveErrorBinding: Binding<Bool> {
@@ -176,40 +440,63 @@ struct FilePreviewSheet: View {
         )
     }
 
-    private var shareItems: [Any] {
-        if let imagePreview {
-            return [imagePreview.image]
+    @MainActor
+    private func loadPreview() async {
+        switch previewItem.kind {
+        case .generatedImage:
+            await loadImagePreview()
+        case .generatedPDF:
+            await loadPDFPreview()
         }
-        return [fileURL]
     }
 
     @MainActor
     private func loadImagePreview() async {
-        isLoadingPreview = true
-        imagePreview = nil
+        imagePreviewState = .loading
 
         for attempt in 0..<4 {
-            switch Self.loadImagePreview(from: fileURL) {
+            switch Self.loadGeneratedImagePreview(from: fileURL) {
             case .image(let payload):
-                imagePreview = payload
-                isLoadingPreview = false
+                imagePreviewState = .image(payload)
                 return
-            case .notImage:
-                isLoadingPreview = false
+            case .error(let message):
+                imagePreviewState = .error(message)
                 return
             case .unavailable:
                 if attempt < 3 {
                     try? await Task.sleep(nanoseconds: 150_000_000)
+                } else {
+                    imagePreviewState = .error("This generated image could not be loaded.")
                 }
             }
         }
+    }
 
-        isLoadingPreview = false
+    @MainActor
+    private func loadPDFPreview() async {
+        pdfPreviewState = .loading
+
+        for attempt in 0..<4 {
+            switch Self.loadGeneratedPDFPreview(from: fileURL) {
+            case .document(let document):
+                pdfPreviewState = .document(document)
+                return
+            case .error(let message):
+                pdfPreviewState = .error(message)
+                return
+            case .unavailable:
+                if attempt < 3 {
+                    try? await Task.sleep(nanoseconds: 150_000_000)
+                } else {
+                    pdfPreviewState = .error("This generated PDF could not be loaded.")
+                }
+            }
+        }
     }
 
     @MainActor
     private func saveImageToPhotos() async {
-        guard let imagePreview, canSaveToPhotos, saveState != .saving else { return }
+        guard let imagePreviewPayload, canSaveToPhotos, saveState != .saving else { return }
 
         saveState = .saving
 
@@ -222,17 +509,13 @@ struct FilePreviewSheet: View {
 
         do {
             try await PhotoLibraryImageSaver.saveImageData(
-                imagePreview.data,
-                originalFilename: fileURL.lastPathComponent
+                imagePreviewPayload.data,
+                originalFilename: previewItem.viewerFilename
             )
-            saveState = .saved
-
-            Task { @MainActor in
-                try? await Task.sleep(nanoseconds: 1_500_000_000)
-                if saveState == .saved {
-                    saveState = .idle
-                }
-            }
+            saveState = .idle
+            HapticService.shared.notify(.success)
+            UIAccessibility.post(notification: .announcement, argument: "Saved to Photos")
+            showSaveSuccessFeedback()
         } catch {
             saveState = .idle
             saveError = error.localizedDescription
@@ -247,18 +530,17 @@ struct FilePreviewSheet: View {
         }
     }
 
-    private static func loadImagePreview(from fileURL: URL) -> ImagePreviewLoadResult {
+    private static func loadGeneratedImagePreview(from fileURL: URL) -> ImagePreviewLoadResult {
         guard let data = try? Data(contentsOf: fileURL), !data.isEmpty else {
             return .unavailable
         }
 
-        guard let imageSource = CGImageSourceCreateWithData(data as CFData, nil) else {
-            return .notImage
+        guard FileDownloadService.isGeneratedImageFilename(fileURL.lastPathComponent) else {
+            return .error("This file is no longer recognized as an image.")
         }
 
-        let contentType = inferredContentType(from: imageSource, fileURL: fileURL, data: data)
-        guard contentType.conforms(to: .image) else {
-            return .notImage
+        guard let imageSource = CGImageSourceCreateWithData(data as CFData, nil) else {
+            return .error("This generated image could not be rendered.")
         }
 
         guard let cgImage = CGImageSourceCreateImageAtIndex(
@@ -269,41 +551,54 @@ struct FilePreviewSheet: View {
                 kCGImageSourceShouldCacheImmediately: true
             ] as CFDictionary
         ) else {
-            return .unavailable
+            return .error("This generated image could not be rendered.")
         }
 
         return .image(
             ImagePreviewPayload(
                 image: UIImage(cgImage: cgImage),
-                data: data,
-                contentType: contentType
+                data: data
             )
         )
     }
 
-    private static func inferredContentType(from imageSource: CGImageSource, fileURL: URL, data: Data) -> UTType {
-        if let typeIdentifier = CGImageSourceGetType(imageSource) as? String,
-           let type = UTType(typeIdentifier) {
-            return type
+    private static func loadGeneratedPDFPreview(from fileURL: URL) -> PDFPreviewLoadResult {
+        guard let data = try? Data(contentsOf: fileURL), !data.isEmpty else {
+            return .unavailable
         }
 
-        if let type = UTType(filenameExtension: fileURL.pathExtension) {
-            return type
+        guard FileDownloadService.isGeneratedPDFFilename(fileURL.lastPathComponent) else {
+            return .error("This file is no longer recognized as a PDF.")
         }
 
-        if data.starts(with: [0x89, 0x50, 0x4E, 0x47]) {
-            return .png
+        guard let document = PDFDocument(data: data) else {
+            return .error("This generated PDF could not be rendered.")
         }
 
-        if data.starts(with: [0xFF, 0xD8, 0xFF]) {
-            return .jpeg
+        return .document(document)
+    }
+
+    private func presentShareSheet() {
+        isShowingShareSheet = true
+    }
+
+    private func showSaveSuccessFeedback() {
+        let token = UUID()
+        saveSuccessHUDToken = token
+
+        withAnimation(.spring(response: 0.24, dampingFraction: 0.9)) {
+            showSaveSuccessHUD = true
         }
 
-        if data.starts(with: Array("GIF8".utf8)) {
-            return .gif
-        }
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 1_600_000_000)
 
-        return .data
+            guard saveSuccessHUDToken == token else { return }
+
+            withAnimation(.easeInOut(duration: 0.2)) {
+                showSaveSuccessHUD = false
+            }
+        }
     }
 }
 
@@ -331,7 +626,7 @@ private enum PhotoLibraryImageSaver {
     }
 }
 
-private struct ActivityViewController: UIViewControllerRepresentable {
+struct ActivityViewController: UIViewControllerRepresentable {
     let activityItems: [Any]
 
     func makeUIViewController(context: Context) -> UIActivityViewController {
@@ -339,6 +634,30 @@ private struct ActivityViewController: UIViewControllerRepresentable {
     }
 
     func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
+}
+
+private struct GeneratedPDFView: UIViewRepresentable {
+    let document: PDFDocument
+    let isDarkAppearance: Bool
+
+    func makeUIView(context: Context) -> PDFView {
+        let pdfView = PDFView()
+        pdfView.displayMode = .singlePageContinuous
+        pdfView.displayDirection = .vertical
+        pdfView.autoScales = true
+        pdfView.usePageViewController(false)
+        pdfView.displaysPageBreaks = true
+        pdfView.backgroundColor = UIColor(isDarkAppearance ? .black : .white)
+        pdfView.document = document
+        return pdfView
+    }
+
+    func updateUIView(_ pdfView: PDFView, context: Context) {
+        if pdfView.document !== document {
+            pdfView.document = document
+        }
+        pdfView.backgroundColor = UIColor(isDarkAppearance ? .black : .white)
+    }
 }
 
 private enum PhotoLibrarySaveError: LocalizedError {

@@ -17,6 +17,49 @@ struct MessageBubble: View {
 
     // File preview handler
     var onSandboxLinkTap: ((String, FilePathAnnotation?) -> Void)?
+    private let renderKey: RenderKey
+
+    init(
+        message: Message,
+        onRegenerate: (() -> Void)? = nil,
+        liveContent: String? = nil,
+        liveThinking: String? = nil,
+        activeToolCalls: [ToolCallInfo] = [],
+        liveCitations: [URLCitation] = [],
+        liveFilePathAnnotations: [FilePathAnnotation] = [],
+        showsRecoveryIndicator: Bool = false,
+        onSandboxLinkTap: ((String, FilePathAnnotation?) -> Void)? = nil
+    ) {
+        self.message = message
+        self.onRegenerate = onRegenerate
+        self.liveContent = liveContent
+        self.liveThinking = liveThinking
+        self.activeToolCalls = activeToolCalls
+        self.liveCitations = liveCitations
+        self.liveFilePathAnnotations = liveFilePathAnnotations
+        self.showsRecoveryIndicator = showsRecoveryIndicator
+        self.onSandboxLinkTap = onSandboxLinkTap
+        self.renderKey = RenderKey(
+            messageID: message.id,
+            roleRawValue: message.roleRawValue,
+            content: message.content,
+            thinking: message.thinking,
+            imageData: message.imageData,
+            responseId: message.responseId,
+            lastSequenceNumber: message.lastSequenceNumber,
+            isComplete: message.isComplete,
+            annotationsData: message.annotationsData,
+            toolCallsData: message.toolCallsData,
+            fileAttachmentsData: message.fileAttachmentsData,
+            filePathAnnotationsData: message.filePathAnnotationsData,
+            liveContent: liveContent,
+            liveThinking: liveThinking,
+            activeToolCalls: activeToolCalls,
+            liveCitations: liveCitations,
+            liveFilePathAnnotations: liveFilePathAnnotations,
+            showsRecoveryIndicator: showsRecoveryIndicator
+        )
+    }
 
     private var displayedContent: String {
         if let liveContent, !liveContent.isEmpty {
@@ -66,9 +109,9 @@ struct MessageBubble: View {
 
     var body: some View {
         HStack(alignment: .top) {
-            if message.role == .user {
-                Spacer(minLength: 40)
-            }
+        if message.role == .user {
+            Spacer(minLength: 40)
+        }
 
             VStack(alignment: message.role == .user ? .trailing : .leading, spacing: 8) {
                 // Thinking/reasoning (collapsible, completed — starts collapsed)
@@ -188,12 +231,9 @@ struct MessageBubble: View {
             )
         }
         .padding(12)
-        .background {
-            RoundedRectangle(cornerRadius: 20)
-                .fill(.ultraThinMaterial)
-        }
-        .glassEffect(.regular.interactive(), in: RoundedRectangle(cornerRadius: 20))
-        .compositingGroup()
+        .modifier(
+            AssistantBubbleSurfaceModifier(isLive: isDisplayingLiveAssistantState)
+        )
         .contentShape(.contextMenuPreview, RoundedRectangle(cornerRadius: 20))
         .contextMenu {
             copyButton
@@ -250,5 +290,53 @@ struct MessageBubble: View {
         ShareLink(item: displayedContent) {
             Label("Share", systemImage: "square.and.arrow.up")
         }
+    }
+}
+
+private struct AssistantBubbleSurfaceModifier: ViewModifier {
+    let isLive: Bool
+
+    func body(content: Content) -> some View {
+        content
+            .background {
+                UIKitGlassBackgroundView(
+                    cornerRadius: 20,
+                    innerInset: 0,
+                    stableFillOpacity: isLive ? 0.012 : 0,
+                    showsBorder: true,
+                    borderWidth: 0.85,
+                    darkBorderOpacity: 0.16,
+                    lightBorderOpacity: 0.09
+                )
+            }
+    }
+}
+
+extension MessageBubble: Equatable {
+    nonisolated static func == (lhs: MessageBubble, rhs: MessageBubble) -> Bool {
+        lhs.renderKey == rhs.renderKey
+    }
+}
+
+private extension MessageBubble {
+    struct RenderKey: Equatable {
+        let messageID: UUID
+        let roleRawValue: String
+        let content: String
+        let thinking: String?
+        let imageData: Data?
+        let responseId: String?
+        let lastSequenceNumber: Int?
+        let isComplete: Bool
+        let annotationsData: Data?
+        let toolCallsData: Data?
+        let fileAttachmentsData: Data?
+        let filePathAnnotationsData: Data?
+        let liveContent: String?
+        let liveThinking: String?
+        let activeToolCalls: [ToolCallInfo]
+        let liveCitations: [URLCitation]
+        let liveFilePathAnnotations: [FilePathAnnotation]
+        let showsRecoveryIndicator: Bool
     }
 }

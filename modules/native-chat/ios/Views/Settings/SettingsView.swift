@@ -182,6 +182,52 @@ struct SettingsView: View {
                     }
                 }
 
+                Section {
+                    LabeledContent("Used", value: viewModel.generatedImageCacheSizeString)
+
+                    Button(role: .destructive) {
+                        Task { @MainActor in
+                            await viewModel.clearGeneratedImageCache()
+                        }
+                    } label: {
+                        HStack {
+                            if viewModel.isClearingImageCache {
+                                ProgressView()
+                                    .controlSize(.small)
+                            }
+                            Text("Clear Image Cache")
+                        }
+                    }
+                    .disabled(viewModel.isClearingImageCache || viewModel.generatedImageCacheSizeBytes == 0)
+                } header: {
+                    Text("Image Cache")
+                } footer: {
+                    Text("Generated images are cached automatically so old download links still open later. Maximum cache size: \(viewModel.generatedImageCacheLimitString).")
+                }
+
+                Section {
+                    LabeledContent("Used", value: viewModel.generatedDocumentCacheSizeString)
+
+                    Button(role: .destructive) {
+                        Task { @MainActor in
+                            await viewModel.clearGeneratedDocumentCache()
+                        }
+                    } label: {
+                        HStack {
+                            if viewModel.isClearingDocumentCache {
+                                ProgressView()
+                                    .controlSize(.small)
+                            }
+                            Text("Clear Document Cache")
+                        }
+                    }
+                    .disabled(viewModel.isClearingDocumentCache || viewModel.generatedDocumentCacheSizeBytes == 0)
+                } header: {
+                    Text("Document Cache")
+                } footer: {
+                    Text("Generated PDFs and other files are cached automatically so old download links still open or share later. Maximum cache size: \(viewModel.generatedDocumentCacheLimitString).")
+                }
+
                 Section("About") {
                     LabeledContent("Version", value: appVersionString)
                     LabeledContent("Platform", value: platformString)
@@ -200,6 +246,10 @@ struct SettingsView: View {
                 }
             }
             .navigationTitle("Settings")
+            .task {
+                await viewModel.refreshGeneratedImageCacheSize()
+                await viewModel.refreshGeneratedDocumentCacheSize()
+            }
             .alert("API Key Saved", isPresented: $viewModel.saveConfirmation) {
                 Button("OK", role: .cancel) {}
             } message: {
