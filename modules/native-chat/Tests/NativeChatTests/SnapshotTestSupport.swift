@@ -47,13 +47,13 @@ enum SnapshotTestThemeVariant: CaseIterable {
     }
 
     private static func makePhoneConfig(style: UIUserInterfaceStyle) -> ViewImageConfig {
-        let traits = UITraitCollection(traitsFrom: [
-            UITraitCollection(userInterfaceIdiom: .phone),
-            UITraitCollection(horizontalSizeClass: .compact),
-            UITraitCollection(verticalSizeClass: .regular),
-            UITraitCollection(displayScale: 3),
-            UITraitCollection(userInterfaceStyle: style)
-        ])
+        let traits = UITraitCollection(mutations: {
+            $0.userInterfaceIdiom = .phone
+            $0.horizontalSizeClass = .compact
+            $0.verticalSizeClass = .regular
+            $0.displayScale = 3
+            $0.userInterfaceStyle = style
+        })
 
         return ViewImageConfig(
             safeArea: UIEdgeInsets(top: 59, left: 0, bottom: 34, right: 0),
@@ -63,13 +63,13 @@ enum SnapshotTestThemeVariant: CaseIterable {
     }
 
     private static func makePadConfig(style: UIUserInterfaceStyle) -> ViewImageConfig {
-        let traits = UITraitCollection(traitsFrom: [
-            UITraitCollection(userInterfaceIdiom: .pad),
-            UITraitCollection(horizontalSizeClass: .regular),
-            UITraitCollection(verticalSizeClass: .regular),
-            UITraitCollection(displayScale: 2),
-            UITraitCollection(userInterfaceStyle: style)
-        ])
+        let traits = UITraitCollection(mutations: {
+            $0.userInterfaceIdiom = .pad
+            $0.horizontalSizeClass = .regular
+            $0.verticalSizeClass = .regular
+            $0.displayScale = 2
+            $0.userInterfaceStyle = style
+        })
 
         return ViewImageConfig(
             safeArea: UIEdgeInsets(top: 24, left: 0, bottom: 20, right: 0),

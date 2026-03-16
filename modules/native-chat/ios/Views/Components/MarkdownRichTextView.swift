@@ -16,7 +16,7 @@ struct RichTextView: View {
             }
         }.joined()
 
-        let attributed = robustMarkdownParse(combinedText)
+        let attributed = RichTextAttributedStringBuilder.parseRichText(combinedText)
         Text(attributed)
             .font(.body)
             .textSelection(.enabled)
@@ -66,134 +66,6 @@ struct RichTextView: View {
         }
 
         return nil
-    }
-
-    func robustMarkdownParse(_ text: String) -> AttributedString {
-        if let appleResult = parsedMarkdownText(text) {
-            let plainText = String(appleResult.characters)
-            if !plainText.contains("**") {
-                return appleResult
-            }
-            let hasLinks = appleResult.runs.contains { run in
-                run.link != nil
-            }
-            if hasLinks {
-                return appleResult
-            }
-        }
-
-        return manualMarkdownParse(text)
-    }
-
-    private func parsedMarkdownText(_ text: String) -> AttributedString? {
-        do {
-            return try AttributedString(
-                markdown: text,
-                options: .init(
-                    allowsExtendedAttributes: true,
-                    interpretedSyntax: .inlineOnlyPreservingWhitespace,
-                    failurePolicy: .returnPartiallyParsedIfPossible
-                )
-            )
-        } catch {
-            return nil
-        }
-    }
-
-    func manualMarkdownParse(_ text: String) -> AttributedString {
-        var result = AttributedString()
-
-        let chars = Array(text)
-        let count = chars.count
-        var i = 0
-        var currentText = ""
-
-        func flushCurrent() {
-            if !currentText.isEmpty {
-                var chunk = AttributedString(currentText)
-                chunk.font = .body
-                result += chunk
-                currentText = ""
-            }
-        }
-
-        while i < count {
-            if chars[i] == "`" {
-                var end = i + 1
-                while end < count && chars[end] != "`" { end += 1 }
-                if end < count {
-                    flushCurrent()
-                    let codeContent = String(chars[(i + 1)..<end])
-                    var chunk = AttributedString(codeContent)
-                    chunk.font = .body.monospaced()
-                    chunk.backgroundColor = .secondary.opacity(0.12)
-                    result += chunk
-                    i = end + 1
-                    continue
-                }
-            }
-
-            if i + 2 < count && chars[i] == "*" && chars[i + 1] == "*" && chars[i + 2] == "*" {
-                var end = i + 3
-                while end + 2 < count {
-                    if chars[end] == "*" && chars[end + 1] == "*" && chars[end + 2] == "*" { break }
-                    end += 1
-                }
-                if end + 2 < count {
-                    flushCurrent()
-                    let content = String(chars[(i + 3)..<end])
-                    var chunk = AttributedString(content)
-                    chunk.font = .body.bold().italic()
-                    result += chunk
-                    i = end + 3
-                    continue
-                }
-            }
-
-            if i + 1 < count && ((chars[i] == "*" && chars[i + 1] == "*") || (chars[i] == "_" && chars[i + 1] == "_")) {
-                let marker = chars[i]
-                var end = i + 2
-                while end + 1 < count {
-                    if chars[end] == marker && chars[end + 1] == marker { break }
-                    end += 1
-                }
-                if end + 1 < count {
-                    flushCurrent()
-                    let content = String(chars[(i + 2)..<end])
-                    var chunk = AttributedString(content)
-                    chunk.font = .body.bold()
-                    result += chunk
-                    i = end + 2
-                    continue
-                }
-            }
-
-            if chars[i] == "*" || chars[i] == "_" {
-                let marker = chars[i]
-                if i + 1 < count && chars[i + 1] != marker {
-                    var end = i + 1
-                    while end < count {
-                        if chars[end] == marker && (end + 1 >= count || chars[end + 1] != marker) { break }
-                        end += 1
-                    }
-                    if end < count {
-                        flushCurrent()
-                        let content = String(chars[(i + 1)..<end])
-                        var chunk = AttributedString(content)
-                        chunk.font = .body.italic()
-                        result += chunk
-                        i = end + 1
-                        continue
-                    }
-                }
-            }
-
-            currentText.append(chars[i])
-            i += 1
-        }
-
-        flushCurrent()
-        return result
     }
 
     func latexToUnicode(_ latex: String) -> String {

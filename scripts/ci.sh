@@ -2,35 +2,26 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+CI_OUTPUT_DIR="$ROOT_DIR/.local/build/ci"
 
 cd "$ROOT_DIR"
-
-function check_allowed_warnings() {
-  local log_file="$1"
-  local unexpected_warnings
-  unexpected_warnings="$(
-    rg "^.*warning:" "$log_file" \
-      | rg -v "Metadata extraction skipped\\. No AppIntents\\.framework dependency found\\." \
-      || true
-  )"
-
-  if [[ -n "$unexpected_warnings" ]]; then
-    echo "Unexpected warnings found:" >&2
-    echo "$unexpected_warnings" >&2
-    exit 1
-  fi
-}
 
 function run_checked_xcodebuild() {
   local label="$1"
   shift
 
-  local log_file
-  log_file="$(mktemp "/tmp/${label}.XXXX.log")"
+  local log_file="$CI_OUTPUT_DIR/${label}.log"
 
+  rm -f "$log_file"
   "$@" | tee "$log_file"
-  check_allowed_warnings "$log_file"
+  ./scripts/check_warnings.sh "$log_file"
 }
+
+mkdir -p "$CI_OUTPUT_DIR"
+rm -rf \
+  "$CI_OUTPUT_DIR/GlassGPTTests.xcresult" \
+  "$CI_OUTPUT_DIR/GlassGPTUITests.xcresult"
+rm -f "$CI_OUTPUT_DIR/coverage-report.txt"
 
 echo "==> Linting"
 ./scripts/lint.sh
@@ -43,10 +34,27 @@ run_checked_xcodebuild glassgpt-build \
   -destination 'generic/platform=iOS Simulator' \
   build
 
-echo "==> Testing app"
-run_checked_xcodebuild glassgpt-test \
+echo "==> Running unit, integration, and snapshot tests"
+run_checked_xcodebuild glassgpt-tests \
+  xcodebuild \
+  -project ios/GlassGPT.xcodeproj \
+  -scheme GlassGPT \
+  -enableCodeCoverage YES \
+  -destination 'platform=iOS Simulator,name=iPhone 17' \
+  -resultBundlePath "$CI_OUTPUT_DIR/GlassGPTTests.xcresult" \
+  -only-testing:GlassGPTTests \
+  test
+
+if [[ -d "$CI_OUTPUT_DIR/GlassGPTTests.xcresult" ]]; then
+  xcrun xccov view --report "$CI_OUTPUT_DIR/GlassGPTTests.xcresult" > "$CI_OUTPUT_DIR/coverage-report.txt"
+fi
+
+echo "==> Running UI tests"
+run_checked_xcodebuild glassgpt-ui-tests \
   xcodebuild \
   -project ios/GlassGPT.xcodeproj \
   -scheme GlassGPT \
   -destination 'platform=iOS Simulator,name=iPhone 17' \
+  -resultBundlePath "$CI_OUTPUT_DIR/GlassGPTUITests.xcresult" \
+  -only-testing:GlassGPTUITests \
   test

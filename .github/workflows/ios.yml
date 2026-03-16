@@ -3,8 +3,10 @@ name: iOS
 on:
   push:
     branches:
+      - main
       - codex/stable-4.1
       - codex/stable-4.2
+      - codex/feature/**
   pull_request:
 
 jobs:

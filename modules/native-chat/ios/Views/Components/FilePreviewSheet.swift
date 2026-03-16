@@ -59,6 +59,7 @@ struct FilePreviewSheet: View {
         let diameter: CGFloat
         let isEnabled: Bool
         let accessibilityLabel: String
+        var accessibilityIdentifier: String?
         var onTriggerStart: () -> Void = {}
         let action: () -> Void
         @ViewBuilder let label: () -> Label
@@ -109,6 +110,7 @@ struct FilePreviewSheet: View {
                 .accessibilityElement()
                 .accessibilityAddTraits(.isButton)
                 .accessibilityLabel(Text(accessibilityLabel))
+                .accessibilityIdentifier(accessibilityIdentifier ?? accessibilityLabel)
                 .accessibilityAction {
                     guard isEnabled else { return }
                     action()
@@ -181,6 +183,8 @@ struct FilePreviewSheet: View {
 
     var body: some View {
         content
+            .accessibilityElement(children: .contain)
+            .accessibilityIdentifier("filePreview.root")
             .scaleEffect(isDismissPending ? 0.986 : 1)
             .opacity(isDismissPending ? 0.9 : 1)
             .animation(.easeInOut(duration: 0.12), value: isDismissPending)

@@ -55,7 +55,13 @@ struct CodeBlockView: View {
                         isCopied = true
                     }
                     Task {
-                        try? await Task.sleep(nanoseconds: 2_000_000_000)
+                        do {
+                            try await Task.sleep(nanoseconds: 2_000_000_000)
+                        } catch is CancellationError {
+                            // Preserve the previous swallowed-error behavior by continuing immediately.
+                        } catch {
+                            Loggers.app.error("[CodeBlockView] Copy badge reset delay failed: \(error.localizedDescription)")
+                        }
                         withAnimation(.spring(duration: 0.3)) {
                             isCopied = false
                         }
@@ -185,7 +191,13 @@ struct CodeBlockView: View {
     }
 
     private func applyPattern(_ text: inout AttributedString, pattern: String, color: Color) {
-        guard let regex = try? NSRegularExpression(pattern: pattern, options: []) else { return }
+        let regex: NSRegularExpression
+        do {
+            regex = try NSRegularExpression(pattern: pattern, options: [])
+        } catch {
+            Loggers.app.error("[CodeBlockView] Invalid syntax highlighting regex: \(pattern)")
+            return
+        }
         let nsString = String(text.characters[...])
         let nsRange = NSRange(location: 0, length: nsString.utf16.count)
         let matches = regex.matches(in: nsString, range: nsRange)

@@ -26,6 +26,7 @@ struct HistoryView: View {
                             } label: {
                                 HistoryRow(conversation: conversation)
                             }
+                            .accessibilityIdentifier("history.row.\(conversation.title)")
                             .listRowBackground(Color.clear)
                         }
                         .onDelete(perform: deleteConversations)
@@ -54,6 +55,7 @@ struct HistoryView: View {
                                 )
                         }
                         .buttonStyle(GlassPressButtonStyle())
+                        .accessibilityIdentifier("history.deleteAll")
                     }
                 }
             }

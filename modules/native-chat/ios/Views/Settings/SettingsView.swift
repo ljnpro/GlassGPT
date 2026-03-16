@@ -3,9 +3,14 @@ import UIKit
 
 struct SettingsView: View {
     @State private var viewModel: SettingsViewModel
+    private let appVersionStringOverride: String?
 
-    init(viewModel: SettingsViewModel = SettingsViewModel()) {
+    init(
+        viewModel: SettingsViewModel = SettingsViewModel(),
+        appVersionStringOverride: String? = nil
+    ) {
         _viewModel = State(initialValue: viewModel)
+        self.appVersionStringOverride = appVersionStringOverride
     }
 
     private var platformString: String {
@@ -30,6 +35,10 @@ struct SettingsView: View {
     }
 
     private var appVersionString: String {
+        if let appVersionStringOverride {
+            return appVersionStringOverride
+        }
+
         let info = Bundle.main.infoDictionary
         let shortVersion = info?["CFBundleShortVersionString"] as? String ?? "Unknown"
         let buildNumber = info?["CFBundleVersion"] as? String ?? "?"
@@ -70,6 +79,7 @@ struct SettingsView: View {
                         .textContentType(.password)
                         .autocorrectionDisabled()
                         .textInputAutocapitalization(.never)
+                        .accessibilityIdentifier("settings.apiKey")
 
                     if let isValid = viewModel.isAPIKeyValid {
                         HStack {
@@ -112,6 +122,7 @@ struct SettingsView: View {
 
                 Section {
                     Toggle("Enable Cloudflare Gateway", isOn: $viewModel.cloudflareEnabled)
+                        .accessibilityIdentifier("settings.cloudflare")
 
                     if viewModel.cloudflareEnabled {
                         HStack(spacing: 10) {
@@ -180,9 +191,11 @@ struct SettingsView: View {
                         }
                     }
                     .pickerStyle(.segmented)
+                    .accessibilityIdentifier("settings.themePicker")
 
                     if UIDevice.current.userInterfaceIdiom == .phone {
                         Toggle("Haptic Feedback", isOn: $viewModel.hapticEnabled)
+                            .accessibilityIdentifier("settings.haptics")
                     }
                 }
 

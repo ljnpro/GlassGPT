@@ -143,7 +143,7 @@ private struct ThinkingMarkdownText: View {
     var allowsSelection: Bool = true
 
     var body: some View {
-        let attributed = robustMarkdownParse(text)
+        let attributed = RichTextAttributedStringBuilder.parseThinkingText(text)
         Text(attributed)
             .font(.caption)
             .foregroundStyle(.secondary)
@@ -151,122 +151,6 @@ private struct ThinkingMarkdownText: View {
             .applyingIf(allowsSelection) { view in
                 view.textSelection(.enabled)
             }
-    }
-
-    /// Robust Markdown parser: try Apple's parser first, fall back to manual
-    /// parsing if the result still contains literal `**` markers.
-    private func robustMarkdownParse(_ text: String) -> AttributedString {
-        if let appleResult = try? AttributedString(
-            markdown: text,
-            options: .init(
-                allowsExtendedAttributes: true,
-                interpretedSyntax: .inlineOnlyPreservingWhitespace,
-                failurePolicy: .returnPartiallyParsedIfPossible
-            )
-        ) {
-            let plainText = String(appleResult.characters)
-            if !plainText.contains("**") {
-                return appleResult
-            }
-        }
-        return manualMarkdownParse(text)
-    }
-
-    /// Manual inline Markdown parser for bold, italic, bold+italic, and inline code.
-    private func manualMarkdownParse(_ text: String) -> AttributedString {
-        var result = AttributedString()
-        let chars = Array(text)
-        let count = chars.count
-        var i = 0
-        var currentText = ""
-
-        func flushPlain() {
-            if !currentText.isEmpty {
-                var chunk = AttributedString(currentText)
-                chunk.font = .caption
-                result += chunk
-                currentText = ""
-            }
-        }
-
-        while i < count {
-            // Inline code: `...`
-            if chars[i] == "`" {
-                var end = i + 1
-                while end < count && chars[end] != "`" { end += 1 }
-                if end < count {
-                    flushPlain()
-                    let codeContent = String(chars[(i + 1)..<end])
-                    var chunk = AttributedString(codeContent)
-                    chunk.font = .caption.monospaced()
-                    result += chunk
-                    i = end + 1
-                    continue
-                }
-            }
-
-            // Bold+Italic: ***...***
-            if i + 2 < count && chars[i] == "*" && chars[i + 1] == "*" && chars[i + 2] == "*" {
-                var end = i + 3
-                while end + 2 < count {
-                    if chars[end] == "*" && chars[end + 1] == "*" && chars[end + 2] == "*" { break }
-                    end += 1
-                }
-                if end + 2 < count {
-                    flushPlain()
-                    let content = String(chars[(i + 3)..<end])
-                    var chunk = AttributedString(content)
-                    chunk.font = .caption.bold().italic()
-                    result += chunk
-                    i = end + 3
-                    continue
-                }
-            }
-
-            // Bold: **...**
-            if i + 1 < count && chars[i] == "*" && chars[i + 1] == "*" {
-                var end = i + 2
-                while end + 1 < count {
-                    if chars[end] == "*" && chars[end + 1] == "*" { break }
-                    end += 1
-                }
-                if end + 1 < count {
-                    flushPlain()
-                    let content = String(chars[(i + 2)..<end])
-                    var chunk = AttributedString(content)
-                    chunk.font = .caption.bold()
-                    result += chunk
-                    i = end + 2
-                    continue
-                }
-            }
-
-            // Italic: *...*
-            if chars[i] == "*" {
-                if i + 1 < count && chars[i + 1] != "*" {
-                    var end = i + 1
-                    while end < count {
-                        if chars[end] == "*" && (end + 1 >= count || chars[end + 1] != "*") { break }
-                        end += 1
-                    }
-                    if end < count {
-                        flushPlain()
-                        let content = String(chars[(i + 1)..<end])
-                        var chunk = AttributedString(content)
-                        chunk.font = .caption.italic()
-                        result += chunk
-                        i = end + 1
-                        continue
-                    }
-                }
-            }
-
-            currentText.append(chars[i])
-            i += 1
-        }
-
-        flushPlain()
-        return result
     }
 }
 
