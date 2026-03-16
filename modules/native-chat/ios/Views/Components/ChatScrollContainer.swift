@@ -47,6 +47,7 @@ final class ChatScrollContainerController: UIViewController, UIScrollViewDelegat
     private let scrollView = UIScrollView()
     private let contentHostingController = UIHostingController(rootView: AnyView(EmptyView()))
     private let composerHostingController = UIHostingController(rootView: AnyView(EmptyView()))
+    private var contentSizeObservation: NSKeyValueObservation?
 
     private var scrollBottomConstraint: NSLayoutConstraint?
     private var composerBottomConstraint: NSLayoutConstraint?
@@ -74,6 +75,10 @@ final class ChatScrollContainerController: UIViewController, UIScrollViewDelegat
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
         reconcileLayout()
+    }
+
+    deinit {
+        contentSizeObservation?.invalidate()
     }
 
     func update(
@@ -175,6 +180,13 @@ final class ChatScrollContainerController: UIViewController, UIScrollViewDelegat
             contentHostingController.view.bottomAnchor.constraint(equalTo: scrollView.contentLayoutGuide.bottomAnchor),
             contentHostingController.view.widthAnchor.constraint(equalTo: scrollView.frameLayoutGuide.widthAnchor)
         ])
+
+        contentSizeObservation = scrollView.observe(\.contentSize, options: [.new]) { [weak self] _, _ in
+            guard let self else { return }
+            DispatchQueue.main.async { [weak self] in
+                self?.handleObservedContentSizeChange()
+            }
+        }
     }
 
     // MARK: - Layout
@@ -235,6 +247,17 @@ final class ChatScrollContainerController: UIViewController, UIScrollViewDelegat
         scrollView.verticalScrollIndicatorInsets.top = top
         scrollView.verticalScrollIndicatorInsets.bottom = bottom
         isApplyingProgrammaticScroll = false
+    }
+
+    private func handleObservedContentSizeChange() {
+        guard layoutMode == .bottomAnchored else { return }
+        guard scrollView.bounds.height > 1 else { return }
+
+        if isPinnedToBottom {
+            shouldPinToBottomOnNextLayout = true
+        }
+
+        reconcileLayout()
     }
 
     private func scrollToBottom() {
