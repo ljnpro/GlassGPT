@@ -561,7 +561,9 @@ private struct DetachedStreamingBubbleView: View, Equatable {
             .singleSurfaceGlass(
                 cornerRadius: 20,
                 stableFillOpacity: 0.01,
-                tintOpacity: 0.03,
+                tintOpacity: 0.016,
+                lightGlassTone: .neutral,
+                backdropStyle: .themeSolid,
                 borderWidth: 0.85,
                 darkBorderOpacity: 0.16,
                 lightBorderOpacity: 0.09

@@ -69,11 +69,17 @@ final class ChatScrollContainerController: UIViewController, UIScrollViewDelegat
     override func viewDidLoad() {
         super.viewDidLoad()
         configureViewHierarchy()
+        updateThemeBackground()
     }
 
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
         reconcileLayout()
+    }
+
+    override func traitCollectionDidChange(_ previousTraitCollection: UITraitCollection?) {
+        super.traitCollectionDidChange(previousTraitCollection)
+        updateThemeBackground()
     }
 
     func update(
@@ -175,6 +181,12 @@ final class ChatScrollContainerController: UIViewController, UIScrollViewDelegat
             contentHostingController.view.bottomAnchor.constraint(equalTo: scrollView.contentLayoutGuide.bottomAnchor),
             contentHostingController.view.widthAnchor.constraint(equalTo: scrollView.frameLayoutGuide.widthAnchor)
         ])
+    }
+
+    private func updateThemeBackground() {
+        let backgroundColor: UIColor = traitCollection.userInterfaceStyle == .dark ? .black : .white
+        view.backgroundColor = backgroundColor
+        scrollView.backgroundColor = backgroundColor
     }
 
     // MARK: - Layout

@@ -660,7 +660,9 @@ private extension View {
         singleSurfaceGlass(
             cornerRadius: 20,
             stableFillOpacity: isLive ? 0.01 : 0.004,
-            tintOpacity: isLive ? 0.03 : 0.024,
+            tintOpacity: isLive ? 0.016 : 0.01,
+            lightGlassTone: .neutral,
+            backdropStyle: .themeSolid,
             borderWidth: 0.85,
             darkBorderOpacity: 0.16,
             lightBorderOpacity: 0.09

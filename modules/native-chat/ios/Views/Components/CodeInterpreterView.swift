@@ -18,7 +18,9 @@ struct CodeInterpreterIndicator: View {
         .singleSurfaceGlass(
             cornerRadius: 999,
             stableFillOpacity: 0.01,
-            tintOpacity: 0.022,
+            tintOpacity: 0.01,
+            lightGlassTone: .neutral,
+            backdropStyle: .themeSolid,
             borderWidth: 0.75,
             darkBorderOpacity: 0.14,
             lightBorderOpacity: 0.08
@@ -83,7 +85,9 @@ struct CodeInterpreterResultView: View {
                         .singleSurfaceGlass(
                             cornerRadius: 8,
                             stableFillOpacity: 0.006,
-                            tintOpacity: 0.022,
+                            tintOpacity: 0.01,
+                            lightGlassTone: .neutral,
+                            backdropStyle: .themeSolid,
                             borderWidth: 0.7,
                             darkBorderOpacity: 0.13,
                             lightBorderOpacity: 0.075
@@ -110,7 +114,9 @@ struct CodeInterpreterResultView: View {
                         .singleSurfaceGlass(
                             cornerRadius: 8,
                             stableFillOpacity: 0.006,
-                            tintOpacity: 0.022,
+                            tintOpacity: 0.01,
+                            lightGlassTone: .neutral,
+                            backdropStyle: .themeSolid,
                             borderWidth: 0.7,
                             darkBorderOpacity: 0.13,
                             lightBorderOpacity: 0.075
@@ -125,7 +131,9 @@ struct CodeInterpreterResultView: View {
         .singleSurfaceGlass(
             cornerRadius: 12,
             stableFillOpacity: 0.01,
-            tintOpacity: 0.024,
+            tintOpacity: 0.01,
+            lightGlassTone: .neutral,
+            backdropStyle: .themeSolid,
             borderWidth: 0.75,
             darkBorderOpacity: 0.14,
             lightBorderOpacity: 0.08

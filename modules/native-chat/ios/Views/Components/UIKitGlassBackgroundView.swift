@@ -1,11 +1,23 @@
 import SwiftUI
 import UIKit
 
+enum LightGlassTone {
+    case cool
+    case neutral
+}
+
+enum GlassBackdropStyle {
+    case none
+    case themeSolid
+}
+
 struct UIKitGlassBackgroundView: UIViewRepresentable {
     let cornerRadius: CGFloat
     var innerInset: CGFloat = 0
     var stableFillOpacity: CGFloat = 0.04
     var tintOpacity: CGFloat = 0
+    var lightGlassTone: LightGlassTone = .cool
+    var backdropStyle: GlassBackdropStyle = .none
     var showsBorder: Bool = true
     var borderWidth: CGFloat = 0.9
     var darkBorderOpacity: CGFloat = 0.13
@@ -17,6 +29,8 @@ struct UIKitGlassBackgroundView: UIViewRepresentable {
             innerInset: innerInset,
             stableFillOpacity: stableFillOpacity,
             tintOpacity: tintOpacity,
+            lightGlassTone: lightGlassTone,
+            backdropStyle: backdropStyle,
             showsBorder: showsBorder,
             borderWidth: borderWidth,
             darkBorderOpacity: darkBorderOpacity,
@@ -30,6 +44,8 @@ struct UIKitGlassBackgroundView: UIViewRepresentable {
             innerInset: innerInset,
             stableFillOpacity: stableFillOpacity,
             tintOpacity: tintOpacity,
+            lightGlassTone: lightGlassTone,
+            backdropStyle: backdropStyle,
             showsBorder: showsBorder,
             borderWidth: borderWidth,
             darkBorderOpacity: darkBorderOpacity,
@@ -44,6 +60,8 @@ extension View {
         innerInset: CGFloat = 0,
         stableFillOpacity: CGFloat = 0,
         tintOpacity: CGFloat = 0.02,
+        lightGlassTone: LightGlassTone = .cool,
+        backdropStyle: GlassBackdropStyle = .none,
         showsBorder: Bool = true,
         borderWidth: CGFloat = 0.85,
         darkBorderOpacity: CGFloat = 0.16,
@@ -55,6 +73,8 @@ extension View {
                 innerInset: innerInset,
                 stableFillOpacity: stableFillOpacity,
                 tintOpacity: tintOpacity,
+                lightGlassTone: lightGlassTone,
+                backdropStyle: backdropStyle,
                 showsBorder: showsBorder,
                 borderWidth: borderWidth,
                 darkBorderOpacity: darkBorderOpacity,
@@ -133,6 +153,7 @@ struct GlassPressButtonStyle: ButtonStyle {
 
 @MainActor
 final class GlassBackgroundHostingView: UIView {
+    private let backdropView = UIView()
     private let effectView = UIVisualEffectView()
     private let stableFillView = UIView()
 
@@ -140,6 +161,8 @@ final class GlassBackgroundHostingView: UIView {
     private var innerInset: CGFloat
     private var stableFillOpacity: CGFloat
     private var tintOpacity: CGFloat
+    private var lightGlassTone: LightGlassTone
+    private var backdropStyle: GlassBackdropStyle
     private var showsBorder: Bool
     private var borderWidth: CGFloat
     private var darkBorderOpacity: CGFloat
@@ -150,6 +173,8 @@ final class GlassBackgroundHostingView: UIView {
         innerInset: CGFloat,
         stableFillOpacity: CGFloat,
         tintOpacity: CGFloat = 0,
+        lightGlassTone: LightGlassTone,
+        backdropStyle: GlassBackdropStyle,
         showsBorder: Bool,
         borderWidth: CGFloat,
         darkBorderOpacity: CGFloat,
@@ -159,6 +184,8 @@ final class GlassBackgroundHostingView: UIView {
         self.innerInset = innerInset
         self.stableFillOpacity = stableFillOpacity
         self.tintOpacity = tintOpacity
+        self.lightGlassTone = lightGlassTone
+        self.backdropStyle = backdropStyle
         self.showsBorder = showsBorder
         self.borderWidth = borderWidth
         self.darkBorderOpacity = darkBorderOpacity
@@ -170,6 +197,8 @@ final class GlassBackgroundHostingView: UIView {
             innerInset: innerInset,
             stableFillOpacity: stableFillOpacity,
             tintOpacity: tintOpacity,
+            lightGlassTone: lightGlassTone,
+            backdropStyle: backdropStyle,
             showsBorder: showsBorder,
             borderWidth: borderWidth,
             darkBorderOpacity: darkBorderOpacity,
@@ -184,6 +213,11 @@ final class GlassBackgroundHostingView: UIView {
 
     override func layoutSubviews() {
         super.layoutSubviews()
+
+        backdropView.frame = bounds
+        applyCornerConfiguration(to: backdropView, cornerRadius: cornerRadius)
+        backdropView.layer.cornerRadius = cornerRadius
+        backdropView.layer.cornerCurve = .continuous
 
         effectView.frame = bounds
         applyCornerConfiguration(to: effectView, cornerRadius: cornerRadius)
@@ -211,6 +245,8 @@ final class GlassBackgroundHostingView: UIView {
         innerInset: CGFloat,
         stableFillOpacity: CGFloat,
         tintOpacity: CGFloat = 0,
+        lightGlassTone: LightGlassTone,
+        backdropStyle: GlassBackdropStyle,
         showsBorder: Bool,
         borderWidth: CGFloat,
         darkBorderOpacity: CGFloat,
@@ -220,6 +256,8 @@ final class GlassBackgroundHostingView: UIView {
         self.innerInset = innerInset
         self.stableFillOpacity = stableFillOpacity
         self.tintOpacity = tintOpacity
+        self.lightGlassTone = lightGlassTone
+        self.backdropStyle = backdropStyle
         self.showsBorder = showsBorder
         self.borderWidth = borderWidth
         self.darkBorderOpacity = darkBorderOpacity
@@ -234,6 +272,11 @@ final class GlassBackgroundHostingView: UIView {
         backgroundColor = .clear
         isUserInteractionEnabled = false
         clipsToBounds = false
+
+        backdropView.isUserInteractionEnabled = false
+        backdropView.clipsToBounds = true
+        backdropView.backgroundColor = .clear
+        addSubview(backdropView)
 
         effectView.clipsToBounds = true
         effectView.isUserInteractionEnabled = false
@@ -263,28 +306,49 @@ final class GlassBackgroundHostingView: UIView {
                 ? nil
                 : UIColor.white.withAlphaComponent(resolvedTintOpacity)
         } else {
-            let lightFillOpacity = min(fillOpacity * 0.42, 0.05)
-            fillColor = UIColor(
-                red: 0.82,
-                green: 0.85,
-                blue: 0.90,
-                alpha: lightFillOpacity
-            )
-            let lightTintOpacity = min(max(resolvedTintOpacity * 1.3, 0), 0.07)
-            tintColor = lightTintOpacity <= 0.001
-                ? nil
-                : UIColor(
-                    red: 0.76,
-                    green: 0.80,
-                    blue: 0.86,
-                    alpha: lightTintOpacity
+            switch lightGlassTone {
+            case .cool:
+                let lightFillOpacity = min(fillOpacity * 0.42, 0.05)
+                fillColor = UIColor(
+                    red: 0.82,
+                    green: 0.85,
+                    blue: 0.90,
+                    alpha: lightFillOpacity
                 )
+                let lightTintOpacity = min(max(resolvedTintOpacity * 1.3, 0), 0.07)
+                tintColor = lightTintOpacity <= 0.001
+                    ? nil
+                    : UIColor(
+                        red: 0.76,
+                        green: 0.80,
+                        blue: 0.86,
+                        alpha: lightTintOpacity
+                    )
+
+            case .neutral:
+                let lightFillOpacity = min(fillOpacity * 0.55, 0.055)
+                fillColor = UIColor(white: 1.0, alpha: lightFillOpacity)
+                let neutralTintOpacity = min(max(resolvedTintOpacity * 0.16, 0), 0.008)
+                tintColor = neutralTintOpacity <= 0.001
+                    ? nil
+                    : UIColor(white: 1.0, alpha: neutralTintOpacity)
+            }
         }
 
         let effect = UIGlassEffect(style: .regular)
         effect.isInteractive = false
         effect.tintColor = tintColor
         effectView.effect = effect
+
+        switch backdropStyle {
+        case .none:
+            backdropView.isHidden = true
+            backdropView.backgroundColor = .clear
+
+        case .themeSolid:
+            backdropView.isHidden = false
+            backdropView.backgroundColor = isDark ? .black : .white
+        }
 
         if innerInset <= 0.001 {
             effectView.contentView.backgroundColor = fillOpacity <= 0.001 ? .clear : fillColor

@@ -26,6 +26,8 @@ struct FileSearchIndicator: View {
             .singleSurfaceGlass(
                 cornerRadius: 999,
                 stableFillOpacity: 0.01,
+                lightGlassTone: .neutral,
+                backdropStyle: .themeSolid,
                 borderWidth: 0.75,
                 darkBorderOpacity: 0.14,
                 lightBorderOpacity: 0.08
