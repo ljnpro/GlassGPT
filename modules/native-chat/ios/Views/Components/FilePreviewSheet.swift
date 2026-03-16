@@ -105,6 +105,10 @@ struct FilePreviewSheet: View {
         isPad ? 23 : 21
     }
 
+    private var circularButtonDiameter: CGFloat {
+        isPad ? 48 : 44
+    }
+
     private var imageTopBarSideClearance: CGFloat {
         isPad ? 116 : 104
     }
@@ -366,11 +370,17 @@ struct FilePreviewSheet: View {
         } label: {
             Image(systemName: "xmark")
                 .font(.system(size: closeIconSize, weight: .semibold))
-                .frame(width: closeIconSize, height: closeIconSize)
-                .padding(10)
+                .foregroundStyle(viewerPrimaryColor)
+                .frame(width: circularButtonDiameter, height: circularButtonDiameter)
+                .singleFrameGlassCircleControl(
+                    tintOpacity: 0.015,
+                    borderWidth: 0.78,
+                    darkBorderOpacity: 0.14,
+                    lightBorderOpacity: 0.08
+                )
         }
-        .buttonStyle(.glass)
-        .disabled(isDismissPending)
+        .buttonStyle(.plain)
+        .allowsHitTesting(!isDismissPending)
         .accessibilityLabel("Close preview")
     }
 
@@ -382,53 +392,67 @@ struct FilePreviewSheet: View {
             case .idle:
                 Image(systemName: "arrow.down.to.line")
                     .font(.system(size: actionIconSize, weight: .semibold))
-                    .frame(width: actionIconSize, height: actionIconSize)
+                    .foregroundStyle(viewerPrimaryColor)
             case .saving:
                 ProgressView()
                     .controlSize(.small)
                     .tint(viewerPrimaryColor)
-                    .frame(width: actionIconSize, height: actionIconSize)
             }
         }
-        .padding(10)
-        .buttonStyle(
-            .glass
+        .frame(width: circularButtonDiameter, height: circularButtonDiameter)
+        .singleFrameGlassCircleControl(
+            tintOpacity: 0.015,
+            borderWidth: 0.78,
+            darkBorderOpacity: 0.14,
+            lightBorderOpacity: 0.08
         )
+        .buttonStyle(.plain)
         .accessibilityLabel("Download to Photos")
-        .disabled(saveState == .saving || !canSaveToPhotos || isDismissPending)
-        .opacity((saveState == .saving || !canSaveToPhotos || isDismissPending) ? 0.62 : 1)
+        .allowsHitTesting(!isDismissPending)
+        .disabled(saveState == .saving || !canSaveToPhotos)
+        .opacity((saveState == .saving || !canSaveToPhotos) ? 0.62 : 1)
     }
 
     private var bottomShareButton: some View {
         Button {
+            guard !isDismissPending else { return }
             presentShareSheet()
         } label: {
             Image(systemName: "square.and.arrow.up")
                 .font(.system(size: actionIconSize, weight: .semibold))
-                .frame(width: actionIconSize, height: actionIconSize)
+                .foregroundStyle(viewerPrimaryColor)
+                .frame(width: circularButtonDiameter, height: circularButtonDiameter)
+                .singleFrameGlassCircleControl(
+                    tintOpacity: 0.015,
+                    borderWidth: 0.78,
+                    darkBorderOpacity: 0.14,
+                    lightBorderOpacity: 0.08
+                )
         }
-        .padding(10)
-        .buttonStyle(
-            .glass
-        )
+        .buttonStyle(.plain)
         .accessibilityLabel("Share")
-        .disabled(isDismissPending)
+        .allowsHitTesting(!isDismissPending)
     }
 
     private var pdfShareButton: some View {
         Button {
+            guard !isDismissPending else { return }
             presentShareSheet()
         } label: {
             Image(systemName: "square.and.arrow.up")
                 .font(.system(size: actionIconSize, weight: .semibold))
-                .frame(width: actionIconSize, height: actionIconSize)
+                .foregroundStyle(viewerPrimaryColor)
+                .frame(width: circularButtonDiameter, height: circularButtonDiameter)
+                .singleFrameGlassCircleControl(
+                    tintOpacity: 0.015,
+                    borderWidth: 0.78,
+                    darkBorderOpacity: 0.14,
+                    lightBorderOpacity: 0.08
+                )
         }
-        .padding(10)
-        .buttonStyle(
-            .glass
-        )
+        .buttonStyle(.plain)
         .accessibilityLabel("Share")
-        .disabled(isDismissPending)
+        .allowsHitTesting(!isDismissPending)
     }
 
     private var saveSuccessHUD: some View {
