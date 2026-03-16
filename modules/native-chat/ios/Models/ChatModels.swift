@@ -138,13 +138,23 @@ struct ToolCallInfo: Codable, Sendable, Identifiable, Equatable {
     /// Encode an array of ToolCallInfo to Data for SwiftData storage.
     static func encode(_ items: [ToolCallInfo]?) -> Data? {
         guard let items = items, !items.isEmpty else { return nil }
-        return try? JSONEncoder().encode(items)
+        do {
+            return try JSONCoding.encode(items)
+        } catch {
+            Loggers.persistence.error("[ToolCallInfo.encode] \(error.localizedDescription)")
+            return nil
+        }
     }
 
     /// Decode an array of ToolCallInfo from Data.
     static func decode(_ data: Data?) -> [ToolCallInfo]? {
         guard let data = data else { return nil }
-        return try? JSONDecoder().decode([ToolCallInfo].self, from: data)
+        do {
+            return try JSONCoding.decode([ToolCallInfo].self, from: data)
+        } catch {
+            Loggers.persistence.error("[ToolCallInfo.decode] \(error.localizedDescription)")
+            return nil
+        }
     }
 }
 
@@ -161,13 +171,23 @@ struct URLCitation: Codable, Sendable, Identifiable, Equatable {
     /// Encode an array of URLCitation to Data for SwiftData storage.
     static func encode(_ items: [URLCitation]?) -> Data? {
         guard let items = items, !items.isEmpty else { return nil }
-        return try? JSONEncoder().encode(items)
+        do {
+            return try JSONCoding.encode(items)
+        } catch {
+            Loggers.persistence.error("[URLCitation.encode] \(error.localizedDescription)")
+            return nil
+        }
     }
 
     /// Decode an array of URLCitation from Data.
     static func decode(_ data: Data?) -> [URLCitation]? {
         guard let data = data else { return nil }
-        return try? JSONDecoder().decode([URLCitation].self, from: data)
+        do {
+            return try JSONCoding.decode([URLCitation].self, from: data)
+        } catch {
+            Loggers.persistence.error("[URLCitation.decode] \(error.localizedDescription)")
+            return nil
+        }
     }
 }
 
@@ -186,13 +206,23 @@ struct FilePathAnnotation: Codable, Sendable, Identifiable, Equatable {
     /// Encode an array of FilePathAnnotation to Data for SwiftData storage.
     static func encode(_ items: [FilePathAnnotation]?) -> Data? {
         guard let items = items, !items.isEmpty else { return nil }
-        return try? JSONEncoder().encode(items)
+        do {
+            return try JSONCoding.encode(items)
+        } catch {
+            Loggers.persistence.error("[FilePathAnnotation.encode] \(error.localizedDescription)")
+            return nil
+        }
     }
 
     /// Decode an array of FilePathAnnotation from Data.
     static func decode(_ data: Data?) -> [FilePathAnnotation]? {
         guard let data = data else { return nil }
-        return try? JSONDecoder().decode([FilePathAnnotation].self, from: data)
+        do {
+            return try JSONCoding.decode([FilePathAnnotation].self, from: data)
+        } catch {
+            Loggers.persistence.error("[FilePathAnnotation.decode] \(error.localizedDescription)")
+            return nil
+        }
     }
 }
 
@@ -281,12 +311,22 @@ struct FileAttachment: Codable, Sendable, Identifiable {
     /// Encode an array of FileAttachment to Data for SwiftData storage.
     static func encode(_ items: [FileAttachment]?) -> Data? {
         guard let items = items, !items.isEmpty else { return nil }
-        return try? JSONEncoder().encode(items)
+        do {
+            return try JSONCoding.encode(items)
+        } catch {
+            Loggers.persistence.error("[FileAttachment.encode] \(error.localizedDescription)")
+            return nil
+        }
     }
 
     /// Decode an array of FileAttachment from Data.
     static func decode(_ data: Data?) -> [FileAttachment]? {
         guard let data = data else { return nil }
-        return try? JSONDecoder().decode([FileAttachment].self, from: data)
+        do {
+            return try JSONCoding.decode([FileAttachment].self, from: data)
+        } catch {
+            Loggers.persistence.error("[FileAttachment.decode] \(error.localizedDescription)")
+            return nil
+        }
     }
 }
