@@ -127,6 +127,9 @@ struct FilePreviewSheet: View {
 
     var body: some View {
         content
+            .scaleEffect(isDismissPending ? 0.992 : 1)
+            .opacity(isDismissPending ? 0.94 : 1)
+            .animation(.easeInOut(duration: 0.18), value: isDismissPending)
             .preferredColorScheme(selectedTheme.colorScheme)
             .task(id: previewItem.id) {
                 await loadPreview()
@@ -379,7 +382,7 @@ struct FilePreviewSheet: View {
                     lightBorderOpacity: 0.08
                 )
         }
-        .buttonStyle(.plain)
+        .buttonStyle(GlassPressButtonStyle(pressedScale: 0.94, pressedOpacity: 0.86))
         .allowsHitTesting(!isDismissPending)
         .accessibilityLabel("Close preview")
     }
@@ -406,7 +409,7 @@ struct FilePreviewSheet: View {
             darkBorderOpacity: 0.14,
             lightBorderOpacity: 0.08
         )
-        .buttonStyle(.plain)
+        .buttonStyle(GlassPressButtonStyle(pressedScale: 0.94, pressedOpacity: 0.86))
         .accessibilityLabel("Download to Photos")
         .allowsHitTesting(!isDismissPending)
         .disabled(saveState == .saving || !canSaveToPhotos)
@@ -429,7 +432,7 @@ struct FilePreviewSheet: View {
                     lightBorderOpacity: 0.08
                 )
         }
-        .buttonStyle(.plain)
+        .buttonStyle(GlassPressButtonStyle(pressedScale: 0.94, pressedOpacity: 0.86))
         .accessibilityLabel("Share")
         .allowsHitTesting(!isDismissPending)
     }
@@ -450,7 +453,7 @@ struct FilePreviewSheet: View {
                     lightBorderOpacity: 0.08
                 )
         }
-        .buttonStyle(.plain)
+        .buttonStyle(GlassPressButtonStyle(pressedScale: 0.94, pressedOpacity: 0.86))
         .accessibilityLabel("Share")
         .allowsHitTesting(!isDismissPending)
     }

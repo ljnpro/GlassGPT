@@ -53,7 +53,7 @@ struct HistoryView: View {
                                     lightBorderOpacity: 0.08
                                 )
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(GlassPressButtonStyle())
                     }
                 }
             }
