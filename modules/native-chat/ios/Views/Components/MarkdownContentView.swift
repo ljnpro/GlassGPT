@@ -47,50 +47,78 @@ struct MarkdownContentView: View {
         parseBlocks(text)
     }
 
+    private var normalizedAssistantBlockParts: [BlockPart] {
+        splitAssistantRichTextParts(blockParts)
+    }
+
     private var shouldUseSegmentedAssistantSurface: Bool {
-        blockParts.contains { part in
+        normalizedAssistantBlockParts.contains { part in
             switch part {
             case .codeBlock, .latexBlock:
                 return true
             default:
                 return false
             }
-        }
+        } || normalizedAssistantBlockParts.count > 4 || text.count > 900
     }
 
     private var assistantSurfaceSections: [AssistantSurfaceSection] {
         var sections: [AssistantSurfaceSection] = []
         var currentParts: [BlockPart] = []
+        var currentWeight = 0
 
         func flushCurrentParts() {
             guard !currentParts.isEmpty else { return }
             sections.append(
                 AssistantSurfaceSection(
                     id: currentParts[0].id,
-                    parts: currentParts
+                    presentation: .content(parts: currentParts)
                 )
             )
             currentParts = []
+            currentWeight = 0
         }
 
-        for part in blockParts {
+        for part in normalizedAssistantBlockParts {
             switch part {
-            case .codeBlock, .latexBlock:
+            case let .codeBlock(_, language, code):
                 flushCurrentParts()
                 sections.append(
                     AssistantSurfaceSection(
                         id: part.id,
-                        parts: [part]
+                        presentation: .code(language: language, code: code)
+                    )
+                )
+            case let .latexBlock(_, content):
+                flushCurrentParts()
+                sections.append(
+                    AssistantSurfaceSection(
+                        id: part.id,
+                        presentation: .latex(content: content)
                     )
                 )
             default:
+                if part.startsAssistantSection, !currentParts.isEmpty {
+                    flushCurrentParts()
+                }
+
+                let weight = part.assistantGroupingWeight
+                let shouldSplit = !currentParts.isEmpty && (
+                    currentParts.count >= 2 || currentWeight + weight > 5
+                )
+
+                if shouldSplit {
+                    flushCurrentParts()
+                }
+
                 currentParts.append(part)
+                currentWeight += weight
             }
         }
 
         flushCurrentParts()
         return sections.isEmpty
-            ? [AssistantSurfaceSection(id: 0, parts: blockParts)]
+            ? [AssistantSurfaceSection(id: 0, presentation: .content(parts: normalizedAssistantBlockParts))]
             : sections
     }
 
@@ -397,12 +425,7 @@ struct MarkdownContentView: View {
             if shouldUseSegmentedAssistantSurface {
                 VStack(alignment: .leading, spacing: 8) {
                     ForEach(assistantSurfaceSections) { section in
-                        blockStack(
-                            for: section.parts,
-                            codeBlockSurfaceStyle: .embedded
-                        )
-                        .padding(section.contentPadding)
-                        .assistantSingleSurfaceGlass(isLive: isLive)
+                        assistantSurfaceView(section, isLive: isLive)
                     }
                 }
             } else {
@@ -413,6 +436,29 @@ struct MarkdownContentView: View {
                 .padding(12)
                 .assistantSingleSurfaceGlass(isLive: isLive)
             }
+        }
+    }
+
+    @ViewBuilder
+    private func assistantSurfaceView(_ section: AssistantSurfaceSection, isLive: Bool) -> some View {
+        switch section.presentation {
+        case let .content(parts):
+            blockStack(
+                for: parts,
+                codeBlockSurfaceStyle: .embedded
+            )
+            .padding(section.contentPadding)
+            .assistantSingleSurfaceGlass(isLive: isLive)
+
+        case let .code(language, code):
+            CodeBlockView(
+                language: language,
+                code: code,
+                surfaceStyle: .standalone
+            )
+
+        case let .latex(content):
+            StandaloneBlockLaTeXCardView(latex: content)
         }
     }
 
@@ -468,20 +514,152 @@ struct MarkdownContentView: View {
 }
 
 private struct AssistantSurfaceSection: Identifiable {
+    enum Presentation {
+        case content(parts: [BlockPart])
+        case code(language: String?, code: String)
+        case latex(content: String)
+    }
+
     let id: Int
-    let parts: [BlockPart]
+    let presentation: Presentation
 
     var contentPadding: EdgeInsets {
-        if parts.count == 1 {
-            switch parts[0] {
-            case .codeBlock, .latexBlock:
-                return EdgeInsets(top: 10, leading: 10, bottom: 10, trailing: 10)
-            default:
-                break
+        switch presentation {
+        case let .content(parts):
+            if parts.count == 1 {
+                switch parts[0] {
+                case .heading:
+                    return EdgeInsets(top: 12, leading: 12, bottom: 10, trailing: 12)
+                default:
+                    break
+                }
+            }
+
+            return EdgeInsets(top: 12, leading: 12, bottom: 12, trailing: 12)
+        case .code, .latex:
+            return EdgeInsets()
+        }
+    }
+}
+
+private extension BlockPart {
+    var assistantGroupingWeight: Int {
+        switch self {
+        case let .richText(_, segments):
+            let length = segments.reduce(into: 0) { partialResult, segment in
+                switch segment {
+                case let .text(text):
+                    partialResult += text.count
+                case let .latexInline(latex):
+                    partialResult += latex.count + 2
+                }
+            }
+            return min(max((length / 220) + 1, 1), 4)
+        case .heading:
+            return 2
+        case .horizontalRule:
+            return 1
+        case .codeBlock, .latexBlock:
+            return 6
+        }
+    }
+
+    var startsAssistantSection: Bool {
+        switch self {
+        case .heading:
+            return true
+        default:
+            return false
+        }
+    }
+}
+
+private extension MarkdownContentView {
+    func splitAssistantRichTextParts(_ parts: [BlockPart]) -> [BlockPart] {
+        var nextID = 0
+
+        func makeID() -> Int {
+            defer { nextID += 1 }
+            return nextID
+        }
+
+        func rebuiltPart(_ part: BlockPart) -> BlockPart {
+            switch part {
+            case let .heading(_, level, text):
+                return .heading(id: makeID(), level: level, text: text)
+            case .horizontalRule:
+                return .horizontalRule(id: makeID())
+            case let .latexBlock(_, content):
+                return .latexBlock(id: makeID(), content: content)
+            case let .codeBlock(_, language, code):
+                return .codeBlock(id: makeID(), language: language, code: code)
+            case let .richText(_, segments):
+                return .richText(id: makeID(), segments: segments)
             }
         }
 
-        return EdgeInsets(top: 12, leading: 12, bottom: 12, trailing: 12)
+        func rebuildInlineText(from segments: [InlineSegment]) -> String {
+            segments.map { segment in
+                switch segment {
+                case let .text(text):
+                    return text
+                case let .latexInline(latex):
+                    return "$\(latex)$"
+                }
+            }
+            .joined()
+        }
+
+        func splitParagraphs(in text: String) -> [String] {
+            var paragraphs: [String] = []
+            var currentLines: [String] = []
+
+            func flushCurrentLines() {
+                let paragraph = currentLines
+                    .joined(separator: "\n")
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                if !paragraph.isEmpty {
+                    paragraphs.append(paragraph)
+                }
+                currentLines = []
+            }
+
+            for line in text.components(separatedBy: "\n") {
+                if line.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    flushCurrentLines()
+                } else {
+                    currentLines.append(line)
+                }
+            }
+
+            flushCurrentLines()
+            return paragraphs
+        }
+
+        var normalized: [BlockPart] = []
+
+        for part in parts {
+            switch part {
+            case let .richText(_, segments):
+                let rawText = rebuildInlineText(from: segments)
+                let paragraphs = splitParagraphs(in: rawText)
+
+                if paragraphs.count <= 1 {
+                    normalized.append(rebuiltPart(part))
+                } else {
+                    for paragraph in paragraphs {
+                        let inlineSegments = parseInlineSegments(paragraph)
+                        if !inlineSegments.isEmpty {
+                            normalized.append(.richText(id: makeID(), segments: inlineSegments))
+                        }
+                    }
+                }
+            default:
+                normalized.append(rebuiltPart(part))
+            }
+        }
+
+        return normalized
     }
 }
 
@@ -992,6 +1170,24 @@ private struct BlockLaTeXView: View {
         let roundedWidth = max((newWidth * screenScale).rounded(.down) / screenScale, 0)
         guard abs(availableWidth - roundedWidth) > 0.5 else { return }
         availableWidth = roundedWidth
+    }
+}
+
+private struct StandaloneBlockLaTeXCardView: View {
+    let latex: String
+
+    var body: some View {
+        BlockLaTeXView(latex: latex)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+            .singleSurfaceGlass(
+                cornerRadius: 18,
+                stableFillOpacity: 0.008,
+                tintOpacity: 0.022,
+                borderWidth: 0.8,
+                darkBorderOpacity: 0.15,
+                lightBorderOpacity: 0.085
+            )
     }
 }
 
