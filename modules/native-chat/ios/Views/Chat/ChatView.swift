@@ -19,9 +19,12 @@ struct ChatView: View {
     @State private var scrollRequestID = UUID()
     @State private var streamingThinkingExpanded: Bool? = true
     @State private var isBlockingGeneratedPreviewTouches = false
-    @State private var generatedPreviewTouchShieldTask: Task<Void, Never>?
+    @State private var presentedGeneratedPreviewItem: FilePreviewItem?
+    @State private var isGeneratedPreviewDismissPending = false
+    @State private var generatedPreviewDismissTask: Task<Void, Never>?
 
-    private let generatedPreviewTouchShieldDuration: UInt64 = 1_000_000_000
+    private let generatedPreviewOverlayDismissDelay: UInt64 = 220_000_000
+    private let generatedPreviewTouchCooldownDuration: UInt64 = 1_000_000_000
 
     private var selectedTheme: AppTheme {
         AppTheme(rawValue: appThemeRawValue) ?? .system
@@ -39,108 +42,122 @@ struct ChatView: View {
     }
 
     var body: some View {
-        NavigationStack {
-            ZStack {
-                chatContent
+        ZStack {
+            NavigationStack {
+                ZStack {
+                    chatContent
 
-                if viewModel.isRestoringConversation {
-                    restoringOverlay
-                        .transition(.opacity)
-                }
-
-                if viewModel.isDownloadingFile {
-                    fileDownloadingOverlay
-                        .transition(.opacity)
-                }
-            }
-            .animation(.easeInOut(duration: 0.25), value: viewModel.isRestoringConversation)
-            .animation(.easeInOut(duration: 0.2), value: viewModel.isDownloadingFile)
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    ModelBadge(
-                        model: viewModel.selectedModel,
-                        effort: viewModel.reasoningEffort,
-                        onTap: { presentModelSelector() }
-                    )
-                    .fixedSize(horizontal: true, vertical: false)
-                    .allowsHitTesting(!isBlockingGeneratedPreviewTouches)
-                }
-
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("New Chat", systemImage: "square.and.pencil") {
-                        startNewChat()
+                    if viewModel.isRestoringConversation {
+                        restoringOverlay
+                            .transition(.opacity)
                     }
-                    .buttonStyle(.glass)
-                    .allowsHitTesting(!isBlockingGeneratedPreviewTouches)
+
+                    if viewModel.isDownloadingFile {
+                        fileDownloadingOverlay
+                            .transition(.opacity)
+                    }
                 }
+                .animation(.easeInOut(duration: 0.25), value: viewModel.isRestoringConversation)
+                .animation(.easeInOut(duration: 0.2), value: viewModel.isDownloadingFile)
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .topBarLeading) {
+                        ModelBadge(
+                            model: viewModel.selectedModel,
+                            effort: viewModel.reasoningEffort,
+                            onTap: { presentModelSelector() }
+                        )
+                        .fixedSize(horizontal: true, vertical: false)
+                        .allowsHitTesting(!isBlockingGeneratedPreviewTouches)
+                    }
+
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button {
+                            startNewChat()
+                        } label: {
+                            Label("New Chat", systemImage: "square.and.pencil")
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(.primary)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 6)
+                        }
+                        .buttonStyle(.glass)
+                        .disabled(isBlockingGeneratedPreviewTouches)
+                        .allowsHitTesting(!isBlockingGeneratedPreviewTouches)
+                    }
+                }
+                .toolbarBackgroundVisibility(.hidden, for: .navigationBar)
+                .sheet(item: sharedGeneratedFileBinding) { sharedItem in
+                    ActivityViewController(activityItems: [sharedItem.url])
+                }
+                .overFullScreenCover(
+                    isPresented: $isShowingModelSelector,
+                    interfaceStyle: modelSelectorInterfaceStyle,
+                    onDismiss: dismissModelSelector
+                ) {
+                    modelSelectorPresentation
+                }
+                .onChange(of: generatedPreviewCandidate?.id) { _, _ in
+                    syncGeneratedPreviewPresentation()
+                }
+                .onChange(of: viewModel.currentConversation?.id) { _, _ in
+                    composerResetToken = UUID()
+                }
+                .photosPicker(isPresented: $showPhotoPicker, selection: $selectedPhotoItem, matching: .images)
+                .onChange(of: selectedPhotoItem) { _, newItem in
+                    Task {
+                        do {
+                            guard
+                                let rawData = try await newItem?.loadTransferable(type: Data.self),
+                                let image = UIImage(data: rawData),
+                                let jpegData = image.jpegData(compressionQuality: 0.85)
+                            else {
+                                return
+                            }
+                            viewModel.selectedImageData = jpegData
+                        } catch {
+                            print("Failed to load photo: \(error.localizedDescription)")
+                        }
+                    }
+                }
+                .sheet(isPresented: $showDocumentPicker) {
+                    DocumentPicker { urls in
+                        viewModel.handlePickedDocuments(urls)
+                    }
+                }
+                .alert("File Download Error", isPresented: fileDownloadErrorBinding) {
+                    Button("OK", role: .cancel) {
+                        viewModel.fileDownloadError = nil
+                    }
+                } message: {
+                    Text(viewModel.fileDownloadError ?? "An unknown error occurred.")
+                }
+                .onAppear {
+                    syncGeneratedPreviewPresentation()
+                }
+                .onDisappear {
+                    generatedPreviewDismissTask?.cancel()
+                    generatedPreviewDismissTask = nil
+                    isBlockingGeneratedPreviewTouches = false
+                    presentedGeneratedPreviewItem = nil
+                    isGeneratedPreviewDismissPending = false
+                }
+                .allowsHitTesting(presentedGeneratedPreviewItem == nil && !isBlockingGeneratedPreviewTouches)
             }
-            .toolbarBackgroundVisibility(.hidden, for: .navigationBar)
-            .sheet(item: sharedGeneratedFileBinding) { sharedItem in
-                ActivityViewController(activityItems: [sharedItem.url])
-            }
-            .overFullScreenCover(
-                isPresented: $isShowingModelSelector,
-                interfaceStyle: modelSelectorInterfaceStyle,
-                onDismiss: dismissModelSelector
-            ) {
-                modelSelectorPresentation
-            }
-            .fullScreenCover(item: generatedPreviewBinding) { previewItem in
+            if let previewItem = presentedGeneratedPreviewItem {
                 FilePreviewSheet(
                     previewItem: previewItem,
-                    onWillDismiss: beginGeneratedPreviewDismissal
+                    isDismissPending: isGeneratedPreviewDismissPending,
+                    onRequestDismiss: beginGeneratedPreviewDismissal
                 )
-            }
-            .onChange(of: isGeneratedPreviewPresented) { _, isPresented in
-                handleGeneratedPreviewPresentationChange(isPresented)
-            }
-            .onChange(of: viewModel.currentConversation?.id) { _, _ in
-                composerResetToken = UUID()
-            }
-            .photosPicker(isPresented: $showPhotoPicker, selection: $selectedPhotoItem, matching: .images)
-            .onChange(of: selectedPhotoItem) { _, newItem in
-                Task {
-                    do {
-                        guard
-                            let rawData = try await newItem?.loadTransferable(type: Data.self),
-                            let image = UIImage(data: rawData),
-                            let jpegData = image.jpegData(compressionQuality: 0.85)
-                        else {
-                            return
-                        }
-                        viewModel.selectedImageData = jpegData
-                    } catch {
-                        print("Failed to load photo: \(error.localizedDescription)")
-                    }
-                }
-            }
-            .sheet(isPresented: $showDocumentPicker) {
-                DocumentPicker { urls in
-                    viewModel.handlePickedDocuments(urls)
-                }
-            }
-            .alert("File Download Error", isPresented: fileDownloadErrorBinding) {
-                Button("OK", role: .cancel) {
-                    viewModel.fileDownloadError = nil
-                }
-            } message: {
-                Text(viewModel.fileDownloadError ?? "An unknown error occurred.")
-            }
-            .onDisappear {
-                generatedPreviewTouchShieldTask?.cancel()
-                generatedPreviewTouchShieldTask = nil
-                isBlockingGeneratedPreviewTouches = false
-                PreviewDismissTouchShield.deactivate()
-            }
-        }
-        .overlay {
-            if isBlockingGeneratedPreviewTouches {
+                .zIndex(2000)
+                .transition(.opacity)
+            } else if isBlockingGeneratedPreviewTouches {
                 Color.black.opacity(0.001)
                     .ignoresSafeArea()
                     .contentShape(Rectangle())
                     .accessibilityHidden(true)
-                    .zIndex(1000)
+                    .zIndex(1500)
             }
         }
     }
@@ -162,30 +179,11 @@ struct ChatView: View {
         )
     }
 
-    private var generatedPreviewBinding: Binding<FilePreviewItem?> {
-        Binding(
-            get: {
-                guard let previewItem = viewModel.filePreviewItem else { return nil }
-                switch previewItem.kind {
-                case .generatedImage, .generatedPDF:
-                    return previewItem
-                }
-            },
-            set: { newValue in
-                if let newValue {
-                    viewModel.filePreviewItem = newValue
-                } else if viewModel.filePreviewItem != nil {
-                    viewModel.filePreviewItem = nil
-                }
-            }
-        )
-    }
-
-    private var isGeneratedPreviewPresented: Bool {
-        guard let kind = viewModel.filePreviewItem?.kind else { return false }
-        switch kind {
+    private var generatedPreviewCandidate: FilePreviewItem? {
+        guard let previewItem = viewModel.filePreviewItem else { return nil }
+        switch previewItem.kind {
         case .generatedImage, .generatedPDF:
-            return true
+            return previewItem
         }
     }
 
@@ -579,34 +577,41 @@ private extension ChatView {
         UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
     }
 
-    func handleGeneratedPreviewPresentationChange(_ isPresented: Bool) {
-        generatedPreviewTouchShieldTask?.cancel()
-        generatedPreviewTouchShieldTask = nil
-
-        if isPresented {
+    func syncGeneratedPreviewPresentation() {
+        guard let previewItem = generatedPreviewCandidate else {
+            guard !isGeneratedPreviewDismissPending else { return }
+            presentedGeneratedPreviewItem = nil
             isBlockingGeneratedPreviewTouches = false
-            PreviewDismissTouchShield.deactivate()
             return
         }
 
-        guard isBlockingGeneratedPreviewTouches else {
-            PreviewDismissTouchShield.deactivate()
-            return
-        }
-
-        generatedPreviewTouchShieldTask = Task { @MainActor in
-            try? await Task.sleep(nanoseconds: generatedPreviewTouchShieldDuration)
-            isBlockingGeneratedPreviewTouches = false
-            PreviewDismissTouchShield.deactivate()
-            generatedPreviewTouchShieldTask = nil
+        generatedPreviewDismissTask?.cancel()
+        generatedPreviewDismissTask = nil
+        presentedGeneratedPreviewItem = previewItem
+        isGeneratedPreviewDismissPending = false
+        if !isBlockingGeneratedPreviewTouches {
+            isBlockingGeneratedPreviewTouches = true
         }
     }
 
     func beginGeneratedPreviewDismissal() {
-        generatedPreviewTouchShieldTask?.cancel()
-        generatedPreviewTouchShieldTask = nil
+        guard presentedGeneratedPreviewItem != nil, !isGeneratedPreviewDismissPending else { return }
+
+        generatedPreviewDismissTask?.cancel()
+        generatedPreviewDismissTask = nil
+        isGeneratedPreviewDismissPending = true
         isBlockingGeneratedPreviewTouches = true
-        PreviewDismissTouchShield.activate()
+        viewModel.filePreviewItem = nil
+
+        generatedPreviewDismissTask = Task { @MainActor in
+            try? await Task.sleep(nanoseconds: generatedPreviewOverlayDismissDelay)
+            presentedGeneratedPreviewItem = nil
+
+            try? await Task.sleep(nanoseconds: generatedPreviewTouchCooldownDuration)
+            isBlockingGeneratedPreviewTouches = false
+            isGeneratedPreviewDismissPending = false
+            generatedPreviewDismissTask = nil
+        }
     }
 
     func presentModelSelector() {

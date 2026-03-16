@@ -33,12 +33,65 @@ fileprivate enum BlockPart: Identifiable, Sendable {
 // MARK: - Markdown Content View
 
 struct MarkdownContentView: View {
+    enum SurfaceStyle {
+        case plain
+        case assistant(isLive: Bool)
+    }
+
     let text: String
     var filePathAnnotations: [FilePathAnnotation] = []
     var onSandboxLinkTap: ((String, FilePathAnnotation?) -> Void)?
+    var surfaceStyle: SurfaceStyle = .plain
 
     private var blockParts: [BlockPart] {
         parseBlocks(text)
+    }
+
+    private var shouldUseSegmentedAssistantSurface: Bool {
+        blockParts.contains { part in
+            switch part {
+            case .codeBlock, .latexBlock:
+                return true
+            default:
+                return false
+            }
+        }
+    }
+
+    private var assistantSurfaceSections: [AssistantSurfaceSection] {
+        var sections: [AssistantSurfaceSection] = []
+        var currentParts: [BlockPart] = []
+
+        func flushCurrentParts() {
+            guard !currentParts.isEmpty else { return }
+            sections.append(
+                AssistantSurfaceSection(
+                    id: currentParts[0].id,
+                    parts: currentParts
+                )
+            )
+            currentParts = []
+        }
+
+        for part in blockParts {
+            switch part {
+            case .codeBlock, .latexBlock:
+                flushCurrentParts()
+                sections.append(
+                    AssistantSurfaceSection(
+                        id: part.id,
+                        parts: [part]
+                    )
+                )
+            default:
+                currentParts.append(part)
+            }
+        }
+
+        flushCurrentParts()
+        return sections.isEmpty
+            ? [AssistantSurfaceSection(id: 0, parts: blockParts)]
+            : sections
     }
 
     /// First pass: extract code blocks and LaTeX blocks from raw text.
@@ -333,18 +386,62 @@ struct MarkdownContentView: View {
     }
 
     var body: some View {
+        switch surfaceStyle {
+        case .plain:
+            blockStack(
+                for: blockParts,
+                codeBlockSurfaceStyle: .standalone
+            )
+
+        case .assistant(let isLive):
+            if shouldUseSegmentedAssistantSurface {
+                VStack(alignment: .leading, spacing: 8) {
+                    ForEach(assistantSurfaceSections) { section in
+                        blockStack(
+                            for: section.parts,
+                            codeBlockSurfaceStyle: .embedded
+                        )
+                        .padding(section.contentPadding)
+                        .assistantSingleSurfaceGlass(isLive: isLive)
+                    }
+                }
+            } else {
+                blockStack(
+                    for: blockParts,
+                    codeBlockSurfaceStyle: .embedded
+                )
+                .padding(12)
+                .assistantSingleSurfaceGlass(isLive: isLive)
+            }
+        }
+    }
+
+    private func blockStack(
+        for parts: [BlockPart],
+        codeBlockSurfaceStyle: CodeBlockView.SurfaceStyle
+    ) -> some View {
         VStack(alignment: .leading, spacing: 10) {
-            ForEach(Array(blockParts.enumerated()), id: \.element.id) { index, part in
-                blockView(for: part, at: index)
+            ForEach(parts) { part in
+                blockView(
+                    for: part,
+                    codeBlockSurfaceStyle: codeBlockSurfaceStyle
+                )
             }
         }
     }
 
     @ViewBuilder
-    private func blockView(for part: BlockPart, at index: Int) -> some View {
+    private func blockView(
+        for part: BlockPart,
+        codeBlockSurfaceStyle: CodeBlockView.SurfaceStyle
+    ) -> some View {
         switch part {
         case let .codeBlock(id: id, language: language, code: code):
-            CodeBlockView(language: language, code: code)
+            CodeBlockView(
+                language: language,
+                code: code,
+                surfaceStyle: codeBlockSurfaceStyle
+            )
                 .id(id)
 
         case let .horizontalRule(id: id):
@@ -367,6 +464,37 @@ struct MarkdownContentView: View {
             )
             .id(id)
         }
+    }
+}
+
+private struct AssistantSurfaceSection: Identifiable {
+    let id: Int
+    let parts: [BlockPart]
+
+    var contentPadding: EdgeInsets {
+        if parts.count == 1 {
+            switch parts[0] {
+            case .codeBlock, .latexBlock:
+                return EdgeInsets(top: 10, leading: 10, bottom: 10, trailing: 10)
+            default:
+                break
+            }
+        }
+
+        return EdgeInsets(top: 12, leading: 12, bottom: 12, trailing: 12)
+    }
+}
+
+private extension View {
+    func assistantSingleSurfaceGlass(isLive: Bool) -> some View {
+        singleSurfaceGlass(
+            cornerRadius: 20,
+            stableFillOpacity: isLive ? 0.01 : 0.004,
+            tintOpacity: isLive ? 0.03 : 0.024,
+            borderWidth: 0.85,
+            darkBorderOpacity: 0.16,
+            lightBorderOpacity: 0.09
+        )
     }
 }
 

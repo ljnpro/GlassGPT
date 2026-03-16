@@ -2,13 +2,40 @@ import SwiftUI
 
 @MainActor
 struct CodeBlockView: View {
+    enum SurfaceStyle {
+        case standalone
+        case embedded
+    }
+
     let language: String?
     let code: String
+    var surfaceStyle: SurfaceStyle = .standalone
 
     @State private var isCopied = false
     @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
+        Group {
+            switch surfaceStyle {
+            case .standalone:
+                chrome
+                    .padding(10)
+                    .singleSurfaceGlass(
+                        cornerRadius: 16,
+                        stableFillOpacity: 0.01,
+                        tintOpacity: 0.024,
+                        borderWidth: 0.8,
+                        darkBorderOpacity: 0.15,
+                        lightBorderOpacity: 0.085
+                    )
+
+            case .embedded:
+                chrome
+            }
+        }
+    }
+
+    private var chrome: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 10) {
                 if let languageTitle {
@@ -42,20 +69,13 @@ struct CodeBlockView: View {
                     .font(.caption.weight(.semibold))
                     .contentTransition(.symbolEffect(.replace))
                     .padding(.horizontal, 11)
-                    .padding(.vertical, 5)
-                    .background {
-                        Capsule(style: .continuous)
-                            .fill(buttonFill)
-                    }
-                    .overlay {
-                        Capsule(style: .continuous)
-                            .strokeBorder(borderColor.opacity(0.85), lineWidth: 0.75)
-                    }
+                    .padding(.vertical, 4)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.glass)
             }
             .padding(.horizontal, 12)
-            .frame(minHeight: 26)
+            .padding(.vertical, 2)
+            .frame(minHeight: 24)
             .background(headerFill)
             .overlay(alignment: .bottom) {
                 Rectangle()
@@ -71,27 +91,12 @@ struct CodeBlockView: View {
                     .textSelection(.enabled)
             }
         }
-        .singleSurfaceGlass(
-            cornerRadius: 14,
-            stableFillOpacity: 0.006,
-            tintOpacity: 0.026,
-            borderWidth: 0.8,
-            darkBorderOpacity: 0.15,
-            lightBorderOpacity: 0.085
-        )
-        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 
     private var headerFill: Color {
         colorScheme == .dark
             ? Color.white.opacity(0.035)
             : Color.black.opacity(0.028)
-    }
-
-    private var buttonFill: Color {
-        colorScheme == .dark
-            ? Color.white.opacity(0.075)
-            : Color.white.opacity(0.72)
     }
 
     private var borderColor: Color {
