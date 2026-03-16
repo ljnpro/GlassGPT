@@ -23,15 +23,7 @@ struct ModelBadge: View {
             .padding(.vertical, 6)
             .fixedSize(horizontal: true, vertical: false)
         }
-        .buttonStyle(.plain)
-        .singleSurfaceGlass(
-            cornerRadius: 999,
-            stableFillOpacity: 0.012,
-            tintOpacity: 0.022,
-            borderWidth: 0.8,
-            darkBorderOpacity: 0.14,
-            lightBorderOpacity: 0.08
-        )
+        .buttonStyle(.glass)
     }
 
     private var badgeText: String {
@@ -245,8 +237,16 @@ struct ModelSelectorSheet: View {
 
             Spacer(minLength: 12)
 
-            Button("Save") { onDone() }
-                .buttonStyle(.glassProminent)
+            Button {
+                onDone()
+            } label: {
+                Text("Save")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.primary)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+            }
+            .buttonStyle(.glass)
         }
         .padding(.horizontal, 2)
     }

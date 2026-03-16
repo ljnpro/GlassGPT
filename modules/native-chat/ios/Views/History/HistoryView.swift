@@ -38,11 +38,16 @@ struct HistoryView: View {
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     if !conversations.isEmpty {
-                        Button("Delete All", systemImage: "trash", role: .destructive) {
+                        Button(role: .destructive) {
                             showDeleteConfirmation = true
+                        } label: {
+                            Label("Delete All", systemImage: "trash")
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(.red)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 6)
                         }
                         .buttonStyle(.glass)
-                        .tint(.red)
                     }
                 }
             }

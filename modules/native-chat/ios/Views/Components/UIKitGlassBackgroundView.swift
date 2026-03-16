@@ -187,13 +187,36 @@ final class GlassBackgroundHostingView: UIView {
         let isDark = traitCollection.userInterfaceStyle == .dark
         let fillOpacity = isDark ? stableFillOpacity : min(stableFillOpacity * 2, 0.12)
         let resolvedTintOpacity = isDark ? tintOpacity : min(tintOpacity * 0.85, 0.08)
-        let fillColor = UIColor.white.withAlphaComponent(fillOpacity)
+        let fillColor: UIColor
+        let tintColor: UIColor?
+
+        if isDark {
+            fillColor = UIColor.white.withAlphaComponent(fillOpacity)
+            tintColor = resolvedTintOpacity <= 0.001
+                ? nil
+                : UIColor.white.withAlphaComponent(resolvedTintOpacity)
+        } else {
+            let lightFillOpacity = min(fillOpacity * 0.42, 0.05)
+            fillColor = UIColor(
+                red: 0.82,
+                green: 0.85,
+                blue: 0.90,
+                alpha: lightFillOpacity
+            )
+            let lightTintOpacity = min(max(resolvedTintOpacity * 1.3, 0), 0.07)
+            tintColor = lightTintOpacity <= 0.001
+                ? nil
+                : UIColor(
+                    red: 0.76,
+                    green: 0.80,
+                    blue: 0.86,
+                    alpha: lightTintOpacity
+                )
+        }
 
         let effect = UIGlassEffect(style: .regular)
         effect.isInteractive = false
-        effect.tintColor = resolvedTintOpacity <= 0.001
-            ? nil
-            : UIColor.white.withAlphaComponent(resolvedTintOpacity)
+        effect.tintColor = tintColor
         effectView.effect = effect
 
         if innerInset <= 0.001 {
