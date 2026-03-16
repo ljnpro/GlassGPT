@@ -1,12 +1,12 @@
-# 4.2 Parity Baseline
+# 4.2.2 Parity Baseline
 
-This document records the `codex/stable-4.1` baseline that `codex/stable-4.2` must preserve.
+This document records the `4.2.1` release baseline that `4.2.2` must preserve.
 
 ## Stable Baseline
 
-- Source branch: `codex/stable-4.1`
-- Refactor branch: `codex/stable-4.2`
-- Baseline app version: `4.0.29 (20165)`
+- Source branch: `codex/stable-4.2`
+- Development branch: `codex/feature/4.2.2-maintainability`
+- Baseline app version: `4.2.1 (20167)`
 - App target: `GlassGPT`
 - Package target: `NativeChat`
 - Current package size: ~13k Swift LOC across 41 Swift files
@@ -19,14 +19,11 @@ Last verified baseline command:
 xcodebuild -project ios/GlassGPT.xcodeproj -scheme GlassGPT -destination 'generic/platform=iOS Simulator' build
 ```
 
-Baseline result before 4.2 refactor:
+Baseline result before 4.2.2 work:
 
 - Build status: succeeded
-- Existing warnings before 4.2 shell cleanup:
-  - `AppDelegate.swift`: `UIWindow(frame:)` deprecated on iOS 26
-  - `AppDelegate.swift`: `UIScreen.main` deprecated on iOS 26
-  - `AppDelegate.swift`: `UIApplication.OpenURLOptionsKey` deprecated on iOS 26
-  - `Info.plist`: `UIRequiresFullScreen` deprecated on iOS 26
+- Existing warnings:
+  - `appintentsmetadataprocessor`: `Metadata extraction skipped. No AppIntents.framework dependency found.`
 
 ## User-Visible Invariants
 
@@ -47,7 +44,7 @@ The following must remain unchanged unless a release blocker forces a deviation:
 
 ## Manual Acceptance Checklist
 
-Run this checklist against both `codex/stable-4.1` and `codex/stable-4.2` before release:
+Run this checklist against both `v4.2.1` and the current `4.2.2` candidate before release:
 
 1. Launch the app and confirm the initial empty state matches.
 2. Open Settings and confirm sections, ordering, labels, and controls match.

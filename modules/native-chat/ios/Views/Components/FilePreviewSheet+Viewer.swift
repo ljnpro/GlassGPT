@@ -159,6 +159,7 @@ extension FilePreviewSheet {
             diameter: circularButtonDiameter,
             isEnabled: !isDismissPending,
             accessibilityLabel: "Close preview",
+            accessibilityIdentifier: "filePreview.close",
             onTriggerStart: onBeginDismissInteraction,
             action: onRequestDismiss
         ) {

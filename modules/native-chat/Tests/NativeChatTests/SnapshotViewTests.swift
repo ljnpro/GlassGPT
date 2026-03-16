@@ -5,15 +5,22 @@ import XCTest
 
 @MainActor
 final class SnapshotViewTests: XCTestCase {
+    override func invokeTest() {
+        let recordMode: SnapshotTestingConfiguration.Record =
+            ProcessInfo.processInfo.environment["RECORD_SNAPSHOTS"] == "1" ? .all : .missing
+
+        withSnapshotTesting(record: recordMode) {
+            super.invokeTest()
+        }
+    }
+
     override func setUp() {
         super.setUp()
-        isRecording = ProcessInfo.processInfo.environment["RECORD_SNAPSHOTS"] == "1"
         UIView.setAnimationsEnabled(false)
     }
 
     override func tearDown() {
         UIView.setAnimationsEnabled(true)
-        isRecording = false
         super.tearDown()
     }
 
@@ -54,6 +61,27 @@ final class SnapshotViewTests: XCTestCase {
         assertViewSnapshots(named: "chat-error") {
             ChatView(viewModel: errorViewModel)
         }
+
+        let restoringViewModel = try makeSnapshotChatViewModel(hasAPIKey: true)
+        _ = makeConversationSamples(in: restoringViewModel)
+        restoringViewModel.isRestoringConversation = true
+        assertViewSnapshots(named: "chat-restoring") {
+            ChatView(viewModel: restoringViewModel)
+        }
+
+        let recoveringViewModel = try makeSnapshotChatViewModel(hasAPIKey: true)
+        _ = makeConversationSamples(in: recoveringViewModel)
+        if let liveDraft = recoveringViewModel.messages.last {
+            recoveringViewModel.visibleSessionMessageID = liveDraft.id
+            recoveringViewModel.draftMessage = liveDraft
+        }
+        recoveringViewModel.isStreaming = true
+        recoveringViewModel.isRecovering = true
+        recoveringViewModel.currentThinkingText = "Rebinding the in-progress response after app relaunch."
+        recoveringViewModel.currentStreamingText = "Recovery stream connected. Replaying any missing deltas now."
+        assertViewSnapshots(named: "chat-recovering") {
+            ChatView(viewModel: recoveringViewModel)
+        }
     }
 
     func testHistorySnapshots() throws {
@@ -67,7 +95,10 @@ final class SnapshotViewTests: XCTestCase {
     func testSettingsSnapshots() {
         let viewModel = makeSettingsSnapshotViewModel()
         assertViewSnapshots(named: "settings") {
-            SettingsView(viewModel: viewModel)
+            SettingsView(
+                viewModel: viewModel,
+                appVersionStringOverride: "4.2.1 (20167)"
+            )
         }
     }
 

@@ -2,7 +2,7 @@
 
 ## Principle
 
-4.2 prioritizes parity over optimization. Tests are intended to prove that refactors preserve behavior.
+4.2.x prioritizes parity over optimization. Tests exist to prove that refactors preserve behavior.
 
 ## Coverage
 
@@ -15,6 +15,12 @@
   - cache bucket/open-behavior decisions
 - Integration tests
   - end-to-end package-facing behavior where no UI host is required
+- Snapshot tests
+  - chat, history, settings, model selector, and generated file preview
+  - iPhone/iPad plus light/dark variants
+- UI tests
+  - app launch reachability
+  - scenario-driven smoke coverage for history, settings, streaming, model selection, and file preview
 - Manual parity checks
   - see [parity-baseline.md](/Applications/GlassGPT/docs/parity-baseline.md)
 
@@ -29,10 +35,15 @@ xcodebuild -project ios/GlassGPT.xcodeproj -scheme GlassGPT -destination 'generi
 ```
 
 ```bash
-xcodebuild -scheme NativeChat -destination 'platform=iOS Simulator,name=iPhone 16' test
+xcodebuild -project ios/GlassGPT.xcodeproj -scheme GlassGPT -destination 'platform=iOS Simulator,name=iPhone 17' -only-testing:GlassGPTTests test
+```
+
+```bash
+xcodebuild -project ios/GlassGPT.xcodeproj -scheme GlassGPT -destination 'platform=iOS Simulator,name=iPhone 17' -only-testing:GlassGPTUITests test
 ```
 
 ## Notes
 
-- UI parity currently relies on the manual checklist plus build/test gates.
-- If a future 4.2 patch adds screenshot testing, it must compare against the 4.1 visual baseline, not against a moving target.
+- Coverage reports are emitted to `.local/build/ci/coverage-report.txt` during `./scripts/ci.sh`.
+- Warnings are gated by `scripts/check_warnings.sh`. The only currently allowed warning is the external `appintentsmetadataprocessor` metadata extraction notice if Xcode emits it.
+- Snapshot comparisons anchor to the 4.2.1 baseline, not to a moving target.
