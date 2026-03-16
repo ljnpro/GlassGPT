@@ -20,6 +20,11 @@ let package = Package(
             resources: [
                 .process("Resources")
             ]
+        ),
+        .testTarget(
+            name: "NativeChatTests",
+            dependencies: ["NativeChat"],
+            path: "Tests/NativeChatTests"
         )
     ]
 )

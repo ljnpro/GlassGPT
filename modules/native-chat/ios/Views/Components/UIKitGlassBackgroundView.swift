@@ -165,6 +165,9 @@ final class GlassBackgroundHostingView: UIView {
         self.lightBorderOpacity = lightBorderOpacity
         super.init(frame: .zero)
         configureViewHierarchy()
+        registerForTraitChanges([UITraitUserInterfaceStyle.self]) { (view: Self, _) in
+            view.updateColors()
+        }
         configure(
             cornerRadius: cornerRadius,
             innerInset: innerInset,
@@ -199,11 +202,6 @@ final class GlassBackgroundHostingView: UIView {
         )
         stableFillView.layer.cornerRadius = max(cornerRadius - innerInset, 0)
         stableFillView.layer.cornerCurve = .continuous
-    }
-
-    override func traitCollectionDidChange(_ previousTraitCollection: UITraitCollection?) {
-        super.traitCollectionDidChange(previousTraitCollection)
-        updateColors()
     }
 
     func configure(

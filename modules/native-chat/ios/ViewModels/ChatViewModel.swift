@@ -86,13 +86,6 @@ final class ChatViewModel {
         }
     }
 
-    private enum StorageKeys {
-        static let defaultModel = "defaultModel"
-        static let defaultEffort = "defaultEffort"
-        static let defaultBackgroundModeEnabled = "defaultBackgroundModeEnabled"
-        static let defaultServiceTier = "defaultServiceTier"
-    }
-
     // MARK: - State
 
     var messages: [Message] = []
@@ -154,7 +147,11 @@ final class ChatViewModel {
     // MARK: - Dependencies
 
     private let openAIService = OpenAIService()
-    private let keychainService = KeychainService()
+    private let settingsStore: SettingsStore
+    private let apiKeyStore: APIKeyStore
+    private let conversationRepository: ConversationRepository
+    private let draftRepository: DraftRepository
+    private let generatedFileCoordinator = GeneratedFileCoordinator()
     private var modelContext: ModelContext
 
     // Visible live session state
@@ -176,8 +173,16 @@ final class ChatViewModel {
 
     // MARK: - Init
 
-    init(modelContext: ModelContext) {
+    init(
+        modelContext: ModelContext,
+        settingsStore: SettingsStore = .shared,
+        apiKeyStore: APIKeyStore = .shared
+    ) {
         self.modelContext = modelContext
+        self.settingsStore = settingsStore
+        self.apiKeyStore = apiKeyStore
+        self.conversationRepository = ConversationRepository(modelContext: modelContext)
+        self.draftRepository = DraftRepository(modelContext: modelContext)
         loadDefaultsFromSettings()
         restoreLastConversationIfAvailable()
 
@@ -335,7 +340,7 @@ final class ChatViewModel {
     // MARK: - API Key
 
     var apiKey: String {
-        keychainService.loadAPIKey() ?? ""
+        apiKeyStore.loadAPIKey() ?? ""
     }
 
     var hasAPIKey: Bool {
@@ -351,7 +356,7 @@ final class ChatViewModel {
         }
 
         let key = apiKey
-        let requestedFilename = annotation?.filename ?? extractFilename(from: sandboxURL)
+        let requestedFilename = generatedFileCoordinator.requestedFilename(for: sandboxURL, annotation: annotation)
         var requestedOpenBehavior = FileDownloadService.openBehavior(for: requestedFilename)
 
         filePreviewItem = nil
@@ -368,7 +373,9 @@ final class ChatViewModel {
                     suggestedFilename: requestedFilename
                    ) {
                     isDownloadingFile = false
-                    presentGeneratedFile(cachedResource, suggestedFilename: requestedFilename)
+                    applyGeneratedFilePresentation(
+                        generatedFileCoordinator.presentation(for: cachedResource, suggestedFilename: requestedFilename)
+                    )
                     HapticService.shared.impact(.light)
                     return
                 }
@@ -382,8 +389,10 @@ final class ChatViewModel {
                     throw FileDownloadError.fileNotFound
                 }
 
-                let resolvedFilename = resolvedAnnotation.filename ?? requestedFilename ?? extractFilename(from: sandboxURL)
-                requestedOpenBehavior = Self.generatedOpenBehavior(for: resolvedAnnotation)
+                let resolvedFilename = resolvedAnnotation.filename
+                    ?? requestedFilename
+                    ?? generatedFileCoordinator.requestedFilename(for: sandboxURL, annotation: nil)
+                requestedOpenBehavior = generatedFileCoordinator.generatedOpenBehavior(for: resolvedAnnotation)
                 let resource = try await FileDownloadService.shared.prefetchGeneratedFile(
                     fileId: resolvedAnnotation.fileId,
                     containerId: resolvedAnnotation.containerId,
@@ -392,17 +401,19 @@ final class ChatViewModel {
                 )
 
                 isDownloadingFile = false
-                presentGeneratedFile(resource, suggestedFilename: resolvedFilename)
+                applyGeneratedFilePresentation(
+                    generatedFileCoordinator.presentation(for: resource, suggestedFilename: resolvedFilename)
+                )
                 HapticService.shared.impact(.light)
             } catch {
                 isDownloadingFile = false
-                fileDownloadError = userFacingDownloadError(
+                fileDownloadError = generatedFileCoordinator.userFacingDownloadError(
                     error,
                     openBehavior: requestedOpenBehavior
                 )
                 HapticService.shared.notify(.error)
                 #if DEBUG
-                print("[FileDownload] Failed: \(error)")
+                Loggers.files.debug("[FileDownload] Failed: \(error.localizedDescription)")
                 #endif
             }
         }
@@ -414,7 +425,7 @@ final class ChatViewModel {
         fallback: FilePathAnnotation?,
         apiKey: String
     ) async throws -> FilePathAnnotation? {
-        if let fallback, annotationCanDownloadDirectly(fallback) {
+        if let fallback, generatedFileCoordinator.annotationCanDownloadDirectly(fallback) {
             return fallback
         }
 
@@ -423,7 +434,7 @@ final class ChatViewModel {
         }
 
         let result = try await openAIService.fetchResponse(responseId: responseId, apiKey: apiKey)
-        guard let refreshedAnnotation = findMatchingFilePathAnnotation(
+        guard let refreshedAnnotation = generatedFileCoordinator.findMatchingFilePathAnnotation(
             in: result.filePathAnnotations,
             sandboxURL: sandboxURL,
             fallback: fallback
@@ -440,166 +451,17 @@ final class ChatViewModel {
         }
 
         message.filePathAnnotations = persistedAnnotations
-        try? modelContext.save()
+        saveContextIfPossible("resolveDownloadAnnotation")
         return refreshedAnnotation
     }
 
-    private func annotationCanDownloadDirectly(_ annotation: FilePathAnnotation) -> Bool {
-        if let containerId = annotation.containerId, !containerId.isEmpty {
-            return true
+    private func applyGeneratedFilePresentation(_ presentation: GeneratedFilePresentation) {
+        switch presentation {
+        case .preview(let previewItem):
+            filePreviewItem = previewItem
+        case .share(let sharedItem):
+            sharedGeneratedFileItem = sharedItem
         }
-
-        return !annotation.fileId.hasPrefix("cfile_")
-    }
-
-    private func findMatchingFilePathAnnotation(
-        in annotations: [FilePathAnnotation],
-        sandboxURL: String,
-        fallback: FilePathAnnotation?
-    ) -> FilePathAnnotation? {
-        if let fallback,
-           let exactFileIdMatch = annotations.first(where: { $0.fileId == fallback.fileId }) {
-            return exactFileIdMatch
-        }
-
-        if let exact = annotations.first(where: { $0.sandboxPath == sandboxURL }) {
-            return exact
-        }
-
-        let pathOnly: String
-        if sandboxURL.hasPrefix("sandbox:") {
-            pathOnly = String(sandboxURL.dropFirst("sandbox:".count))
-        } else {
-            pathOnly = sandboxURL
-        }
-
-        if let match = annotations.first(where: {
-            $0.sandboxPath == pathOnly ||
-            $0.sandboxPath.hasSuffix(pathOnly) ||
-            pathOnly.hasSuffix($0.sandboxPath)
-        }) {
-            return match
-        }
-
-        let filename = (pathOnly as NSString).lastPathComponent
-        if !filename.isEmpty,
-           let match = annotations.first(where: {
-               ($0.sandboxPath as NSString).lastPathComponent == filename ||
-               $0.filename == filename
-           }) {
-            return match
-        }
-
-        if annotations.count == 1 {
-            return annotations.first
-        }
-
-        return fallback
-    }
-
-    private func extractFilename(from sandboxURL: String) -> String? {
-        let path: String
-        if sandboxURL.hasPrefix("sandbox:") {
-            path = String(sandboxURL.dropFirst("sandbox:".count))
-        } else {
-            path = sandboxURL
-        }
-        let filename = (path as NSString).lastPathComponent
-        return filename.isEmpty ? nil : filename
-    }
-
-    private func makePreviewItem(
-        url: URL,
-        kind: FilePreviewKind,
-        suggestedFilename: String?
-    ) -> FilePreviewItem {
-        let viewerFilename = previewViewerFilename(for: suggestedFilename) ?? url.lastPathComponent
-        let fallbackName = url.deletingPathExtension().lastPathComponent
-        let displayName = previewDisplayName(for: viewerFilename) ?? (fallbackName.isEmpty ? viewerFilename : fallbackName)
-        return FilePreviewItem(
-            url: url,
-            kind: kind,
-            displayName: displayName,
-            viewerFilename: viewerFilename
-        )
-    }
-
-    private func presentGeneratedFile(
-        _ resource: GeneratedFileLocalResource,
-        suggestedFilename: String?
-    ) {
-        switch resource.openBehavior {
-        case .imagePreview:
-            filePreviewItem = makePreviewItem(
-                url: resource.localURL,
-                kind: .generatedImage,
-                suggestedFilename: resource.filename.isEmpty ? suggestedFilename : resource.filename
-            )
-        case .pdfPreview:
-            filePreviewItem = makePreviewItem(
-                url: resource.localURL,
-                kind: .generatedPDF,
-                suggestedFilename: resource.filename.isEmpty ? suggestedFilename : resource.filename
-            )
-        case .directShare:
-            sharedGeneratedFileItem = SharedGeneratedFileItem(
-                url: resource.localURL,
-                filename: resource.filename
-            )
-        }
-    }
-
-    private func previewViewerFilename(for filename: String?) -> String? {
-        guard let filename else { return nil }
-        let sanitizedFilename = URL(fileURLWithPath: filename).lastPathComponent
-        return sanitizedFilename.isEmpty ? nil : sanitizedFilename
-    }
-
-    private func previewDisplayName(for filename: String?) -> String? {
-        guard let filename else { return nil }
-        let trimmed = URL(fileURLWithPath: filename).deletingPathExtension().lastPathComponent
-        return trimmed.isEmpty ? nil : trimmed
-    }
-
-    private func userFacingDownloadError(
-        _ error: Error,
-        openBehavior: GeneratedFileOpenBehavior
-    ) -> String {
-        if let fileError = error as? FileDownloadError {
-            switch (openBehavior, fileError) {
-            case (.imagePreview, .fileNotFound):
-                return "This generated image is no longer available. Please regenerate it."
-            case (.imagePreview, .httpError(let statusCode, _)) where statusCode == 404 || statusCode == 410:
-                return "This generated image has expired and can no longer be downloaded. Please regenerate it."
-            case (.imagePreview, .invalidImageData):
-                return "This generated image could not be rendered."
-            case (.pdfPreview, .fileNotFound):
-                return "This generated file is no longer available. Please regenerate it."
-            case (.pdfPreview, .httpError(let statusCode, _)) where statusCode == 404 || statusCode == 410:
-                return "This generated file has expired and can no longer be downloaded. Please regenerate it."
-            case (.pdfPreview, .invalidPDFData):
-                return "This generated PDF could not be rendered."
-            case (.directShare, .fileNotFound):
-                return "This generated file is no longer available. Please regenerate it."
-            case (.directShare, .httpError(let statusCode, _)) where statusCode == 404 || statusCode == 410:
-                return "This generated file has expired and can no longer be downloaded. Please regenerate it."
-            default:
-                break
-            }
-        }
-
-        return error.localizedDescription
-    }
-
-    private static func generatedOpenBehavior(for annotation: FilePathAnnotation) -> GeneratedFileOpenBehavior {
-        if let filename = annotation.filename {
-            return FileDownloadService.openBehavior(for: filename)
-        }
-
-        let sandboxPath = annotation.sandboxPath
-        guard !sandboxPath.isEmpty else { return .directShare }
-        let filename = (sandboxPath as NSString).lastPathComponent
-        return FileDownloadService.openBehavior(for: filename)
     }
 
     private func prefetchGeneratedFilesIfNeeded(for message: Message) {
@@ -615,7 +477,7 @@ final class ChatViewModel {
         Task { @MainActor in
             var annotationsToPrefetch = initialAnnotations
 
-            if annotationsToPrefetch.contains(where: { !annotationCanDownloadDirectly($0) }),
+            if annotationsToPrefetch.contains(where: { !generatedFileCoordinator.annotationCanDownloadDirectly($0) }),
                let responseId,
                !responseId.isEmpty {
                 do {
@@ -627,7 +489,7 @@ final class ChatViewModel {
 
                         if let persistedMessage = findMessage(byId: messageID) {
                             persistedMessage.filePathAnnotations = refreshedAnnotations
-                            try? modelContext.save()
+                            saveContextIfPossible("prefetchGeneratedFilesIfNeeded.refreshAnnotations")
 
                             if persistedMessage.conversation?.id == currentConversation?.id {
                                 upsertMessage(persistedMessage)
@@ -636,7 +498,7 @@ final class ChatViewModel {
                     }
                 } catch {
                     #if DEBUG
-                    print("[GeneratedFileCache] Refresh failed for \(messageID): \(error.localizedDescription)")
+                    Loggers.files.debug("[GeneratedFileCache] Refresh failed for \(messageID): \(error.localizedDescription)")
                     #endif
                 }
             }
@@ -652,7 +514,7 @@ final class ChatViewModel {
                         )
                     } catch {
                         #if DEBUG
-                        print("[GeneratedFileCache] Prefetch failed for \(annotation.fileId): \(error.localizedDescription)")
+                        Loggers.files.debug("[GeneratedFileCache] Prefetch failed for \(annotation.fileId): \(error.localizedDescription)")
                         #endif
                     }
                 }
@@ -676,7 +538,7 @@ final class ChatViewModel {
                 pendingAttachments.append(attachment)
             } catch {
                 #if DEBUG
-                print("[Documents] Failed to read file \(url.lastPathComponent): \(error)")
+                Loggers.files.debug("[Documents] Failed to read file \(url.lastPathComponent): \(error.localizedDescription)")
                 #endif
             }
         }
@@ -709,7 +571,7 @@ final class ChatViewModel {
             } catch {
                 uploadedAttachments[index].uploadStatus = .failed
                 #if DEBUG
-                print("[Upload] Failed to upload \(uploadedAttachments[index].filename): \(error)")
+                Loggers.files.debug("[Upload] Failed to upload \(uploadedAttachments[index].filename): \(error.localizedDescription)")
                 #endif
             }
         }
@@ -744,13 +606,7 @@ final class ChatViewModel {
         }
 
         if currentConversation == nil {
-            let conversation = Conversation(
-                model: selectedModel.rawValue,
-                reasoningEffort: reasoningEffort.rawValue,
-                backgroundModeEnabled: backgroundModeEnabled,
-                serviceTierRawValue: serviceTier.rawValue
-            )
-            modelContext.insert(conversation)
+            let conversation = conversationRepository.createConversation(configuration: conversationConfiguration)
             currentConversation = conversation
         }
 
@@ -763,10 +619,7 @@ final class ChatViewModel {
         currentConversation?.updatedAt = .now
         messages.append(userMessage)
 
-        do {
-            try modelContext.save()
-        } catch {
-            errorMessage = "Failed to save your message."
+        guard saveContext(reportingUserError: "Failed to save your message.", logContext: "sendMessage.userMessage") else {
             return false
         }
 
@@ -784,7 +637,7 @@ final class ChatViewModel {
         )
         draft.conversation = currentConversation
         currentConversation?.messages.append(draft)
-        try? modelContext.save()
+        saveContextIfPossible("sendMessage.draft")
 
         guard let session = makeStreamingSession(for: draft) else {
             errorMessage = "Failed to start response session."
@@ -802,7 +655,7 @@ final class ChatViewModel {
             Task { @MainActor in
                 let uploadedAttachments = await uploadAttachments(attachmentsToSend)
                 userMessage.fileAttachmentsData = FileAttachment.encode(uploadedAttachments)
-                try? modelContext.save()
+                self.saveContextIfPossible("sendMessage.uploadedAttachments")
                 self.startStreamingRequest(for: session)
             }
         } else {
@@ -878,7 +731,7 @@ final class ChatViewModel {
                     receivedConnectionLost = true
                     self.saveSessionNow(session)
                     #if DEBUG
-                    print("[VM] Connection lost for session \(session.messageID)")
+                    Loggers.chat.debug("[VM] Connection lost for session \(session.messageID)")
                     #endif
 
                 case .error(let error):
@@ -888,7 +741,7 @@ final class ChatViewModel {
                         pendingRecoveryResponseId = responseId
                         pendingRecoveryError = error.localizedDescription
                         #if DEBUG
-                        print("[VM] Stream error, attempting recovery: \(error.localizedDescription)")
+                        Loggers.chat.debug("[VM] Stream error, attempting recovery: \(error.localizedDescription)")
                         #endif
                     } else if !session.currentText.isEmpty {
                         self.finalizeSessionAsPartial(session)
@@ -954,7 +807,7 @@ final class ChatViewModel {
                 if nextAttempt < Self.maxReconnectAttempts {
                     let delay = Self.reconnectBaseDelay * UInt64(1 << reconnectAttempt)
                     #if DEBUG
-                    print("[VM] Retrying full stream in \(Double(delay) / 1_000_000_000)s")
+                    Loggers.chat.debug("[VM] Retrying full stream in \(Double(delay) / 1_000_000_000)s")
                     #endif
 
                     try? await Task.sleep(nanoseconds: delay)
@@ -1158,7 +1011,7 @@ final class ChatViewModel {
                 }
 
                 #if DEBUG
-                print("[Recovery] Status fetch failed for \(responseId): \(error.localizedDescription)")
+                Loggers.recovery.debug("[Recovery] Status fetch failed for \(responseId): \(error.localizedDescription)")
                 #endif
                 await self.pollResponseUntilTerminal(session: session, responseId: responseId)
             }
@@ -1252,7 +1105,7 @@ final class ChatViewModel {
            !useDirectEndpoint,
            gatewayResumeTimedOut || !receivedAnyRecoveryEvent {
             #if DEBUG
-            print("[Recovery] Gateway resume stalled for \(responseId); retrying direct")
+            Loggers.recovery.debug("[Recovery] Gateway resume stalled for \(responseId); retrying direct")
             #endif
             await startStreamingRecovery(
                 session: session,
@@ -1290,7 +1143,7 @@ final class ChatViewModel {
                 case .queued, .inProgress:
                     #if DEBUG
                     if attempts <= 3 || attempts % 10 == 0 {
-                        print("[Recovery] Response still \(result.status.rawValue), attempt \(attempts)/\(maxAttempts)")
+                        Loggers.recovery.debug("[Recovery] Response still \(result.status.rawValue), attempt \(attempts)/\(maxAttempts)")
                     }
                     #endif
                     try? await Task.sleep(nanoseconds: 2_000_000_000)
@@ -1327,7 +1180,7 @@ final class ChatViewModel {
 
                 lastError = error.localizedDescription
                 #if DEBUG
-                print("[Recovery] Poll error: \(lastError ?? "unknown"), attempt \(attempts)/\(maxAttempts)")
+                Loggers.recovery.debug("[Recovery] Poll error: \(lastError ?? "unknown"), attempt \(attempts)/\(maxAttempts)")
                 #endif
 
                 let delay: UInt64 = attempts < 10 ? 2_000_000_000 : 3_000_000_000
@@ -1353,7 +1206,7 @@ final class ChatViewModel {
         }
 
         #if DEBUG
-        print("[Recovery] Finished with fallback after \(attempts) attempts. Last error: \(lastError ?? "none")")
+        Loggers.recovery.debug("[Recovery] Finished with fallback after \(attempts) attempts. Last error: \(lastError ?? "none")")
         #endif
     }
 
@@ -1362,13 +1215,7 @@ final class ChatViewModel {
 
         await cleanupStaleDrafts()
 
-        let descriptor = FetchDescriptor<Message>(
-            predicate: #Predicate<Message> { message in
-                message.isComplete == false && message.responseId != nil
-            }
-        )
-
-        guard let fetchedMessages = try? modelContext.fetch(descriptor) else { return }
+        guard let fetchedMessages = try? draftRepository.fetchRecoverableDrafts() else { return }
         let activeDraftID = activeIncompleteAssistantDraft()?.id
         let currentConversationID = currentConversation?.id
         let incompleteMessages = fetchedMessages.filter {
@@ -1377,7 +1224,7 @@ final class ChatViewModel {
         guard !incompleteMessages.isEmpty else { return }
 
         #if DEBUG
-        print("[Recovery] Found \(incompleteMessages.count) incomplete message(s) to recover")
+        Loggers.recovery.debug("[Recovery] Found \(incompleteMessages.count) incomplete message(s) to recover")
         #endif
 
         for message in incompleteMessages {
@@ -1389,13 +1236,7 @@ final class ChatViewModel {
     private func cleanupStaleDrafts() async {
         let staleThreshold = Date().addingTimeInterval(-24 * 60 * 60)
 
-        let descriptor = FetchDescriptor<Message>(
-            predicate: #Predicate<Message> { message in
-                message.isComplete == false
-            }
-        )
-
-        guard let staleMessages = try? modelContext.fetch(descriptor) else { return }
+        guard let staleMessages = try? draftRepository.fetchIncompleteDrafts() else { return }
 
         var cleanedCount = 0
 
@@ -1403,7 +1244,7 @@ final class ChatViewModel {
             guard message.createdAt < staleThreshold else { continue }
 
             if message.content.isEmpty && message.responseId == nil {
-                modelContext.delete(message)
+                conversationRepository.delete(message)
                 cleanedCount += 1
             } else {
                 message.isComplete = true
@@ -1415,9 +1256,9 @@ final class ChatViewModel {
         }
 
         if cleanedCount > 0 {
-            try? modelContext.save()
+            saveContextIfPossible("cleanupStaleDrafts")
             #if DEBUG
-            print("[Recovery] Cleaned up \(cleanedCount) stale draft(s)")
+            Loggers.recovery.debug("[Recovery] Cleaned up \(cleanedCount) stale draft(s)")
             #endif
         }
     }
@@ -1425,19 +1266,13 @@ final class ChatViewModel {
     private func resendOrphanedDrafts() async {
         guard !apiKey.isEmpty else { return }
 
-        let descriptor = FetchDescriptor<Message>(
-            predicate: #Predicate<Message> { message in
-                message.isComplete == false && message.responseId == nil
-            }
-        )
-
-        guard let orphanedDrafts = try? modelContext.fetch(descriptor) else { return }
+        guard let orphanedDrafts = try? draftRepository.fetchOrphanedDrafts() else { return }
 
         let draftsToResend = orphanedDrafts.filter { $0.role == .assistant && $0.content.isEmpty }
 
         #if DEBUG
         if !draftsToResend.isEmpty {
-            print("[Recovery] Found \(draftsToResend.count) orphaned draft(s) to resend")
+            Loggers.recovery.debug("[Recovery] Found \(draftsToResend.count) orphaned draft(s) to resend")
         }
         #endif
 
@@ -1445,8 +1280,8 @@ final class ChatViewModel {
 
         for draft in draftsToResend {
             guard let conversation = draft.conversation else {
-                modelContext.delete(draft)
-                try? modelContext.save()
+                conversationRepository.delete(draft)
+                saveContextIfPossible("resendOrphanedDrafts.deleteDetachedDraft")
                 continue
             }
 
@@ -1459,13 +1294,13 @@ final class ChatViewModel {
                 .sorted { $0.createdAt < $1.createdAt }
 
             guard userMessages.last != nil else {
-                modelContext.delete(draft)
-                try? modelContext.save()
+                conversationRepository.delete(draft)
+                saveContextIfPossible("resendOrphanedDrafts.deleteDraftWithoutUserMessage")
                 continue
             }
 
             #if DEBUG
-            print("[Recovery] Resending request for orphaned draft in conversation: \(conversation.title)")
+            Loggers.recovery.debug("[Recovery] Resending request for orphaned draft in conversation: \(conversation.title)")
             #endif
 
             currentConversation = conversation
@@ -1478,8 +1313,8 @@ final class ChatViewModel {
                 conversation.messages.remove(at: idx)
             }
 
-            modelContext.delete(draft)
-            try? modelContext.save()
+            conversationRepository.delete(draft)
+            saveContextIfPossible("resendOrphanedDrafts.deleteBeforeRestart")
 
             let newDraft = Message(
                 role: .assistant,
@@ -1491,7 +1326,7 @@ final class ChatViewModel {
             )
             newDraft.conversation = currentConversation
             currentConversation?.messages.append(newDraft)
-            try? modelContext.save()
+            saveContextIfPossible("resendOrphanedDrafts.insertReplacementDraft")
 
             guard let session = makeStreamingSession(for: newDraft) else {
                 errorMessage = "Failed to restart orphaned draft."
@@ -1506,7 +1341,7 @@ final class ChatViewModel {
             errorMessage = nil
 
             #if DEBUG
-            print("[Recovery] Starting resend stream for conversation: \(conversation.title), messages count: \(messages.count)")
+            Loggers.recovery.debug("[Recovery] Starting resend stream for conversation: \(conversation.title), messages count: \(messages.count)")
             #endif
 
             startStreamingRequest(for: session)
@@ -1560,10 +1395,7 @@ final class ChatViewModel {
             return draft
         }
 
-        let descriptor = FetchDescriptor<Message>(
-            predicate: #Predicate<Message> { $0.id == id }
-        )
-        return try? modelContext.fetch(descriptor).first
+        return try? conversationRepository.fetchMessage(id: id)
     }
 
     @discardableResult
@@ -1583,7 +1415,7 @@ final class ChatViewModel {
         endBackgroundTask()
 
         #if DEBUG
-        print("[Detach] Detached background response for \(reason)")
+        Loggers.chat.debug("[Detach] Detached background response for \(reason)")
         #endif
 
         return true
@@ -1623,7 +1455,7 @@ final class ChatViewModel {
             if !draft.content.isEmpty {
                 draft.isComplete = true
                 draft.lastSequenceNumber = nil
-                try? modelContext.save()
+                saveContextIfPossible("stopGeneration.persistPartialDraft")
                 upsertMessage(draft)
                 removeSession(session)
             } else {
@@ -1694,8 +1526,8 @@ final class ChatViewModel {
             conversation.messages.remove(at: idx)
         }
 
-        modelContext.delete(message)
-        try? modelContext.save()
+        conversationRepository.delete(message)
+        saveContextIfPossible("regenerateMessage.deleteOriginal")
 
         errorMessage = nil
 
@@ -1709,7 +1541,7 @@ final class ChatViewModel {
         )
         draft.conversation = currentConversation
         currentConversation?.messages.append(draft)
-        try? modelContext.save()
+        saveContextIfPossible("regenerateMessage.insertDraft")
 
         guard let session = makeStreamingSession(for: draft) else {
             errorMessage = "Failed to start response session."
@@ -1765,13 +1597,7 @@ final class ChatViewModel {
     // MARK: - Restore Last Conversation
 
     private func restoreLastConversationIfAvailable() {
-        var descriptor = FetchDescriptor<Conversation>(
-            sortBy: [SortDescriptor(\Conversation.updatedAt, order: .reverse)]
-        )
-        descriptor.fetchLimit = 1
-
-        if let conversations = try? modelContext.fetch(descriptor),
-           let lastConversation = conversations.first,
+        if let lastConversation = try? conversationRepository.fetchMostRecentConversation(),
            !lastConversation.messages.isEmpty {
             currentConversation = lastConversation
             messages = visibleMessages(for: lastConversation)
@@ -1779,7 +1605,7 @@ final class ChatViewModel {
             applyConversationConfiguration(from: lastConversation)
 
             #if DEBUG
-            print("[Restore] Loaded last conversation: \(lastConversation.title) (\(messages.count) messages)")
+            Loggers.chat.debug("[Restore] Loaded last conversation: \(lastConversation.title) (\(messages.count) messages)")
             #endif
         }
     }
@@ -1787,13 +1613,7 @@ final class ChatViewModel {
     private func generateTitlesForUntitledConversations() async {
         guard !apiKey.isEmpty else { return }
 
-        let descriptor = FetchDescriptor<Conversation>(
-            predicate: #Predicate<Conversation> { conversation in
-                conversation.title == "New Chat"
-            }
-        )
-
-        guard let untitled = try? modelContext.fetch(descriptor) else { return }
+        guard let untitled = try? conversationRepository.fetchUntitledConversations() else { return }
 
         for conversation in untitled {
             guard conversation.messages.count >= 2 else { continue }
@@ -1810,18 +1630,18 @@ final class ChatViewModel {
                     apiKey: apiKey
                 )
                 conversation.title = title
-                try? modelContext.save()
+                saveContextIfPossible("generateTitlesForUntitledConversations")
 
                 if conversation.id == currentConversation?.id {
                     currentConversation?.title = title
                 }
 
                 #if DEBUG
-                print("[Title] Generated title for conversation \(conversation.id): \(title)")
+                Loggers.chat.debug("[Title] Generated title for conversation \(conversation.id): \(title)")
                 #endif
             } catch {
                 #if DEBUG
-                print("[Title] Failed to generate title: \(error.localizedDescription)")
+                Loggers.chat.debug("[Title] Failed to generate title: \(error.localizedDescription)")
                 #endif
             }
         }
@@ -1987,7 +1807,7 @@ final class ChatViewModel {
         message.conversation?.updatedAt = .now
         session.lastDraftSaveTime = Date()
 
-        try? modelContext.save()
+        saveContextIfPossible("saveSessionNow")
 
         if message.conversation?.id == currentConversation?.id {
             upsertMessage(message)
@@ -2020,7 +1840,7 @@ final class ChatViewModel {
         message.responseId = session.responseId
         message.conversation?.updatedAt = .now
         upsertMessage(message)
-        try? modelContext.save()
+        saveContextIfPossible("finalizeSession")
         prefetchGeneratedFilesIfNeeded(for: message)
 
         let finishedConversation = message.conversation
@@ -2060,7 +1880,7 @@ final class ChatViewModel {
         message.responseId = session.responseId
         message.conversation?.updatedAt = .now
         upsertMessage(message)
-        try? modelContext.save()
+        saveContextIfPossible("finalizeSessionAsPartial")
         prefetchGeneratedFilesIfNeeded(for: message)
 
         removeSession(session)
@@ -2076,8 +1896,8 @@ final class ChatViewModel {
             messages.remove(at: idx)
         }
 
-        modelContext.delete(message)
-        try? modelContext.save()
+        conversationRepository.delete(message)
+        saveContextIfPossible("removeEmptyMessage")
         removeSession(session)
     }
 
@@ -2131,10 +1951,10 @@ final class ChatViewModel {
                 apiKey: apiKey
             )
             conversation.title = title
-            try? modelContext.save()
+            saveContextIfPossible("generateTitleIfNeeded")
         } catch {
             #if DEBUG
-            print("[Title] Failed to generate title: \(error.localizedDescription)")
+            Loggers.chat.debug("[Title] Failed to generate title: \(error.localizedDescription)")
             #endif
         }
     }
@@ -2149,33 +1969,33 @@ final class ChatViewModel {
         case error(OpenAIServiceError)
     }
 
+    @discardableResult
+    private func saveContext(
+        reportingUserError userError: String? = nil,
+        logContext: String
+    ) -> Bool {
+        do {
+            try conversationRepository.save()
+            return true
+        } catch {
+            if let userError {
+                errorMessage = userError
+            }
+            Loggers.persistence.error("[\(logContext)] \(error.localizedDescription)")
+            return false
+        }
+    }
+
+    private func saveContextIfPossible(_ logContext: String) {
+        _ = saveContext(logContext: logContext)
+    }
+
     private func loadDefaultsFromSettings() {
-        if let savedModel = UserDefaults.standard.string(forKey: StorageKeys.defaultModel),
-           let model = ModelType(rawValue: savedModel) {
-            selectedModel = model
-        } else {
-            selectedModel = .gpt5_4_pro
-        }
-
-        if let savedEffort = UserDefaults.standard.string(forKey: StorageKeys.defaultEffort),
-           let effort = ReasoningEffort(rawValue: savedEffort) {
-            reasoningEffort = effort
-        } else {
-            reasoningEffort = .xhigh
-        }
-
-        if let savedBackgroundMode = UserDefaults.standard.object(forKey: StorageKeys.defaultBackgroundModeEnabled) as? Bool {
-            backgroundModeEnabled = savedBackgroundMode
-        } else {
-            backgroundModeEnabled = false
-        }
-
-        if let savedServiceTier = UserDefaults.standard.string(forKey: StorageKeys.defaultServiceTier),
-           let storedTier = ServiceTier(rawValue: savedServiceTier) {
-            serviceTier = storedTier
-        } else {
-            serviceTier = .standard
-        }
+        let defaults = settingsStore.defaultConversationConfiguration
+        selectedModel = defaults.model
+        reasoningEffort = defaults.reasoningEffort
+        backgroundModeEnabled = defaults.backgroundModeEnabled
+        serviceTier = defaults.serviceTier
 
         if !selectedModel.availableEfforts.contains(reasoningEffort) {
             reasoningEffort = selectedModel.defaultEffort
@@ -2255,7 +2075,7 @@ final class ChatViewModel {
         }
 
         #if DEBUG
-        print("[Recovery] Response \(responseId) is no longer available: \(responseBody)")
+        Loggers.recovery.debug("[Recovery] Response \(responseId) is no longer available: \(responseBody)")
         #endif
 
         finishRecovery(
@@ -2275,7 +2095,7 @@ final class ChatViewModel {
         currentConversation.backgroundModeEnabled = backgroundModeEnabled
         currentConversation.serviceTierRawValue = serviceTier.rawValue
         currentConversation.updatedAt = .now
-        try? modelContext.save()
+        saveContextIfPossible("syncConversationConfiguration")
     }
 
     private func upsertMessage(_ message: Message) {
@@ -2339,7 +2159,7 @@ final class ChatViewModel {
             }
         }
 
-        try? modelContext.save()
+        saveContextIfPossible("suspendActiveSessionsForAppBackground")
         activeResponseSessions.removeAll()
         detachVisibleSessionBinding()
     }
@@ -2397,7 +2217,7 @@ final class ChatViewModel {
             fallbackThinking: fallbackThinking
         )
 
-        try? modelContext.save()
+        saveContextIfPossible("finishRecovery")
         upsertMessage(message)
         prefetchGeneratedFilesIfNeeded(for: message)
 
@@ -2465,10 +2285,10 @@ final class ChatViewModel {
             if let draft = findMessage(byId: session.messageID) {
                 draft.responseId = responseId
                 draft.usedBackgroundMode = session.requestUsesBackgroundMode
-                try? modelContext.save()
+                saveContextIfPossible("applyStreamEvent.responseCreated")
                 upsertMessage(draft)
                 #if DEBUG
-                print("[VM] Saved responseId: \(responseId)")
+                Loggers.chat.debug("[VM] Saved responseId: \(responseId)")
                 #endif
             }
             syncVisibleState(from: session)
@@ -2618,7 +2438,7 @@ final class ChatViewModel {
             try await openAIService.cancelResponse(responseId: responseId, apiKey: apiKey)
         } catch {
             #if DEBUG
-            print("[Stop] Background cancel failed for \(responseId): \(error.localizedDescription)")
+            Loggers.chat.debug("[Stop] Background cancel failed for \(responseId): \(error.localizedDescription)")
             #endif
         }
 
@@ -2641,13 +2461,13 @@ final class ChatViewModel {
                     fallbackText: message.content,
                     fallbackThinking: message.thinking
                 )
-                try? modelContext.save()
+                saveContextIfPossible("cancelBackgroundResponseAndSync")
                 upsertMessage(message)
                 prefetchGeneratedFilesIfNeeded(for: message)
             }
         } catch {
             #if DEBUG
-            print("[Stop] Failed to refresh cancelled response \(responseId): \(error.localizedDescription)")
+            Loggers.chat.debug("[Stop] Failed to refresh cancelled response \(responseId): \(error.localizedDescription)")
             #endif
         }
     }
@@ -2665,7 +2485,7 @@ final class ChatViewModel {
                 apiKey: apiKey
             )
             conversation.title = title
-            try? modelContext.save()
+            saveContextIfPossible("generateTitle")
         } catch {
             // Non-critical
         }
