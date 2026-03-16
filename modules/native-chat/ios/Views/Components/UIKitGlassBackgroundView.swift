@@ -5,6 +5,7 @@ struct UIKitGlassBackgroundView: UIViewRepresentable {
     let cornerRadius: CGFloat
     var innerInset: CGFloat = 0
     var stableFillOpacity: CGFloat = 0.04
+    var tintOpacity: CGFloat = 0
     var showsBorder: Bool = true
     var borderWidth: CGFloat = 0.9
     var darkBorderOpacity: CGFloat = 0.13
@@ -15,6 +16,7 @@ struct UIKitGlassBackgroundView: UIViewRepresentable {
             cornerRadius: cornerRadius,
             innerInset: innerInset,
             stableFillOpacity: stableFillOpacity,
+            tintOpacity: tintOpacity,
             showsBorder: showsBorder,
             borderWidth: borderWidth,
             darkBorderOpacity: darkBorderOpacity,
@@ -27,6 +29,7 @@ struct UIKitGlassBackgroundView: UIViewRepresentable {
             cornerRadius: cornerRadius,
             innerInset: innerInset,
             stableFillOpacity: stableFillOpacity,
+            tintOpacity: tintOpacity,
             showsBorder: showsBorder,
             borderWidth: borderWidth,
             darkBorderOpacity: darkBorderOpacity,
@@ -40,6 +43,7 @@ extension View {
         cornerRadius: CGFloat,
         innerInset: CGFloat = 0,
         stableFillOpacity: CGFloat = 0,
+        tintOpacity: CGFloat = 0.02,
         showsBorder: Bool = true,
         borderWidth: CGFloat = 0.85,
         darkBorderOpacity: CGFloat = 0.16,
@@ -50,6 +54,7 @@ extension View {
                 cornerRadius: cornerRadius,
                 innerInset: innerInset,
                 stableFillOpacity: stableFillOpacity,
+                tintOpacity: tintOpacity,
                 showsBorder: showsBorder,
                 borderWidth: borderWidth,
                 darkBorderOpacity: darkBorderOpacity,
@@ -67,6 +72,7 @@ final class GlassBackgroundHostingView: UIView {
     private var cornerRadius: CGFloat
     private var innerInset: CGFloat
     private var stableFillOpacity: CGFloat
+    private var tintOpacity: CGFloat
     private var showsBorder: Bool
     private var borderWidth: CGFloat
     private var darkBorderOpacity: CGFloat
@@ -76,6 +82,7 @@ final class GlassBackgroundHostingView: UIView {
         cornerRadius: CGFloat,
         innerInset: CGFloat,
         stableFillOpacity: CGFloat,
+        tintOpacity: CGFloat = 0,
         showsBorder: Bool,
         borderWidth: CGFloat,
         darkBorderOpacity: CGFloat,
@@ -84,6 +91,7 @@ final class GlassBackgroundHostingView: UIView {
         self.cornerRadius = cornerRadius
         self.innerInset = innerInset
         self.stableFillOpacity = stableFillOpacity
+        self.tintOpacity = tintOpacity
         self.showsBorder = showsBorder
         self.borderWidth = borderWidth
         self.darkBorderOpacity = darkBorderOpacity
@@ -94,6 +102,7 @@ final class GlassBackgroundHostingView: UIView {
             cornerRadius: cornerRadius,
             innerInset: innerInset,
             stableFillOpacity: stableFillOpacity,
+            tintOpacity: tintOpacity,
             showsBorder: showsBorder,
             borderWidth: borderWidth,
             darkBorderOpacity: darkBorderOpacity,
@@ -115,7 +124,7 @@ final class GlassBackgroundHostingView: UIView {
         effectView.layer.cornerCurve = .continuous
         effectView.layer.borderWidth = showsBorder ? borderWidth : 0
 
-        let insetBounds = bounds.insetBy(dx: innerInset, dy: innerInset)
+        let insetBounds = effectView.contentView.bounds.insetBy(dx: innerInset, dy: innerInset)
         stableFillView.frame = insetBounds
         applyCornerConfiguration(
             to: stableFillView,
@@ -134,6 +143,7 @@ final class GlassBackgroundHostingView: UIView {
         cornerRadius: CGFloat,
         innerInset: CGFloat,
         stableFillOpacity: CGFloat,
+        tintOpacity: CGFloat = 0,
         showsBorder: Bool,
         borderWidth: CGFloat,
         darkBorderOpacity: CGFloat,
@@ -142,14 +152,11 @@ final class GlassBackgroundHostingView: UIView {
         self.cornerRadius = cornerRadius
         self.innerInset = innerInset
         self.stableFillOpacity = stableFillOpacity
+        self.tintOpacity = tintOpacity
         self.showsBorder = showsBorder
         self.borderWidth = borderWidth
         self.darkBorderOpacity = darkBorderOpacity
         self.lightBorderOpacity = lightBorderOpacity
-
-        let effect = UIGlassEffect(style: .regular)
-        effect.isInteractive = false
-        effectView.effect = effect
 
         updateColors()
         setNeedsLayout()
@@ -168,7 +175,7 @@ final class GlassBackgroundHostingView: UIView {
 
         stableFillView.isUserInteractionEnabled = false
         stableFillView.clipsToBounds = true
-        addSubview(stableFillView)
+        effectView.contentView.addSubview(stableFillView)
     }
 
     private func applyCornerConfiguration(to view: UIView, cornerRadius: CGFloat) {
@@ -179,8 +186,25 @@ final class GlassBackgroundHostingView: UIView {
     private func updateColors() {
         let isDark = traitCollection.userInterfaceStyle == .dark
         let fillOpacity = isDark ? stableFillOpacity : min(stableFillOpacity * 2, 0.12)
-        stableFillView.isHidden = fillOpacity <= 0.001
-        stableFillView.backgroundColor = UIColor.white.withAlphaComponent(fillOpacity)
+        let resolvedTintOpacity = isDark ? tintOpacity : min(tintOpacity * 0.85, 0.08)
+        let fillColor = UIColor.white.withAlphaComponent(fillOpacity)
+
+        let effect = UIGlassEffect(style: .regular)
+        effect.isInteractive = false
+        effect.tintColor = resolvedTintOpacity <= 0.001
+            ? nil
+            : UIColor.white.withAlphaComponent(resolvedTintOpacity)
+        effectView.effect = effect
+
+        if innerInset <= 0.001 {
+            effectView.contentView.backgroundColor = fillOpacity <= 0.001 ? .clear : fillColor
+            stableFillView.isHidden = true
+            stableFillView.backgroundColor = .clear
+        } else {
+            effectView.contentView.backgroundColor = .clear
+            stableFillView.isHidden = fillOpacity <= 0.001
+            stableFillView.backgroundColor = fillColor
+        }
         effectView.layer.borderColor = (
             isDark
                 ? UIColor.white.withAlphaComponent(darkBorderOpacity)

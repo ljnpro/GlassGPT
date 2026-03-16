@@ -19,6 +19,7 @@ struct FilePreviewSheet: View {
     @State private var showSaveSuccessHUD = false
     @State private var saveSuccessHUDToken = UUID()
     @State private var isShowingShareSheet = false
+    @State private var isDismissingPreview = false
 
     private struct ImagePreviewPayload {
         let image: UIImage
@@ -136,6 +137,14 @@ struct FilePreviewSheet: View {
                 }
             } message: {
                 Text(saveError ?? "Unable to save this image to Photos.")
+            }
+            .overlay {
+                if isDismissingPreview {
+                    Color.black.opacity(0.001)
+                        .ignoresSafeArea()
+                        .contentShape(Rectangle())
+                        .accessibilityHidden(true)
+                }
             }
     }
 
@@ -353,8 +362,13 @@ struct FilePreviewSheet: View {
 
     private var closeButton: some View {
         Button {
+            guard !isDismissingPreview else { return }
+            isDismissingPreview = true
             onWillDismiss()
-            dismiss()
+            Task { @MainActor in
+                try? await Task.sleep(nanoseconds: 60_000_000)
+                dismiss()
+            }
         } label: {
             Image(systemName: "xmark")
                 .font(.system(size: closeIconSize, weight: .semibold))
@@ -364,6 +378,7 @@ struct FilePreviewSheet: View {
         .buttonBorderShape(.circle)
         .controlSize(topButtonControlSize)
         .accessibilityLabel("Close preview")
+        .disabled(isDismissingPreview)
     }
 
     private var downloadButton: some View {

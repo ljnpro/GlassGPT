@@ -55,7 +55,7 @@ struct CodeBlockView: View {
                 .buttonStyle(.plain)
             }
             .padding(.horizontal, 12)
-            .frame(minHeight: 28)
+            .frame(minHeight: 26)
             .background(headerFill)
             .overlay(alignment: .bottom) {
                 Rectangle()
@@ -71,24 +71,21 @@ struct CodeBlockView: View {
                     .textSelection(.enabled)
             }
         }
-        .background(surfaceFill, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .strokeBorder(borderColor, lineWidth: 0.75)
-        }
+        .singleSurfaceGlass(
+            cornerRadius: 14,
+            stableFillOpacity: 0.006,
+            tintOpacity: 0.026,
+            borderWidth: 0.8,
+            darkBorderOpacity: 0.15,
+            lightBorderOpacity: 0.085
+        )
         .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-    }
-
-    private var surfaceFill: Color {
-        colorScheme == .dark
-            ? Color.white.opacity(0.038)
-            : Color.black.opacity(0.028)
     }
 
     private var headerFill: Color {
         colorScheme == .dark
-            ? Color.white.opacity(0.05)
-            : Color.black.opacity(0.035)
+            ? Color.white.opacity(0.035)
+            : Color.black.opacity(0.028)
     }
 
     private var buttonFill: Color {
