@@ -148,6 +148,13 @@ struct ChatView: View {
                 }
                 .allowsHitTesting(presentedGeneratedPreviewItem == nil && !isBlockingGeneratedPreviewTouches)
             }
+            if shouldShowGeneratedPreviewTouchShield {
+                Color.black.opacity(0.001)
+                    .ignoresSafeArea()
+                    .contentShape(Rectangle())
+                    .accessibilityHidden(true)
+                    .zIndex(1500)
+            }
             if let previewItem = presentedGeneratedPreviewItem {
                 FilePreviewSheet(
                     previewItem: previewItem,
@@ -161,12 +168,6 @@ struct ChatView: View {
                         removal: .opacity.combined(with: .scale(scale: 0.975))
                     )
                 )
-            } else if isBlockingGeneratedPreviewTouches {
-                Color.black.opacity(0.001)
-                    .ignoresSafeArea()
-                    .contentShape(Rectangle())
-                    .accessibilityHidden(true)
-                    .zIndex(1500)
             }
         }
     }
@@ -201,6 +202,10 @@ struct ChatView: View {
             get: { viewModel.fileDownloadError != nil },
             set: { if !$0 { viewModel.fileDownloadError = nil } }
         )
+    }
+
+    private var shouldShowGeneratedPreviewTouchShield: Bool {
+        presentedGeneratedPreviewItem != nil || isBlockingGeneratedPreviewTouches
     }
 
     // MARK: - Chat Content
