@@ -29,7 +29,7 @@ struct ModelBadge: View {
                 lightBorderOpacity: 0.08
             )
         }
-        .buttonStyle(.plain)
+        .buttonStyle(GlassPressButtonStyle())
     }
 
     private var badgeText: String {
@@ -258,7 +258,7 @@ struct ModelSelectorSheet: View {
                         lightBorderOpacity: 0.08
                     )
             }
-            .buttonStyle(.plain)
+            .buttonStyle(GlassPressButtonStyle())
         }
         .padding(.horizontal, 2)
     }

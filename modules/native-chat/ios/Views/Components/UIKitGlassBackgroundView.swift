@@ -119,6 +119,18 @@ extension View {
     }
 }
 
+struct GlassPressButtonStyle: ButtonStyle {
+    var pressedScale: CGFloat = 0.965
+    var pressedOpacity: Double = 0.92
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? pressedScale : 1)
+            .opacity(configuration.isPressed ? pressedOpacity : 1)
+            .animation(.spring(response: 0.2, dampingFraction: 0.82), value: configuration.isPressed)
+    }
+}
+
 @MainActor
 final class GlassBackgroundHostingView: UIView {
     private let effectView = UIVisualEffectView()

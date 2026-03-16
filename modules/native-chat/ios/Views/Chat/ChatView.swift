@@ -75,7 +75,7 @@ struct ChatView: View {
                             startNewChat()
                         } label: {
                             Image(systemName: "square.and.pencil")
-                                .font(.system(size: 18, weight: .semibold))
+                                .font(.subheadline.weight(.semibold))
                                 .foregroundStyle(.primary)
                                 .frame(width: 44, height: 44)
                                 .singleFrameGlassCircleControl(
@@ -85,7 +85,7 @@ struct ChatView: View {
                                     lightBorderOpacity: 0.08
                                 )
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(GlassPressButtonStyle(pressedScale: 0.97))
                         .accessibilityLabel("New Chat")
                     }
                 }
@@ -583,14 +583,18 @@ private extension ChatView {
     func syncGeneratedPreviewPresentation() {
         guard let previewItem = generatedPreviewCandidate else {
             guard !isGeneratedPreviewDismissPending else { return }
-            presentedGeneratedPreviewItem = nil
+            withAnimation(.easeInOut(duration: 0.2)) {
+                presentedGeneratedPreviewItem = nil
+            }
             isBlockingGeneratedPreviewTouches = false
             return
         }
 
         generatedPreviewDismissTask?.cancel()
         generatedPreviewDismissTask = nil
-        presentedGeneratedPreviewItem = previewItem
+        withAnimation(.easeInOut(duration: 0.2)) {
+            presentedGeneratedPreviewItem = previewItem
+        }
         isGeneratedPreviewDismissPending = false
         if !isBlockingGeneratedPreviewTouches {
             isBlockingGeneratedPreviewTouches = true
@@ -608,7 +612,9 @@ private extension ChatView {
 
         generatedPreviewDismissTask = Task { @MainActor in
             try? await Task.sleep(nanoseconds: generatedPreviewOverlayDismissDelay)
-            presentedGeneratedPreviewItem = nil
+            withAnimation(.easeInOut(duration: 0.22)) {
+                presentedGeneratedPreviewItem = nil
+            }
 
             try? await Task.sleep(nanoseconds: generatedPreviewTouchCooldownDuration)
             isBlockingGeneratedPreviewTouches = false
