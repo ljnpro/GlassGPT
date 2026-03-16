@@ -23,7 +23,7 @@ struct ChatView: View {
     @State private var isGeneratedPreviewDismissPending = false
     @State private var generatedPreviewDismissTask: Task<Void, Never>?
 
-    private let generatedPreviewOverlayDismissDelay: UInt64 = 320_000_000
+    private let generatedPreviewOverlayDismissDelay: UInt64 = 90_000_000
     private let generatedPreviewTouchCooldownDuration: UInt64 = 1_000_000_000
 
     private var selectedTheme: AppTheme {
@@ -77,15 +77,16 @@ struct ChatView: View {
                             Image(systemName: "square.and.pencil")
                                 .font(.subheadline.weight(.semibold))
                                 .foregroundStyle(.primary)
-                                .frame(width: 44, height: 44)
-                                .singleFrameGlassCircleControl(
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 6)
+                                .singleFrameGlassCapsuleControl(
                                     tintOpacity: 0.015,
                                     borderWidth: 0.78,
                                     darkBorderOpacity: 0.14,
                                     lightBorderOpacity: 0.08
                                 )
                         }
-                        .buttonStyle(GlassPressButtonStyle(pressedScale: 0.97))
+                        .buttonStyle(GlassPressButtonStyle())
                         .accessibilityLabel("New Chat")
                     }
                 }
@@ -154,7 +155,12 @@ struct ChatView: View {
                     onRequestDismiss: beginGeneratedPreviewDismissal
                 )
                 .zIndex(2000)
-                .transition(.opacity)
+                .transition(
+                    .asymmetric(
+                        insertion: .opacity.combined(with: .scale(scale: 0.985)),
+                        removal: .opacity.combined(with: .scale(scale: 0.975))
+                    )
+                )
             } else if isBlockingGeneratedPreviewTouches {
                 Color.black.opacity(0.001)
                     .ignoresSafeArea()
