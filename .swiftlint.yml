@@ -1,0 +1,23 @@
+included:
+  - ios
+  - modules/native-chat/ios
+  - modules/native-chat/Tests
+
+excluded:
+  - .github
+  - .local
+  - docs
+  - scripts
+
+only_rules:
+  - blanket_disable_command
+  - duplicate_conditions
+  - duplicate_enum_cases
+  - duplicate_imports
+  - empty_count
+  - explicit_init
+  - first_where
+  - redundant_nil_coalescing
+  - toggle_bool
+
+reporter: "xcode"

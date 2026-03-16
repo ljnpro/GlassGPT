@@ -2,7 +2,11 @@ import SwiftUI
 import UIKit
 
 struct SettingsView: View {
-    @State private var viewModel = SettingsViewModel()
+    @State private var viewModel: SettingsViewModel
+
+    init(viewModel: SettingsViewModel = SettingsViewModel()) {
+        _viewModel = State(initialValue: viewModel)
+    }
 
     private var platformString: String {
         let device = UIDevice.current

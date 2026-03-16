@@ -244,10 +244,14 @@ private final class OpenAISSEDelegate: NSObject, URLSessionDataDelegate, @unchec
     }
 
     private func processEvent(type: String, data: String) -> EventResult {
-        guard
-            let jsonData = data.data(using: .utf8),
-            let json = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any]
-        else {
+        guard let jsonData = data.data(using: .utf8) else {
+            return .continued
+        }
+
+        let json: [String: Any]
+        do {
+            json = try JSONCoding.jsonObject(from: jsonData)
+        } catch {
             return .continued
         }
 

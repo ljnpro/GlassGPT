@@ -278,9 +278,10 @@ final class SettingsViewModel {
     // MARK: - Helpers
 
     private static func parseErrorMessage(from data: Data) -> String? {
-        guard
-            let json = try? JSONSerialization.jsonObject(with: data, options: []) as? [String: Any]
-        else {
+        let json: [String: Any]
+        do {
+            json = try JSONCoding.jsonObject(from: data)
+        } catch {
             return String(data: data, encoding: .utf8)
         }
 

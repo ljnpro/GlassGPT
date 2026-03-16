@@ -17,18 +17,11 @@ jobs:
       - name: Select Xcode
         run: sudo xcode-select -s /Applications/Xcode.app
 
-      - name: Build app
+      - name: Install SwiftLint
         run: |
-          xcodebuild \
-            -project ios/GlassGPT.xcodeproj \
-            -scheme GlassGPT \
-            -destination 'generic/platform=iOS Simulator' \
-            build
+          if ! command -v swiftlint >/dev/null 2>&1; then
+            HOMEBREW_NO_AUTO_UPDATE=1 brew install swiftlint
+          fi
 
-      - name: Test package
-        run: |
-          xcodebuild \
-            -project ios/GlassGPT.xcodeproj \
-            -scheme GlassGPT \
-            -destination 'platform=iOS Simulator,name=iPhone 17' \
-            test
+      - name: CI Gate
+        run: ./scripts/ci.sh
