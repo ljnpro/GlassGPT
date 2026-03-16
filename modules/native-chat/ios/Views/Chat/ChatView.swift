@@ -68,6 +68,7 @@ struct ChatView: View {
                             onTap: { presentModelSelector() }
                         )
                         .fixedSize(horizontal: true, vertical: false)
+                        .allowsHitTesting(!shouldShowGeneratedPreviewTouchShield)
                     }
 
                     ToolbarItem(placement: .topBarTrailing) {
@@ -88,6 +89,7 @@ struct ChatView: View {
                         }
                         .buttonStyle(GlassPressButtonStyle())
                         .accessibilityLabel("New Chat")
+                        .allowsHitTesting(!shouldShowGeneratedPreviewTouchShield)
                     }
                 }
                 .toolbarBackgroundVisibility(.hidden, for: .navigationBar)
