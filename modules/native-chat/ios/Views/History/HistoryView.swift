@@ -103,7 +103,7 @@ struct HistoryView: View {
             try modelContext.save()
             HapticService.shared.impact(.medium)
         } catch {
-            print("Failed to delete conversations: \(error.localizedDescription)")
+            Loggers.persistence.error("Failed to delete conversations: \(error.localizedDescription)")
         }
     }
 
@@ -118,7 +118,7 @@ struct HistoryView: View {
             try modelContext.save()
             HapticService.shared.notify(.warning)
         } catch {
-            print("Failed to delete all conversations: \(error.localizedDescription)")
+            Loggers.persistence.error("Failed to delete all conversations: \(error.localizedDescription)")
         }
     }
 }

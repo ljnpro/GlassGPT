@@ -1133,12 +1133,14 @@ private struct BlockLaTeXView: View {
     @State private var height: CGFloat = 44
     @State private var availableWidth: CGFloat = 0
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.displayScale) private var displayScale
 
     var body: some View {
         BlockLaTeXWebView(
             latex: latex,
             isDark: colorScheme == .dark,
             availableWidth: availableWidth,
+            displayScale: max(displayScale, 1),
             height: $height
         )
         .frame(height: height)
@@ -1158,7 +1160,7 @@ private struct BlockLaTeXView: View {
     }
 
     private func updateAvailableWidth(_ newWidth: CGFloat) {
-        let screenScale = UIScreen.main.scale
+        let screenScale = max(displayScale, 1)
         let roundedWidth = max((newWidth * screenScale).rounded(.down) / screenScale, 0)
         guard abs(availableWidth - roundedWidth) > 0.5 else { return }
         availableWidth = roundedWidth
@@ -1190,10 +1192,11 @@ private struct BlockLaTeXWebView: UIViewRepresentable {
     let latex: String
     let isDark: Bool
     let availableWidth: CGFloat
+    let displayScale: CGFloat
     @Binding var height: CGFloat
 
     func makeCoordinator() -> Coordinator {
-        Coordinator(height: $height)
+        Coordinator(height: $height, displayScale: displayScale)
     }
 
     func makeUIView(context: Context) -> WKWebView {
@@ -1214,8 +1217,9 @@ private struct BlockLaTeXWebView: UIViewRepresentable {
 
     func updateUIView(_ webView: WKWebView, context: Context) {
         guard availableWidth > 1 else { return }
+        context.coordinator.displayScale = max(displayScale, 1)
 
-        let pixelWidth = Int((availableWidth * UIScreen.main.scale).rounded(.toNearestOrEven))
+        let pixelWidth = Int((availableWidth * max(displayScale, 1)).rounded(.toNearestOrEven))
         let key = "\(latex)-\(isDark)-\(pixelWidth)"
         guard key != context.coordinator.lastKey else { return }
         context.coordinator.lastKey = key
@@ -1249,39 +1253,41 @@ private struct BlockLaTeXWebView: UIViewRepresentable {
     @MainActor
     final class Coordinator: NSObject, WKNavigationDelegate, WKScriptMessageHandler, @unchecked Sendable {
         @Binding var height: CGFloat
+        var displayScale: CGFloat
         var lastKey: String = ""
         var cacheKey: String = ""
         var expectedMeasurementToken: String = ""
 
-        init(height: Binding<CGFloat>) {
+        init(height: Binding<CGFloat>, displayScale: CGFloat) {
             _height = height
+            self.displayScale = displayScale
         }
 
         nonisolated func userContentController(
             _ userContentController: WKUserContentController,
             didReceive message: WKScriptMessage
         ) {
-            guard let payload = message.body as? [String: Any],
-                  let token = payload["token"] as? String
-            else {
-                return
-            }
-
-            let newHeight: CGFloat
-            if let value = payload["height"] as? CGFloat {
-                newHeight = max(value, 20)
-            } else if let value = payload["height"] as? Int {
-                newHeight = max(CGFloat(value), 20)
-            } else if let value = payload["height"] as? Double {
-                newHeight = max(CGFloat(value), 20)
-            } else {
-                return
-            }
-
             Task { @MainActor in
+                guard let payload = message.body as? [String: Any],
+                      let token = payload["token"] as? String
+                else {
+                    return
+                }
+
+                let newHeight: CGFloat
+                if let value = payload["height"] as? CGFloat {
+                    newHeight = max(value, 20)
+                } else if let value = payload["height"] as? Int {
+                    newHeight = max(CGFloat(value), 20)
+                } else if let value = payload["height"] as? Double {
+                    newHeight = max(CGFloat(value), 20)
+                } else {
+                    return
+                }
+
                 guard token == self.expectedMeasurementToken else { return }
 
-                let screenScale = UIScreen.main.scale
+                let screenScale = max(self.displayScale, 1)
                 let roundedHeight = max((newHeight * screenScale).rounded(.up) / screenScale, 20)
                 guard roundedHeight < 4096 else { return }
 

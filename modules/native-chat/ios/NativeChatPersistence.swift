@@ -23,7 +23,7 @@ public enum NativeChatPersistence {
             return try makeContainer()
         } catch {
             #if DEBUG
-            print("[NativeChatPersistence] Failed to open store: \(error.localizedDescription)")
+            Loggers.persistence.debug("[NativeChatPersistence] Failed to open store: \(error.localizedDescription)")
             #endif
         }
 
@@ -33,9 +33,9 @@ public enum NativeChatPersistence {
             let container = try makeContainer()
             #if DEBUG
             if let recoveryLocation {
-                print("[NativeChatPersistence] Preserved original store at \(recoveryLocation.path)")
+                Loggers.persistence.debug("[NativeChatPersistence] Preserved original store at \(recoveryLocation.path)")
             }
-            print("[NativeChatPersistence] Created fresh store after preserving incompatible files")
+            Loggers.persistence.debug("[NativeChatPersistence] Created fresh store after preserving incompatible files")
             #endif
             return container
         } catch {
@@ -85,7 +85,7 @@ public enum NativeChatPersistence {
             return recoveryDirectory
         } catch {
             #if DEBUG
-            print("[NativeChatPersistence] Failed to preserve existing store: \(error.localizedDescription)")
+            Loggers.persistence.debug("[NativeChatPersistence] Failed to preserve existing store: \(error.localizedDescription)")
             #endif
             return nil
         }
