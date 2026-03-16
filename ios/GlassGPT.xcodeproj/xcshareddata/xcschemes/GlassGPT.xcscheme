@@ -38,6 +38,16 @@
                ReferencedContainer = "container:GlassGPT.xcodeproj">
             </BuildableReference>
          </TestableReference>
+         <TestableReference
+            skipped = "NO">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "8D6D859798356320BBD2B074"
+               BuildableName = "GlassGPTUITests.xctest"
+               BlueprintName = "GlassGPTUITests"
+               ReferencedContainer = "container:GlassGPT.xcodeproj">
+            </BuildableReference>
+         </TestableReference>
       </Testables>
    </TestAction>
    <LaunchAction

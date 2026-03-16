@@ -122,11 +122,21 @@ final class Message {
 
     private static func encode<T: Encodable>(_ value: T?) -> Data? {
         guard let value = value else { return nil }
-        return try? JSONEncoder().encode(value)
+        do {
+            return try JSONCoding.encode(value)
+        } catch {
+            Loggers.persistence.error("[Message.encode] \(error.localizedDescription)")
+            return nil
+        }
     }
 
     private static func decode<T: Decodable>(_ data: Data?) -> T? {
         guard let data = data else { return nil }
-        return try? JSONDecoder().decode(T.self, from: data)
+        do {
+            return try JSONCoding.decode(T.self, from: data)
+        } catch {
+            Loggers.persistence.error("[Message.decode] \(error.localizedDescription)")
+            return nil
+        }
     }
 }

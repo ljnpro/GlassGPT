@@ -26,7 +26,13 @@ enum KaTeXProvider {
     static var cssContent: String? {
         if let cached = _cachedCSS { return cached }
         guard let url = findResource(named: "katex.min", ext: "css") else { return nil }
-        guard let content = try? String(contentsOf: url, encoding: .utf8) else { return nil }
+        let content: String
+        do {
+            content = try String(contentsOf: url, encoding: .utf8)
+        } catch {
+            Loggers.app.debug("[KaTeXProvider.cssContent] \(error.localizedDescription)")
+            return nil
+        }
         _cachedCSS = content
         return content
     }
@@ -35,7 +41,13 @@ enum KaTeXProvider {
     static var jsContent: String? {
         if let cached = _cachedJS { return cached }
         guard let url = findResource(named: "katex.min", ext: "js") else { return nil }
-        guard let content = try? String(contentsOf: url, encoding: .utf8) else { return nil }
+        let content: String
+        do {
+            content = try String(contentsOf: url, encoding: .utf8)
+        } catch {
+            Loggers.app.debug("[KaTeXProvider.jsContent] \(error.localizedDescription)")
+            return nil
+        }
         _cachedJS = content
         return content
     }
@@ -57,12 +69,18 @@ enum KaTeXProvider {
         let textColor = isDark ? "#e5e5e5" : "#1c1c1e"
         let clampedMaxWidth = max(Int(maxWidth.rounded(.down)), 1)
 
-        let encoder = JSONEncoder()
         let jsonLatex: String
-        if let jsonData = try? encoder.encode(latex),
-           let jsonString = String(data: jsonData, encoding: .utf8) {
-            jsonLatex = jsonString
-        } else {
+        do {
+            let jsonData = try JSONCoding.encode(latex)
+            if let jsonString = String(data: jsonData, encoding: .utf8) {
+                jsonLatex = jsonString
+            } else {
+                let escaped = latex
+                    .replacingOccurrences(of: "\\", with: "\\\\")
+                    .replacingOccurrences(of: "\"", with: "\\\"")
+                jsonLatex = "\"\(escaped)\""
+            }
+        } catch {
             let escaped = latex
                 .replacingOccurrences(of: "\\", with: "\\\\")
                 .replacingOccurrences(of: "\"", with: "\\\"")

@@ -11,10 +11,14 @@ struct OpenAIResponseParser {
             throw OpenAIServiceError.httpError(httpResponse.statusCode, errorMsg)
         }
 
-        guard
-            let json = try? JSONSerialization.jsonObject(with: responseData) as? [String: Any],
-            let fileId = json["id"] as? String
-        else {
+        let json: [String: Any]
+        do {
+            json = try JSONCoding.jsonObject(from: responseData)
+        } catch {
+            throw OpenAIServiceError.requestFailed("Failed to parse upload response")
+        }
+
+        guard let fileId = json["id"] as? String else {
             throw OpenAIServiceError.requestFailed("Failed to parse upload response")
         }
 
@@ -27,8 +31,14 @@ struct OpenAIResponseParser {
             throw OpenAIServiceError.requestFailed("Title generation failed")
         }
 
-        if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-           let text = OpenAIStreamEventTranslator.extractOutputText(from: json) {
+        let json: [String: Any]
+        do {
+            json = try JSONCoding.jsonObject(from: data)
+        } catch {
+            return "New Chat"
+        }
+
+        if let text = OpenAIStreamEventTranslator.extractOutputText(from: json) {
             let cleaned = text
                 .trimmingCharacters(in: .whitespacesAndNewlines)
                 .trimmingCharacters(in: CharacterSet(charactersIn: "\"'"))
@@ -52,7 +62,10 @@ struct OpenAIResponseParser {
             throw OpenAIServiceError.httpError(httpResponse.statusCode, errorMsg)
         }
 
-        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+        let json: [String: Any]
+        do {
+            json = try JSONCoding.jsonObject(from: data)
+        } catch {
             throw OpenAIServiceError.requestFailed("Failed to parse response")
         }
 
