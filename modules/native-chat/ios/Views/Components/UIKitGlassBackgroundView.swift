@@ -131,40 +131,6 @@ struct GlassPressButtonStyle: ButtonStyle {
     }
 }
 
-private struct GlassPressEffectModifier: ViewModifier {
-    let pressedScale: CGFloat
-    let pressedOpacity: Double
-
-    @GestureState private var isPressed = false
-
-    func body(content: Content) -> some View {
-        content
-            .scaleEffect(isPressed ? pressedScale : 1)
-            .opacity(isPressed ? pressedOpacity : 1)
-            .animation(.spring(response: 0.18, dampingFraction: 0.82), value: isPressed)
-            .simultaneousGesture(
-                DragGesture(minimumDistance: 0)
-                    .updating($isPressed) { _, state, _ in
-                        state = true
-                    }
-            )
-    }
-}
-
-extension View {
-    func glassPressEffect(
-        pressedScale: CGFloat = 0.965,
-        pressedOpacity: Double = 0.92
-    ) -> some View {
-        modifier(
-            GlassPressEffectModifier(
-                pressedScale: pressedScale,
-                pressedOpacity: pressedOpacity
-            )
-        )
-    }
-}
-
 @MainActor
 final class GlassBackgroundHostingView: UIView {
     private let effectView = UIVisualEffectView()

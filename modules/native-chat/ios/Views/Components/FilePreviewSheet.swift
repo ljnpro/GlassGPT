@@ -381,9 +381,8 @@ struct FilePreviewSheet: View {
                     darkBorderOpacity: 0.14,
                     lightBorderOpacity: 0.08
                 )
-                .glassPressEffect(pressedScale: 0.92, pressedOpacity: 0.82)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(GlassPressButtonStyle(pressedScale: 0.9, pressedOpacity: 0.8))
         .allowsHitTesting(!isDismissPending)
         .accessibilityLabel("Close preview")
     }
@@ -410,8 +409,7 @@ struct FilePreviewSheet: View {
             darkBorderOpacity: 0.14,
             lightBorderOpacity: 0.08
         )
-        .glassPressEffect(pressedScale: 0.92, pressedOpacity: 0.82)
-        .buttonStyle(.plain)
+        .buttonStyle(GlassPressButtonStyle(pressedScale: 0.9, pressedOpacity: 0.8))
         .accessibilityLabel("Download to Photos")
         .allowsHitTesting(!isDismissPending)
         .disabled(saveState == .saving || !canSaveToPhotos)
@@ -433,9 +431,8 @@ struct FilePreviewSheet: View {
                     darkBorderOpacity: 0.14,
                     lightBorderOpacity: 0.08
                 )
-                .glassPressEffect(pressedScale: 0.92, pressedOpacity: 0.82)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(GlassPressButtonStyle(pressedScale: 0.9, pressedOpacity: 0.8))
         .accessibilityLabel("Share")
         .allowsHitTesting(!isDismissPending)
     }
@@ -455,9 +452,8 @@ struct FilePreviewSheet: View {
                     darkBorderOpacity: 0.14,
                     lightBorderOpacity: 0.08
                 )
-                .glassPressEffect(pressedScale: 0.92, pressedOpacity: 0.82)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(GlassPressButtonStyle(pressedScale: 0.9, pressedOpacity: 0.8))
         .accessibilityLabel("Share")
         .allowsHitTesting(!isDismissPending)
     }
