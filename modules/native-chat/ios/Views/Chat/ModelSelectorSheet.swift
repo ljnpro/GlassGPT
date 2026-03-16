@@ -22,8 +22,14 @@ struct ModelBadge: View {
             .padding(.horizontal, 12)
             .padding(.vertical, 6)
             .fixedSize(horizontal: true, vertical: false)
+            .singleFrameGlassCapsuleControl(
+                tintOpacity: 0.015,
+                borderWidth: 0.78,
+                darkBorderOpacity: 0.14,
+                lightBorderOpacity: 0.08
+            )
         }
-        .buttonStyle(.glass)
+        .buttonStyle(.plain)
     }
 
     private var badgeText: String {
@@ -245,8 +251,14 @@ struct ModelSelectorSheet: View {
                     .foregroundStyle(.primary)
                     .padding(.horizontal, 12)
                     .padding(.vertical, 6)
+                    .singleFrameGlassCapsuleControl(
+                        tintOpacity: 0.015,
+                        borderWidth: 0.78,
+                        darkBorderOpacity: 0.14,
+                        lightBorderOpacity: 0.08
+                    )
             }
-            .buttonStyle(.glass)
+            .buttonStyle(.plain)
         }
         .padding(.horizontal, 2)
     }

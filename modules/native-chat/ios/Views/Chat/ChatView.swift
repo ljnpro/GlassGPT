@@ -23,7 +23,7 @@ struct ChatView: View {
     @State private var isGeneratedPreviewDismissPending = false
     @State private var generatedPreviewDismissTask: Task<Void, Never>?
 
-    private let generatedPreviewOverlayDismissDelay: UInt64 = 220_000_000
+    private let generatedPreviewOverlayDismissDelay: UInt64 = 320_000_000
     private let generatedPreviewTouchCooldownDuration: UInt64 = 1_000_000_000
 
     private var selectedTheme: AppTheme {
@@ -68,22 +68,25 @@ struct ChatView: View {
                             onTap: { presentModelSelector() }
                         )
                         .fixedSize(horizontal: true, vertical: false)
-                        .allowsHitTesting(!isBlockingGeneratedPreviewTouches)
                     }
 
                     ToolbarItem(placement: .topBarTrailing) {
                         Button {
                             startNewChat()
                         } label: {
-                            Label("New Chat", systemImage: "square.and.pencil")
-                                .font(.subheadline.weight(.semibold))
+                            Image(systemName: "square.and.pencil")
+                                .font(.system(size: 18, weight: .semibold))
                                 .foregroundStyle(.primary)
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 6)
+                                .frame(width: 44, height: 44)
+                                .singleFrameGlassCircleControl(
+                                    tintOpacity: 0.015,
+                                    borderWidth: 0.78,
+                                    darkBorderOpacity: 0.14,
+                                    lightBorderOpacity: 0.08
+                                )
                         }
-                        .buttonStyle(.glass)
-                        .disabled(isBlockingGeneratedPreviewTouches)
-                        .allowsHitTesting(!isBlockingGeneratedPreviewTouches)
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("New Chat")
                     }
                 }
                 .toolbarBackgroundVisibility(.hidden, for: .navigationBar)
