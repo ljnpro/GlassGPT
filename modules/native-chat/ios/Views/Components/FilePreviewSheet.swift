@@ -127,9 +127,9 @@ struct FilePreviewSheet: View {
 
     var body: some View {
         content
-            .scaleEffect(isDismissPending ? 0.992 : 1)
-            .opacity(isDismissPending ? 0.94 : 1)
-            .animation(.easeInOut(duration: 0.18), value: isDismissPending)
+            .scaleEffect(isDismissPending ? 0.986 : 1)
+            .opacity(isDismissPending ? 0.9 : 1)
+            .animation(.easeInOut(duration: 0.12), value: isDismissPending)
             .preferredColorScheme(selectedTheme.colorScheme)
             .task(id: previewItem.id) {
                 await loadPreview()
@@ -381,8 +381,9 @@ struct FilePreviewSheet: View {
                     darkBorderOpacity: 0.14,
                     lightBorderOpacity: 0.08
                 )
+                .glassPressEffect(pressedScale: 0.92, pressedOpacity: 0.82)
         }
-        .buttonStyle(GlassPressButtonStyle(pressedScale: 0.94, pressedOpacity: 0.86))
+        .buttonStyle(.plain)
         .allowsHitTesting(!isDismissPending)
         .accessibilityLabel("Close preview")
     }
@@ -409,7 +410,8 @@ struct FilePreviewSheet: View {
             darkBorderOpacity: 0.14,
             lightBorderOpacity: 0.08
         )
-        .buttonStyle(GlassPressButtonStyle(pressedScale: 0.94, pressedOpacity: 0.86))
+        .glassPressEffect(pressedScale: 0.92, pressedOpacity: 0.82)
+        .buttonStyle(.plain)
         .accessibilityLabel("Download to Photos")
         .allowsHitTesting(!isDismissPending)
         .disabled(saveState == .saving || !canSaveToPhotos)
@@ -431,8 +433,9 @@ struct FilePreviewSheet: View {
                     darkBorderOpacity: 0.14,
                     lightBorderOpacity: 0.08
                 )
+                .glassPressEffect(pressedScale: 0.92, pressedOpacity: 0.82)
         }
-        .buttonStyle(GlassPressButtonStyle(pressedScale: 0.94, pressedOpacity: 0.86))
+        .buttonStyle(.plain)
         .accessibilityLabel("Share")
         .allowsHitTesting(!isDismissPending)
     }
@@ -452,8 +455,9 @@ struct FilePreviewSheet: View {
                     darkBorderOpacity: 0.14,
                     lightBorderOpacity: 0.08
                 )
+                .glassPressEffect(pressedScale: 0.92, pressedOpacity: 0.82)
         }
-        .buttonStyle(GlassPressButtonStyle(pressedScale: 0.94, pressedOpacity: 0.86))
+        .buttonStyle(.plain)
         .accessibilityLabel("Share")
         .allowsHitTesting(!isDismissPending)
     }
