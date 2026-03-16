@@ -7,6 +7,7 @@ import UIKit
 struct FilePreviewSheet: View {
     let previewItem: FilePreviewItem
     var isDismissPending: Bool = false
+    var onBeginDismissInteraction: () -> Void = {}
     var onRequestDismiss: () -> Void = {}
 
     @AppStorage("appTheme") private var appThemeRawValue: String = AppTheme.system.rawValue
@@ -58,6 +59,7 @@ struct FilePreviewSheet: View {
         let diameter: CGFloat
         let isEnabled: Bool
         let accessibilityLabel: String
+        var onTriggerStart: () -> Void = {}
         let action: () -> Void
         @ViewBuilder let label: () -> Label
 
@@ -93,6 +95,7 @@ struct FilePreviewSheet: View {
                             }
 
                             guard shouldTrigger else { return }
+                            onTriggerStart()
                             Task { @MainActor in
                                 try? await Task.sleep(nanoseconds: 55_000_000)
                                 action()
@@ -426,6 +429,7 @@ struct FilePreviewSheet: View {
             diameter: circularButtonDiameter,
             isEnabled: !isDismissPending,
             accessibilityLabel: "Close preview",
+            onTriggerStart: onBeginDismissInteraction,
             action: onRequestDismiss
         ) {
             Image(systemName: "xmark")
