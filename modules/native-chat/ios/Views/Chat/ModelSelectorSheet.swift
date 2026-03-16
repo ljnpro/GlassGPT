@@ -30,6 +30,7 @@ struct ModelBadge: View {
             )
         }
         .buttonStyle(GlassPressButtonStyle())
+        .accessibilityIdentifier("chat.modelBadge")
     }
 
     private var badgeText: String {
@@ -259,6 +260,7 @@ struct ModelSelectorSheet: View {
                     )
             }
             .buttonStyle(GlassPressButtonStyle())
+            .accessibilityIdentifier("modelSelector.save")
         }
         .padding(.horizontal, 2)
     }

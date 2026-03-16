@@ -1,8 +1,8 @@
-# 4.2 Architecture
+# 4.2.2 Architecture
 
 ## Goal
 
-Refactor the app for maintainability while preserving the exact 4.1 user experience.
+Refactor the app for maintainability while preserving the exact 4.2.1 user experience.
 
 ## Layering
 
@@ -11,7 +11,7 @@ Refactor the app for maintainability while preserving the exact 4.1 user experie
 - Product package: `modules/native-chat/ios`
   - owns UI, state, persistence, services, and feature logic
 
-## 4.2 Internal Boundaries
+## 4.2.2 Internal Boundaries
 
 - `Infrastructure`
   - app-wide logging and low-level helper abstractions
@@ -22,7 +22,7 @@ Refactor the app for maintainability while preserving the exact 4.1 user experie
 - `Services`
   - OpenAI transport, streaming, file download, feature flags, KaTeX, haptics
 - `Coordinators`
-  - orchestration for chat sessions, recovery, file presentation, and bootstrap
+  - orchestration for generated files and other cross-cutting feature flows
 - `ViewModels`
   - UI-facing observable facades with stable public behavior
 - `Views`
@@ -33,14 +33,15 @@ Refactor the app for maintainability while preserving the exact 4.1 user experie
 - Preserve view output and interaction behavior. Extract logic out of views and view models; do not redesign UI.
 - Keep `ChatViewModel` as the single facade consumed by chat views.
 - Keep `OpenAIService` as the public facade consumed by view models while pushing implementation details into collaborators.
-- Avoid schema changes to SwiftData models in 4.2 unless a release blocker requires them.
+- Avoid schema changes to SwiftData models in 4.2.x unless a release blocker requires them.
 - Prefer typed request/response helpers over ad hoc `[String: Any]` parsing in feature code.
 - Route debug output through a single logging surface.
 
-## Current 4.2 Refactor Direction
+## Current 4.2.2 Refactor Direction
 
 - Replace direct `UserDefaults`/Keychain access in view models with stores.
 - Replace ad hoc persistence calls in feature logic with repositories.
-- Split OpenAI request building, SSE parsing, response fetching, and file upload into focused collaborators.
+- Keep streaming, recovery, and background-mode decisions explicit and separately testable.
+- Split SSE transport, framing, decoding, and session lifecycle helpers without changing wire behavior.
 - Split file download/cache responsibilities into typed helpers without changing cache behavior.
-- Move deprecated app shell code to a scene-based SwiftUI entrypoint with the same root view hierarchy.
+- Keep UI parity protected by snapshot coverage, XCUITest scenarios, and the manual baseline checklist.

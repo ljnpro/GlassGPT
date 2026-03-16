@@ -58,4 +58,28 @@ final class OpenAIStreamEventTranslatorTests: XCTestCase {
             )
         ])
     }
+
+    func testSSEFrameBufferReassemblesChunkedFrames() {
+        var buffer = SSEFrameBuffer()
+
+        XCTAssertTrue(
+            buffer.append("event: response.created\ndata: {\"response\":{\"id\":\"resp_123\"}}").isEmpty
+        )
+
+        let frames = buffer.append("\n\nevent: response.output_text.delta\ndata: {\"delta\":\"Hi\"}\n\n")
+
+        XCTAssertEqual(
+            frames,
+            [
+                SSEFrame(
+                    type: "response.created",
+                    data: #"{"response":{"id":"resp_123"}}"#
+                ),
+                SSEFrame(
+                    type: "response.output_text.delta",
+                    data: #"{"delta":"Hi"}"#
+                )
+            ]
+        )
+    }
 }

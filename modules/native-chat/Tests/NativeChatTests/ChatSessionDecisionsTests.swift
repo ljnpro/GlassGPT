@@ -22,6 +22,16 @@ final class ChatSessionDecisionsTests: XCTestCase {
         XCTAssertEqual(mode, .poll)
     }
 
+    func testRecoveryResumeModeFallsBackToPollingWhenStreamingResumeIsNotPreferred() {
+        let mode = ChatSessionDecisions.recoveryResumeMode(
+            preferStreamingResume: false,
+            usedBackgroundMode: true,
+            lastSequenceNumber: 42
+        )
+
+        XCTAssertEqual(mode, .poll)
+    }
+
     func testGatewayFallbackTriggersDirectResumeWhenNoRecoveryEventsArrive() {
         XCTAssertTrue(
             ChatSessionDecisions.shouldFallbackToDirectRecoveryStream(
@@ -40,6 +50,17 @@ final class ChatSessionDecisionsTests: XCTestCase {
                 useDirectEndpoint: true,
                 gatewayResumeTimedOut: true,
                 receivedAnyRecoveryEvent: false
+            )
+        )
+    }
+
+    func testGatewayFallbackTriggersWhenGatewayResumeTimesOut() {
+        XCTAssertTrue(
+            ChatSessionDecisions.shouldFallbackToDirectRecoveryStream(
+                cloudflareGatewayEnabled: true,
+                useDirectEndpoint: false,
+                gatewayResumeTimedOut: true,
+                receivedAnyRecoveryEvent: true
             )
         )
     }

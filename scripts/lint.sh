@@ -18,14 +18,13 @@ swiftlint lint --strict --config "$ROOT_DIR/.swiftlint.yml"
 
 critical_try_hits="$(
   rg -n -P '\btry\?' \
-    "$ROOT_DIR/modules/native-chat/ios/Models" \
-    "$ROOT_DIR/modules/native-chat/ios/Services" \
-    "$ROOT_DIR/modules/native-chat/ios/ViewModels" \
+    "$ROOT_DIR/modules/native-chat/ios" \
+    "$ROOT_DIR/ios/GlassGPT" \
     || true
 )"
 
 if [[ -n "$critical_try_hits" ]]; then
-  echo "Critical silent failure paths still use try?:" >&2
+  echo "Production code still uses try?:" >&2
   echo "$critical_try_hits" >&2
   exit 1
 fi
