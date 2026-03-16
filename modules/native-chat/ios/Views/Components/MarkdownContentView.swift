@@ -422,20 +422,12 @@ struct MarkdownContentView: View {
             )
 
         case .assistant(let isLive):
-            if shouldUseSegmentedAssistantSurface {
-                VStack(alignment: .leading, spacing: 8) {
-                    ForEach(assistantSurfaceSections) { section in
-                        assistantSurfaceView(section, isLive: isLive)
-                    }
-                }
-            } else {
-                blockStack(
-                    for: blockParts,
-                    codeBlockSurfaceStyle: .embedded
-                )
-                .padding(12)
-                .assistantSingleSurfaceGlass(isLive: isLive)
-            }
+            blockStack(
+                for: blockParts,
+                codeBlockSurfaceStyle: .embedded
+            )
+            .padding(12)
+            .assistantSingleSurfaceGlass(isLive: isLive)
         }
     }
 
