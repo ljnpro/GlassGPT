@@ -10,6 +10,7 @@ fileprivate enum InlineSegment: Sendable {
 fileprivate enum BlockPart: Identifiable, Sendable {
     case richText(id: Int, segments: [InlineSegment])
     case heading(id: Int, level: Int, text: String)
+    case horizontalRule(id: Int)
     case latexBlock(id: Int, content: String)
     case codeBlock(id: Int, language: String?, code: String)
 
@@ -18,6 +19,8 @@ fileprivate enum BlockPart: Identifiable, Sendable {
         case let .richText(id, _):
             return id
         case let .heading(id, _, _):
+            return id
+        case let .horizontalRule(id):
             return id
         case let .latexBlock(id, _):
             return id
@@ -195,6 +198,9 @@ struct MarkdownContentView: View {
                     if let headingMatch = detectHeading(trimmed) {
                         flushLineBuffer()
                         finalParts.append(.heading(id: makeID(), level: headingMatch.level, text: headingMatch.text))
+                    } else if isHorizontalRule(trimmed) {
+                        flushLineBuffer()
+                        finalParts.append(.horizontalRule(id: makeID()))
                     } else {
                         lineBuffer.append(line)
                     }
@@ -215,6 +221,8 @@ struct MarkdownContentView: View {
                 result.append(.richText(id: finalID, segments: segments))
             case let .heading(_, level, text):
                 result.append(.heading(id: finalID, level: level, text: text))
+            case .horizontalRule:
+                result.append(.horizontalRule(id: finalID))
             case let .latexBlock(_, content):
                 result.append(.latexBlock(id: finalID, content: content))
             case let .codeBlock(_, language, code):
@@ -239,6 +247,14 @@ struct MarkdownContentView: View {
         let text = String(chars[(level + 1)...]).trimmingCharacters(in: .whitespaces)
         guard !text.isEmpty else { return nil }
         return (level, text)
+    }
+
+    private func isHorizontalRule(_ line: String) -> Bool {
+        let condensed = line.replacingOccurrences(of: " ", with: "")
+        guard condensed.count >= 3 else { return false }
+        guard let marker = condensed.first else { return false }
+        guard marker == "-" || marker == "_" || marker == "*" else { return false }
+        return condensed.allSatisfy { $0 == marker }
     }
 
     private func parseInlineSegments(_ input: String) -> [InlineSegment] {
@@ -317,7 +333,7 @@ struct MarkdownContentView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 2) {
+        VStack(alignment: .leading, spacing: 10) {
             ForEach(Array(blockParts.enumerated()), id: \.element.id) { index, part in
                 blockView(for: part, at: index)
             }
@@ -331,14 +347,13 @@ struct MarkdownContentView: View {
             CodeBlockView(language: language, code: code)
                 .id(id)
 
+        case let .horizontalRule(id: id):
+            HorizontalRuleView()
+                .id(id)
+
         case let .latexBlock(id: id, content: content):
-            let prevIsLatex = index > 0 && isLatexBlock(blockParts[index - 1])
-            let nextIsLatex = index + 1 < blockParts.count && isLatexBlock(blockParts[index + 1])
             BlockLaTeXView(latex: content)
                 .id(id)
-                // Tighten spacing to surrounding text, but keep normal spacing between consecutive LaTeX blocks
-                .padding(.top, prevIsLatex ? 8 : -2)
-                .padding(.bottom, nextIsLatex ? 8 : -2)
 
         case let .heading(id: id, level: level, text: text):
             HeadingView(level: level, text: text)
@@ -352,11 +367,6 @@ struct MarkdownContentView: View {
             )
             .id(id)
         }
-    }
-
-    private func isLatexBlock(_ part: BlockPart) -> Bool {
-        if case .latexBlock = part { return true }
-        return false
     }
 }
 
@@ -418,6 +428,26 @@ private struct HeadingView: View {
         case 3: return 8
         default: return 6
         }
+    }
+}
+
+// MARK: - Horizontal Rule View
+
+private struct HorizontalRuleView: View {
+    @Environment(\.colorScheme) private var colorScheme
+
+    var body: some View {
+        Capsule(style: .continuous)
+            .fill(ruleColor)
+            .frame(maxWidth: .infinity)
+            .frame(height: 1)
+            .padding(.vertical, 2)
+    }
+
+    private var ruleColor: Color {
+        colorScheme == .dark
+            ? Color.white.opacity(0.16)
+            : Color.black.opacity(0.14)
     }
 }
 
@@ -803,17 +833,37 @@ private struct BlockLaTeXView: View {
     let latex: String
 
     @State private var height: CGFloat = 44
+    @State private var availableWidth: CGFloat = 0
     @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         BlockLaTeXWebView(
             latex: latex,
             isDark: colorScheme == .dark,
+            availableWidth: availableWidth,
             height: $height
         )
         .frame(height: height)
         .frame(maxWidth: .infinity, alignment: .center)
+        .background {
+            GeometryReader { geometry in
+                Color.clear
+                    .onAppear {
+                        updateAvailableWidth(geometry.size.width)
+                    }
+                    .onChange(of: geometry.size.width) { _, newWidth in
+                        updateAvailableWidth(newWidth)
+                    }
+            }
+        }
         .clipped()
+    }
+
+    private func updateAvailableWidth(_ newWidth: CGFloat) {
+        let screenScale = UIScreen.main.scale
+        let roundedWidth = max((newWidth * screenScale).rounded(.down) / screenScale, 0)
+        guard abs(availableWidth - roundedWidth) > 0.5 else { return }
+        availableWidth = roundedWidth
     }
 }
 
@@ -823,6 +873,7 @@ private struct BlockLaTeXView: View {
 private struct BlockLaTeXWebView: UIViewRepresentable {
     let latex: String
     let isDark: Bool
+    let availableWidth: CGFloat
     @Binding var height: CGFloat
 
     func makeCoordinator() -> Coordinator {
@@ -846,11 +897,31 @@ private struct BlockLaTeXWebView: UIViewRepresentable {
     }
 
     func updateUIView(_ webView: WKWebView, context: Context) {
-        let key = "\(latex)-\(isDark)"
+        guard availableWidth > 1 else { return }
+
+        let pixelWidth = Int((availableWidth * UIScreen.main.scale).rounded(.toNearestOrEven))
+        let key = "\(latex)-\(isDark)-\(pixelWidth)"
         guard key != context.coordinator.lastKey else { return }
         context.coordinator.lastKey = key
+        context.coordinator.cacheKey = key
 
-        let result = KaTeXProvider.htmlForLatex(latex, isDark: isDark)
+        if let cachedHeight = LaTeXMeasurementState.cachedHeights[key] {
+            Task { @MainActor in
+                if abs(height - cachedHeight) > 0.5 {
+                    height = cachedHeight
+                }
+            }
+        }
+
+        let token = UUID().uuidString
+        context.coordinator.expectedMeasurementToken = token
+
+        let result = KaTeXProvider.htmlForLatex(
+            latex,
+            isDark: isDark,
+            measurementToken: token,
+            maxWidth: availableWidth
+        )
         webView.loadHTMLString(result.html, baseURL: result.baseURL)
     }
 
@@ -863,6 +934,8 @@ private struct BlockLaTeXWebView: UIViewRepresentable {
     final class Coordinator: NSObject, WKNavigationDelegate, WKScriptMessageHandler, @unchecked Sendable {
         @Binding var height: CGFloat
         var lastKey: String = ""
+        var cacheKey: String = ""
+        var expectedMeasurementToken: String = ""
 
         init(height: Binding<CGFloat>) {
             _height = height
@@ -872,20 +945,41 @@ private struct BlockLaTeXWebView: UIViewRepresentable {
             _ userContentController: WKUserContentController,
             didReceive message: WKScriptMessage
         ) {
+            guard let payload = message.body as? [String: Any],
+                  let token = payload["token"] as? String
+            else {
+                return
+            }
+
             let newHeight: CGFloat
-            if let value = message.body as? CGFloat {
+            if let value = payload["height"] as? CGFloat {
                 newHeight = max(value, 20)
-            } else if let value = message.body as? Int {
+            } else if let value = payload["height"] as? Int {
                 newHeight = max(CGFloat(value), 20)
-            } else if let value = message.body as? Double {
+            } else if let value = payload["height"] as? Double {
                 newHeight = max(CGFloat(value), 20)
             } else {
                 return
             }
 
             Task { @MainActor in
-                self.height = newHeight
+                guard token == self.expectedMeasurementToken else { return }
+
+                let screenScale = UIScreen.main.scale
+                let roundedHeight = max((newHeight * screenScale).rounded(.up) / screenScale, 20)
+                guard roundedHeight < 4096 else { return }
+
+                LaTeXMeasurementState.cachedHeights[self.cacheKey] = roundedHeight
+
+                if abs(self.height - roundedHeight) > 0.5 {
+                    self.height = roundedHeight
+                }
             }
         }
     }
+}
+
+@MainActor
+private enum LaTeXMeasurementState {
+    static var cachedHeights: [String: CGFloat] = [:]
 }

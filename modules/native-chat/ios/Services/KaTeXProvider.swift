@@ -48,8 +48,14 @@ enum KaTeXProvider {
     // MARK: - HTML Generation
 
     /// Generate a complete HTML document for rendering a LaTeX expression.
-    static func htmlForLatex(_ latex: String, isDark: Bool) -> (html: String, baseURL: URL?) {
+    static func htmlForLatex(
+        _ latex: String,
+        isDark: Bool,
+        measurementToken: String,
+        maxWidth: CGFloat
+    ) -> (html: String, baseURL: URL?) {
         let textColor = isDark ? "#e5e5e5" : "#1c1c1e"
+        let clampedMaxWidth = max(Int(maxWidth.rounded(.down)), 1)
 
         let encoder = JSONEncoder()
         let jsonLatex: String
@@ -77,6 +83,7 @@ enum KaTeXProvider {
                 background: transparent;
                 color: \(textColor);
                 font-size: 17px;
+                width: 100%;
                 display: flex;
                 align-items: center;
                 justify-content: center;
@@ -87,7 +94,7 @@ enum KaTeXProvider {
             }
             .katex { font-size: 1em !important; }
             .katex-display { margin: 0 !important; }
-            #math { display: inline-block; max-width: 100%; overflow-x: auto; }
+            #math { display: inline-block; max-width: min(100%, \(clampedMaxWidth)px); overflow-x: auto; }
             </style>
             </head>
             <body>
@@ -96,6 +103,7 @@ enum KaTeXProvider {
             <script>
             (function() {
                 var latexStr = \(jsonLatex);
+                var token = "\(measurementToken)";
                 try {
                     katex.render(latexStr, document.getElementById('math'), {
                         displayMode: true,
@@ -107,9 +115,10 @@ enum KaTeXProvider {
                     document.getElementById('math').textContent = latexStr;
                 }
                 function reportHeight() {
-                    var h = document.body.scrollHeight;
+                    var node = document.getElementById('math');
+                    var h = node ? Math.ceil(node.getBoundingClientRect().height) : 0;
                     if (h > 0) {
-                        window.webkit.messageHandlers.sizeCallback.postMessage(h);
+                        window.webkit.messageHandlers.sizeCallback.postMessage({ token: token, height: h });
                     }
                 }
                 // Multiple callbacks to ensure accurate height after fonts load
@@ -143,6 +152,7 @@ enum KaTeXProvider {
                 background: transparent;
                 color: \(textColor);
                 font-size: 17px;
+                width: 100%;
                 display: flex;
                 align-items: center;
                 justify-content: center;
@@ -153,7 +163,7 @@ enum KaTeXProvider {
             }
             .katex { font-size: 1em !important; }
             .katex-display { margin: 0 !important; }
-            #math { display: inline-block; max-width: 100%; overflow-x: auto; }
+            #math { display: inline-block; max-width: min(100%, \(clampedMaxWidth)px); overflow-x: auto; }
             </style>
             </head>
             <body>
@@ -161,6 +171,7 @@ enum KaTeXProvider {
             <script>
             document.addEventListener('DOMContentLoaded', function() {
                 var latexStr = \(jsonLatex);
+                var token = "\(measurementToken)";
                 try {
                     katex.render(latexStr, document.getElementById('math'), {
                         displayMode: true,
@@ -172,9 +183,10 @@ enum KaTeXProvider {
                     document.getElementById('math').textContent = latexStr;
                 }
                 function reportHeight() {
-                    var h = document.body.scrollHeight;
+                    var node = document.getElementById('math');
+                    var h = node ? Math.ceil(node.getBoundingClientRect().height) : 0;
                     if (h > 0) {
-                        window.webkit.messageHandlers.sizeCallback.postMessage(h);
+                        window.webkit.messageHandlers.sizeCallback.postMessage({ token: token, height: h });
                     }
                 }
                 reportHeight();
@@ -196,10 +208,19 @@ enum KaTeXProvider {
 
     // MARK: - Resource Lookup
 
+    private static var candidateBundles: [Bundle] {
+        var bundles: [Bundle] = []
+        #if SWIFT_PACKAGE
+        bundles.append(.module)
+        #endif
+        bundles.append(contentsOf: Bundle.allBundles)
+        bundles.append(Bundle.main)
+        return bundles
+    }
+
     private static func findResourceDirectory() -> URL? {
         // Search through all bundles for the Resources directory containing KaTeX files
-        let allBundles = Bundle.allBundles + [Bundle.main]
-        for bundle in allBundles {
+        for bundle in candidateBundles {
             // Check for resources directly in bundle
             if let cssURL = bundle.url(forResource: "katex.min", withExtension: "css") {
                 return cssURL.deletingLastPathComponent()

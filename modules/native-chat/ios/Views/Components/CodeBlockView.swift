@@ -10,16 +10,17 @@ struct CodeBlockView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            // Header with language label and copy button
-            HStack {
-                if let language, !language.isEmpty {
-                    Text(language.uppercased())
-                        .font(.caption2.weight(.bold))
+            HStack(spacing: 10) {
+                if let languageTitle {
+                    Text(languageTitle)
+                        .font(.caption2.weight(.semibold))
                         .foregroundStyle(.secondary)
-                        .padding(.leading, 12)
-                }
+                        .tracking(0.2)
 
-                Spacer()
+                    Spacer(minLength: 8)
+                } else {
+                    Spacer()
+                }
 
                 Button {
                     UIPasteboard.general.string = code
@@ -38,26 +39,89 @@ struct CodeBlockView: View {
                         isCopied ? "Copied" : "Copy",
                         systemImage: isCopied ? "checkmark" : "doc.on.doc"
                     )
-                    .font(.caption2)
+                    .font(.caption.weight(.semibold))
                     .contentTransition(.symbolEffect(.replace))
+                    .padding(.horizontal, 11)
+                    .padding(.vertical, 5)
+                    .background {
+                        Capsule(style: .continuous)
+                            .fill(buttonFill)
+                    }
+                    .overlay {
+                        Capsule(style: .continuous)
+                            .strokeBorder(borderColor.opacity(0.85), lineWidth: 0.75)
+                    }
                 }
-                .buttonStyle(.glass)
-                .padding(6)
+                .buttonStyle(.plain)
             }
-            .padding(.vertical, 4)
-            .background(.ultraThinMaterial)
+            .padding(.horizontal, 12)
+            .frame(minHeight: 28)
+            .background(headerFill)
+            .overlay(alignment: .bottom) {
+                Rectangle()
+                    .fill(borderColor.opacity(0.5))
+                    .frame(height: 0.5)
+            }
 
-            // Code content
             ScrollView(.horizontal, showsIndicators: false) {
                 Text(highlightedCode)
                     .font(.system(.callout, design: .monospaced))
-                    .padding(12)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 10)
                     .textSelection(.enabled)
             }
         }
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
-        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 12))
-        .padding(.vertical, 4)
+        .background(surfaceFill, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .strokeBorder(borderColor, lineWidth: 0.75)
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+    }
+
+    private var surfaceFill: Color {
+        colorScheme == .dark
+            ? Color.white.opacity(0.038)
+            : Color.black.opacity(0.028)
+    }
+
+    private var headerFill: Color {
+        colorScheme == .dark
+            ? Color.white.opacity(0.05)
+            : Color.black.opacity(0.035)
+    }
+
+    private var buttonFill: Color {
+        colorScheme == .dark
+            ? Color.white.opacity(0.075)
+            : Color.white.opacity(0.72)
+    }
+
+    private var borderColor: Color {
+        colorScheme == .dark
+            ? Color.white.opacity(0.08)
+            : Color.black.opacity(0.08)
+    }
+
+    private var languageTitle: String? {
+        guard let language, !language.isEmpty else { return nil }
+
+        switch language.lowercased() {
+        case "latex":
+            return "LaTeX"
+        case "swift":
+            return "Swift"
+        case "python":
+            return "Python"
+        case "javascript", "js":
+            return "JavaScript"
+        case "typescript", "ts":
+            return "TypeScript"
+        case "json":
+            return "JSON"
+        default:
+            return language.uppercased()
+        }
     }
 
     // MARK: - Native Syntax Highlighting

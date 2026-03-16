@@ -84,14 +84,13 @@ private struct CitationCard: View {
             }
             .padding(.horizontal, 10)
             .padding(.vertical, 8)
-            .background {
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .fill(.ultraThinMaterial)
-            }
-            .overlay {
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .strokeBorder(.quaternary, lineWidth: 0.5)
-            }
+            .singleSurfaceGlass(
+                cornerRadius: 10,
+                stableFillOpacity: 0.01,
+                borderWidth: 0.7,
+                darkBorderOpacity: 0.14,
+                lightBorderOpacity: 0.08
+            )
         }
         .buttonStyle(.plain)
     }

@@ -1,18 +1,25 @@
 import SwiftUI
+import UIKit
 
 struct MessageInputBar: View {
-    @Binding var text: String
+    let resetToken: UUID
     let isStreaming: Bool
     @Binding var selectedImageData: Data?
     @Binding var pendingAttachments: [FileAttachment]
-    let onSend: () -> Void
+    let onSend: (String) -> Bool
     let onStop: () -> Void
     let onPickImage: () -> Void
     let onPickDocument: () -> Void
     let onRemoveAttachment: (FileAttachment) -> Void
 
-    @FocusState private var isFocused: Bool
-    @State private var showAttachmentMenu = false
+    @State private var text = ""
+    @State private var composerHeight = Self.minimumComposerHeight
+
+    private static let horizontalTextInset: CGFloat = 12
+    private static let verticalTextInset: CGFloat = 8
+    private static let composerFont = UIFont.preferredFont(forTextStyle: .body)
+    private static let minimumComposerHeight = ceil(composerFont.lineHeight + (verticalTextInset * 2))
+    private static let maximumComposerHeight = ceil((composerFont.lineHeight * 6) + (verticalTextInset * 2))
 
     var body: some View {
         VStack(spacing: 0) {
@@ -73,15 +80,7 @@ struct MessageInputBar: View {
                 }
                 .buttonStyle(.glass)
 
-                // Text field
-                TextField("Message", text: $text, axis: .vertical)
-                    .lineLimit(1...6)
-                    .focused($isFocused)
-                    .textFieldStyle(.plain)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
-                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 20))
-                    .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 20))
+                messageComposer
 
                 // Send / Stop button
                 if isStreaming {
@@ -93,7 +92,7 @@ struct MessageInputBar: View {
                     }
                     .buttonStyle(.glass)
                 } else {
-                    Button(action: onSend) {
+                    Button(action: handleSend) {
                         Image(systemName: "arrow.up.circle.fill")
                             .font(.title2)
                             .foregroundStyle(canSend ? .blue : .secondary)
@@ -106,11 +105,43 @@ struct MessageInputBar: View {
             .padding(.vertical, 8)
         }
         .background(Color(.systemBackground))
+        .onChange(of: resetToken) { _, _ in
+            clearComposer()
+        }
     }
 
     private var canSend: Bool {
         !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             || selectedImageData != nil
             || !pendingAttachments.isEmpty
+    }
+
+    private var messageComposer: some View {
+        MessageComposerTextView(
+            text: $text,
+            measuredHeight: $composerHeight,
+            placeholder: "Message",
+            minHeight: Self.minimumComposerHeight,
+            maxHeight: Self.maximumComposerHeight,
+            textInsets: UIEdgeInsets(
+                top: Self.verticalTextInset,
+                left: Self.horizontalTextInset,
+                bottom: Self.verticalTextInset,
+                right: Self.horizontalTextInset
+            )
+        )
+        .frame(height: composerHeight)
+        .frame(maxWidth: .infinity, minHeight: Self.minimumComposerHeight, alignment: .leading)
+    }
+
+    private func handleSend() {
+        let textToSend = text
+        guard onSend(textToSend) else { return }
+        clearComposer()
+    }
+
+    private func clearComposer() {
+        text = ""
+        composerHeight = Self.minimumComposerHeight
     }
 }

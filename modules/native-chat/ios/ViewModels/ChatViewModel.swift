@@ -2,6 +2,27 @@ import SwiftUI
 import SwiftData
 import UIKit
 
+enum FilePreviewKind: String, Sendable {
+    case generatedImage
+    case generatedPDF
+}
+
+struct FilePreviewItem: Identifiable, Sendable {
+    let url: URL
+    let kind: FilePreviewKind
+    let displayName: String
+    let viewerFilename: String
+
+    var id: String { "\(kind.rawValue):\(url.path)" }
+}
+
+struct SharedGeneratedFileItem: Identifiable, Sendable {
+    let url: URL
+    let filename: String
+
+    var id: String { url.path }
+}
+
 @Observable
 @MainActor
 final class ChatViewModel {
@@ -81,13 +102,12 @@ final class ChatViewModel {
     var isThinking: Bool = false
     var isRecovering: Bool = false
     var isRestoringConversation: Bool = false
-    var inputText: String = ""
     var selectedModel: ModelType = .gpt5_4 {
         didSet {
             if !selectedModel.availableEfforts.contains(reasoningEffort) {
                 reasoningEffort = selectedModel.defaultEffort
             }
-            guard !isApplyingStoredConversationConfiguration else { return }
+            guard !isApplyingStoredConversationConfiguration && !isApplyingConversationConfigurationBatch else { return }
             syncConversationConfiguration()
         }
     }
@@ -97,25 +117,24 @@ final class ChatViewModel {
                 reasoningEffort = selectedModel.defaultEffort
                 return
             }
-            guard !isApplyingStoredConversationConfiguration else { return }
+            guard !isApplyingStoredConversationConfiguration && !isApplyingConversationConfigurationBatch else { return }
             syncConversationConfiguration()
         }
     }
     var backgroundModeEnabled: Bool = false {
         didSet {
-            guard !isApplyingStoredConversationConfiguration else { return }
+            guard !isApplyingStoredConversationConfiguration && !isApplyingConversationConfigurationBatch else { return }
             syncConversationConfiguration()
         }
     }
     var serviceTier: ServiceTier = .standard {
         didSet {
-            guard !isApplyingStoredConversationConfiguration else { return }
+            guard !isApplyingStoredConversationConfiguration && !isApplyingConversationConfigurationBatch else { return }
             syncConversationConfiguration()
         }
     }
     var currentConversation: Conversation?
     var errorMessage: String?
-    var showModelSelector: Bool = false
     var selectedImageData: Data?
 
     // Tool call state
@@ -127,7 +146,8 @@ final class ChatViewModel {
     var pendingAttachments: [FileAttachment] = []
 
     // File preview state
-    var filePreviewURL: URL?
+    var filePreviewItem: FilePreviewItem?
+    var sharedGeneratedFileItem: SharedGeneratedFileItem?
     var isDownloadingFile: Bool = false
     var fileDownloadError: String?
 
@@ -145,6 +165,7 @@ final class ChatViewModel {
     private var activeRequestUsesBackgroundMode = false
     private var activeRequestServiceTier: ServiceTier = .standard
     private var isApplyingStoredConversationConfiguration = false
+    private var isApplyingConversationConfigurationBatch = false
     private var didCompleteLaunchBootstrap = false
     private var visibleSessionMessageID: UUID?
     private var visibleRecoveryPhase: RecoveryPhase = .idle
@@ -198,6 +219,31 @@ final class ChatViewModel {
     var flexModeEnabled: Bool {
         get { serviceTier == .flex }
         set { serviceTier = newValue ? .flex : .standard }
+    }
+
+    var conversationConfiguration: ConversationConfiguration {
+        ConversationConfiguration(
+            model: selectedModel,
+            reasoningEffort: reasoningEffort,
+            backgroundModeEnabled: backgroundModeEnabled,
+            serviceTier: serviceTier
+        )
+    }
+
+    func applyConversationConfiguration(_ configuration: ConversationConfiguration) {
+        isApplyingConversationConfigurationBatch = true
+        defer { isApplyingConversationConfigurationBatch = false }
+
+        selectedModel = configuration.model
+        reasoningEffort = configuration.reasoningEffort
+        backgroundModeEnabled = configuration.backgroundModeEnabled
+        serviceTier = configuration.serviceTier
+
+        if !selectedModel.availableEfforts.contains(reasoningEffort) {
+            reasoningEffort = selectedModel.defaultEffort
+        }
+
+        syncConversationConfiguration()
     }
 
     // MARK: - Lifecycle Observers
@@ -305,12 +351,28 @@ final class ChatViewModel {
         }
 
         let key = apiKey
+        let requestedFilename = annotation?.filename ?? extractFilename(from: sandboxURL)
+        var requestedOpenBehavior = FileDownloadService.openBehavior(for: requestedFilename)
 
+        filePreviewItem = nil
+        sharedGeneratedFileItem = nil
         isDownloadingFile = true
         fileDownloadError = nil
 
         Task { @MainActor in
             do {
+                if let annotation,
+                   let cachedResource = await FileDownloadService.shared.cachedGeneratedFile(
+                    fileId: annotation.fileId,
+                    containerId: annotation.containerId,
+                    suggestedFilename: requestedFilename
+                   ) {
+                    isDownloadingFile = false
+                    presentGeneratedFile(cachedResource, suggestedFilename: requestedFilename)
+                    HapticService.shared.impact(.light)
+                    return
+                }
+
                 guard let resolvedAnnotation = try await resolveDownloadAnnotation(
                     for: message,
                     sandboxURL: sandboxURL,
@@ -320,18 +382,24 @@ final class ChatViewModel {
                     throw FileDownloadError.fileNotFound
                 }
 
-                let localURL = try await FileDownloadService.shared.downloadFile(
+                let resolvedFilename = resolvedAnnotation.filename ?? requestedFilename ?? extractFilename(from: sandboxURL)
+                requestedOpenBehavior = Self.generatedOpenBehavior(for: resolvedAnnotation)
+                let resource = try await FileDownloadService.shared.prefetchGeneratedFile(
                     fileId: resolvedAnnotation.fileId,
                     containerId: resolvedAnnotation.containerId,
-                    suggestedFilename: resolvedAnnotation.filename ?? extractFilename(from: sandboxURL),
+                    suggestedFilename: resolvedFilename,
                     apiKey: key
                 )
+
                 isDownloadingFile = false
-                filePreviewURL = localURL
+                presentGeneratedFile(resource, suggestedFilename: resolvedFilename)
                 HapticService.shared.impact(.light)
             } catch {
                 isDownloadingFile = false
-                fileDownloadError = error.localizedDescription
+                fileDownloadError = userFacingDownloadError(
+                    error,
+                    openBehavior: requestedOpenBehavior
+                )
                 HapticService.shared.notify(.error)
                 #if DEBUG
                 print("[FileDownload] Failed: \(error)")
@@ -440,6 +508,158 @@ final class ChatViewModel {
         return filename.isEmpty ? nil : filename
     }
 
+    private func makePreviewItem(
+        url: URL,
+        kind: FilePreviewKind,
+        suggestedFilename: String?
+    ) -> FilePreviewItem {
+        let viewerFilename = previewViewerFilename(for: suggestedFilename) ?? url.lastPathComponent
+        let fallbackName = url.deletingPathExtension().lastPathComponent
+        let displayName = previewDisplayName(for: viewerFilename) ?? (fallbackName.isEmpty ? viewerFilename : fallbackName)
+        return FilePreviewItem(
+            url: url,
+            kind: kind,
+            displayName: displayName,
+            viewerFilename: viewerFilename
+        )
+    }
+
+    private func presentGeneratedFile(
+        _ resource: GeneratedFileLocalResource,
+        suggestedFilename: String?
+    ) {
+        switch resource.openBehavior {
+        case .imagePreview:
+            filePreviewItem = makePreviewItem(
+                url: resource.localURL,
+                kind: .generatedImage,
+                suggestedFilename: resource.filename.isEmpty ? suggestedFilename : resource.filename
+            )
+        case .pdfPreview:
+            filePreviewItem = makePreviewItem(
+                url: resource.localURL,
+                kind: .generatedPDF,
+                suggestedFilename: resource.filename.isEmpty ? suggestedFilename : resource.filename
+            )
+        case .directShare:
+            sharedGeneratedFileItem = SharedGeneratedFileItem(
+                url: resource.localURL,
+                filename: resource.filename
+            )
+        }
+    }
+
+    private func previewViewerFilename(for filename: String?) -> String? {
+        guard let filename else { return nil }
+        let sanitizedFilename = URL(fileURLWithPath: filename).lastPathComponent
+        return sanitizedFilename.isEmpty ? nil : sanitizedFilename
+    }
+
+    private func previewDisplayName(for filename: String?) -> String? {
+        guard let filename else { return nil }
+        let trimmed = URL(fileURLWithPath: filename).deletingPathExtension().lastPathComponent
+        return trimmed.isEmpty ? nil : trimmed
+    }
+
+    private func userFacingDownloadError(
+        _ error: Error,
+        openBehavior: GeneratedFileOpenBehavior
+    ) -> String {
+        if let fileError = error as? FileDownloadError {
+            switch (openBehavior, fileError) {
+            case (.imagePreview, .fileNotFound):
+                return "This generated image is no longer available. Please regenerate it."
+            case (.imagePreview, .httpError(let statusCode, _)) where statusCode == 404 || statusCode == 410:
+                return "This generated image has expired and can no longer be downloaded. Please regenerate it."
+            case (.imagePreview, .invalidImageData):
+                return "This generated image could not be rendered."
+            case (.pdfPreview, .fileNotFound):
+                return "This generated file is no longer available. Please regenerate it."
+            case (.pdfPreview, .httpError(let statusCode, _)) where statusCode == 404 || statusCode == 410:
+                return "This generated file has expired and can no longer be downloaded. Please regenerate it."
+            case (.pdfPreview, .invalidPDFData):
+                return "This generated PDF could not be rendered."
+            case (.directShare, .fileNotFound):
+                return "This generated file is no longer available. Please regenerate it."
+            case (.directShare, .httpError(let statusCode, _)) where statusCode == 404 || statusCode == 410:
+                return "This generated file has expired and can no longer be downloaded. Please regenerate it."
+            default:
+                break
+            }
+        }
+
+        return error.localizedDescription
+    }
+
+    private static func generatedOpenBehavior(for annotation: FilePathAnnotation) -> GeneratedFileOpenBehavior {
+        if let filename = annotation.filename {
+            return FileDownloadService.openBehavior(for: filename)
+        }
+
+        let sandboxPath = annotation.sandboxPath
+        guard !sandboxPath.isEmpty else { return .directShare }
+        let filename = (sandboxPath as NSString).lastPathComponent
+        return FileDownloadService.openBehavior(for: filename)
+    }
+
+    private func prefetchGeneratedFilesIfNeeded(for message: Message) {
+        let key = apiKey.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !key.isEmpty else { return }
+
+        let initialAnnotations = message.filePathAnnotations.filter { !$0.fileId.isEmpty }
+        guard !initialAnnotations.isEmpty else { return }
+
+        let messageID = message.id
+        let responseId = message.responseId
+
+        Task { @MainActor in
+            var annotationsToPrefetch = initialAnnotations
+
+            if annotationsToPrefetch.contains(where: { !annotationCanDownloadDirectly($0) }),
+               let responseId,
+               !responseId.isEmpty {
+                do {
+                    let result = try await openAIService.fetchResponse(responseId: responseId, apiKey: key)
+                    let refreshedAnnotations = result.filePathAnnotations.filter { !$0.fileId.isEmpty }
+
+                    if !refreshedAnnotations.isEmpty {
+                        annotationsToPrefetch = refreshedAnnotations
+
+                        if let persistedMessage = findMessage(byId: messageID) {
+                            persistedMessage.filePathAnnotations = refreshedAnnotations
+                            try? modelContext.save()
+
+                            if persistedMessage.conversation?.id == currentConversation?.id {
+                                upsertMessage(persistedMessage)
+                            }
+                        }
+                    }
+                } catch {
+                    #if DEBUG
+                    print("[GeneratedFileCache] Refresh failed for \(messageID): \(error.localizedDescription)")
+                    #endif
+                }
+            }
+
+            Task.detached(priority: .utility) {
+                for annotation in annotationsToPrefetch {
+                    do {
+                        _ = try await FileDownloadService.shared.prefetchGeneratedFile(
+                            fileId: annotation.fileId,
+                            containerId: annotation.containerId,
+                            suggestedFilename: annotation.filename,
+                            apiKey: key
+                        )
+                    } catch {
+                        #if DEBUG
+                        print("[GeneratedFileCache] Prefetch failed for \(annotation.fileId): \(error.localizedDescription)")
+                        #endif
+                    }
+                }
+            }
+        }
+    }
+
     // MARK: - Document Handling
 
     func handlePickedDocuments(_ urls: [URL]) {
@@ -466,56 +686,57 @@ final class ChatViewModel {
         pendingAttachments.removeAll { $0.id == attachment.id }
     }
 
-    private func uploadPendingAttachments() async -> [FileAttachment] {
-        var uploaded: [FileAttachment] = []
+    private func uploadAttachments(_ attachments: [FileAttachment]) async -> [FileAttachment] {
+        var uploadedAttachments = attachments
 
-        for i in pendingAttachments.indices {
-            pendingAttachments[i].uploadStatus = .uploading
+        for index in uploadedAttachments.indices {
+            uploadedAttachments[index].uploadStatus = .uploading
 
-            guard let data = pendingAttachments[i].localData else {
-                pendingAttachments[i].uploadStatus = .failed
+            guard let data = uploadedAttachments[index].localData else {
+                uploadedAttachments[index].uploadStatus = .failed
                 continue
             }
 
             do {
                 let fileId = try await openAIService.uploadFile(
                     data: data,
-                    filename: pendingAttachments[i].filename,
+                    filename: uploadedAttachments[index].filename,
                     apiKey: apiKey
                 )
 
-                pendingAttachments[i].openAIFileId = fileId
-                pendingAttachments[i].uploadStatus = .uploaded
-                uploaded.append(pendingAttachments[i])
+                uploadedAttachments[index].openAIFileId = fileId
+                uploadedAttachments[index].uploadStatus = .uploaded
             } catch {
-                pendingAttachments[i].uploadStatus = .failed
+                uploadedAttachments[index].uploadStatus = .failed
                 #if DEBUG
-                print("[Upload] Failed to upload \(pendingAttachments[i].filename): \(error)")
+                print("[Upload] Failed to upload \(uploadedAttachments[index].filename): \(error)")
                 #endif
             }
         }
 
-        return uploaded
+        return uploadedAttachments
     }
 
     // MARK: - Send Message
 
-    func sendMessage() {
-        guard !isStreaming else { return }
+    @discardableResult
+    func sendMessage(text rawText: String) -> Bool {
+        guard !isStreaming else { return false }
 
-        let text = inputText.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !text.isEmpty || selectedImageData != nil || !pendingAttachments.isEmpty else { return }
+        let text = rawText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty || selectedImageData != nil || !pendingAttachments.isEmpty else { return false }
         guard !apiKey.isEmpty else {
             errorMessage = "Please add your OpenAI API key in Settings."
-            return
+            return false
         }
 
+        let imageDataToSend = selectedImageData
         let attachmentsToSend = pendingAttachments
 
         let userMessage = Message(
             role: .user,
             content: text,
-            imageData: selectedImageData
+            imageData: imageDataToSend
         )
 
         if !attachmentsToSend.isEmpty {
@@ -546,11 +767,11 @@ final class ChatViewModel {
             try modelContext.save()
         } catch {
             errorMessage = "Failed to save your message."
-            return
+            return false
         }
 
-        inputText = ""
         selectedImageData = nil
+        pendingAttachments = []
         errorMessage = nil
 
         let draft = Message(
@@ -567,7 +788,7 @@ final class ChatViewModel {
 
         guard let session = makeStreamingSession(for: draft) else {
             errorMessage = "Failed to start response session."
-            return
+            return false
         }
 
         registerSession(session, visible: true)
@@ -579,18 +800,16 @@ final class ChatViewModel {
 
         if !attachmentsToSend.isEmpty {
             Task { @MainActor in
-                let uploaded = await uploadPendingAttachments()
-                if !uploaded.isEmpty {
-                    userMessage.fileAttachmentsData = FileAttachment.encode(uploaded)
-                    try? modelContext.save()
-                }
-                pendingAttachments = []
+                let uploadedAttachments = await uploadAttachments(attachmentsToSend)
+                userMessage.fileAttachmentsData = FileAttachment.encode(uploadedAttachments)
+                try? modelContext.save()
                 self.startStreamingRequest(for: session)
             }
         } else {
-            pendingAttachments = []
             startStreamingRequest(for: session)
         }
+
+        return true
     }
 
     // MARK: - Core Streaming Logic
@@ -1438,7 +1657,6 @@ final class ChatViewModel {
         messages = []
         currentStreamingText = ""
         currentThinkingText = ""
-        inputText = ""
         errorMessage = nil
         selectedImageData = nil
         pendingAttachments = []
@@ -1450,7 +1668,8 @@ final class ChatViewModel {
         liveFilePathAnnotations = []
         lastSequenceNumber = nil
         activeRequestUsesBackgroundMode = false
-        filePreviewURL = nil
+        filePreviewItem = nil
+        sharedGeneratedFileItem = nil
         fileDownloadError = nil
         loadDefaultsFromSettings()
         HapticService.shared.selection()
@@ -1532,7 +1751,8 @@ final class ChatViewModel {
         lastSequenceNumber = nil
         activeRequestUsesBackgroundMode = false
         pendingAttachments = []
-        filePreviewURL = nil
+        filePreviewItem = nil
+        sharedGeneratedFileItem = nil
         fileDownloadError = nil
 
         refreshVisibleBindingForCurrentConversation()
@@ -1801,6 +2021,7 @@ final class ChatViewModel {
         message.conversation?.updatedAt = .now
         upsertMessage(message)
         try? modelContext.save()
+        prefetchGeneratedFilesIfNeeded(for: message)
 
         let finishedConversation = message.conversation
         let wasVisible = visibleSessionMessageID == session.messageID
@@ -1840,6 +2061,7 @@ final class ChatViewModel {
         message.conversation?.updatedAt = .now
         upsertMessage(message)
         try? modelContext.save()
+        prefetchGeneratedFilesIfNeeded(for: message)
 
         removeSession(session)
     }
@@ -2177,6 +2399,7 @@ final class ChatViewModel {
 
         try? modelContext.save()
         upsertMessage(message)
+        prefetchGeneratedFilesIfNeeded(for: message)
 
         let conversation = message.conversation
         let wasVisible = visibleSessionMessageID == session.messageID
@@ -2420,6 +2643,7 @@ final class ChatViewModel {
                 )
                 try? modelContext.save()
                 upsertMessage(message)
+                prefetchGeneratedFilesIfNeeded(for: message)
             }
         } catch {
             #if DEBUG

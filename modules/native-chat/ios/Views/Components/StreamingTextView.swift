@@ -10,12 +10,15 @@ import SwiftUI
 /// the full `MarkdownContentView`.
 struct StreamingTextView: View {
     let text: String
+    var allowsSelection: Bool = false
 
     var body: some View {
         let attributed = robustMarkdownParse(sanitisedText)
         Text(attributed)
             .font(.body)
-            .textSelection(.enabled)
+            .applyingIf(allowsSelection) { view in
+                view.textSelection(.enabled)
+            }
             .frame(maxWidth: .infinity, alignment: .leading)
     }
 

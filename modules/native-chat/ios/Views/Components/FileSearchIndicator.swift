@@ -23,11 +23,13 @@ struct FileSearchIndicator: View {
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
-            .background {
-                Capsule()
-                    .fill(.ultraThinMaterial)
-            }
-            .glassEffect(.regular, in: Capsule())
+            .singleSurfaceGlass(
+                cornerRadius: 999,
+                stableFillOpacity: 0.01,
+                borderWidth: 0.75,
+                darkBorderOpacity: 0.14,
+                lightBorderOpacity: 0.08
+            )
             .transition(.opacity.combined(with: .scale(scale: 0.95)))
             .onAppear {
                 // Start timeout timer
