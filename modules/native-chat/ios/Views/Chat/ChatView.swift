@@ -21,7 +21,7 @@ struct ChatView: View {
     @State private var isBlockingGeneratedPreviewTouches = false
     @State private var generatedPreviewTouchShieldTask: Task<Void, Never>?
 
-    private let generatedPreviewTouchShieldDuration: UInt64 = 500_000_000
+    private let generatedPreviewTouchShieldDuration: UInt64 = 1_000_000_000
 
     private var selectedTheme: AppTheme {
         AppTheme(rawValue: appThemeRawValue) ?? .system
@@ -51,14 +51,6 @@ struct ChatView: View {
                 if viewModel.isDownloadingFile {
                     fileDownloadingOverlay
                         .transition(.opacity)
-                }
-
-                if isBlockingGeneratedPreviewTouches {
-                    Color.black.opacity(0.001)
-                        .ignoresSafeArea()
-                        .contentShape(Rectangle())
-                        .accessibilityHidden(true)
-                        .zIndex(30)
                 }
             }
             .animation(.easeInOut(duration: 0.25), value: viewModel.isRestoringConversation)
@@ -134,6 +126,21 @@ struct ChatView: View {
                 }
             } message: {
                 Text(viewModel.fileDownloadError ?? "An unknown error occurred.")
+            }
+            .onDisappear {
+                generatedPreviewTouchShieldTask?.cancel()
+                generatedPreviewTouchShieldTask = nil
+                isBlockingGeneratedPreviewTouches = false
+                PreviewDismissTouchShield.deactivate()
+            }
+        }
+        .overlay {
+            if isBlockingGeneratedPreviewTouches {
+                Color.black.opacity(0.001)
+                    .ignoresSafeArea()
+                    .contentShape(Rectangle())
+                    .accessibilityHidden(true)
+                    .zIndex(1000)
             }
         }
     }
@@ -532,17 +539,14 @@ private struct DetachedStreamingBubbleView: View, Equatable {
                 }
             }
             .padding(12)
-            .background {
-                UIKitGlassBackgroundView(
-                    cornerRadius: 20,
-                    innerInset: 0,
-                    stableFillOpacity: 0.012,
-                    showsBorder: true,
-                    borderWidth: 0.85,
-                    darkBorderOpacity: 0.16,
-                    lightBorderOpacity: 0.09
-                )
-            }
+            .singleSurfaceGlass(
+                cornerRadius: 20,
+                stableFillOpacity: 0.01,
+                tintOpacity: 0.03,
+                borderWidth: 0.85,
+                darkBorderOpacity: 0.16,
+                lightBorderOpacity: 0.09
+            )
             .frame(maxWidth: assistantBubbleMaxWidth, alignment: .leading)
 
             Spacer(minLength: 40)
@@ -580,15 +584,20 @@ private extension ChatView {
         generatedPreviewTouchShieldTask = nil
 
         if isPresented {
-            isBlockingGeneratedPreviewTouches = true
+            isBlockingGeneratedPreviewTouches = false
+            PreviewDismissTouchShield.deactivate()
             return
         }
 
-        guard isBlockingGeneratedPreviewTouches else { return }
+        guard isBlockingGeneratedPreviewTouches else {
+            PreviewDismissTouchShield.deactivate()
+            return
+        }
 
         generatedPreviewTouchShieldTask = Task { @MainActor in
             try? await Task.sleep(nanoseconds: generatedPreviewTouchShieldDuration)
             isBlockingGeneratedPreviewTouches = false
+            PreviewDismissTouchShield.deactivate()
             generatedPreviewTouchShieldTask = nil
         }
     }
@@ -597,6 +606,7 @@ private extension ChatView {
         generatedPreviewTouchShieldTask?.cancel()
         generatedPreviewTouchShieldTask = nil
         isBlockingGeneratedPreviewTouches = true
+        PreviewDismissTouchShield.activate()
     }
 
     func presentModelSelector() {

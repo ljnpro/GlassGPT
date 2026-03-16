@@ -18,6 +18,7 @@ struct CodeInterpreterIndicator: View {
         .singleSurfaceGlass(
             cornerRadius: 999,
             stableFillOpacity: 0.01,
+            tintOpacity: 0.022,
             borderWidth: 0.75,
             darkBorderOpacity: 0.14,
             lightBorderOpacity: 0.08
@@ -79,10 +80,14 @@ struct CodeInterpreterResultView: View {
                             }
                         }
                         .padding(.vertical, 6)
-                        .background {
-                            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                .fill(Color(.systemGray6))
-                        }
+                        .singleSurfaceGlass(
+                            cornerRadius: 8,
+                            stableFillOpacity: 0.006,
+                            tintOpacity: 0.022,
+                            borderWidth: 0.7,
+                            darkBorderOpacity: 0.13,
+                            lightBorderOpacity: 0.075
+                        )
                         .padding(.horizontal, 12)
                     }
 
@@ -102,10 +107,14 @@ struct CodeInterpreterResultView: View {
                             }
                         }
                         .padding(.vertical, 6)
-                        .background {
-                            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                .fill(Color(.systemGray6))
-                        }
+                        .singleSurfaceGlass(
+                            cornerRadius: 8,
+                            stableFillOpacity: 0.006,
+                            tintOpacity: 0.022,
+                            borderWidth: 0.7,
+                            darkBorderOpacity: 0.13,
+                            lightBorderOpacity: 0.075
+                        )
                         .padding(.horizontal, 12)
                     }
                 }
@@ -116,6 +125,7 @@ struct CodeInterpreterResultView: View {
         .singleSurfaceGlass(
             cornerRadius: 12,
             stableFillOpacity: 0.01,
+            tintOpacity: 0.024,
             borderWidth: 0.75,
             darkBorderOpacity: 0.14,
             lightBorderOpacity: 0.08
