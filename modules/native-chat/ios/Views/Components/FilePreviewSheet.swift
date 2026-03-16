@@ -6,10 +6,10 @@ import UIKit
 
 struct FilePreviewSheet: View {
     let previewItem: FilePreviewItem
-    var onWillDismiss: () -> Void = {}
+    var isDismissPending: Bool = false
+    var onRequestDismiss: () -> Void = {}
 
     @AppStorage("appTheme") private var appThemeRawValue: String = AppTheme.system.rawValue
-    @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var colorScheme
 
     @State private var saveState: SaveState = .idle
@@ -19,7 +19,6 @@ struct FilePreviewSheet: View {
     @State private var showSaveSuccessHUD = false
     @State private var saveSuccessHUDToken = UUID()
     @State private var isShowingShareSheet = false
-    @State private var isDismissingPreview = false
 
     private struct ImagePreviewPayload {
         let image: UIImage
@@ -139,7 +138,7 @@ struct FilePreviewSheet: View {
                 Text(saveError ?? "Unable to save this image to Photos.")
             }
             .overlay {
-                if isDismissingPreview {
+                if isDismissPending {
                     Color.black.opacity(0.001)
                         .ignoresSafeArea()
                         .contentShape(Rectangle())
@@ -362,23 +361,17 @@ struct FilePreviewSheet: View {
 
     private var closeButton: some View {
         Button {
-            guard !isDismissingPreview else { return }
-            isDismissingPreview = true
-            onWillDismiss()
-            Task { @MainActor in
-                try? await Task.sleep(nanoseconds: 60_000_000)
-                dismiss()
-            }
+            guard !isDismissPending else { return }
+            onRequestDismiss()
         } label: {
             Image(systemName: "xmark")
                 .font(.system(size: closeIconSize, weight: .semibold))
                 .frame(width: closeIconSize, height: closeIconSize)
+                .padding(10)
         }
         .buttonStyle(.glass)
-        .buttonBorderShape(.circle)
-        .controlSize(topButtonControlSize)
+        .disabled(isDismissPending)
         .accessibilityLabel("Close preview")
-        .disabled(isDismissingPreview)
     }
 
     private var downloadButton: some View {
@@ -397,12 +390,13 @@ struct FilePreviewSheet: View {
                     .frame(width: actionIconSize, height: actionIconSize)
             }
         }
-        .buttonStyle(.glass)
-        .buttonBorderShape(.circle)
-        .controlSize(bottomButtonControlSize)
+        .padding(10)
+        .buttonStyle(
+            .glass
+        )
         .accessibilityLabel("Download to Photos")
-        .disabled(saveState == .saving || !canSaveToPhotos)
-        .opacity((saveState == .saving || !canSaveToPhotos) ? 0.62 : 1)
+        .disabled(saveState == .saving || !canSaveToPhotos || isDismissPending)
+        .opacity((saveState == .saving || !canSaveToPhotos || isDismissPending) ? 0.62 : 1)
     }
 
     private var bottomShareButton: some View {
@@ -413,10 +407,12 @@ struct FilePreviewSheet: View {
                 .font(.system(size: actionIconSize, weight: .semibold))
                 .frame(width: actionIconSize, height: actionIconSize)
         }
-        .buttonStyle(.glass)
-        .buttonBorderShape(.circle)
-        .controlSize(bottomButtonControlSize)
+        .padding(10)
+        .buttonStyle(
+            .glass
+        )
         .accessibilityLabel("Share")
+        .disabled(isDismissPending)
     }
 
     private var pdfShareButton: some View {
@@ -427,10 +423,12 @@ struct FilePreviewSheet: View {
                 .font(.system(size: actionIconSize, weight: .semibold))
                 .frame(width: actionIconSize, height: actionIconSize)
         }
-        .buttonStyle(.glass)
-        .buttonBorderShape(.circle)
-        .controlSize(topButtonControlSize)
+        .padding(10)
+        .buttonStyle(
+            .glass
+        )
         .accessibilityLabel("Share")
+        .disabled(isDismissPending)
     }
 
     private var saveSuccessHUD: some View {

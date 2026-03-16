@@ -223,16 +223,11 @@ struct MessageBubble: View {
     // MARK: - Assistant Bubble
 
     private var assistantBubble: some View {
-        VStack(alignment: .leading) {
-            MarkdownContentView(
-                text: displayedContent,
-                filePathAnnotations: displayedFilePathAnnotations,
-                onSandboxLinkTap: onSandboxLinkTap
-            )
-        }
-        .padding(12)
-        .modifier(
-            AssistantBubbleSurfaceModifier(isLive: isDisplayingLiveAssistantState)
+        MarkdownContentView(
+            text: displayedContent,
+            filePathAnnotations: displayedFilePathAnnotations,
+            onSandboxLinkTap: onSandboxLinkTap,
+            surfaceStyle: .assistant(isLive: isDisplayingLiveAssistantState)
         )
         .contentShape(.contextMenuPreview, RoundedRectangle(cornerRadius: 20))
         .contextMenu {
@@ -290,22 +285,6 @@ struct MessageBubble: View {
         ShareLink(item: displayedContent) {
             Label("Share", systemImage: "square.and.arrow.up")
         }
-    }
-}
-
-private struct AssistantBubbleSurfaceModifier: ViewModifier {
-    let isLive: Bool
-
-    func body(content: Content) -> some View {
-        content
-            .singleSurfaceGlass(
-                cornerRadius: 20,
-                stableFillOpacity: isLive ? 0.01 : 0.004,
-                tintOpacity: isLive ? 0.03 : 0.024,
-                borderWidth: 0.85,
-                darkBorderOpacity: 0.16,
-                lightBorderOpacity: 0.09
-            )
     }
 }
 
