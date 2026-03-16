@@ -13,6 +13,7 @@ struct ChatScrollContainer: UIViewControllerRepresentable {
     let fixedBottomGap: CGFloat
     let conversationID: UUID?
     let scrollRequestID: UUID
+    let liveBottomAnchorKey: Int
     let onBackgroundTap: () -> Void
 
     func makeUIViewController(context: Context) -> ChatScrollContainerController {
@@ -24,6 +25,7 @@ struct ChatScrollContainer: UIViewControllerRepresentable {
             fixedBottomGap: fixedBottomGap,
             conversationID: conversationID,
             scrollRequestID: scrollRequestID,
+            liveBottomAnchorKey: liveBottomAnchorKey,
             onBackgroundTap: onBackgroundTap
         )
         return controller
@@ -37,6 +39,7 @@ struct ChatScrollContainer: UIViewControllerRepresentable {
             fixedBottomGap: fixedBottomGap,
             conversationID: conversationID,
             scrollRequestID: scrollRequestID,
+            liveBottomAnchorKey: liveBottomAnchorKey,
             onBackgroundTap: onBackgroundTap
         )
     }
@@ -56,9 +59,11 @@ final class ChatScrollContainerController: UIViewController, UIScrollViewDelegat
     private var fixedBottomGap: CGFloat = 12
     private var lastConversationID: UUID?
     private var lastScrollRequestID: UUID?
+    private var lastLiveBottomAnchorKey: Int?
     private var onBackgroundTap: (() -> Void)?
 
     private var isPinnedToBottom = true
+    private var shouldFollowBottom = true
     private var shouldPinToBottomOnNextLayout = true
     private var isApplyingProgrammaticScroll = false
 
@@ -88,6 +93,7 @@ final class ChatScrollContainerController: UIViewController, UIScrollViewDelegat
         fixedBottomGap: CGFloat,
         conversationID: UUID?,
         scrollRequestID: UUID,
+        liveBottomAnchorKey: Int,
         onBackgroundTap: @escaping () -> Void
     ) {
         contentHostingController.rootView = content
@@ -97,6 +103,7 @@ final class ChatScrollContainerController: UIViewController, UIScrollViewDelegat
         if self.layoutMode != layoutMode {
             self.layoutMode = layoutMode
             isPinnedToBottom = layoutMode == .bottomAnchored
+            shouldFollowBottom = layoutMode == .bottomAnchored
             shouldPinToBottomOnNextLayout = true
         }
 
@@ -108,13 +115,22 @@ final class ChatScrollContainerController: UIViewController, UIScrollViewDelegat
         if lastConversationID != conversationID {
             lastConversationID = conversationID
             isPinnedToBottom = true
+            shouldFollowBottom = true
             shouldPinToBottomOnNextLayout = true
         }
 
         if lastScrollRequestID != scrollRequestID {
             lastScrollRequestID = scrollRequestID
             isPinnedToBottom = true
+            shouldFollowBottom = true
             shouldPinToBottomOnNextLayout = true
+        }
+
+        if lastLiveBottomAnchorKey != liveBottomAnchorKey {
+            lastLiveBottomAnchorKey = liveBottomAnchorKey
+            if layoutMode == .bottomAnchored && shouldFollowBottom {
+                shouldPinToBottomOnNextLayout = true
+            }
         }
 
         view.setNeedsLayout()
@@ -228,7 +244,7 @@ final class ChatScrollContainerController: UIViewController, UIScrollViewDelegat
             shouldPinToBottomOnNextLayout = false
         case .bottomAnchored:
             if shouldPinToBottomOnNextLayout || (
-                isPinnedToBottom && (insetsChanged || contentHeightChanged || viewportHeightChanged || composerHeightChanged)
+                shouldFollowBottom && (insetsChanged || contentHeightChanged || viewportHeightChanged || composerHeightChanged)
             ) {
                 scrollToBottom()
                 shouldPinToBottomOnNextLayout = false
@@ -253,7 +269,7 @@ final class ChatScrollContainerController: UIViewController, UIScrollViewDelegat
         guard layoutMode == .bottomAnchored else { return }
         guard scrollView.bounds.height > 1 else { return }
 
-        if isPinnedToBottom {
+        if shouldFollowBottom {
             shouldPinToBottomOnNextLayout = true
         }
 
@@ -282,7 +298,14 @@ final class ChatScrollContainerController: UIViewController, UIScrollViewDelegat
 
         let visibleBottom = scrollView.contentOffset.y + scrollView.bounds.height - scrollView.adjustedContentInset.bottom
         let distanceToBottom = max(scrollView.contentSize.height - visibleBottom, 0)
-        isPinnedToBottom = distanceToBottom <= pinnedThreshold
+        let pinnedToBottom = distanceToBottom <= pinnedThreshold
+        isPinnedToBottom = pinnedToBottom
+
+        // Preserve auto-follow across live content growth and keyboard geometry changes.
+        // Only explicit user scrolling away from the bottom should disable it.
+        if scrollView.isTracking || scrollView.isDragging || scrollView.isDecelerating {
+            shouldFollowBottom = pinnedToBottom
+        }
     }
 
     // MARK: - Gesture
