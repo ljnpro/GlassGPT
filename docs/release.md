@@ -5,8 +5,9 @@
 - Default branch: `main`
 - Stable 4.1 branch is read-only: `codex/stable-4.1`
 - 4.2 release branch: `codex/stable-4.2` (maintenance only)
-- 4.3 release branch: `codex/stable-4.3`
-- 4.3.1 development work happens on `codex/feature/<topic>`
+- 4.3 release branch: `codex/stable-4.3` (maintenance only)
+- 4.4 release branch: `codex/stable-4.4`
+- 4.4.0 development work happens on `codex/feature/<topic>`
 - version/build source of truth is `ios/GlassGPT/Config/Versions.xcconfig`
 - Local credentials remain in `.local/publish.env`
 - Local machine-specific release helper remains `.local/one_click_release.sh`
@@ -16,7 +17,7 @@
 Use the tracked wrapper:
 
 ```bash
-./scripts/release_testflight.sh 4.3.1 <build-number> --branch codex/stable-4.3
+./scripts/release_testflight.sh 4.4.0 <build-number> --branch codex/stable-4.4
 ```
 
 The wrapper validates release-readiness, then runs:
@@ -37,8 +38,8 @@ The wrapper validates release-readiness, then runs:
 3. `./scripts/ci.sh release-readiness`
 4. manual parity checklist from `docs/parity-baseline.md`
 5. verify clean worktree
-6. verify branch is `codex/stable-4.3` (or `main` for backfilled maintenance)
-7. verify release version/build number (4.3.1 / 20172 baseline)
+6. verify branch is `codex/stable-4.4` (or `main` for backfilled maintenance)
+7. verify release version/build number (4.4.0 / 20173 baseline)
 8. verify `.local/build` artifacts and logs exist from the release attempt
 
 ## Output Artifacts
@@ -52,7 +53,7 @@ The wrapper validates release-readiness, then runs:
 ## Post-Release Checklist
 
 1. Save TestFlight Delivery UUID
-2. Verify branch `codex/stable-4.3` moved to release commit
-3. Verify release tag `v4.3.1` exists and points to release commit
-4. Verify `git ls-remote` shows `codex/stable-4.3`, `main`, and `v<marketing-version>` on the expected commit
+2. Verify branch `codex/stable-4.4` moved to release commit
+3. Verify release tag `v4.4.0` exists and points to release commit
+4. Verify `git ls-remote` shows `codex/stable-4.4`, `main`, and `v<marketing-version>` on the expected commit
 5. Preserve the pre-release backup tag and bundle for rollback/reference

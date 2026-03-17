@@ -12,16 +12,19 @@
   - maintenance branch for post-4.3 hot-fixes only
   - no feature development
 - `codex/stable-4.3`
-  - active 4.3.x release line
-  - every 4.3.x release lands here first, including the 4.3.1 maintainability release
+  - maintenance branch for post-4.4 hot-fixes only
+  - no feature development
+- `codex/stable-4.4`
+  - active 4.4.x release line
+  - every 4.4.x release lands here first, beginning with the ultra-maintainability release
 
 ## Short-Lived Branches
 
 - `codex/feature/<topic>`
   - implementation branches only
-  - branch from `codex/stable-4.3`
-  - merge to `codex/stable-4.3` through PR/review only
-  - delete after the release commit lands on `codex/stable-4.3`
+  - branch from `codex/stable-4.4`
+  - merge to `codex/stable-4.4` through PR/review only
+  - delete after the release commit lands on `codex/stable-4.4`
 
 ## Archival Policy
 
@@ -36,9 +39,9 @@
 - Release tags use `v<marketing-version>`.
 - Before a large refactor release, create an annotated backup tag and a local source bundle from the previous stable commit.
 - After a stable release succeeds on TestFlight:
-  - verify `scripts/ci.sh release-readiness` passes on `codex/stable-4.3`
-  - verify `scripts/ci.sh maintainability` passes on `codex/stable-4.3`
+  - verify `scripts/ci.sh release-readiness` passes on `codex/stable-4.4`
+  - verify `scripts/ci.sh maintainability` passes on `codex/stable-4.4`
   - tag the release commit
-  - push `codex/stable-4.3`
+  - push `codex/stable-4.4`
   - fast-forward `main` to the same commit
-  - keep `main` and `codex/stable-4.3` aligned until the next development cycle starts
+  - keep `main` and `codex/stable-4.4` aligned until the next development cycle starts
