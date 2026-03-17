@@ -7,6 +7,7 @@ enum UITestScenario: String {
     case seeded
     case streaming
     case preview
+    case replySplit
     case history
     case settings
 
@@ -123,6 +124,8 @@ enum UITestScenarioLoader {
             return []
         case .seeded, .streaming, .preview:
             return [makeConversation(title: "Release Planning", timeOffset: 0, backgroundModeEnabled: false, in: modelContext)]
+        case .replySplit:
+            return [makeRichMarkdownConversation(in: modelContext)]
         case .history:
             return [
                 makeConversation(title: "Release Planning", timeOffset: 0, backgroundModeEnabled: false, in: modelContext),
@@ -177,6 +180,18 @@ enum UITestScenarioLoader {
         return conversation
     }
 
+    private static func makeRichMarkdownConversation(in modelContext: ModelContext) -> Conversation {
+        let conversation = RichAssistantReplyFixture.makeConversation()
+
+        do {
+            try RichAssistantReplyFixture.insertConversation(conversation, into: modelContext)
+        } catch {
+            Loggers.persistence.error("[UITestScenarioLoader] Failed to save rich markdown conversation: \(error.localizedDescription)")
+        }
+
+        return conversation
+    }
+
     private static func applyScenario(
         _ scenario: UITestScenario,
         conversations: [Conversation],
@@ -186,7 +201,7 @@ enum UITestScenarioLoader {
         case .empty, .history, .settings:
             return
 
-        case .seeded:
+        case .seeded, .replySplit:
             if let conversation = conversations.first {
                 viewModel.loadConversation(conversation)
             }

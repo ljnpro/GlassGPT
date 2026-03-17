@@ -116,6 +116,8 @@ struct DetachedStreamingBubbleView: View, Equatable {
                 darkBorderOpacity: 0.16,
                 lightBorderOpacity: 0.09
             )
+            .accessibilityElement(children: .contain)
+            .accessibilityIdentifier("chat.assistant.detachedSurface")
             .frame(maxWidth: assistantBubbleMaxWidth, alignment: .leading)
 
             Spacer(minLength: 40)
