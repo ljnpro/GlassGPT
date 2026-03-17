@@ -2,89 +2,9 @@ import SwiftUI
 import SwiftData
 import UIKit
 
-enum FilePreviewKind: String, Sendable {
-    case generatedImage
-    case generatedPDF
-}
-
-struct FilePreviewItem: Identifiable, Sendable {
-    let url: URL
-    let kind: FilePreviewKind
-    let displayName: String
-    let viewerFilename: String
-
-    var id: String { "\(kind.rawValue):\(url.path)" }
-}
-
-struct SharedGeneratedFileItem: Identifiable, Sendable {
-    let url: URL
-    let filename: String
-
-    var id: String { url.path }
-}
-
 @Observable
 @MainActor
 final class ChatViewModel {
-
-    enum RecoveryPhase: Equatable {
-        case idle
-        case checkingStatus
-        case streamResuming
-        case pollingTerminal
-    }
-
-    @MainActor
-    final class ResponseSession {
-        let messageID: UUID
-        let conversationID: UUID
-        let service = OpenAIService()
-        let requestMessages: [APIMessage]?
-        let requestModel: ModelType
-        let requestEffort: ReasoningEffort
-        let requestUsesBackgroundMode: Bool
-        let requestServiceTier: ServiceTier
-
-        var currentText: String
-        var currentThinking: String
-        var toolCalls: [ToolCallInfo]
-        var citations: [URLCitation]
-        var filePathAnnotations: [FilePathAnnotation]
-        var lastSequenceNumber: Int?
-        var responseId: String?
-
-        var isStreaming = false
-        var recoveryPhase: RecoveryPhase = .idle
-        var isThinking = false
-        var activeStreamID = UUID()
-        var lastDraftSaveTime: Date = .distantPast
-        var task: Task<Void, Never>?
-
-        init(
-            message: Message,
-            conversationID: UUID,
-            requestMessages: [APIMessage]? = nil,
-            requestModel: ModelType,
-            requestEffort: ReasoningEffort,
-            requestUsesBackgroundMode: Bool,
-            requestServiceTier: ServiceTier
-        ) {
-            self.messageID = message.id
-            self.conversationID = conversationID
-            self.requestMessages = requestMessages
-            self.requestModel = requestModel
-            self.requestEffort = requestEffort
-            self.requestUsesBackgroundMode = requestUsesBackgroundMode
-            self.requestServiceTier = requestServiceTier
-            self.currentText = message.content
-            self.currentThinking = message.thinking ?? ""
-            self.toolCalls = message.toolCalls
-            self.citations = message.annotations
-            self.filePathAnnotations = message.filePathAnnotations
-            self.lastSequenceNumber = message.lastSequenceNumber
-            self.responseId = message.responseId
-        }
-    }
 
     // MARK: - State
 
@@ -164,9 +84,8 @@ final class ChatViewModel {
     var isApplyingStoredConversationConfiguration = false
     var isApplyingConversationConfigurationBatch = false
     var didCompleteLaunchBootstrap = false
-    var visibleSessionMessageID: UUID?
     var visibleRecoveryPhase: RecoveryPhase = .idle
-    var activeResponseSessions: [UUID: ResponseSession] = [:]
+    let sessionRegistry = ChatSessionRegistry()
 
     // Background task
     var backgroundTaskID: UIBackgroundTaskIdentifier = .invalid
@@ -203,22 +122,26 @@ final class ChatViewModel {
     }
 
     var currentVisibleSession: ResponseSession? {
-        guard let visibleSessionMessageID else { return nil }
-        return activeResponseSessions[visibleSessionMessageID]
+        sessionRegistry.currentVisibleSession
+    }
+
+    var visibleSessionMessageID: UUID? {
+        get { sessionRegistry.visibleMessageID }
+        set { sessionRegistry.bindVisibleSession(messageID: newValue) }
     }
 
     var liveDraftMessageID: UUID? {
-        guard let visibleSessionMessageID,
-              messages.contains(where: { $0.id == visibleSessionMessageID })
-        else {
-            return nil
-        }
-
-        return visibleSessionMessageID
+        SessionVisibilityCoordinator.liveDraftMessageID(
+            visibleMessageID: visibleSessionMessageID,
+            messages: messages
+        )
     }
 
     var shouldShowDetachedStreamingBubble: Bool {
-        isStreaming && liveDraftMessageID == nil
+        SessionVisibilityCoordinator.shouldShowDetachedStreamingBubble(
+            isStreaming: isStreaming,
+            liveDraftMessageID: liveDraftMessageID
+        )
     }
 
     var flexModeEnabled: Bool {

@@ -18,7 +18,7 @@ extension ChatViewModel {
         guard let message = findMessage(byId: messageId) else { return }
 
         let session: ResponseSession
-        if let existing = activeResponseSessions[messageId] {
+        if let existing = sessionRegistry.session(for: messageId) {
             session = existing
         } else if let created = makeRecoverySession(for: message) {
             session = created
