@@ -1,6 +1,7 @@
 import XCTest
 @testable import NativeChat
 
+@MainActor
 final class MarkdownContentViewParsingTests: XCTestCase {
     func testParseInlineSegmentsExtractsInlineLatexAndPreservesEscapedDollarText() {
         let segments = makeView().parseInlineSegments(#"alpha $x^2$ beta \(y + z\) cost \$5"#)

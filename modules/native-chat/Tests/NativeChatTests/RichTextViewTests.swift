@@ -1,6 +1,7 @@
 import XCTest
 @testable import NativeChat
 
+@MainActor
 final class RichTextViewTests: XCTestCase {
     func testFindFilePathAnnotationPrefersExactSandboxMatch() {
         let exact = makeAnnotation(
