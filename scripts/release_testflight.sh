@@ -18,7 +18,7 @@ Usage:
   ./scripts/release_testflight.sh <marketing_version> <build_number> [--branch <name>] [--commit-message "<message>"] [--skip-ci] [--skip-readiness]
 
 Examples:
-  ./scripts/release_testflight.sh 4.3.0 20171 --branch codex/stable-4.3
+  ./scripts/release_testflight.sh 4.3.1 20172 --branch codex/stable-4.3
 EOF
 }
 
@@ -234,6 +234,8 @@ if [[ "${PUSH_RELEASE:-1}" == "1" ]]; then
   git -C "$ROOT_DIR" push "$REMOTE" "$RELEASE_TAG"
   echo "==> Fast-forwarding main"
   git -C "$ROOT_DIR" push "$REMOTE" "HEAD:main"
+  echo "==> Verifying remote refs"
+  git -C "$ROOT_DIR" ls-remote --heads --tags "$REMOTE" "$TARGET_BRANCH" main "refs/tags/$RELEASE_TAG"
 fi
 
 echo ""

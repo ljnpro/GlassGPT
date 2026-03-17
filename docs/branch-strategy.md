@@ -13,7 +13,7 @@
   - no feature development
 - `codex/stable-4.3`
   - active 4.3.x release line
-  - every 4.3.x release lands here first
+  - every 4.3.x release lands here first, including the 4.3.1 maintainability release
 
 ## Short-Lived Branches
 
@@ -37,6 +37,7 @@
 - Before a large refactor release, create an annotated backup tag and a local source bundle from the previous stable commit.
 - After a stable release succeeds on TestFlight:
   - verify `scripts/ci.sh release-readiness` passes on `codex/stable-4.3`
+  - verify `scripts/ci.sh maintainability` passes on `codex/stable-4.3`
   - tag the release commit
   - push `codex/stable-4.3`
   - fast-forward `main` to the same commit
