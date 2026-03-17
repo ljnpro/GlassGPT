@@ -204,7 +204,7 @@ PY
 
 echo "==> Uploading to TestFlight"
 UPLOAD_OUTPUT="$(xcrun altool --upload-app --type ios --file "$IPA_PATH" --apiKey "$ASC_API_KEY_ID" --apiIssuer "$ASC_ISSUER_ID" | tee "$UPLOAD_LOG")"
-DELIVERY_UUID="$(printf '%s\n' "$UPLOAD_OUTPUT" | rg -o "Delivery UUID: .*" | sed 's/.*Delivery UUID: //g' | tail -1)"
+DELIVERY_UUID="$(printf '%s\n' "$UPLOAD_OUTPUT" | awk -F'Delivery UUID: ' '/Delivery UUID:/ {print $2}' | tail -1)"
 
 if [[ -z "$DELIVERY_UUID" ]]; then
   DELIVERY_UUID="unknown"
