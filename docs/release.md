@@ -14,7 +14,7 @@
 Use the tracked wrapper:
 
 ```bash
-./scripts/release_testflight.sh 4.2.2 <build-number> --branch codex/stable-4.2
+./scripts/release_testflight.sh 4.2.4 <build-number> --branch codex/stable-4.2
 ```
 
 The wrapper delegates to `.local/one_click_release.sh` so tracked source never stores credentials.
@@ -27,6 +27,7 @@ The wrapper delegates to `.local/one_click_release.sh` so tracked source never s
 4. verify branch is `codex/stable-4.2`
 5. verify release version/build number
 6. verify `main` still points to the previous stable release before the new release is tagged
+7. verify the latest backup tag and local source bundle exist before the release branch is merged
 
 ## Output Artifacts
 
@@ -43,3 +44,4 @@ The wrapper delegates to `.local/one_click_release.sh` so tracked source never s
 3. Tag release as `v<marketing-version>`
 4. Fast-forward `main` to the same release commit
 5. Confirm the branch and tag exist on GitHub
+6. Preserve the pre-release backup tag and bundle for rollback/reference

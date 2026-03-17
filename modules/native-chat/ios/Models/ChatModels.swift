@@ -1,5 +1,4 @@
-import SwiftUI
-import SwiftData
+import Foundation
 
 // MARK: - Model Type
 
@@ -74,28 +73,6 @@ enum ServiceTier: String, CaseIterable, Identifiable, Codable, Sendable {
         switch self {
         case .standard: return "Standard"
         case .flex: return "Flex"
-        }
-    }
-}
-
-// MARK: - App Theme
-
-enum AppTheme: String, CaseIterable, Identifiable, Codable, Sendable {
-    case system
-    case light
-    case dark
-
-    var id: String { rawValue }
-
-    var displayName: String {
-        rawValue.capitalized
-    }
-
-    var colorScheme: ColorScheme? {
-        switch self {
-        case .system: return nil
-        case .light: return .light
-        case .dark: return .dark
         }
     }
 }
@@ -293,18 +270,6 @@ struct FileAttachment: Codable, Sendable, Identifiable {
         case "csv": return "tablecells"
         case "xlsx", "xls": return "tablecells.badge.ellipsis"
         default: return "doc"
-        }
-    }
-
-    /// Color for the file type icon
-    var iconColor: Color {
-        switch fileType.lowercased() {
-        case "pdf": return .red
-        case "docx", "doc": return .blue
-        case "pptx", "ppt": return .orange
-        case "csv": return .green
-        case "xlsx", "xls": return .green
-        default: return .secondary
         }
     }
 

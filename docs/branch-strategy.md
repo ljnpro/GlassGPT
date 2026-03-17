@@ -30,6 +30,7 @@
 ## Release Alignment
 
 - Release tags use `v<marketing-version>`.
+- Before a large refactor release, create an annotated backup tag and a local source bundle from the previous stable commit.
 - After a stable release succeeds on TestFlight:
   - tag the release commit
   - push `codex/stable-4.2`

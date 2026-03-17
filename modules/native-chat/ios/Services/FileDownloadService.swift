@@ -41,17 +41,11 @@ actor FileDownloadService {
         let openBehavior: GeneratedFileOpenBehavior
     }
 
-    struct CachedGeneratedFileEntry {
-        let directoryURL: URL
-        let fileURL: URL
-        let size: Int64
-        let modifiedAt: Date
-    }
-
     var inFlightDownloads: [String: Task<URL, Error>] = [:]
     var inFlightGeneratedFileDownloads: [String: Task<GeneratedFileLocalResource, Error>] = [:]
     let session: URLSession
     let fileManager: FileManager
+    let cacheStore: GeneratedFileCacheStore
 
     init() {
         let config = URLSessionConfiguration.default
@@ -59,7 +53,10 @@ actor FileDownloadService {
         config.timeoutIntervalForResource = 300
         self.session = URLSession(configuration: config)
         self.fileManager = .default
+        self.cacheStore = GeneratedFileCacheStore(fileManager: fileManager)
     }
+
+    typealias CachedGeneratedFileEntry = GeneratedFileCacheStore.CachedEntry
 
     /// Download a file by its OpenAI file_id and save to a temp location.
     /// Returns the local file URL.

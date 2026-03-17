@@ -64,12 +64,10 @@ extension ChatViewModel {
     }
 
     func registerSession(_ session: ResponseSession, visible: Bool) {
-        if let existing = activeResponseSessions[session.messageID], existing !== session {
+        sessionRegistry.register(session, visible: visible) { existing in
             existing.task?.cancel()
             existing.service.cancelStream()
         }
-
-        activeResponseSessions[session.messageID] = session
 
         if visible {
             bindVisibleSession(messageID: session.messageID)
@@ -79,15 +77,15 @@ extension ChatViewModel {
     }
 
     func isSessionActive(_ session: ResponseSession) -> Bool {
-        activeResponseSessions[session.messageID] === session
+        sessionRegistry.contains(session)
     }
 
     func bindVisibleSession(messageID: UUID?) {
-        visibleSessionMessageID = messageID
+        sessionRegistry.bindVisibleSession(messageID: messageID)
 
         guard
             let messageID,
-            let session = activeResponseSessions[messageID],
+            let session = sessionRegistry.session(for: messageID),
             let message = findMessage(byId: messageID),
             currentConversation?.id == session.conversationID
         else {
@@ -102,7 +100,7 @@ extension ChatViewModel {
     }
 
     func detachVisibleSessionBinding() {
-        visibleSessionMessageID = nil
+        sessionRegistry.bindVisibleSession(messageID: nil)
         draftMessage = nil
         clearLiveGenerationState(clearDraft: false)
         errorMessage = nil
@@ -123,23 +121,11 @@ extension ChatViewModel {
     func syncVisibleState(from session: ResponseSession) {
         guard visibleSessionMessageID == session.messageID else { return }
 
-        currentStreamingText = session.currentText
-        currentThinkingText = session.currentThinking
-        activeToolCalls = session.toolCalls
-        liveCitations = session.citations
-        liveFilePathAnnotations = session.filePathAnnotations
-        lastSequenceNumber = session.lastSequenceNumber
-        activeRequestModel = session.requestModel
-        activeRequestEffort = session.requestEffort
-        activeRequestUsesBackgroundMode = session.requestUsesBackgroundMode
-        activeRequestServiceTier = session.requestServiceTier
-        isStreaming = session.isStreaming
-        setVisibleRecoveryPhase(session.recoveryPhase)
-        isThinking = session.isThinking
-
-        if let message = findMessage(byId: session.messageID) {
-            draftMessage = message
-        }
+        let state = SessionVisibilityCoordinator.visibleState(
+            from: session,
+            draftMessage: findMessage(byId: session.messageID)
+        )
+        applyVisibleState(state)
     }
 
     func saveSessionIfNeeded(_ session: ResponseSession) {
@@ -258,11 +244,13 @@ extension ChatViewModel {
     }
 
     func removeSession(_ session: ResponseSession) {
-        session.task?.cancel()
-        session.service.cancelStream()
-        activeResponseSessions.removeValue(forKey: session.messageID)
+        let wasVisible = visibleSessionMessageID == session.messageID
+        sessionRegistry.remove(session) { target in
+            target.task?.cancel()
+            target.service.cancelStream()
+        }
 
-        if visibleSessionMessageID == session.messageID {
+        if wasVisible {
             refreshVisibleBindingForCurrentConversation()
         }
     }
@@ -277,13 +265,13 @@ extension ChatViewModel {
             .filter { $0.role == .assistant && !$0.isComplete }
             .sorted(by: { $0.createdAt < $1.createdAt })
 
-        if let message = activeMessages.last(where: { activeResponseSessions[$0.id] != nil }) {
+        if let message = activeMessages.last(where: { sessionRegistry.session(for: $0.id) != nil }) {
             bindVisibleSession(messageID: message.id)
             return
         }
 
         if let message = activeMessages.last {
-            visibleSessionMessageID = nil
+            sessionRegistry.bindVisibleSession(messageID: nil)
             clearLiveGenerationState(clearDraft: false)
             draftMessage = message
         } else {
@@ -348,26 +336,16 @@ extension ChatViewModel {
     }
 
     func clearLiveGenerationState(clearDraft: Bool) {
-        currentStreamingText = ""
-        currentThinkingText = ""
-        isStreaming = false
-        isThinking = false
-        setVisibleRecoveryPhase(.idle)
-        activeToolCalls = []
-        liveCitations = []
-        liveFilePathAnnotations = []
-        lastSequenceNumber = nil
-        activeRequestModel = nil
-        activeRequestEffort = nil
-        activeRequestUsesBackgroundMode = false
-        activeRequestServiceTier = .standard
-        if clearDraft {
-            draftMessage = nil
-        }
+        applyVisibleState(
+            SessionVisibilityCoordinator.clearedState(
+                retaining: draftMessage,
+                clearDraft: clearDraft
+            )
+        )
     }
 
     func suspendActiveSessionsForAppBackground() {
-        let sessions = Array(activeResponseSessions.values)
+        let sessions = sessionRegistry.allSessions
         guard !sessions.isEmpty else { return }
 
         for session in sessions {
@@ -396,7 +374,28 @@ extension ChatViewModel {
         }
 
         saveContextIfPossible("suspendActiveSessionsForAppBackground")
-        activeResponseSessions.removeAll()
+        sessionRegistry.removeAll { session in
+            session.task?.cancel()
+            session.service.cancelStream()
+        }
         detachVisibleSessionBinding()
+    }
+
+    func applyVisibleState(_ state: ChatVisibleSessionState) {
+        draftMessage = state.draftMessage
+        currentStreamingText = state.currentStreamingText
+        currentThinkingText = state.currentThinkingText
+        activeToolCalls = state.activeToolCalls
+        liveCitations = state.liveCitations
+        liveFilePathAnnotations = state.liveFilePathAnnotations
+        lastSequenceNumber = state.lastSequenceNumber
+        activeRequestModel = state.activeRequestModel
+        activeRequestEffort = state.activeRequestEffort
+        activeRequestUsesBackgroundMode = state.activeRequestUsesBackgroundMode
+        activeRequestServiceTier = state.activeRequestServiceTier
+        isStreaming = state.isStreaming
+        isThinking = state.isThinking
+        visibleRecoveryPhase = state.visibleRecoveryPhase
+        isRecovering = state.isRecovering
     }
 }

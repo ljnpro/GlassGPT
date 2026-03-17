@@ -169,7 +169,7 @@ extension ChatViewModel {
 
         switch event {
         case .responseCreated(let responseId):
-            session.responseId = responseId
+            StreamingTransitionReducer.recordResponseCreated(responseId, for: session)
             if let draft = findMessage(byId: session.messageID) {
                 draft.responseId = responseId
                 draft.usedBackgroundMode = session.requestUsesBackgroundMode
@@ -183,39 +183,34 @@ extension ChatViewModel {
             return .continued
 
         case .sequenceUpdate(let sequence):
-            if let lastSequenceNumber = session.lastSequenceNumber {
-                session.lastSequenceNumber = max(lastSequenceNumber, sequence)
-            } else {
-                session.lastSequenceNumber = sequence
-            }
+            StreamingTransitionReducer.recordSequenceUpdate(sequence, for: session)
             saveSessionIfNeeded(session)
             return .continued
 
         case .textDelta(let delta):
-            if session.isThinking {
+            if StreamingTransitionReducer.applyTextDelta(delta, to: session) {
                 animateIfNeeded(shouldAnimate, animation: .easeOut(duration: 0.2)) {
                     session.isThinking = false
                 }
             }
-            session.currentText += delta
             saveSessionIfNeeded(session)
             return .continued
 
         case .thinkingDelta(let delta):
-            session.currentThinking += delta
+            StreamingTransitionReducer.applyThinkingDelta(delta, to: session)
             saveSessionIfNeeded(session)
             return .continued
 
         case .thinkingStarted:
             animateIfNeeded(shouldAnimate, animation: .easeIn(duration: 0.2)) {
-                session.isThinking = true
+                _ = StreamingTransitionReducer.setThinking(true, for: session)
             }
             syncVisibleState(from: session)
             return .continued
 
         case .thinkingFinished:
             animateIfNeeded(shouldAnimate, animation: .easeOut(duration: 0.2)) {
-                session.isThinking = false
+                _ = StreamingTransitionReducer.setThinking(false, for: session)
             }
             saveSessionNow(session)
             return .continued
@@ -286,28 +281,22 @@ extension ChatViewModel {
             return .continued
 
         case .completed(let fullText, let fullThinking, let filePathAnns):
-            if !fullText.isEmpty {
-                session.currentText = fullText
-            }
-            if let fullThinking, !fullThinking.isEmpty {
-                session.currentThinking = fullThinking
-            }
-            if let filePathAnns, !filePathAnns.isEmpty {
-                session.filePathAnnotations = filePathAnns
-            }
+            StreamingTransitionReducer.mergeTerminalPayload(
+                text: fullText,
+                thinking: fullThinking,
+                filePathAnnotations: filePathAnns,
+                into: session
+            )
             saveSessionNow(session)
             return .terminalCompleted
 
         case .incomplete(let fullText, let fullThinking, let filePathAnns, let message):
-            if !fullText.isEmpty {
-                session.currentText = fullText
-            }
-            if let fullThinking, !fullThinking.isEmpty {
-                session.currentThinking = fullThinking
-            }
-            if let filePathAnns, !filePathAnns.isEmpty {
-                session.filePathAnnotations = filePathAnns
-            }
+            StreamingTransitionReducer.mergeTerminalPayload(
+                text: fullText,
+                thinking: fullThinking,
+                filePathAnnotations: filePathAnns,
+                into: session
+            )
             saveSessionNow(session)
             return .terminalIncomplete(message)
 
@@ -369,16 +358,9 @@ extension ChatViewModel {
     }
 
     func startToolCallIfNeeded(in session: ResponseSession, id: String, type: ToolCallType, animated: Bool) {
-        guard !session.toolCalls.contains(where: { $0.id == id }) else { return }
+        guard StreamingTransitionReducer.startToolCallIfNeeded(in: session, id: id, type: type) else { return }
 
         let insert = {
-            session.toolCalls.append(
-                ToolCallInfo(
-                    id: id,
-                    type: type,
-                    status: .inProgress
-                )
-            )
             self.syncVisibleState(from: session)
         }
 
@@ -386,10 +368,9 @@ extension ChatViewModel {
     }
 
     func setToolCallStatus(in session: ResponseSession, _ id: String, status: ToolCallStatus, animated: Bool) {
-        guard let idx = session.toolCalls.firstIndex(where: { $0.id == id }) else { return }
+        guard StreamingTransitionReducer.setToolCallStatus(in: session, id: id, status: status) else { return }
 
         let update = {
-            session.toolCalls[idx].status = status
             self.syncVisibleState(from: session)
         }
 
@@ -397,23 +378,19 @@ extension ChatViewModel {
     }
 
     func appendToolCodeDelta(in session: ResponseSession, _ id: String, delta: String) {
-        guard let idx = session.toolCalls.firstIndex(where: { $0.id == id }) else { return }
-        let existing = session.toolCalls[idx].code ?? ""
-        session.toolCalls[idx].code = existing + delta
+        guard StreamingTransitionReducer.appendToolCodeDelta(in: session, id: id, delta: delta) else { return }
         syncVisibleState(from: session)
     }
 
     func setToolCode(in session: ResponseSession, _ id: String, code: String) {
-        guard let idx = session.toolCalls.firstIndex(where: { $0.id == id }) else { return }
-        session.toolCalls[idx].code = code
+        guard StreamingTransitionReducer.setToolCode(in: session, id: id, code: code) else { return }
         syncVisibleState(from: session)
     }
 
     func addLiveCitationIfNeeded(in session: ResponseSession, _ citation: URLCitation, animated: Bool) {
-        guard !session.citations.contains(where: { $0.id == citation.id }) else { return }
+        guard StreamingTransitionReducer.addCitationIfNeeded(in: session, citation: citation) else { return }
 
         let insert = {
-            session.citations.append(citation)
             self.syncVisibleState(from: session)
         }
 
@@ -421,10 +398,9 @@ extension ChatViewModel {
     }
 
     func addLiveFilePathAnnotationIfNeeded(in session: ResponseSession, _ annotation: FilePathAnnotation, animated: Bool) {
-        guard !session.filePathAnnotations.contains(where: { $0.fileId == annotation.fileId }) else { return }
+        guard StreamingTransitionReducer.addFilePathAnnotationIfNeeded(in: session, annotation: annotation) else { return }
 
         let insert = {
-            session.filePathAnnotations.append(annotation)
             self.syncVisibleState(from: session)
         }
 
