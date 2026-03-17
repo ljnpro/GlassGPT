@@ -2,10 +2,10 @@ import Foundation
 
 @MainActor
 final class SessionProjectionStore {
-    unowned let viewModel: ChatScreenStore
+    unowned let viewModel: any ChatRuntimeScreenStore
     let registry = ChatSessionRegistry()
 
-    init(viewModel: ChatScreenStore) {
+    init(viewModel: any ChatRuntimeScreenStore) {
         self.viewModel = viewModel
     }
 
@@ -88,7 +88,7 @@ final class SessionProjectionStore {
     func setRecoveryPhase(_ phase: RecoveryPhase, for session: ResponseSession) {
         session.setRecoveryPhase(phase)
         if viewModel.visibleSessionMessageID == session.messageID {
-            setVisibleRecoveryPhase(phase)
+            viewModel.setVisibleRecoveryPhase(phase)
         }
     }
 
@@ -125,11 +125,6 @@ final class SessionProjectionStore {
 
     func clearLiveGenerationState(clearDraft: Bool) {
         clearVisibleState(clearDraft: clearDraft)
-    }
-
-    private func setVisibleRecoveryPhase(_ phase: RecoveryPhase) {
-        viewModel.visibleRecoveryPhase = phase
-        viewModel.isRecovering = phase == .streamResuming
     }
 
     func clearVisibleState(clearDraft: Bool) {

@@ -10,6 +10,7 @@ extension StreamingEffectHandler {
     func startStreamingRequest(for session: ResponseSession, reconnectAttempt: Int = 0) {
         guard let requestMessages = session.requestMessages else { return }
 
+        let viewModel = self.viewModel
         let requestAPIKey = viewModel.apiKey
         let streamID = UUID()
         session.beginStreaming(streamID: streamID)
@@ -33,36 +34,36 @@ extension StreamingEffectHandler {
             var pendingRecoveryError: String?
 
             for await event in stream {
-                guard self.viewModel.isSessionActive(session), session.activeStreamID == streamID else { break }
+                guard viewModel.isSessionActive(session), session.activeStreamID == streamID else { break }
 
-                switch self.viewModel.applyStreamEvent(event, to: session, animated: self.viewModel.visibleSessionMessageID == session.messageID) {
+                switch viewModel.applyStreamEvent(event, to: session, animated: viewModel.visibleSessionMessageID == session.messageID) {
                 case .continued:
                     break
 
                 case .terminalCompleted:
                     didReceiveCompletedEvent = true
-                    self.viewModel.finalizeSession(session)
+                    viewModel.finalizeSession(session)
 
                 case .terminalIncomplete(let message):
                     pendingRecoveryError = message ?? "Response was incomplete."
-                    self.viewModel.saveSessionNow(session)
+                    viewModel.saveSessionNow(session)
                     if let responseId = session.responseId {
                         pendingRecoveryResponseId = responseId
                     } else if !session.currentText.isEmpty {
-                        self.viewModel.finalizeSessionAsPartial(session)
-                    } else if let message = self.viewModel.findMessage(byId: session.messageID) {
-                        self.viewModel.removeEmptyMessage(message, for: session)
+                        viewModel.finalizeSessionAsPartial(session)
+                    } else if let message = viewModel.findMessage(byId: session.messageID) {
+                        viewModel.removeEmptyMessage(message, for: session)
                     }
 
                 case .connectionLost:
                     receivedConnectionLost = true
-                    self.viewModel.saveSessionNow(session)
+                    viewModel.saveSessionNow(session)
                     #if DEBUG
                     Loggers.chat.debug("[VM] Connection lost for session \(session.messageID)")
                     #endif
 
                 case .error(let error):
-                    self.viewModel.saveSessionNow(session)
+                    viewModel.saveSessionNow(session)
                     if let responseId = session.responseId {
                         pendingRecoveryResponseId = responseId
                         pendingRecoveryError = error.localizedDescription
@@ -70,61 +71,61 @@ extension StreamingEffectHandler {
                         Loggers.chat.debug("[VM] Stream error, attempting recovery: \(error.localizedDescription)")
                         #endif
                     } else if !session.currentText.isEmpty {
-                        self.viewModel.finalizeSessionAsPartial(session)
-                        if self.viewModel.visibleSessionMessageID == session.messageID {
-                            self.viewModel.errorMessage = error.localizedDescription
+                        viewModel.finalizeSessionAsPartial(session)
+                        if viewModel.visibleSessionMessageID == session.messageID {
+                            viewModel.errorMessage = error.localizedDescription
                             HapticService.shared.notify(.error)
                         }
-                    } else if let message = self.viewModel.findMessage(byId: session.messageID) {
-                        self.viewModel.removeEmptyMessage(message, for: session)
-                        if self.viewModel.visibleSessionMessageID == session.messageID {
-                            self.viewModel.errorMessage = error.localizedDescription
-                            self.viewModel.clearLiveGenerationState(clearDraft: true)
+                    } else if let message = viewModel.findMessage(byId: session.messageID) {
+                        viewModel.removeEmptyMessage(message, for: session)
+                        if viewModel.visibleSessionMessageID == session.messageID {
+                            viewModel.errorMessage = error.localizedDescription
+                            viewModel.clearLiveGenerationState(clearDraft: true)
                             HapticService.shared.notify(.error)
                         }
                     }
                 }
             }
 
-            guard self.viewModel.isSessionActive(session), session.activeStreamID == streamID else {
-                self.viewModel.endBackgroundTask()
+            guard viewModel.isSessionActive(session), session.activeStreamID == streamID else {
+                viewModel.endBackgroundTask()
                 return
             }
 
             if didReceiveCompletedEvent {
-                self.viewModel.endBackgroundTask()
+                viewModel.endBackgroundTask()
                 return
             }
 
             if let responseId = pendingRecoveryResponseId {
                 session.setRecoveryPhase(.checkingStatus)
-                self.viewModel.setRecoveryPhase(.checkingStatus, for: session)
-                if self.viewModel.visibleSessionMessageID == session.messageID,
+                viewModel.setRecoveryPhase(.checkingStatus, for: session)
+                if viewModel.visibleSessionMessageID == session.messageID,
                    let pendingRecoveryError,
                    !pendingRecoveryError.isEmpty {
-                    self.viewModel.errorMessage = pendingRecoveryError
+                    viewModel.errorMessage = pendingRecoveryError
                 }
-                self.viewModel.syncVisibleState(from: session)
+                viewModel.syncVisibleState(from: session)
                 self.recoveryCoordinator.recoverResponse(
                     messageId: session.messageID,
                     responseId: responseId,
                     preferStreamingResume: session.requestUsesBackgroundMode
                 )
-                self.viewModel.endBackgroundTask()
+                viewModel.endBackgroundTask()
                 return
             }
 
             if receivedConnectionLost {
                 if let responseId = session.responseId {
                     session.setRecoveryPhase(.checkingStatus)
-                    self.viewModel.setRecoveryPhase(.checkingStatus, for: session)
-                    self.viewModel.syncVisibleState(from: session)
+                    viewModel.setRecoveryPhase(.checkingStatus, for: session)
+                    viewModel.syncVisibleState(from: session)
                     self.recoveryCoordinator.recoverResponse(
                         messageId: session.messageID,
                         responseId: responseId,
                         preferStreamingResume: session.requestUsesBackgroundMode
                     )
-                    self.viewModel.endBackgroundTask()
+                    viewModel.endBackgroundTask()
                     return
                 }
 
@@ -138,58 +139,58 @@ extension StreamingEffectHandler {
                     do {
                         try await Task.sleep(nanoseconds: delay)
                     } catch {
-                        self.viewModel.endBackgroundTask()
+                        viewModel.endBackgroundTask()
                         return
                     }
 
-                    guard self.viewModel.isSessionActive(session), session.activeStreamID == streamID else {
-                        self.viewModel.endBackgroundTask()
+                    guard viewModel.isSessionActive(session), session.activeStreamID == streamID else {
+                        viewModel.endBackgroundTask()
                         return
                     }
 
                     HapticService.shared.impact(.light)
                     self.startStreamingRequest(for: session, reconnectAttempt: nextAttempt)
-                    self.viewModel.endBackgroundTask()
+                    viewModel.endBackgroundTask()
                     return
                 }
 
                 if !session.currentText.isEmpty {
-                    self.viewModel.finalizeSessionAsPartial(session)
-                } else if let message = self.viewModel.findMessage(byId: session.messageID) {
-                    self.viewModel.removeEmptyMessage(message, for: session)
-                    if self.viewModel.visibleSessionMessageID == session.messageID {
-                        self.viewModel.errorMessage = "Connection lost. Please check your network and try again."
-                        self.viewModel.clearLiveGenerationState(clearDraft: true)
+                    viewModel.finalizeSessionAsPartial(session)
+                } else if let message = viewModel.findMessage(byId: session.messageID) {
+                    viewModel.removeEmptyMessage(message, for: session)
+                    if viewModel.visibleSessionMessageID == session.messageID {
+                        viewModel.errorMessage = "Connection lost. Please check your network and try again."
+                        viewModel.clearLiveGenerationState(clearDraft: true)
                         HapticService.shared.notify(.error)
                     }
                 }
 
-                self.viewModel.endBackgroundTask()
+                viewModel.endBackgroundTask()
                 return
             }
 
             if session.isStreaming {
                 if let responseId = session.responseId {
-                    self.viewModel.saveSessionNow(session)
+                    viewModel.saveSessionNow(session)
                     session.setRecoveryPhase(.checkingStatus)
-                    self.viewModel.setRecoveryPhase(.checkingStatus, for: session)
-                    self.viewModel.syncVisibleState(from: session)
+                    viewModel.setRecoveryPhase(.checkingStatus, for: session)
+                    viewModel.syncVisibleState(from: session)
                     self.recoveryCoordinator.recoverResponse(
                         messageId: session.messageID,
                         responseId: responseId,
                         preferStreamingResume: session.requestUsesBackgroundMode
                     )
                 } else if !session.currentText.isEmpty {
-                    self.viewModel.finalizeSessionAsPartial(session)
-                } else if let message = self.viewModel.findMessage(byId: session.messageID) {
-                    self.viewModel.removeEmptyMessage(message, for: session)
-                    if self.viewModel.visibleSessionMessageID == session.messageID {
-                        self.viewModel.clearLiveGenerationState(clearDraft: true)
+                    viewModel.finalizeSessionAsPartial(session)
+                } else if let message = viewModel.findMessage(byId: session.messageID) {
+                    viewModel.removeEmptyMessage(message, for: session)
+                    if viewModel.visibleSessionMessageID == session.messageID {
+                        viewModel.clearLiveGenerationState(clearDraft: true)
                     }
                 }
             }
 
-            self.viewModel.endBackgroundTask()
+            viewModel.endBackgroundTask()
         }
     }
 }

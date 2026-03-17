@@ -2,9 +2,9 @@ import Foundation
 
 @MainActor
 final class RecoveryEffectHandler {
-    unowned let viewModel: ChatScreenStore
+    unowned let viewModel: any ChatRuntimeScreenStore
 
-    init(viewModel: ChatScreenStore) {
+    init(viewModel: any ChatRuntimeScreenStore) {
         self.viewModel = viewModel
     }
 
@@ -14,6 +14,7 @@ final class RecoveryEffectHandler {
         preferStreamingResume: Bool,
         visible: Bool = false
     ) {
+        let viewModel = self.viewModel
         guard !viewModel.apiKey.isEmpty else { return }
         guard let message = viewModel.findMessage(byId: messageId) else { return }
 
@@ -46,10 +47,10 @@ final class RecoveryEffectHandler {
 
         session.task?.cancel()
         session.task = Task { @MainActor in
-            guard self.viewModel.isSessionActive(session) else { return }
+            guard viewModel.isSessionActive(session) else { return }
 
             do {
-                let result = try await session.service.fetchResponse(responseId: responseId, apiKey: self.viewModel.apiKey)
+                let result = try await session.service.fetchResponse(responseId: responseId, apiKey: viewModel.apiKey)
 
                 switch result.status {
                 case .completed:
@@ -63,7 +64,7 @@ final class RecoveryEffectHandler {
 
                 case .failed, .incomplete, .unknown:
                     if visible {
-                        self.viewModel.errorMessage = result.errorMessage ?? "Response did not complete."
+                        viewModel.errorMessage = result.errorMessage ?? "Response did not complete."
                     }
                     self.finishRecovery(
                         for: message,
@@ -84,7 +85,7 @@ final class RecoveryEffectHandler {
                             session: session,
                             responseId: responseId,
                             lastSeq: lastSequenceNumber,
-                            apiKey: self.viewModel.apiKey
+                            apiKey: viewModel.apiKey
                         )
                     case .poll:
                         await self.pollResponseUntilTerminal(session: session, responseId: responseId)

@@ -1,35 +1,5 @@
 import Foundation
 import SwiftData
-import UIKit
-
-enum UITestScenario: String {
-    case empty
-    case seeded
-    case streaming
-    case preview
-    case replySplit
-    case history
-    case settings
-
-    var initialTab: Int {
-        switch self {
-        case .history:
-            return 1
-        case .settings:
-            return 2
-        default:
-            return 0
-        }
-    }
-}
-
-struct UITestBootstrap {
-    let chatScreenStore: ChatScreenStore
-    let settingsScreenStore: SettingsScreenStore
-    let initialTab: Int
-    let scenario: UITestScenario
-    let initialPreviewItem: FilePreviewItem?
-}
 
 @MainActor
 enum UITestScenarioLoader {
@@ -50,12 +20,17 @@ enum UITestScenarioLoader {
         let chatScreenStore = ChatScreenStore(
             modelContext: modelContext,
             settingsStore: settingsStore,
-            apiKeyStore: apiKeyStore
+            apiKeyStore: apiKeyStore,
+            bootstrapPolicy: .testing
         )
         let settingsScreenStore = SettingsScreenStore(
             settingsStore: settingsStore,
             apiKeyStore: apiKeyStore
         )
+
+        if scenario == .settingsGateway {
+            settingsScreenStore.cloudflareEnabled = true
+        }
 
         applyScenario(
             scenario,
@@ -95,112 +70,13 @@ enum UITestScenarioLoader {
         settingsStore.cloudflareGatewayEnabled = false
     }
 
-    private static func clearAllConversations(in modelContext: ModelContext) {
-        let descriptor = FetchDescriptor<Conversation>()
-        let conversations: [Conversation]
-
-        do {
-            conversations = try modelContext.fetch(descriptor)
-        } catch {
-            Loggers.persistence.error("[UITestScenarioLoader] Failed to fetch conversations for reset: \(error.localizedDescription)")
-            return
-        }
-
-        for conversation in conversations {
-            modelContext.delete(conversation)
-        }
-
-        do {
-            try modelContext.save()
-        } catch {
-            Loggers.persistence.error("[UITestScenarioLoader] Failed to save reset state: \(error.localizedDescription)")
-        }
-    }
-
-    private static func seedConversationsIfNeeded(
-        in modelContext: ModelContext,
-        scenario: UITestScenario
-    ) -> [Conversation] {
-        switch scenario {
-        case .empty, .settings:
-            return []
-        case .seeded, .streaming, .preview:
-            return [makeConversation(title: "Release Planning", timeOffset: 0, backgroundModeEnabled: false, in: modelContext)]
-        case .replySplit:
-            return [makeRichMarkdownConversation(in: modelContext)]
-        case .history:
-            return [
-                makeConversation(title: "Release Planning", timeOffset: 0, backgroundModeEnabled: false, in: modelContext),
-                makeConversation(title: "Archive Audit", timeOffset: -120, backgroundModeEnabled: true, in: modelContext),
-                makeConversation(title: "Snapshot Review", timeOffset: -240, backgroundModeEnabled: false, in: modelContext)
-            ]
-        }
-    }
-
-    private static func makeConversation(
-        title: String,
-        timeOffset: TimeInterval,
-        backgroundModeEnabled: Bool,
-        in modelContext: ModelContext
-    ) -> Conversation {
-        let createdAt = Date(timeIntervalSinceNow: timeOffset)
-        let updatedAt = Date(timeIntervalSinceNow: timeOffset)
-        let conversation = Conversation(
-            title: title,
-            createdAt: createdAt,
-            updatedAt: updatedAt,
-            model: ModelType.gpt5_4.rawValue,
-            reasoningEffort: ReasoningEffort.high.rawValue,
-            backgroundModeEnabled: backgroundModeEnabled,
-            serviceTierRawValue: ServiceTier.standard.rawValue
-        )
-
-        let userMessage = Message(
-            role: .user,
-            content: "Can you keep the refactor zero-diff?"
-        )
-        let assistantMessage = Message(
-            role: .assistant,
-            content: "Yes. I will preserve the current UX and tighten the internal architecture only.",
-            thinking: "Compare the current streaming behavior, preserve background mode semantics, and keep the visual output locked."
-        )
-
-        conversation.messages = [userMessage, assistantMessage]
-        userMessage.conversation = conversation
-        assistantMessage.conversation = conversation
-
-        modelContext.insert(conversation)
-        modelContext.insert(userMessage)
-        modelContext.insert(assistantMessage)
-
-        do {
-            try modelContext.save()
-        } catch {
-            Loggers.persistence.error("[UITestScenarioLoader] Failed to save seeded conversation: \(error.localizedDescription)")
-        }
-
-        return conversation
-    }
-
-    private static func makeRichMarkdownConversation(in modelContext: ModelContext) -> Conversation {
-        let conversation = RichAssistantReplyFixture.makeConversation()
-
-        do {
-            try RichAssistantReplyFixture.insertConversation(conversation, into: modelContext)
-        } catch {
-            Loggers.persistence.error("[UITestScenarioLoader] Failed to save rich markdown conversation: \(error.localizedDescription)")
-        }
-
-        return conversation
-    }
-
     private static func applyScenario(
         _ scenario: UITestScenario,
         conversations: [Conversation],
         to viewModel: ChatScreenStore
     ) {
         switch scenario {
-        case .empty, .history, .settings:
+        case .empty, .history, .settings, .settingsGateway:
             return
 
         case .seeded, .replySplit:
@@ -240,39 +116,6 @@ enum UITestScenarioLoader {
                     viewerFilename: "chart.png"
                 )
             }
-        }
-    }
-
-    private static func makePreviewImageURL() -> URL? {
-        let renderer = UIGraphicsImageRenderer(size: CGSize(width: 1200, height: 900))
-        let image = renderer.image { context in
-            UIColor.systemBlue.setFill()
-            context.fill(CGRect(x: 0, y: 0, width: 1200, height: 900))
-
-            UIColor.white.setFill()
-            context.fill(CGRect(x: 80, y: 120, width: 1040, height: 620))
-
-            let title = "Generated Chart" as NSString
-            let attributes: [NSAttributedString.Key: Any] = [
-                .font: UIFont.systemFont(ofSize: 72, weight: .bold),
-                .foregroundColor: UIColor.black
-            ]
-            title.draw(at: CGPoint(x: 120, y: 180), withAttributes: attributes)
-        }
-
-        guard let data = image.pngData() else {
-            return nil
-        }
-
-        let url = FileManager.default.temporaryDirectory
-            .appendingPathComponent("ui-test-generated-chart.png")
-
-        do {
-            try data.write(to: url, options: .atomic)
-            return url
-        } catch {
-            Loggers.files.error("[UITestScenarioLoader] Failed to write preview image: \(error.localizedDescription)")
-            return nil
         }
     }
 }

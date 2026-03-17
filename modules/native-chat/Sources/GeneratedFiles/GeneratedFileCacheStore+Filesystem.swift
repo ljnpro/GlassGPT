@@ -1,7 +1,7 @@
 import Foundation
 
 extension GeneratedFileCacheStore {
-    func cachedEntry(
+    package func cachedEntry(
         fileURL: URL,
         directoryURL: URL
     ) -> CachedEntry? {
@@ -19,7 +19,7 @@ extension GeneratedFileCacheStore {
         )
     }
 
-    func normalizedFilename(_ candidate: String?, inferredExtension: String?) -> String? {
+    package func normalizedFilename(_ candidate: String?, inferredExtension: String?) -> String? {
         guard let candidate else { return nil }
 
         let trimmed = candidate.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -39,39 +39,43 @@ extension GeneratedFileCacheStore {
         return sanitized
     }
 
-    func removeItemIfExists(at url: URL, logContext: String) {
+    package func removeItemIfExists(at url: URL, logContext: String) {
         guard fileManager.fileExists(atPath: url.path) else { return }
 
         do {
             try fileManager.removeItem(at: url)
         } catch {
-            Loggers.files.error("[\(logContext)] \(error.localizedDescription)")
+            GeneratedFilesLogger.error("[\(logContext)] \(error.localizedDescription)")
         }
     }
 
-    func directoryContents(at url: URL, logContext: String) -> [URL] {
+    package func directoryContents(at url: URL, logContext: String) -> [URL] {
+        guard fileManager.fileExists(atPath: url.path) else {
+            return []
+        }
+
         do {
             return try fileManager.contentsOfDirectory(at: url, includingPropertiesForKeys: nil)
         } catch {
-            Loggers.files.error("[\(logContext)] \(error.localizedDescription)")
+            GeneratedFilesLogger.error("[\(logContext)] \(error.localizedDescription)")
             return []
         }
     }
 
-    func itemAttributes(atPath path: String, logContext: String) -> [FileAttributeKey: Any]? {
+    package func itemAttributes(atPath path: String, logContext: String) -> [FileAttributeKey: Any]? {
         do {
             return try fileManager.attributesOfItem(atPath: path)
         } catch {
-            Loggers.files.error("[\(logContext)] \(error.localizedDescription)")
+            GeneratedFilesLogger.error("[\(logContext)] \(error.localizedDescription)")
             return nil
         }
     }
 
-    func setItemModificationDate(_ date: Date, atPath path: String, logContext: String) {
+    package func setItemModificationDate(_ date: Date, atPath path: String, logContext: String) {
         do {
             try fileManager.setAttributes([.modificationDate: date], ofItemAtPath: path)
         } catch {
-            Loggers.files.error("[\(logContext)] \(error.localizedDescription)")
+            GeneratedFilesLogger.error("[\(logContext)] \(error.localizedDescription)")
         }
     }
 }

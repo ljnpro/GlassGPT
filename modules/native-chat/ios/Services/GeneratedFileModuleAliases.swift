@@ -1,0 +1,6 @@
+import GeneratedFiles
+
+typealias GeneratedFileCacheBucket = GeneratedFiles.GeneratedFileCacheBucket
+typealias GeneratedFileOpenBehavior = GeneratedFiles.GeneratedFileOpenBehavior
+typealias GeneratedFileLocalResource = GeneratedFiles.GeneratedFileLocalResource
+typealias GeneratedFileCacheStore = GeneratedFiles.GeneratedFileCacheStore

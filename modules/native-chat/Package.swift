@@ -82,6 +82,12 @@ let package = Package(
             name: "NativeChatTests",
             dependencies: [
                 "NativeChat",
+                "ChatDomain",
+                "ChatPersistence",
+                "ChatRuntime",
+                "ChatFeatures",
+                "OpenAITransport",
+                "GeneratedFiles",
                 .product(name: "SnapshotTesting", package: "swift-snapshot-testing")
             ],
             path: "Tests/NativeChatTests",

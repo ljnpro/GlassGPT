@@ -2,7 +2,7 @@
 
 ## Principle
 
-4.3.1 prioritizes parity, maintainability, and release reliability. Tests exist to prevent behavioral drift while proving that the refactor improved the production codebase rather than only the test bundle.
+4.4.0 prioritizes parity, maintainability, and release reliability. Tests exist to prevent behavioral drift while proving that the refactor improved the production codebase rather than only the test bundle.
 
 ## Coverage
 
@@ -23,7 +23,9 @@
   - iPhone/iPad plus light/dark variants
 - UI tests
   - app launch reachability
-  - scenario-driven smoke coverage for history, settings, streaming, model selection, and file preview
+  - scenario-driven smoke coverage for history open/search/delete flows
+  - settings theme persistence, API key save/clear, and gateway feedback
+  - seeded conversation rendering, streaming indicators, model selection, file preview, and reply-split single-surface behavior
 - Maintainability gates
   - production code must stay free of `try?`, `[String: Any]`, and `JSONSerialization`
   - operational `fatalError` and `preconditionFailure` are forbidden
@@ -40,6 +42,10 @@
 ```bash
 ./scripts/ci.sh lint
 ./scripts/ci.sh build
+./scripts/ci.sh app-tests
+./scripts/ci.sh snapshot-tests
+./scripts/ci.sh package-tests
+./scripts/ci.sh coverage-report
 ./scripts/ci.sh core-tests
 ./scripts/ci.sh ui-tests
 ./scripts/ci.sh maintainability
@@ -60,27 +66,64 @@ xcodebuild -project ios/GlassGPT.xcodeproj -scheme GlassGPT -destination 'platfo
 
 ## Notes
 
-- Coverage reports are emitted to `.local/build/ci/coverage-report.txt` and `.local/build/ci/coverage-production.txt` during `./scripts/ci.sh core-tests`.
-- The production coverage gate is derived from `xccov` JSON and only counts the tracked core file groups configured in `scripts/report_production_coverage.py`.
+- `./scripts/ci.sh core-tests` is now a grouped flow:
+  - `app-tests`
+  - `snapshot-tests`
+  - `package-tests`
+  - `coverage-report`
+- Coverage reports are emitted to `.local/build/ci/coverage-report.txt` and `.local/build/ci/coverage-production.txt` during `./scripts/ci.sh coverage-report` and `./scripts/ci.sh core-tests`.
+- The production coverage gate merges every available `.xcresult` from app unit tests, snapshot tests, and package tests before evaluating grouped production coverage.
+- Hard coverage gates currently apply to:
+  - `nativechat-non-ui-total`
+  - `runtime-core`
+  - `runtime-coordinators`
+  - `screen-stores`
+  - `transport-and-services`
+  - `settings-and-storage`
+- Informational coverage groups are still reported for:
+  - `views-and-presentation`
+  - `app-shell`
 - Warnings are gated by `scripts/check_warnings.sh`. The only currently allowed warning is the external `appintentsmetadataprocessor` metadata extraction notice if Xcode emits it.
-- Snapshot comparisons anchor to the `4.3.0` baseline set, and the release baseline is refreshed only when `docs/parity-baseline.md` is updated for `4.3.1`.
+- Snapshot comparisons anchor to the `4.3.1` production baseline set, and the release baseline is refreshed only when `docs/parity-baseline.md` is updated for `4.4.0`.
 - Runtime invariants are as important as visual parity. The highest-risk protected paths are:
   - one assistant reply -> one visible bubble
   - stale stream tasks cannot write after reconnect/recovery/cancel
-  - background-mode resume vs polling remains branch-equivalent to the 4.3.0 maintained baseline
+  - background-mode resume vs polling remains branch-equivalent to the 4.3.1 maintained baseline
 
-## 4.3.1 Gates
+## 4.4.0 Gates
+
+`./scripts/ci.sh app-tests` validates:
+
+- `GlassGPTTests` runs without snapshot cases
+- the result bundle is preserved for later merged coverage reporting
+
+`./scripts/ci.sh snapshot-tests` validates:
+
+- each snapshot case runs in its own preserved result bundle
+- chat, history, settings, model selector, and file preview baselines remain unchanged
+
+`./scripts/ci.sh package-tests` validates:
+
+- `NativeChatTests` runs with code coverage enabled
+- package-facing runtime, parser, store, repository, and coordinator tests remain green
+
+`./scripts/ci.sh coverage-report` validates:
+
+- at least one existing `.xcresult` bundle is present in `.local/build/ci`
+- merged `xccov` reporting succeeds across app unit, snapshot, and package bundles
+- grouped production coverage thresholds pass for the required groups above
 
 `./scripts/ci.sh maintainability` validates:
 
 - production code is scanned under `modules/native-chat/ios` and `ios/GlassGPT`
 - `try?`, `[String: Any]`, `JSONSerialization`, `fatalError`, `preconditionFailure`, and `@unchecked Sendable` stay at or below configured limits
-- non-UI files stay at or below `250 LOC`
-- UI files stay at or below `325 LOC`
+- non-UI files stay at or below `220 LOC`
+- UI files stay at or below `280 LOC`
+- `ScreenStores` stay at or below `180 LOC`
 
 `./scripts/ci.sh release-readiness` validates:
 
-- release branch/class is routable (`main`, `codex/stable-4.1`, `codex/stable-4.2`, `codex/stable-4.3`, `codex/feature/*`)
+- release branch/class is routable (`main`, `codex/stable-4.1`, `codex/stable-4.2`, `codex/stable-4.3`, `codex/stable-4.4`)
 - MARKETING_VERSION and CURRENT_PROJECT_VERSION are single-valued in `ios/GlassGPT/Config/Versions.xcconfig`
 - expected release values through `RELEASE_EXPECT_MARKETING_VERSION` and `RELEASE_EXPECT_BUILD_NUMBER` (or CI defaults)
 - release docs and wrappers exist and are executable

@@ -32,6 +32,13 @@ final class ConversationRepository {
         return try modelContext.fetch(descriptor).first
     }
 
+    func fetchMostRecentConversationWithMessages() throws -> Conversation? {
+        let descriptor = FetchDescriptor<Conversation>(
+            sortBy: [SortDescriptor(\.updatedAt, order: .reverse)]
+        )
+        return try modelContext.fetch(descriptor).first(where: { !$0.messages.isEmpty })
+    }
+
     func fetchUntitledConversations() throws -> [Conversation] {
         let descriptor = FetchDescriptor<Conversation>(
             predicate: #Predicate<Conversation> { conversation in

@@ -1,31 +1,5 @@
 import Foundation
-
-enum GeneratedFileCacheBucket: String, Sendable {
-    case image
-    case document
-
-    var directoryName: String {
-        switch self {
-        case .image:
-            return "generated-images"
-        case .document:
-            return "generated-documents"
-        }
-    }
-}
-
-enum GeneratedFileOpenBehavior: Sendable {
-    case imagePreview
-    case pdfPreview
-    case directShare
-}
-
-struct GeneratedFileLocalResource: Sendable {
-    let localURL: URL
-    let filename: String
-    let cacheBucket: GeneratedFileCacheBucket
-    let openBehavior: GeneratedFileOpenBehavior
-}
+import OpenAITransport
 
 /// Actor responsible for downloading files from OpenAI (sandbox files from code interpreter output).
 actor FileDownloadService {

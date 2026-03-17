@@ -1,21 +1,41 @@
 import Foundation
 
 struct ChatVisibleSessionState {
-    let draftMessage: Message?
-    let currentStreamingText: String
-    let currentThinkingText: String
-    let activeToolCalls: [ToolCallInfo]
-    let liveCitations: [URLCitation]
-    let liveFilePathAnnotations: [FilePathAnnotation]
-    let lastSequenceNumber: Int?
-    let activeRequestModel: ModelType?
-    let activeRequestEffort: ReasoningEffort?
-    let activeRequestUsesBackgroundMode: Bool
-    let activeRequestServiceTier: ServiceTier
-    let isStreaming: Bool
-    let isRecovering: Bool
-    let visibleRecoveryPhase: RecoveryPhase
-    let isThinking: Bool
+    var draftMessage: Message?
+    var currentStreamingText: String
+    var currentThinkingText: String
+    var activeToolCalls: [ToolCallInfo]
+    var liveCitations: [URLCitation]
+    var liveFilePathAnnotations: [FilePathAnnotation]
+    var lastSequenceNumber: Int?
+    var activeRequestModel: ModelType?
+    var activeRequestEffort: ReasoningEffort?
+    var activeRequestUsesBackgroundMode: Bool
+    var activeRequestServiceTier: ServiceTier
+    var isStreaming: Bool
+    var isRecovering: Bool
+    var visibleRecoveryPhase: RecoveryPhase
+    var isThinking: Bool
+
+    static func empty() -> ChatVisibleSessionState {
+        ChatVisibleSessionState(
+            draftMessage: nil,
+            currentStreamingText: "",
+            currentThinkingText: "",
+            activeToolCalls: [],
+            liveCitations: [],
+            liveFilePathAnnotations: [],
+            lastSequenceNumber: nil,
+            activeRequestModel: nil,
+            activeRequestEffort: nil,
+            activeRequestUsesBackgroundMode: false,
+            activeRequestServiceTier: .standard,
+            isStreaming: false,
+            isRecovering: false,
+            visibleRecoveryPhase: .idle,
+            isThinking: false
+        )
+    }
 }
 
 enum SessionVisibilityCoordinator {
@@ -67,22 +87,8 @@ enum SessionVisibilityCoordinator {
         retaining draftMessage: Message?,
         clearDraft: Bool
     ) -> ChatVisibleSessionState {
-        ChatVisibleSessionState(
-            draftMessage: clearDraft ? nil : draftMessage,
-            currentStreamingText: "",
-            currentThinkingText: "",
-            activeToolCalls: [],
-            liveCitations: [],
-            liveFilePathAnnotations: [],
-            lastSequenceNumber: nil,
-            activeRequestModel: nil,
-            activeRequestEffort: nil,
-            activeRequestUsesBackgroundMode: false,
-            activeRequestServiceTier: .standard,
-            isStreaming: false,
-            isRecovering: false,
-            visibleRecoveryPhase: .idle,
-            isThinking: false
-        )
+        var state = ChatVisibleSessionState.empty()
+        state.draftMessage = clearDraft ? nil : draftMessage
+        return state
     }
 }

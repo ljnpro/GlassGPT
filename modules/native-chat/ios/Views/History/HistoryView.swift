@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import ChatUI
 
 struct HistoryView: View {
     @Environment(\.modelContext) private var modelContext

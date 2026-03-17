@@ -76,8 +76,9 @@ extension StreamingEffectHandler {
         HapticService.shared.impact(.medium)
 
         if let pendingBackgroundCancellation {
+            let recoveryCoordinator = self.recoveryCoordinator
             Task { @MainActor in
-                await self.recoveryCoordinator.cancelBackgroundResponseAndSync(
+                await recoveryCoordinator.cancelBackgroundResponseAndSync(
                     responseId: pendingBackgroundCancellation.responseId,
                     messageId: pendingBackgroundCancellation.messageId
                 )

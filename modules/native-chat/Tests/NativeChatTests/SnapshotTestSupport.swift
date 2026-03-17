@@ -91,6 +91,14 @@ func assertViewSnapshots<V: View>(
 ) {
     for variant in variants {
         let previousTheme = UserDefaults.standard.string(forKey: SettingsStore.Keys.appTheme)
+        defer {
+            if let previousTheme {
+                UserDefaults.standard.set(previousTheme, forKey: SettingsStore.Keys.appTheme)
+            } else {
+                UserDefaults.standard.removeObject(forKey: SettingsStore.Keys.appTheme)
+            }
+        }
+
         UserDefaults.standard.set(variant.appTheme.rawValue, forKey: SettingsStore.Keys.appTheme)
 
         let hostedView = makeView()
@@ -118,12 +126,6 @@ func assertViewSnapshots<V: View>(
             testName: testName,
             line: line
         )
-
-        if let previousTheme {
-            UserDefaults.standard.set(previousTheme, forKey: SettingsStore.Keys.appTheme)
-        } else {
-            UserDefaults.standard.removeObject(forKey: SettingsStore.Keys.appTheme)
-        }
     }
 }
 
@@ -142,7 +144,8 @@ func makeSnapshotChatScreenStore(hasAPIKey: Bool = false) throws -> ChatScreenSt
     return ChatScreenStore(
         modelContext: context,
         settingsStore: SettingsStore(valueStore: settingsValueStore),
-        apiKeyStore: APIKeyStore(backend: apiBackend)
+        apiKeyStore: APIKeyStore(backend: apiBackend),
+        bootstrapPolicy: .testing
     )
 }
 

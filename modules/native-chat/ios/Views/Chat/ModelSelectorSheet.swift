@@ -1,5 +1,6 @@
 import SwiftUI
 import UIKit
+import ChatUI
 
 struct ModelSelectorSheet: View {
     @Binding var proModeEnabled: Bool
@@ -137,6 +138,7 @@ struct ModelSelectorSheet: View {
             }
         }
         .padding(metrics.rowHorizontalPadding)
+        .accessibilityIdentifier("modelSelector.reasoning")
         .singleSurfaceGlass(
             cornerRadius: metrics.cardCornerRadius,
             stableFillOpacity: 0.012,
@@ -188,7 +190,9 @@ struct ModelSelectorSheet: View {
             toggleRow(
                 title: "Pro Mode",
                 subtitle: "Switches between GPT-5.4 and GPT-5.4 Pro.",
-                isOn: $proModeEnabled
+                isOn: $proModeEnabled,
+                accessibilityIdentifier: "modelSelector.proMode",
+                rowAccessibilityIdentifier: "modelSelector.proModeRow"
             )
 
             Divider()
@@ -197,7 +201,9 @@ struct ModelSelectorSheet: View {
             toggleRow(
                 title: "Background Mode",
                 subtitle: "Slower initial response, but better resume for long-running generations.",
-                isOn: $backgroundModeEnabled
+                isOn: $backgroundModeEnabled,
+                accessibilityIdentifier: "modelSelector.backgroundMode",
+                rowAccessibilityIdentifier: "modelSelector.backgroundModeRow"
             )
 
             Divider()
@@ -206,7 +212,9 @@ struct ModelSelectorSheet: View {
             toggleRow(
                 title: "Flex Mode",
                 subtitle: "Lower cost, but slower and less consistent response times.",
-                isOn: $flexModeEnabled
+                isOn: $flexModeEnabled,
+                accessibilityIdentifier: "modelSelector.flexMode",
+                rowAccessibilityIdentifier: "modelSelector.flexModeRow"
             )
         }
         .singleSurfaceGlass(
@@ -219,7 +227,13 @@ struct ModelSelectorSheet: View {
         )
     }
 
-    private func toggleRow(title: String, subtitle: String, isOn: Binding<Bool>) -> some View {
+    private func toggleRow(
+        title: String,
+        subtitle: String,
+        isOn: Binding<Bool>,
+        accessibilityIdentifier: String,
+        rowAccessibilityIdentifier: String
+    ) -> some View {
         HStack(alignment: .top, spacing: 16) {
             VStack(alignment: .leading, spacing: 6) {
                 Text(title)
@@ -236,11 +250,13 @@ struct ModelSelectorSheet: View {
             Toggle("", isOn: isOn)
                 .labelsHidden()
                 .toggleStyle(.switch)
+                .accessibilityIdentifier(accessibilityIdentifier)
                 .onChange(of: isOn.wrappedValue) { _, _ in
                     HapticService.shared.selection()
                 }
         }
         .padding(.horizontal, metrics.rowHorizontalPadding)
         .padding(.vertical, metrics.rowVerticalPadding)
+        .accessibilityIdentifier(rowAccessibilityIdentifier)
     }
 }

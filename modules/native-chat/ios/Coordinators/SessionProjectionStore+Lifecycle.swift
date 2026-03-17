@@ -30,8 +30,9 @@ extension SessionProjectionStore {
         if let finishedConversation,
            finishedConversation.title == "New Chat",
            finishedConversation.messages.count >= 2 {
+            let viewModel = self.viewModel
             Task { @MainActor in
-                await self.viewModel.generateTitleIfNeeded(for: finishedConversation)
+                await viewModel.generateTitleIfNeeded(for: finishedConversation)
             }
         }
 

@@ -2,27 +2,9 @@ import SwiftUI
 import SwiftData
 import UIKit
 
-struct ChatScreenStoreBootstrapPolicy {
-    let restoreLastConversation: Bool
-    let setupLifecycleObservers: Bool
-    let runLaunchTasks: Bool
-
-    static let live = ChatScreenStoreBootstrapPolicy(
-        restoreLastConversation: true,
-        setupLifecycleObservers: true,
-        runLaunchTasks: true
-    )
-
-    static let testing = ChatScreenStoreBootstrapPolicy(
-        restoreLastConversation: false,
-        setupLifecycleObservers: false,
-        runLaunchTasks: false
-    )
-}
-
 @Observable
 @MainActor
-final class ChatScreenStore {
+final class ChatScreenStore: ChatRuntimeScreenStore {
 
     // MARK: - State
 
@@ -81,20 +63,7 @@ final class ChatScreenStore {
 
     // MARK: - Dependencies
 
-    let configurationProvider: OpenAIConfigurationProvider
-    let requestBuilder: OpenAIRequestBuilder
-    let responseParser: OpenAIResponseParser
-    let transport: OpenAIDataTransport
-    let openAIService: OpenAIService
-    let settingsStore: SettingsStore
-    let apiKeyStore: APIKeyStore
-    let conversationRepository: ConversationRepository
-    let draftRepository: DraftRepository
-    let generatedFileCoordinator = GeneratedFileCoordinator()
-    let messagePersistence = MessagePersistenceAdapter()
-    let backgroundTaskCoordinator = BackgroundTaskCoordinator()
-    let serviceFactory: @MainActor () -> OpenAIService
-    var modelContext: ModelContext
+    let dependencies: NativeChatFeatureDependencies
 
     // Visible live session state
     var draftMessage: Message?
@@ -109,12 +78,6 @@ final class ChatScreenStore {
     var visibleRecoveryPhase: RecoveryPhase = .idle
     @ObservationIgnored
     lazy var conversationRuntime = ChatRuntimeEngine(viewModel: self)
-    @ObservationIgnored
-    let storeActor = NativeChatStoreActor()
-
-    var sessionRegistry: ChatSessionRegistry {
-        conversationRuntime.sessionStateStore.registry
-    }
 
     // MARK: - Init
 
@@ -137,18 +100,19 @@ final class ChatScreenStore {
                 transport: transport
             )
         }
+        let resolvedOpenAIService = resolvedServiceFactory()
 
-        self.modelContext = modelContext
-        self.configurationProvider = configurationProvider
-        self.requestBuilder = resolvedRequestBuilder
-        self.responseParser = resolvedResponseParser
-        self.transport = transport
-        self.openAIService = resolvedServiceFactory()
-        self.settingsStore = settingsStore
-        self.apiKeyStore = apiKeyStore
-        self.conversationRepository = ConversationRepository(modelContext: modelContext)
-        self.draftRepository = DraftRepository(modelContext: modelContext)
-        self.serviceFactory = resolvedServiceFactory
+        self.dependencies = NativeChatFeatureDependencies(
+            modelContext: modelContext,
+            settingsStore: settingsStore,
+            apiKeyStore: apiKeyStore,
+            configurationProvider: configurationProvider,
+            requestBuilder: resolvedRequestBuilder,
+            responseParser: resolvedResponseParser,
+            transport: transport,
+            openAIService: resolvedOpenAIService,
+            serviceFactory: resolvedServiceFactory
+        )
         self.didCompleteLaunchBootstrap = !bootstrapPolicy.runLaunchTasks
         loadDefaultsFromSettings()
         if bootstrapPolicy.restoreLastConversation {
@@ -169,83 +133,5 @@ final class ChatScreenStore {
                 await generateTitlesForUntitledConversations()
             }
         }
-    }
-
-    var proModeEnabled: Bool {
-        get { selectedModel == .gpt5_4_pro }
-        set { selectedModel = newValue ? .gpt5_4_pro : .gpt5_4 }
-    }
-
-    var currentVisibleSession: ResponseSession? {
-        sessionRegistry.currentVisibleSession
-    }
-
-    var visibleSessionMessageID: UUID? {
-        get { sessionRegistry.visibleMessageID }
-        set { sessionRegistry.bindVisibleSession(messageID: newValue) }
-    }
-
-    var liveDraftMessageID: UUID? {
-        SessionVisibilityCoordinator.liveDraftMessageID(
-            visibleMessageID: visibleSessionMessageID,
-            messages: messages
-        )
-    }
-
-    var shouldShowDetachedStreamingBubble: Bool {
-        SessionVisibilityCoordinator.shouldShowDetachedStreamingBubble(
-            isStreaming: isStreaming,
-            liveDraftMessageID: liveDraftMessageID
-        )
-    }
-
-    var flexModeEnabled: Bool {
-        get { serviceTier == .flex }
-        set { serviceTier = newValue ? .flex : .standard }
-    }
-
-    var conversationConfiguration: ConversationConfiguration {
-        ConversationConfiguration(
-            model: selectedModel,
-            reasoningEffort: reasoningEffort,
-            backgroundModeEnabled: backgroundModeEnabled,
-            serviceTier: serviceTier
-        )
-    }
-
-    var filePreviewItem: FilePreviewItem? {
-        get { filePreviewStore.filePreviewItem }
-        set { filePreviewStore.filePreviewItem = newValue }
-    }
-
-    var sharedGeneratedFileItem: SharedGeneratedFileItem? {
-        get { filePreviewStore.sharedGeneratedFileItem }
-        set { filePreviewStore.sharedGeneratedFileItem = newValue }
-    }
-
-    var isDownloadingFile: Bool {
-        get { filePreviewStore.isDownloadingFile }
-        set { filePreviewStore.isDownloadingFile = newValue }
-    }
-
-    var fileDownloadError: String? {
-        get { filePreviewStore.fileDownloadError }
-        set { filePreviewStore.fileDownloadError = newValue }
-    }
-
-    func applyConversationConfiguration(_ configuration: ConversationConfiguration) {
-        isApplyingConversationConfigurationBatch = true
-        defer { isApplyingConversationConfigurationBatch = false }
-
-        selectedModel = configuration.model
-        reasoningEffort = configuration.reasoningEffort
-        backgroundModeEnabled = configuration.backgroundModeEnabled
-        serviceTier = configuration.serviceTier
-
-        if !selectedModel.availableEfforts.contains(reasoningEffort) {
-            reasoningEffort = selectedModel.defaultEffort
-        }
-
-        syncConversationConfiguration()
     }
 }

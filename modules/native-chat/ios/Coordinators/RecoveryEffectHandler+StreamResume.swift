@@ -9,6 +9,7 @@ extension RecoveryEffectHandler {
         apiKey: String,
         useDirectEndpoint: Bool = false
     ) async {
+        let viewModel = self.viewModel
         let streamID = UUID()
         session.beginRecoveryStream(streamID: streamID)
         viewModel.setRecoveryPhase(.streamResuming, for: session)
@@ -37,7 +38,7 @@ extension RecoveryEffectHandler {
                     return
                 }
 
-                guard self.viewModel.isSessionActive(session), session.activeStreamID == streamID, !receivedAnyRecoveryEvent else {
+                guard viewModel.isSessionActive(session), session.activeStreamID == streamID, !receivedAnyRecoveryEvent else {
                     return
                 }
 
