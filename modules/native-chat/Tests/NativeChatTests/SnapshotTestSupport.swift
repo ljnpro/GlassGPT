@@ -184,6 +184,25 @@ func makeConversationSamples(in viewModel: ChatViewModel) -> Conversation {
 }
 
 @MainActor
+func makeRichMarkdownConversationSamples(in viewModel: ChatViewModel) -> Conversation {
+    let conversation = RichAssistantReplyFixture.makeConversation()
+    viewModel.currentConversation = conversation
+    viewModel.messages = conversation.messages.sorted { $0.createdAt < $1.createdAt }
+    return conversation
+}
+
+@MainActor
+func makeRichMarkdownCodeBlockConversationSamples(in viewModel: ChatViewModel) -> Conversation {
+    let conversation = RichAssistantReplyFixture.makeConversation(
+        title: RichAssistantReplyFixture.codeConversationTitle,
+        assistantReply: RichAssistantReplyFixture.assistantReplyWithCodeBlock
+    )
+    viewModel.currentConversation = conversation
+    viewModel.messages = conversation.messages.sorted { $0.createdAt < $1.createdAt }
+    return conversation
+}
+
+@MainActor
 func makeSettingsSnapshotViewModel() -> SettingsViewModel {
     let settingsValueStore = InMemorySettingsValueStore()
     settingsValueStore.set(ModelType.gpt5_4_pro.rawValue, forKey: SettingsStore.Keys.defaultModel)

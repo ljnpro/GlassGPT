@@ -100,6 +100,22 @@ final class GlassGPTUITests: XCTestCase {
         XCTAssertTrue(app.buttons["chat.newChat"].waitForExistence(timeout: 5))
     }
 
+    @MainActor
+    func testReplySplitScenarioKeepsOneAssistantSurface() throws {
+        let app = launchApp(scenario: "replySplit")
+
+        let assistantSurfaces = app.descendants(matching: .any)
+            .matching(identifier: "chat.assistant.surface")
+        XCTAssertTrue(assistantSurfaces.firstMatch.waitForExistence(timeout: 5))
+        XCTAssertEqual(assistantSurfaces.count, 1)
+        XCTAssertEqual(
+            app.descendants(matching: .any)
+                .matching(identifier: "chat.assistant.detachedSurface")
+                .count,
+            0
+        )
+    }
+
     private func launchApp(scenario: String? = nil) -> XCUIApplication {
         let app = XCUIApplication()
         if let scenario {
