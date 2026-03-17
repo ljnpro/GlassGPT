@@ -14,6 +14,7 @@ struct SSEEventDecoder {
     private(set) var thinkingActive = false
     private(set) var emittedAnyOutput = false
     private(set) var sawTerminalEvent = false
+    private(set) var emittedResponseID: String?
 
     mutating func decode(
         frame: SSEFrame,
@@ -24,10 +25,12 @@ struct SSEEventDecoder {
         }
 
         let sequenceNumber = OpenAIStreamEventTranslator.extractSequenceNumber(from: jsonData)
+        let responseID = OpenAIStreamEventTranslator.extractResponseIdentifier(from: jsonData)
 
         if let translated = OpenAIStreamEventTranslator.translate(eventType: frame.type, data: jsonData) {
             switch translated {
             case .textDelta(let delta):
+                yieldResponseIdentifierIfNeeded(responseID, continuation: continuation)
                 emittedAnyOutput = true
                 accumulatedText += delta
                 continuation.yield(.textDelta(delta))
@@ -35,6 +38,7 @@ struct SSEEventDecoder {
                 return .continued
 
             case .thinkingDelta(let delta):
+                yieldResponseIdentifierIfNeeded(responseID, continuation: continuation)
                 if !thinkingActive {
                     thinkingActive = true
                     continuation.yield(.thinkingStarted)
@@ -46,12 +50,13 @@ struct SSEEventDecoder {
                 return .continued
 
             case .thinkingFinished:
+                yieldResponseIdentifierIfNeeded(responseID, continuation: continuation)
                 yieldThinkingFinishedIfNeeded(continuation: continuation)
                 yieldSequenceIfNeeded(sequenceNumber, continuation: continuation)
                 return .continued
 
             case .responseCreated(let responseId):
-                continuation.yield(.responseCreated(responseId))
+                yieldResponseIdentifierIfNeeded(responseId, continuation: continuation)
                 yieldSequenceIfNeeded(sequenceNumber, continuation: continuation)
                 #if DEBUG
                 Loggers.openAI.debug("[SSE] Response created: \(responseId)")
@@ -59,16 +64,19 @@ struct SSEEventDecoder {
                 return .continued
 
             case .sequenceUpdate(_):
+                yieldResponseIdentifierIfNeeded(responseID, continuation: continuation)
                 yieldSequenceIfNeeded(sequenceNumber, continuation: continuation)
                 return .continued
 
             case .filePathAnnotationAdded(let annotation):
+                yieldResponseIdentifierIfNeeded(responseID, continuation: continuation)
                 accumulatedFilePathAnnotations.append(annotation)
                 continuation.yield(.filePathAnnotationAdded(annotation))
                 yieldSequenceIfNeeded(sequenceNumber, continuation: continuation)
                 return .continued
 
             case .completed(let fullText, let fullThinking, let filePathAnnotations):
+                yieldResponseIdentifierIfNeeded(responseID, continuation: continuation)
                 sawTerminalEvent = true
                 updateTerminalState(
                     fullText: fullText,
@@ -78,6 +86,7 @@ struct SSEEventDecoder {
                 return .terminalCompleted
 
             case .incomplete(let fullText, let fullThinking, let filePathAnnotations, let message):
+                yieldResponseIdentifierIfNeeded(responseID, continuation: continuation)
                 sawTerminalEvent = true
                 updateTerminalState(
                     fullText: fullText,
@@ -87,11 +96,13 @@ struct SSEEventDecoder {
                 return .terminalIncomplete(message)
 
             case .error(let error):
+                yieldResponseIdentifierIfNeeded(responseID, continuation: continuation)
                 sawTerminalEvent = true
                 continuation.yield(.error(error))
                 return .terminalError
 
             default:
+                yieldResponseIdentifierIfNeeded(responseID, continuation: continuation)
                 continuation.yield(translated)
                 yieldSequenceIfNeeded(sequenceNumber, continuation: continuation)
                 return .continued
@@ -100,6 +111,7 @@ struct SSEEventDecoder {
 
         switch frame.type {
         case "response.output_text.done":
+            yieldResponseIdentifierIfNeeded(responseID, continuation: continuation)
             if let envelope = decodeEnvelope(from: jsonData),
                let fullText = envelope.text,
                !fullText.isEmpty {
@@ -117,6 +129,7 @@ struct SSEEventDecoder {
              "response.content_part.done",
              "response.reasoning_summary_part.added",
              "response.reasoning_summary_part.done":
+            yieldResponseIdentifierIfNeeded(responseID, continuation: continuation)
             yieldSequenceIfNeeded(sequenceNumber, continuation: continuation)
             return .continued
 
@@ -167,6 +180,15 @@ struct SSEEventDecoder {
     ) {
         guard let sequenceNumber else { return }
         continuation.yield(.sequenceUpdate(sequenceNumber))
+    }
+
+    private mutating func yieldResponseIdentifierIfNeeded(
+        _ responseID: String?,
+        continuation: AsyncStream<StreamEvent>.Continuation
+    ) {
+        guard let responseID, !responseID.isEmpty, responseID != emittedResponseID else { return }
+        emittedResponseID = responseID
+        continuation.yield(.responseCreated(responseID))
     }
 
     private func decodeEnvelope(from data: Data) -> ResponsesStreamEnvelopeDTO? {
