@@ -7,34 +7,12 @@ extension ChatViewModel {
     // MARK: - Lifecycle Observers
 
     func setupLifecycleObservers() {
-        NotificationCenter.default.addObserver(
-            forName: UIApplication.willResignActiveNotification,
-            object: nil,
-            queue: .main
-        ) { [weak self] _ in
-            Task { @MainActor in
-                self?.handleEnterBackground()
-            }
-        }
-
-        NotificationCenter.default.addObserver(
-            forName: UIApplication.didEnterBackgroundNotification,
-            object: nil,
-            queue: .main
-        ) { [weak self] _ in
-            Task { @MainActor in
-                self?.handleDidEnterBackground()
-            }
-        }
-
-        NotificationCenter.default.addObserver(
-            forName: UIApplication.didBecomeActiveNotification,
-            object: nil,
-            queue: .main
-        ) { [weak self] _ in
-            Task { @MainActor in
-                self?.handleReturnToForeground()
-            }
+        backgroundTaskCoordinator.startObservingLifecycle { [weak self] in
+            self?.handleEnterBackground()
+        } onDidEnterBackground: { [weak self] in
+            self?.handleDidEnterBackground()
+        } onDidBecomeActive: { [weak self] in
+            self?.handleReturnToForeground()
         }
     }
 
@@ -44,24 +22,19 @@ extension ChatViewModel {
                 saveSessionNow(session)
             }
 
-            backgroundTaskID = UIApplication.shared.beginBackgroundTask(withName: "StreamCompletion") { [weak self] in
-                Task { @MainActor in
-                    guard let self = self else { return }
-                    self.suspendActiveSessionsForAppBackground()
-                    self.endBackgroundTask()
-                }
+            backgroundTaskCoordinator.beginLongRunningTask(named: "StreamCompletion") { [weak self] in
+                guard let self else { return }
+                self.suspendActiveSessionsForAppBackground()
+                self.endBackgroundTask()
             }
         }
 
         if let conversation = currentConversation,
            conversation.title == "New Chat",
            messages.count >= 2 {
-            let bgTask = UIApplication.shared.beginBackgroundTask(withName: "TitleGeneration")
-            Task { @MainActor in
+            backgroundTaskCoordinator.runTransientTask(named: "TitleGeneration") { [weak self] in
+                guard let self else { return }
                 await self.generateTitle()
-                if bgTask != .invalid {
-                    UIApplication.shared.endBackgroundTask(bgTask)
-                }
             }
         }
     }
@@ -84,10 +57,7 @@ extension ChatViewModel {
     }
 
     func endBackgroundTask() {
-        if backgroundTaskID != .invalid {
-            UIApplication.shared.endBackgroundTask(backgroundTaskID)
-            backgroundTaskID = .invalid
-        }
+        backgroundTaskCoordinator.endBackgroundTask()
     }
 
     // MARK: - Persistence Helpers

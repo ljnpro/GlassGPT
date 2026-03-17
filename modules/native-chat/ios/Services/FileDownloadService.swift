@@ -43,20 +43,37 @@ actor FileDownloadService {
 
     var inFlightDownloads: [String: Task<URL, Error>] = [:]
     var inFlightGeneratedFileDownloads: [String: Task<GeneratedFileLocalResource, Error>] = [:]
-    let session: URLSession
+    let configurationProvider: OpenAIConfigurationProvider
+    let requestAuthorizer: OpenAIRequestAuthorizer
+    let transport: OpenAIDataTransport
     let fileManager: FileManager
     let cacheStore: GeneratedFileCacheStore
 
-    init() {
-        let config = URLSessionConfiguration.default
-        config.timeoutIntervalForRequest = 120
-        config.timeoutIntervalForResource = 300
-        self.session = URLSession(configuration: config)
-        self.fileManager = .default
+    init(
+        configurationProvider: OpenAIConfigurationProvider = DefaultOpenAIConfigurationProvider.shared,
+        requestAuthorizer: OpenAIRequestAuthorizer? = nil,
+        transport: OpenAIDataTransport? = nil,
+        fileManager: FileManager = .default
+    ) {
+        let authorizer = requestAuthorizer ?? OpenAIStandardRequestAuthorizer(configuration: configurationProvider)
+        let resolvedTransport = transport ?? OpenAIURLSessionTransport(
+            session: Self.makeDownloadSession()
+        )
+        self.configurationProvider = configurationProvider
+        self.requestAuthorizer = authorizer
+        self.transport = resolvedTransport
+        self.fileManager = fileManager
         self.cacheStore = GeneratedFileCacheStore(fileManager: fileManager)
     }
 
     typealias CachedGeneratedFileEntry = GeneratedFileCacheStore.CachedEntry
+
+    private static func makeDownloadSession() -> URLSession {
+        let configuration = URLSessionConfiguration.default
+        configuration.timeoutIntervalForRequest = 120
+        configuration.timeoutIntervalForResource = 300
+        return URLSession(configuration: configuration)
+    }
 
     /// Download a file by its OpenAI file_id and save to a temp location.
     /// Returns the local file URL.

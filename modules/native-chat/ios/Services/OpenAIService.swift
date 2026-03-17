@@ -4,21 +4,38 @@ import Foundation
 
 @MainActor
 final class OpenAIService {
-    private let requestBuilder = OpenAIRequestBuilder()
-    private let responseParser = OpenAIResponseParser()
-    private let eventStream = SSEEventStream()
+    private let requestBuilder: OpenAIRequestBuilder
+    private let responseParser: OpenAIResponseParser
+    private let streamClient: OpenAIStreamClient
+    private let transport: OpenAIDataTransport
+
+    init(
+        requestBuilder: OpenAIRequestBuilder = OpenAIRequestBuilder(),
+        responseParser: OpenAIResponseParser = OpenAIResponseParser(),
+        streamClient: OpenAIStreamClient = SSEEventStream(),
+        transport: OpenAIDataTransport = OpenAIURLSessionTransport()
+    ) {
+        self.requestBuilder = requestBuilder
+        self.responseParser = responseParser
+        self.streamClient = streamClient
+        self.transport = transport
+    }
+
+    var configurationProvider: OpenAIConfigurationProvider {
+        requestBuilder.configuration
+    }
 
     // MARK: - Upload File
 
     nonisolated func uploadFile(data: Data, filename: String, apiKey: String) async throws -> String {
-        let request = try OpenAIRequestBuilder().uploadRequest(
+        let request = try requestBuilder.uploadRequest(
             data: data,
             filename: filename,
             apiKey: apiKey
         )
 
-        let (responseData, response) = try await URLSession.shared.data(for: request)
-        let fileId = try OpenAIResponseParser().parseUploadedFileID(
+        let (responseData, response) = try await transport.data(for: request)
+        let fileId = try responseParser.parseUploadedFileID(
             responseData: responseData,
             response: response
         )
@@ -63,7 +80,7 @@ final class OpenAIService {
             )
             #endif
 
-            return eventStream.makeStream(request: request)
+            return streamClient.makeStream(request: request)
         } catch {
             return AsyncStream { continuation in
                 continuation.yield(.error(.requestFailed("Failed to encode request")))
@@ -95,7 +112,7 @@ final class OpenAIService {
             )
             #endif
 
-            return eventStream.makeStream(request: request)
+            return streamClient.makeStream(request: request)
         } catch {
             return AsyncStream { continuation in
                 continuation.yield(.error(.invalidURL))
@@ -107,7 +124,7 @@ final class OpenAIService {
     // MARK: - Cancel
 
     func cancelStream() {
-        eventStream.cancel()
+        streamClient.cancel()
     }
 
     func cancelResponse(responseId: String, apiKey: String) async throws {
@@ -118,7 +135,7 @@ final class OpenAIService {
                 useDirectBaseURL: false
             )
         } catch {
-            guard FeatureFlags.useCloudflareGateway else {
+            guard requestBuilder.configuration.useCloudflareGateway else {
                 throw error
             }
 
@@ -143,7 +160,7 @@ final class OpenAIService {
             conversationPreview: conversationPreview,
             apiKey: apiKey
         )
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await transport.data(for: request)
         return try responseParser.parseGeneratedTitle(data: data, response: response)
     }
 
@@ -157,7 +174,7 @@ final class OpenAIService {
                 useDirectBaseURL: false
             )
         } catch {
-            guard FeatureFlags.useCloudflareGateway else {
+            guard requestBuilder.configuration.useCloudflareGateway else {
                 throw error
             }
 
@@ -178,20 +195,26 @@ final class OpenAIService {
     // MARK: - Validate API Key
 
     func validateAPIKey(_ apiKey: String) async -> Bool {
-        guard let url = URL(string: "\(FeatureFlags.openAIBaseURL)/models") else {
+        let request: URLRequest
+        do {
+            request = try requestBuilder.modelsRequest(apiKey: apiKey)
+        } catch {
             return false
         }
 
-        var request = URLRequest(url: url)
-        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
-        request.timeoutInterval = 10
-        FeatureFlags.applyCloudflareAuthorization(to: &request)
-
         do {
-            let (_, response) = try await URLSession.shared.data(for: request)
+            let (_, response) = try await transport.data(for: request)
             return (response as? HTTPURLResponse)?.statusCode == 200
         } catch {
             return false
+        }
+    }
+
+    func modelsRequest(apiKey: String) -> URLRequest? {
+        do {
+            return try requestBuilder.modelsRequest(apiKey: apiKey)
+        } catch {
+            return nil
         }
     }
 
@@ -206,7 +229,7 @@ final class OpenAIService {
             useDirectBaseURL: useDirectBaseURL
         )
 
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await transport.data(for: request)
 
         guard let httpResponse = response as? HTTPURLResponse else {
             throw OpenAIServiceError.requestFailed("Invalid response")
@@ -229,7 +252,7 @@ final class OpenAIService {
             useDirectBaseURL: useDirectBaseURL
         )
 
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await transport.data(for: request)
         return try responseParser.parseFetchedResponse(data: data, response: response)
     }
 }

@@ -39,13 +39,25 @@ public enum NativeChatPersistence {
             #endif
             return container
         } catch {
-            fatalError("[NativeChatPersistence] Cannot create ModelContainer after recovery: \(error)")
+            #if DEBUG
+            Loggers.persistence.debug("[NativeChatPersistence] Falling back to in-memory store: \(error.localizedDescription)")
+            #endif
+            return makeInMemoryContainer()
         }
     }
 
     private static func makeContainer() throws -> ModelContainer {
         let configuration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
         return try ModelContainer(for: schema, configurations: [configuration])
+    }
+
+    private static func makeInMemoryContainer() -> ModelContainer {
+        do {
+            let configuration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
+            return try ModelContainer(for: schema, configurations: [configuration])
+        } catch {
+            preconditionFailure("[NativeChatPersistence] Cannot create fallback in-memory ModelContainer: \(error)")
+        }
     }
 
     private static func preserveExistingStoreForRecovery() -> URL? {

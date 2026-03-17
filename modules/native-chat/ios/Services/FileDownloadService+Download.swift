@@ -81,7 +81,7 @@ extension FileDownloadService {
         apiKey: String
     ) async throws -> GeneratedFilePayload {
         var lastError: Error = FileDownloadError.invalidGeneratedFileData
-        let attemptDirectFlags: [Bool] = FeatureFlags.useCloudflareGateway ? [false, true] : [false]
+        let attemptDirectFlags: [Bool] = configurationProvider.useCloudflareGateway ? [false, true] : [false]
 
         for useDirectBaseURL in attemptDirectFlags {
             do {
@@ -138,7 +138,7 @@ extension FileDownloadService {
         apiKey: String,
         useDirectBaseURL: Bool = false
     ) async throws -> (Data, URLResponse) {
-        let baseURL = useDirectBaseURL ? FeatureFlags.directOpenAIBaseURL : FeatureFlags.openAIBaseURL
+        let baseURL = useDirectBaseURL ? configurationProvider.directOpenAIBaseURL : configurationProvider.openAIBaseURL
         let urlString: String
 
         if let containerId, !containerId.isEmpty {
@@ -153,13 +153,14 @@ extension FileDownloadService {
 
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
-        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
         request.timeoutInterval = 120
-        if !useDirectBaseURL {
-            FeatureFlags.applyCloudflareAuthorization(to: &request)
-        }
+        requestAuthorizer.applyAuthorization(
+            to: &request,
+            apiKey: apiKey,
+            includeCloudflareAuthorization: !useDirectBaseURL && configurationProvider.useCloudflareGateway
+        )
 
-        let (data, response) = try await session.data(for: request)
+        let (data, response) = try await transport.data(for: request)
 
         guard let httpResponse = response as? HTTPURLResponse else {
             throw FileDownloadError.invalidResponse
