@@ -16,39 +16,43 @@ final class SnapshotViewTests: XCTestCase {
 
     override func setUp() {
         super.setUp()
-        UIView.setAnimationsEnabled(false)
+        MainActor.assumeIsolated {
+            UIView.setAnimationsEnabled(false)
+        }
     }
 
     override func tearDown() {
-        UIView.setAnimationsEnabled(true)
+        MainActor.assumeIsolated {
+            UIView.setAnimationsEnabled(true)
+        }
         super.tearDown()
     }
 
     func testChatSnapshots() throws {
-        let emptyViewModel = try makeSnapshotChatViewModel(hasAPIKey: false)
+        let emptyViewModel = try makeSnapshotChatScreenStore(hasAPIKey: false)
         assertViewSnapshots(named: "chat-empty") {
             ChatView(viewModel: emptyViewModel)
         }
 
-        let conversationViewModel = try makeSnapshotChatViewModel(hasAPIKey: true)
+        let conversationViewModel = try makeSnapshotChatScreenStore(hasAPIKey: true)
         _ = makeConversationSamples(in: conversationViewModel)
         assertViewSnapshots(named: "chat-standard") {
             ChatView(viewModel: conversationViewModel)
         }
 
-        let richMarkdownViewModel = try makeSnapshotChatViewModel(hasAPIKey: true)
+        let richMarkdownViewModel = try makeSnapshotChatScreenStore(hasAPIKey: true)
         _ = makeRichMarkdownConversationSamples(in: richMarkdownViewModel)
         assertViewSnapshots(named: "chat-rich-assistant-response") {
             ChatView(viewModel: richMarkdownViewModel)
         }
 
-        let codeBlockViewModel = try makeSnapshotChatViewModel(hasAPIKey: true)
+        let codeBlockViewModel = try makeSnapshotChatScreenStore(hasAPIKey: true)
         _ = makeRichMarkdownCodeBlockConversationSamples(in: codeBlockViewModel)
         assertViewSnapshots(named: "chat-rich-assistant-response-code-block") {
             ChatView(viewModel: codeBlockViewModel)
         }
 
-        let streamingViewModel = try makeSnapshotChatViewModel(hasAPIKey: true)
+        let streamingViewModel = try makeSnapshotChatScreenStore(hasAPIKey: true)
         _ = makeConversationSamples(in: streamingViewModel)
         streamingViewModel.isStreaming = true
         streamingViewModel.isThinking = true
@@ -67,21 +71,21 @@ final class SnapshotViewTests: XCTestCase {
             ChatView(viewModel: streamingViewModel)
         }
 
-        let errorViewModel = try makeSnapshotChatViewModel(hasAPIKey: true)
+        let errorViewModel = try makeSnapshotChatScreenStore(hasAPIKey: true)
         _ = makeConversationSamples(in: errorViewModel)
         errorViewModel.errorMessage = "Connection lost. Please check your network and try again."
         assertViewSnapshots(named: "chat-error") {
             ChatView(viewModel: errorViewModel)
         }
 
-        let restoringViewModel = try makeSnapshotChatViewModel(hasAPIKey: true)
+        let restoringViewModel = try makeSnapshotChatScreenStore(hasAPIKey: true)
         _ = makeConversationSamples(in: restoringViewModel)
         restoringViewModel.isRestoringConversation = true
         assertViewSnapshots(named: "chat-restoring") {
             ChatView(viewModel: restoringViewModel)
         }
 
-        let recoveringViewModel = try makeSnapshotChatViewModel(hasAPIKey: true)
+        let recoveringViewModel = try makeSnapshotChatScreenStore(hasAPIKey: true)
         _ = makeConversationSamples(in: recoveringViewModel)
         if let liveDraft = recoveringViewModel.messages.last {
             recoveringViewModel.visibleSessionMessageID = liveDraft.id
@@ -98,8 +102,9 @@ final class SnapshotViewTests: XCTestCase {
 
     func testHistorySnapshots() throws {
         let container = try makeHistorySnapshotContainer()
+        let store = makeHistoryScreenStore()
         assertViewSnapshots(named: "history-list") {
-            HistoryView()
+            HistoryView(store: store)
                 .modelContainer(container)
         }
     }
@@ -114,10 +119,20 @@ final class SnapshotViewTests: XCTestCase {
         }
     }
 
-    func testModelSelectorSnapshots() {
-        assertViewSnapshots(named: "model-selector") {
-            SnapshotModelSelectorHost()
-        }
+    func testModelSelectorPhoneLightSnapshot() {
+        assertModelSelectorSnapshot(variant: .phoneLight)
+    }
+
+    func testModelSelectorPhoneDarkSnapshot() {
+        assertModelSelectorSnapshot(variant: .phoneDark)
+    }
+
+    func testModelSelectorPadLightSnapshot() {
+        assertModelSelectorSnapshot(variant: .padLight)
+    }
+
+    func testModelSelectorPadDarkSnapshot() {
+        assertModelSelectorSnapshot(variant: .padDark)
     }
 
     func testFilePreviewSnapshots() throws {
@@ -147,7 +162,20 @@ final class SnapshotViewTests: XCTestCase {
     }
 }
 
+@MainActor
+private func assertModelSelectorSnapshot(variant: SnapshotTestThemeVariant) {
+    assertViewSnapshots(
+        named: "model-selector",
+        variants: [variant],
+        testName: "testModelSelectorSnapshots"
+    ) {
+        SnapshotModelSelectorHost(variant: variant)
+    }
+}
+
 private struct SnapshotModelSelectorHost: View {
+    let variant: SnapshotTestThemeVariant
+
     @State private var configuration = ConversationConfiguration(
         model: .gpt5_4_pro,
         reasoningEffort: .xhigh,
@@ -156,25 +184,41 @@ private struct SnapshotModelSelectorHost: View {
     )
 
     var body: some View {
-        ZStack {
-            Color.black.opacity(0.08)
-                .ignoresSafeArea()
+        GeometryReader { proxy in
+            ZStack(alignment: .top) {
+                backgroundColor
+                    .ignoresSafeArea()
 
-            ModelSelectorSheet(
-                proModeEnabled: Binding(
-                    get: { configuration.proModeEnabled },
-                    set: { configuration.proModeEnabled = $0 }
-                ),
-                backgroundModeEnabled: $configuration.backgroundModeEnabled,
-                flexModeEnabled: Binding(
-                    get: { configuration.flexModeEnabled },
-                    set: { configuration.flexModeEnabled = $0 }
-                ),
-                reasoningEffort: $configuration.reasoningEffort,
-                onDone: {}
-            )
-            .padding(.horizontal, 16)
-            .padding(.top, 56)
+                ModelSelectorSheet(
+                    proModeEnabled: Binding(
+                        get: { configuration.proModeEnabled },
+                        set: { configuration.proModeEnabled = $0 }
+                    ),
+                    backgroundModeEnabled: $configuration.backgroundModeEnabled,
+                    flexModeEnabled: Binding(
+                        get: { configuration.flexModeEnabled },
+                        set: { configuration.flexModeEnabled = $0 }
+                    ),
+                    reasoningEffort: $configuration.reasoningEffort,
+                    onDone: {}
+                )
+                .padding(.horizontal, 16)
+                .padding(.top, topInset)
+            }
+            .frame(width: proxy.size.width, height: proxy.size.height, alignment: .top)
+        }
+    }
+
+    private var topInset: CGFloat {
+        variant.imageConfig.safeArea.top + 56
+    }
+
+    private var backgroundColor: Color {
+        switch variant.appTheme {
+        case .dark:
+            return .black
+        default:
+            return Color(.systemBackground)
         }
     }
 }

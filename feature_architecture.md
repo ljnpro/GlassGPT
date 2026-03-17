@@ -97,7 +97,7 @@ Add new cases:
 - Upload progress indicator
 - Shown in input area (like image preview) and in user message bubble
 
-## ChatViewModel Changes
+## ChatScreenStore Changes
 - Add `currentToolState` property for streaming UI
 - Add `selectedFileAttachments: [FileAttachment]` for pending uploads
 - Handle new StreamEvent cases

@@ -2,7 +2,7 @@ import Foundation
 import UIKit
 
 @MainActor
-extension ChatViewModel {
+extension ChatScreenStore {
 
     // MARK: - Lifecycle Observers
 

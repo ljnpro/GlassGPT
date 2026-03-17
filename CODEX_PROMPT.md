@@ -53,8 +53,8 @@ modules/native-chat/ios/
 │   ├── RelayAPIService.swift      # TO BE REMOVED/REPLACED
 │   └── RelaySocketService.swift   # TO BE REMOVED/REPLACED
 ├── ViewModels/
-│   ├── ChatViewModel.swift
-│   └── SettingsViewModel.swift
+│   ├── ChatScreenStore.swift
+│   └── SettingsScreenStore.swift
 └── Views/
     ├── Chat/
     │   ├── ChatView.swift
@@ -187,7 +187,7 @@ private func downloadFromAPI(fileId: String, apiKey: String) async throws -> (Da
 
 Remove imports/references to `RelayAPIService`, `RELAY_HTTP_BASE_PATH`.
 
-### 4. `ChatViewModel.swift` — Remove relay mode, always use direct (through gateway)
+### 4. `ChatScreenStore.swift` — Remove relay mode, always use direct (through gateway)
 
 This is the biggest change:
 
@@ -247,7 +247,7 @@ Section {
 
 Add computed properties for `cloudflareStatusColor` and `cloudflareStatusText` based on `viewModel.cloudflareHealthStatus`.
 
-### 6. `SettingsViewModel.swift` — Replace relay health check with Cloudflare health check
+### 6. `SettingsScreenStore.swift` — Replace relay health check with Cloudflare health check
 
 **Replace** `RelayHealthStatus` with:
 ```swift

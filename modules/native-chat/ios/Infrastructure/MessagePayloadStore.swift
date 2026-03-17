@@ -76,7 +76,9 @@ enum MessagePayloadStore {
 
     private static func canonicalData<T: Encodable>(for value: T) -> Data {
         do {
-            return try JSONCoding.encode(value)
+            let encoder = JSONEncoder()
+            encoder.outputFormatting = [.sortedKeys]
+            return try encoder.encode(value)
         } catch {
             Loggers.persistence.error("[MessagePayloadStore] Failed to encode payload digest: \(error.localizedDescription)")
             return Data()

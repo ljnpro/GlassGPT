@@ -23,16 +23,9 @@ struct SSEEventDecoder {
             return .continued
         }
 
-        let json: [String: Any]
-        do {
-            json = try JSONCoding.jsonObject(from: jsonData)
-        } catch {
-            return .continued
-        }
+        let sequenceNumber = OpenAIStreamEventTranslator.extractSequenceNumber(from: jsonData)
 
-        let sequenceNumber = OpenAIStreamEventTranslator.extractSequenceNumber(from: json)
-
-        if let translated = OpenAIStreamEventTranslator.translate(eventType: frame.type, data: json) {
+        if let translated = OpenAIStreamEventTranslator.translate(eventType: frame.type, data: jsonData) {
             switch translated {
             case .textDelta(let delta):
                 emittedAnyOutput = true
@@ -107,7 +100,9 @@ struct SSEEventDecoder {
 
         switch frame.type {
         case "response.output_text.done":
-            if let fullText = json["text"] as? String, !fullText.isEmpty {
+            if let envelope = decodeEnvelope(from: jsonData),
+               let fullText = envelope.text,
+               !fullText.isEmpty {
                 accumulatedText = fullText
                 emittedAnyOutput = true
             }
@@ -172,5 +167,13 @@ struct SSEEventDecoder {
     ) {
         guard let sequenceNumber else { return }
         continuation.yield(.sequenceUpdate(sequenceNumber))
+    }
+
+    private func decodeEnvelope(from data: Data) -> ResponsesStreamEnvelopeDTO? {
+        do {
+            return try JSONCoding.decode(ResponsesStreamEnvelopeDTO.self, from: data)
+        } catch {
+            return nil
+        }
     }
 }

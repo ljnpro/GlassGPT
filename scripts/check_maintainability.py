@@ -12,6 +12,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 PRODUCTION_ROOTS = [
     ROOT / "modules" / "native-chat" / "ios",
+    ROOT / "modules" / "native-chat" / "Sources",
     ROOT / "ios" / "GlassGPT",
 ]
 
@@ -67,8 +68,42 @@ def count_pattern(files: list[Path], label: str, pattern: str, limit: int) -> Ch
     return CheckResult(label=label, count=count, limit=limit, matches=matches[:20])
 
 
+def count_fatal_errors(files: list[Path], limit: int) -> CheckResult:
+    count = 0
+    matches: list[str] = []
+
+    for path in files:
+        lines = path.read_text(encoding="utf-8").splitlines()
+        hit_count = 0
+
+        for index, line in enumerate(lines):
+            if "fatalError(" not in line:
+                continue
+
+            window_start = max(index - 3, 0)
+            context = "\n".join(lines[window_start:index + 1])
+            if "required init?(coder:" in context:
+                continue
+
+            hit_count += 1
+
+        if hit_count == 0:
+            continue
+
+        count += hit_count
+        matches.append(f"{hit_count}\t{relative(path)}")
+
+    return CheckResult(
+        label="production fatalError()",
+        count=count,
+        limit=limit,
+        matches=matches[:20],
+    )
+
+
 def classify_ui(path: Path) -> bool:
-    return "/Views/" in f"/{relative(path)}/"
+    relative_path = f"/{relative(path)}/"
+    return "/Views/" in relative_path or "/ScreenStores/" in relative_path
 
 
 def line_length_results(files: list[Path]) -> list[CheckResult]:
@@ -104,10 +139,15 @@ def main() -> int:
     files = production_swift_files()
 
     checks = [
-        count_pattern(files, "production try?", r"\btry\?\b", MAX_TRY_OPTIONAL),
-        count_pattern(files, "production [String: Any]", r"\[String:\s*Any\]", MAX_STRINGLY_TYPED),
+        count_pattern(files, "production try?", r"\btry\?\s*(?:[A-Za-z_(\[])", MAX_TRY_OPTIONAL),
+        count_pattern(
+            files,
+            "production [String: Any]",
+            r"(?:\[\s*String\s*:\s*Any\s*\]|Dictionary\s*<\s*String\s*,\s*Any\s*>)",
+            MAX_STRINGLY_TYPED,
+        ),
         count_pattern(files, "production JSONSerialization", r"\bJSONSerialization\b", MAX_JSON_SERIALIZATION),
-        count_pattern(files, "production fatalError()", r"\bfatalError\s*\(", MAX_FATAL_ERRORS),
+        count_fatal_errors(files, MAX_FATAL_ERRORS),
         count_pattern(files, "production preconditionFailure()", r"\bpreconditionFailure\s*\(", MAX_PRECONDITION_FAILURES),
         count_pattern(files, "production @unchecked Sendable", r"@unchecked\s+Sendable", MAX_UNCHECKED_SENDABLE),
     ]

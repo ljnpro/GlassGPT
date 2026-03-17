@@ -1,6 +1,6 @@
 import Foundation
 
-protocol APIKeyPersisting {
+protocol APIKeyPersisting: Sendable {
     func saveAPIKey(_ apiKey: String) throws
     func loadAPIKey() -> String?
     func deleteAPIKey()
@@ -8,8 +8,8 @@ protocol APIKeyPersisting {
 
 extension KeychainService: APIKeyPersisting {}
 
-final class APIKeyStore: @unchecked Sendable {
-    static let shared = APIKeyStore()
+final class APIKeyStore {
+    nonisolated(unsafe) static let shared = APIKeyStore()
 
     private let backend: APIKeyPersisting
 

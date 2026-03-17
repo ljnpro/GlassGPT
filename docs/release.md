@@ -7,6 +7,7 @@
 - 4.2 release branch: `codex/stable-4.2` (maintenance only)
 - 4.3 release branch: `codex/stable-4.3`
 - 4.3.1 development work happens on `codex/feature/<topic>`
+- version/build source of truth is `ios/GlassGPT/Config/Versions.xcconfig`
 - Local credentials remain in `.local/publish.env`
 - Local machine-specific release helper remains `.local/one_click_release.sh`
 

@@ -1,7 +1,7 @@
 import Foundation
 
 @MainActor
-extension ChatViewModel {
+extension ChatScreenStore {
 
     // MARK: - New Chat
 
@@ -30,6 +30,7 @@ extension ChatViewModel {
         sharedGeneratedFileItem = nil
         fileDownloadError = nil
         loadDefaultsFromSettings()
+        syncConversationProjection()
         HapticService.shared.selection()
     }
 
@@ -93,6 +94,7 @@ extension ChatViewModel {
         detachVisibleSessionBinding()
         currentConversation = conversation
         messages = visibleMessages(for: conversation)
+        syncConversationProjection()
 
         applyConversationConfiguration(from: conversation)
 

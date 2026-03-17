@@ -251,6 +251,272 @@ final class ChatSessionDecisionsTests: XCTestCase {
     }
 
     @MainActor
+    func testStreamingTransitionReducerTracksThinkingTextAndToolCode() {
+        let session = makeResponseSession()
+
+        XCTAssertFalse(StreamingTransitionReducer.applyTextDelta("Hello", to: session))
+        XCTAssertEqual(session.currentText, "Hello")
+
+        XCTAssertTrue(StreamingTransitionReducer.setThinking(true, for: session))
+        XCTAssertTrue(StreamingTransitionReducer.applyTextDelta(" world", to: session))
+        XCTAssertEqual(session.currentText, "Hello world")
+        XCTAssertEqual(session.currentThinking, "")
+
+        StreamingTransitionReducer.applyThinkingDelta("plan", to: session)
+        XCTAssertEqual(session.currentThinking, "plan")
+        XCTAssertFalse(StreamingTransitionReducer.setThinking(true, for: session))
+        XCTAssertTrue(StreamingTransitionReducer.setThinking(false, for: session))
+
+        XCTAssertTrue(
+            StreamingTransitionReducer.startToolCallIfNeeded(
+                in: session,
+                id: "tool_1",
+                type: .codeInterpreter
+            )
+        )
+        XCTAssertTrue(
+            StreamingTransitionReducer.appendToolCodeDelta(
+                in: session,
+                id: "tool_1",
+                delta: "print("
+            )
+        )
+        XCTAssertTrue(
+            StreamingTransitionReducer.appendToolCodeDelta(
+                in: session,
+                id: "tool_1",
+                delta: "\"ok\")"
+            )
+        )
+        XCTAssertEqual(session.toolCalls.first?.code, "print(\"ok\")")
+        XCTAssertTrue(
+            StreamingTransitionReducer.setToolCode(
+                in: session,
+                id: "tool_1",
+                code: "print(\"final\")"
+            )
+        )
+        XCTAssertEqual(session.toolCalls.first?.code, "print(\"final\")")
+        XCTAssertTrue(
+            StreamingTransitionReducer.setToolCallStatus(
+                in: session,
+                id: "tool_1",
+                status: .completed
+            )
+        )
+        XCTAssertEqual(session.toolCalls.first?.status, .completed)
+        XCTAssertFalse(
+            StreamingTransitionReducer.setToolCode(
+                in: session,
+                id: "missing",
+                code: "noop"
+            )
+        )
+        XCTAssertFalse(
+            StreamingTransitionReducer.appendToolCodeDelta(
+                in: session,
+                id: "missing",
+                delta: "noop"
+            )
+        )
+        XCTAssertFalse(
+            StreamingTransitionReducer.setToolCallStatus(
+                in: session,
+                id: "missing",
+                status: .completed
+            )
+        )
+    }
+
+    @MainActor
+    func testStreamingTransitionReducerMergeTerminalPayloadKeepsExistingValuesWhenIncomingValuesAreEmpty() {
+        let session = makeResponseSession()
+        session.currentText = "existing text"
+        session.currentThinking = "existing thinking"
+        session.filePathAnnotations = [
+            FilePathAnnotation(
+                fileId: "existing-file",
+                containerId: nil,
+                sandboxPath: "sandbox:/mnt/data/existing.txt",
+                filename: "existing.txt",
+                startIndex: 0,
+                endIndex: 10
+            )
+        ]
+
+        StreamingTransitionReducer.mergeTerminalPayload(
+            text: "",
+            thinking: "",
+            filePathAnnotations: [],
+            into: session
+        )
+
+        XCTAssertEqual(session.currentText, "existing text")
+        XCTAssertEqual(session.currentThinking, "existing thinking")
+        XCTAssertEqual(session.filePathAnnotations.count, 1)
+
+        let replacement = [
+            FilePathAnnotation(
+                fileId: "replacement-file",
+                containerId: "container_1",
+                sandboxPath: "sandbox:/mnt/data/replacement.txt",
+                filename: "replacement.txt",
+                startIndex: 1,
+                endIndex: 11
+            )
+        ]
+
+        StreamingTransitionReducer.mergeTerminalPayload(
+            text: "final text",
+            thinking: "final thinking",
+            filePathAnnotations: replacement,
+            into: session
+        )
+
+        XCTAssertEqual(session.currentText, "final text")
+        XCTAssertEqual(session.currentThinking, "final thinking")
+        XCTAssertEqual(session.filePathAnnotations, replacement)
+    }
+
+    @MainActor
+    func testSessionVisibilityCoordinatorVisibleAndClearedStateMirrorSessionRuntime() {
+        let conversation = Conversation()
+        let draft = Message(role: .assistant, content: "draft", conversation: conversation)
+        let session = ResponseSession(
+            message: draft,
+            conversationID: conversation.id,
+            service: OpenAIService(),
+            requestModel: .gpt5_4_pro,
+            requestEffort: .xhigh,
+            requestUsesBackgroundMode: true,
+            requestServiceTier: .flex
+        )
+        session.currentText = "visible text"
+        session.currentThinking = "visible thinking"
+        session.toolCalls = [
+            ToolCallInfo(
+                id: "tool_1",
+                type: .webSearch,
+                status: .searching,
+                code: nil,
+                results: nil,
+                queries: ["glassgpt"]
+            )
+        ]
+        session.citations = [
+            URLCitation(
+                url: "https://example.com",
+                title: "Example",
+                startIndex: 0,
+                endIndex: 7
+            )
+        ]
+        session.filePathAnnotations = [
+            FilePathAnnotation(
+                fileId: "file_123",
+                containerId: nil,
+                sandboxPath: "sandbox:/mnt/data/file.txt",
+                filename: "file.txt",
+                startIndex: 0,
+                endIndex: 8
+            )
+        ]
+        session.lastSequenceNumber = 42
+        session.beginRecoveryStream(streamID: UUID())
+        session.isThinking = true
+
+        let visibleState = SessionVisibilityCoordinator.visibleState(from: session, draftMessage: draft)
+
+        XCTAssertEqual(visibleState.draftMessage?.id, draft.id)
+        XCTAssertEqual(visibleState.currentStreamingText, "visible text")
+        XCTAssertEqual(visibleState.currentThinkingText, "visible thinking")
+        XCTAssertEqual(visibleState.activeToolCalls, session.toolCalls)
+        XCTAssertEqual(visibleState.liveCitations, session.citations)
+        XCTAssertEqual(visibleState.liveFilePathAnnotations, session.filePathAnnotations)
+        XCTAssertEqual(visibleState.lastSequenceNumber, 42)
+        XCTAssertEqual(visibleState.activeRequestModel, .gpt5_4_pro)
+        XCTAssertEqual(visibleState.activeRequestEffort, .xhigh)
+        XCTAssertTrue(visibleState.activeRequestUsesBackgroundMode)
+        XCTAssertEqual(visibleState.activeRequestServiceTier, .flex)
+        XCTAssertTrue(visibleState.isStreaming)
+        XCTAssertTrue(visibleState.isRecovering)
+        XCTAssertEqual(visibleState.visibleRecoveryPhase, .streamResuming)
+        XCTAssertTrue(visibleState.isThinking)
+
+        let retained = SessionVisibilityCoordinator.clearedState(retaining: draft, clearDraft: false)
+        XCTAssertEqual(retained.draftMessage?.id, draft.id)
+        XCTAssertFalse(retained.isStreaming)
+        XCTAssertFalse(retained.isRecovering)
+        XCTAssertEqual(retained.visibleRecoveryPhase, .idle)
+        XCTAssertEqual(retained.activeToolCalls, [])
+
+        let cleared = SessionVisibilityCoordinator.clearedState(retaining: draft, clearDraft: true)
+        XCTAssertNil(cleared.draftMessage)
+        XCTAssertEqual(cleared.currentStreamingText, "")
+        XCTAssertEqual(cleared.currentThinkingText, "")
+        XCTAssertEqual(cleared.activeRequestModel, nil)
+    }
+
+    @MainActor
+    func testChatSessionRegistryRemoveAllAndActiveMessageSelectionPreferRegisteredSessions() {
+        let registry = ChatSessionRegistry()
+        let conversation = Conversation()
+        let olderDraft = Message(role: .assistant, content: "", conversation: conversation, isComplete: false)
+        olderDraft.createdAt = Date(timeIntervalSince1970: 1)
+        let newerDraft = Message(role: .assistant, content: "", conversation: conversation, isComplete: false)
+        newerDraft.createdAt = Date(timeIntervalSince1970: 2)
+        let completed = Message(role: .assistant, content: "done", conversation: conversation, isComplete: true)
+        conversation.messages = [olderDraft, newerDraft, completed]
+
+        let olderSession = ResponseSession(
+            message: olderDraft,
+            conversationID: conversation.id,
+            service: OpenAIService(),
+            requestModel: .gpt5_4,
+            requestEffort: .high,
+            requestUsesBackgroundMode: false,
+            requestServiceTier: .standard
+        )
+        let newerSession = ResponseSession(
+            message: newerDraft,
+            conversationID: conversation.id,
+            service: OpenAIService(),
+            requestModel: .gpt5_4,
+            requestEffort: .high,
+            requestUsesBackgroundMode: false,
+            requestServiceTier: .standard
+        )
+
+        registry.register(olderSession, visible: false) { _ in }
+        registry.register(newerSession, visible: true) { _ in }
+
+        XCTAssertTrue(registry.hasVisibleSession(in: conversation.id))
+        XCTAssertEqual(
+            registry.activeMessageID(
+                in: conversation,
+                fallbackMessages: [completed, olderDraft, newerDraft]
+            ),
+            newerDraft.id
+        )
+
+        var cancelled: [UUID] = []
+        registry.remove(olderSession) { cancelled.append($0.messageID) }
+        XCTAssertEqual(cancelled, [olderSession.messageID])
+        XCTAssertNil(registry.session(for: olderDraft.id))
+
+        registry.removeAll { cancelled.append($0.messageID) }
+        XCTAssertNil(registry.visibleMessageID)
+        XCTAssertFalse(registry.hasVisibleSession(in: conversation.id))
+        XCTAssertNil(
+            registry.activeMessageID(
+                in: conversation,
+                fallbackMessages: [completed, olderDraft, newerDraft]
+            )
+        )
+        XCTAssertEqual(Set(cancelled), Set([olderSession.messageID, newerSession.messageID]))
+    }
+
+    @MainActor
     func testResponseSessionCopiesRuntimeStateFromMessageMetadata() {
         let conversation = Conversation()
         let source = Message(
@@ -569,5 +835,109 @@ final class ChatSessionDecisionsTests: XCTestCase {
         MessagePersistenceAdapter().refreshFileAnnotations(replacement, on: source)
 
         XCTAssertEqual(source.filePathAnnotations, replacement)
+    }
+
+    @MainActor
+    func testApplyRecoveredResultUsesFetchedPayloadAndFallsBackWhenNeeded() {
+        let conversation = Conversation()
+        let message = Message(
+            role: .assistant,
+            content: "",
+            thinking: nil,
+            conversation: conversation,
+            isComplete: false
+        )
+
+        let result = OpenAIResponseFetchResult(
+            status: .completed,
+            text: "",
+            thinking: nil,
+            annotations: [
+                URLCitation(
+                    url: "https://example.com/recovered",
+                    title: "Recovered",
+                    startIndex: 0,
+                    endIndex: 9
+                )
+            ],
+            toolCalls: [
+                ToolCallInfo(
+                    id: "tool_1",
+                    type: .codeInterpreter,
+                    status: .completed,
+                    code: "print(1)",
+                    results: ["1"],
+                    queries: nil
+                )
+            ],
+            filePathAnnotations: [
+                FilePathAnnotation(
+                    fileId: "file_recovered",
+                    containerId: "container_1",
+                    sandboxPath: "sandbox:/mnt/data/recovered.txt",
+                    filename: "recovered.txt",
+                    startIndex: 0,
+                    endIndex: 12
+                )
+            ],
+            errorMessage: nil
+        )
+
+        MessagePersistenceAdapter().applyRecoveredResult(
+            result,
+            to: message,
+            fallbackText: "fallback text",
+            fallbackThinking: "fallback thinking"
+        )
+
+        XCTAssertEqual(message.content, "fallback text")
+        XCTAssertEqual(message.thinking, "fallback thinking")
+        XCTAssertEqual(message.annotations, result.annotations)
+        XCTAssertEqual(message.toolCalls, result.toolCalls)
+        XCTAssertEqual(message.filePathAnnotations, result.filePathAnnotations)
+        XCTAssertTrue(message.isComplete)
+        XCTAssertNil(message.lastSequenceNumber)
+    }
+
+    @MainActor
+    func testSetFileAttachmentsStoresPayloadOnMessage() {
+        let message = Message(role: .assistant, content: "seed")
+        let attachments = [
+            FileAttachment(
+                filename: "report.pdf",
+                fileSize: 1024,
+                fileType: "application/pdf",
+                fileId: "file_123",
+                localData: nil,
+                uploadStatus: .uploaded
+            )
+        ]
+
+        MessagePersistenceAdapter().setFileAttachments(attachments, on: message)
+
+        XCTAssertEqual(message.fileAttachments.count, 1)
+        XCTAssertEqual(message.fileAttachments.first?.filename, "report.pdf")
+        XCTAssertEqual(message.fileAttachments.first?.fileId, "file_123")
+        XCTAssertEqual(message.fileAttachments.first?.uploadStatus.rawValue, FileUploadStatus.uploaded.rawValue)
+    }
+
+    @MainActor
+    private func makeResponseSession(
+        model: ModelType = .gpt5_4,
+        effort: ReasoningEffort = .high,
+        usesBackgroundMode: Bool = true,
+        serviceTier: ServiceTier = .standard
+    ) -> ResponseSession {
+        let conversation = Conversation()
+        let message = Message(role: .assistant, content: "", conversation: conversation)
+        return ResponseSession(
+            message: message,
+            conversationID: conversation.id,
+            service: OpenAIService(),
+            requestModel: model,
+            requestEffort: effort,
+            requestUsesBackgroundMode: usesBackgroundMode,
+            requestServiceTier: serviceTier
+        )
     }
 }

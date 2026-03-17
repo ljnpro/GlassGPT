@@ -2,14 +2,21 @@ import SwiftUI
 import UIKit
 
 struct SettingsView: View {
-    @State private var viewModel: SettingsViewModel
+    @State private var viewModel: SettingsScreenStore
     private let appVersionStringOverride: String?
 
+    @MainActor
     init(
-        viewModel: SettingsViewModel = SettingsViewModel(),
+        viewModel: SettingsScreenStore,
         appVersionStringOverride: String? = nil
     ) {
         _viewModel = State(initialValue: viewModel)
+        self.appVersionStringOverride = appVersionStringOverride
+    }
+
+    @MainActor
+    init(appVersionStringOverride: String? = nil) {
+        _viewModel = State(initialValue: SettingsScreenStore())
         self.appVersionStringOverride = appVersionStringOverride
     }
 

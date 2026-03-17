@@ -23,7 +23,7 @@ final class ResponseSession {
     var toolCalls: [ToolCallInfo]
     var citations: [URLCitation]
     var filePathAnnotations: [FilePathAnnotation]
-    private(set) var runtimeState: ConversationRuntimeState
+    private(set) var runtimeState: ChatRuntimeState
     var lastDraftSaveTime: Date = .distantPast
     var task: Task<Void, Never>?
 
@@ -50,7 +50,7 @@ final class ResponseSession {
         self.toolCalls = message.toolCalls
         self.citations = message.annotations
         self.filePathAnnotations = message.filePathAnnotations
-        self.runtimeState = ConversationRuntimeState(
+        self.runtimeState = ChatRuntimeState(
             responseId: message.responseId,
             lastSequenceNumber: message.lastSequenceNumber,
             backgroundResumable: message.usedBackgroundMode
@@ -85,7 +85,7 @@ final class ResponseSession {
         set { runtimeState.activeStreamID = newValue }
     }
 
-    var phase: ConversationRuntimePhase {
+    var phase: ChatRuntimeEnginePhase {
         runtimeState.phase
     }
 
