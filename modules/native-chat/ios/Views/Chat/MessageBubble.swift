@@ -229,6 +229,8 @@ struct MessageBubble: View {
             onSandboxLinkTap: onSandboxLinkTap,
             surfaceStyle: .assistant(isLive: isDisplayingLiveAssistantState)
         )
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("chat.assistant.surface")
         .contentShape(.contextMenuPreview, RoundedRectangle(cornerRadius: 20))
         .contextMenu {
             copyButton

@@ -47,81 +47,6 @@ struct MarkdownContentView: View {
         parseBlocks(text)
     }
 
-    var normalizedAssistantBlockParts: [BlockPart] {
-        splitAssistantRichTextParts(blockParts)
-    }
-
-    var shouldUseSegmentedAssistantSurface: Bool {
-        normalizedAssistantBlockParts.contains { part in
-            switch part {
-            case .codeBlock, .latexBlock:
-                return true
-            default:
-                return false
-            }
-        } || normalizedAssistantBlockParts.count > 4 || text.count > 900
-    }
-
-    var assistantSurfaceSections: [AssistantSurfaceSection] {
-        var sections: [AssistantSurfaceSection] = []
-        var currentParts: [BlockPart] = []
-        var currentWeight = 0
-
-        func flushCurrentParts() {
-            guard !currentParts.isEmpty else { return }
-            sections.append(
-                AssistantSurfaceSection(
-                    id: currentParts[0].id,
-                    presentation: .content(parts: currentParts)
-                )
-            )
-            currentParts = []
-            currentWeight = 0
-        }
-
-        for part in normalizedAssistantBlockParts {
-            switch part {
-            case let .codeBlock(_, language, code):
-                flushCurrentParts()
-                sections.append(
-                    AssistantSurfaceSection(
-                        id: part.id,
-                        presentation: .code(language: language, code: code)
-                    )
-                )
-            case let .latexBlock(_, content):
-                flushCurrentParts()
-                sections.append(
-                    AssistantSurfaceSection(
-                        id: part.id,
-                        presentation: .latex(content: content)
-                    )
-                )
-            default:
-                if part.startsAssistantSection, !currentParts.isEmpty {
-                    flushCurrentParts()
-                }
-
-                let weight = part.assistantGroupingWeight
-                let shouldSplit = !currentParts.isEmpty && (
-                    currentParts.count >= 2 || currentWeight + weight > 5
-                )
-
-                if shouldSplit {
-                    flushCurrentParts()
-                }
-
-                currentParts.append(part)
-                currentWeight += weight
-            }
-        }
-
-        flushCurrentParts()
-        return sections.isEmpty
-            ? [AssistantSurfaceSection(id: 0, presentation: .content(parts: normalizedAssistantBlockParts))]
-            : sections
-    }
-
     var body: some View {
         switch surfaceStyle {
         case .plain:
@@ -131,43 +56,13 @@ struct MarkdownContentView: View {
             )
 
         case .assistant(let isLive):
-            if shouldUseSegmentedAssistantSurface {
-                VStack(alignment: .leading, spacing: 10) {
-                    ForEach(assistantSurfaceSections) { section in
-                        assistantSurfaceView(section, isLive: isLive)
-                    }
-                }
-            } else {
-                blockStack(
-                    for: blockParts,
-                    codeBlockSurfaceStyle: .embedded
-                )
-                .padding(12)
-                .assistantSingleSurfaceGlass(isLive: isLive)
-            }
-        }
-    }
-
-    @ViewBuilder
-    func assistantSurfaceView(_ section: AssistantSurfaceSection, isLive: Bool) -> some View {
-        switch section.presentation {
-        case let .content(parts):
             blockStack(
-                for: parts,
+                for: blockParts,
                 codeBlockSurfaceStyle: .embedded
             )
-            .padding(section.contentPadding)
+            // Keep one logical assistant reply inside one outer bubble.
+            .padding(12)
             .assistantSingleSurfaceGlass(isLive: isLive)
-
-        case let .code(language, code):
-            CodeBlockView(
-                language: language,
-                code: code,
-                surfaceStyle: .standalone
-            )
-
-        case let .latex(content):
-            StandaloneBlockLaTeXCardView(latex: content)
         }
     }
 

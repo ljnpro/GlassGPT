@@ -36,6 +36,18 @@ final class SnapshotViewTests: XCTestCase {
             ChatView(viewModel: conversationViewModel)
         }
 
+        let richMarkdownViewModel = try makeSnapshotChatViewModel(hasAPIKey: true)
+        _ = makeRichMarkdownConversationSamples(in: richMarkdownViewModel)
+        assertViewSnapshots(named: "chat-rich-assistant-response") {
+            ChatView(viewModel: richMarkdownViewModel)
+        }
+
+        let codeBlockViewModel = try makeSnapshotChatViewModel(hasAPIKey: true)
+        _ = makeRichMarkdownCodeBlockConversationSamples(in: codeBlockViewModel)
+        assertViewSnapshots(named: "chat-rich-assistant-response-code-block") {
+            ChatView(viewModel: codeBlockViewModel)
+        }
+
         let streamingViewModel = try makeSnapshotChatViewModel(hasAPIKey: true)
         _ = makeConversationSamples(in: streamingViewModel)
         streamingViewModel.isStreaming = true
