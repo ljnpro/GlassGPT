@@ -1,46 +1,48 @@
-# 4.2.4 Architecture
+# 4.4.1 Architecture
 
 ## Goal
 
-Refactor the app for maintainability while preserving the exact 4.2.3 user experience.
+Refactor the app for maintainability while preserving the exact `4.4.0` user experience.
 
 ## Layering
 
 - App shell: `ios/GlassGPT`
   - owns the iOS app entrypoint and target-specific plist/resources
-- Product package: `modules/native-chat/ios`
-  - still ships as a single `NativeChat` product target for 4.2.4 stability
-  - internally organized into explicit logical modules with dedicated contracts and tests
+- Product package: `modules/native-chat`
+  - still ships a single `NativeChat` product to the app target
+  - internally split into real source targets with direct tests and explicit dependency boundaries
 
-## 4.2.4 Internal Boundaries
+## 4.4.1 Internal Boundaries
 
-- `Core`
-  - persistence models, repositories, stores, logging, and stable value types
-  - implemented through `Models`, `Repositories`, `Stores`, `Infrastructure`
-- `Transport`
-  - OpenAI request building, response parsing, SSE framing/decoding, stream event translation
-  - implemented through focused files under `Services` such as `OpenAITransportModels`, `OpenAIService`, `SSEEventDecoder`, `SSEFrameBuffer`
-- `Files`
-  - generated file cache, download, annotation matching, and preview/share presentation mapping
-  - implemented through `GeneratedFileCacheStore`, `GeneratedFileAnnotationMatcher`, `GeneratedFilePresentationMapper`, `FilePreviewModels`
 - `ChatDomain`
-  - response session state, session registry, visible-state projection, stream transition reduction, recovery decisions
-  - implemented through `ChatDomain/*` plus `ChatSessionDecisions`
-- `UI`
-  - `ChatScreenStore` façade, settings façade, SwiftUI/UIKit views, KaTeX rendering, haptics, and test scenario bootstrapping
+  - stable value types and payload models such as themes, model selection, attachments, annotations, tool calls, and generated-file descriptors
+- `ChatPersistence`
+  - store snapshots, migration planning, and persistence-facing contracts
+- `OpenAITransport`
+  - request DTOs, response DTOs, request factories, transport configuration, stream envelopes, and service errors
+- `GeneratedFiles`
+  - generated-file cache storage, cache policy, metadata normalization, and logging
+- `ChatRuntime`
+  - runtime decision policies and state-transition helpers that do not require UI ownership
+- `ChatFeatures`
+  - feature-level bootstrap policies and orchestration glue that remain testable without the full UI shell
+- `ChatUI`
+  - UIKit/SwiftUI hosts and reusable presentation primitives that do not own chat business logic
+- `NativeChat` (`modules/native-chat/ios`)
+  - composition root, SwiftData entities, repositories, screen stores, views, and release-stable shims that preserve the app-facing contract
 
 ## Design Rules
 
-- Preserve view output and interaction behavior. Extract logic out of views and view models; do not redesign UI.
-- Keep `ChatScreenStore` as the single facade consumed by chat views.
-- Keep `OpenAIService` as the public facade consumed by view models while pushing implementation details into collaborators.
+- Preserve view output and interaction behavior. Extract logic out of views and screen stores; do not redesign UI.
+- Keep `ChatScreenStore`, `SettingsScreenStore`, `HistoryScreenStore`, and `FilePreviewStore` as UI adapters rather than transport or persistence owners.
+- Keep `OpenAIService` as a thin façade over typed transport collaborators.
 - Keep one logical assistant reply mapped to one visible assistant surface. Paragraph breaks, reconnects, and recovery must not create duplicate bubbles.
-- Avoid schema changes to SwiftData models in 4.2.x unless a release blocker requires them.
-- Prefer typed request/response helpers over ad hoc `[String: Any]` parsing in feature code.
-- Route debug output through a single logging surface.
+- Persist API keys only through `APIKeyStore -> KeychainService`; uninstall/reinstall must preserve a previously saved key.
+- Prefer typed request/response helpers over ad hoc parsing in feature code.
+- Prefer moving pure types and policies into `Sources/*` rather than keeping them inside the app-facing `ios` target.
 
-## 4.2.4 Notes
+## Notes
 
-- 4.2.4 intentionally kept a single SwiftPM product target even though the code is now organized into explicit logical modules.
-- The package-level multi-target split was prototyped and rejected for this release because it required a package-wide visibility migration (`internal` to `package`) across persistence models, transport contracts, and view-model state, which materially increased zero-difference regression risk.
-- The maintainability gain for 4.2.4 comes from hard boundaries in code structure, extracted contracts, smaller files, stronger tests, and clearer ownership rather than from forcing public/package access churn across the app.
+- `NativeChat` remains the only product imported by `ios/GlassGPT`, but newly extracted pure types should land in `Sources/*` instead of `ios`.
+- `TargetBoundary.swift` files are no longer treated as sufficient evidence of modularity. CI tracks source-share and module-boundary health directly.
+- `4.4.1` only promises migration compatibility from `4.4.0+`. Reinstall parity focuses on immediate usability through preserved Keychain credentials, not on retaining the local conversation database after uninstall.

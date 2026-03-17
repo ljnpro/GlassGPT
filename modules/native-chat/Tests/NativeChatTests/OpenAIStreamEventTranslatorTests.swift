@@ -373,6 +373,38 @@ final class OpenAIStreamEventTranslatorTests: XCTestCase {
         XCTAssertNil(OpenAIStreamEventTranslator.extractSequenceNumber(from: Data("oops".utf8)))
     }
 
+    func testExtractResponseIdentifierUsesEnvelopeAndResolvedResponse() throws {
+        XCTAssertEqual(
+            OpenAIStreamEventTranslator.extractResponseIdentifier(
+                from: try JSONCoding.encode(
+                    makeEnvelope(response: ResponsesResponseDTO(id: "resp_envelope"))
+                )
+            ),
+            "resp_envelope"
+        )
+
+        XCTAssertEqual(
+            OpenAIStreamEventTranslator.extractResponseIdentifier(
+                from: try JSONCoding.encode(
+                    ResponsesStreamEnvelopeDTO(
+                        delta: nil,
+                        itemID: nil,
+                        code: nil,
+                        text: nil,
+                        annotation: nil,
+                        response: nil,
+                        sequenceNumber: nil,
+                        error: nil,
+                        message: nil
+                    )
+                )
+            ),
+            nil
+        )
+
+        XCTAssertNil(OpenAIStreamEventTranslator.extractResponseIdentifier(from: Data("oops".utf8)))
+    }
+
     func testExtractFilePathAnnotationsUsesAnnotatedSubstring() {
         let text = "sandbox:/mnt/data/report.pdf"
         let annotations = OpenAIStreamEventTranslator.extractFilePathAnnotations(
@@ -601,7 +633,10 @@ final class OpenAIStreamEventTranslatorTests: XCTestCase {
 
     func testSSEEventDecoderTracksThinkingAndTerminalPayload() async throws {
         var decoder = SSEEventDecoder()
-        let continuation = AsyncStream<StreamEvent>.makeStream()
+        let continuation = makeTestAsyncStream() as (
+            stream: AsyncStream<StreamEvent>,
+            continuation: AsyncStream<StreamEvent>.Continuation
+        )
 
         let thinkingResult = decoder.decode(
             frame: SSEFrame(
@@ -695,9 +730,12 @@ final class OpenAIStreamEventTranslatorTests: XCTestCase {
         }
     }
 
-    func testSSEEventDecoderHandlesOutputDoneAndIncompleteTerminalMessage() throws {
+    func testSSEEventDecoderHandlesOutputDoneAndIncompleteTerminalMessage() async throws {
         var decoder = SSEEventDecoder()
-        let continuation = AsyncStream<StreamEvent>.makeStream()
+        let continuation = makeTestAsyncStream() as (
+            stream: AsyncStream<StreamEvent>,
+            continuation: AsyncStream<StreamEvent>.Continuation
+        )
 
         let outputDoneResult = decoder.decode(
             frame: SSEFrame(
@@ -734,6 +772,11 @@ final class OpenAIStreamEventTranslatorTests: XCTestCase {
 
         continuation.continuation.finish()
 
+        var emitted: [StreamEvent] = []
+        for await event in continuation.stream {
+            emitted.append(event)
+        }
+
         if case .continued = outputDoneResult {} else {
             XCTFail("Expected output_text.done to continue")
         }
@@ -745,6 +788,112 @@ final class OpenAIStreamEventTranslatorTests: XCTestCase {
         XCTAssertEqual(decoder.accumulatedText, "terminal text")
         XCTAssertEqual(decoder.terminalThinking, nil)
         XCTAssertNil(decoder.terminalFilePathAnnotations)
+        XCTAssertEqual(
+            emitted.map { eventDescription($0) },
+            ["sequenceUpdate(12)"]
+        )
+    }
+
+    func testSSEEventDecoderEmitsResponseIdentifierFromInProgressFrames() async throws {
+        var decoder = SSEEventDecoder()
+        let continuation = makeTestAsyncStream() as (
+            stream: AsyncStream<StreamEvent>,
+            continuation: AsyncStream<StreamEvent>.Continuation
+        )
+
+        let result = decoder.decode(
+            frame: SSEFrame(
+                type: "response.in_progress",
+                data: try String(
+                    data: JSONCoding.encode(
+                        makeEnvelope(
+                            response: ResponsesResponseDTO(
+                                id: "resp_in_progress",
+                                status: "in_progress"
+                            ),
+                            sequenceNumber: 9
+                        )
+                    ),
+                    encoding: .utf8
+                ) ?? ""
+            ),
+            continuation: continuation.continuation
+        )
+
+        continuation.continuation.finish()
+
+        var emitted: [StreamEvent] = []
+        for await event in continuation.stream {
+            emitted.append(event)
+        }
+
+        if case .continued = result {} else {
+            XCTFail("Expected in-progress frame to continue")
+        }
+
+        XCTAssertEqual(
+            emitted.map { eventDescription($0) },
+            ["responseCreated(resp_in_progress)", "sequenceUpdate(9)"]
+        )
+        XCTAssertEqual(decoder.emittedResponseID, "resp_in_progress")
+    }
+
+    func testSSEEventDecoderDoesNotDuplicateResponseIdentifierAfterInitialEmission() async throws {
+        var decoder = SSEEventDecoder()
+        let continuation = makeTestAsyncStream() as (
+            stream: AsyncStream<StreamEvent>,
+            continuation: AsyncStream<StreamEvent>.Continuation
+        )
+
+        _ = decoder.decode(
+            frame: SSEFrame(
+                type: "response.in_progress",
+                data: try String(
+                    data: JSONCoding.encode(
+                        makeEnvelope(
+                            response: ResponsesResponseDTO(id: "resp_dedupe", status: "in_progress"),
+                            sequenceNumber: 2
+                        )
+                    ),
+                    encoding: .utf8
+                ) ?? ""
+            ),
+            continuation: continuation.continuation
+        )
+        let result = decoder.decode(
+            frame: SSEFrame(
+                type: "response.completed",
+                data: try String(
+                    data: JSONCoding.encode(
+                        makeEnvelope(
+                            response: ResponsesResponseDTO(
+                                id: "resp_dedupe",
+                                outputText: "done"
+                            ),
+                            sequenceNumber: 3
+                        )
+                    ),
+                    encoding: .utf8
+                ) ?? ""
+            ),
+            continuation: continuation.continuation
+        )
+
+        continuation.continuation.finish()
+
+        var emitted: [StreamEvent] = []
+        for await event in continuation.stream {
+            emitted.append(event)
+        }
+
+        if case .terminalCompleted = result {} else {
+            XCTFail("Expected completed frame to be terminal")
+        }
+
+        XCTAssertEqual(
+            emitted.map { eventDescription($0) },
+            ["responseCreated(resp_dedupe)", "sequenceUpdate(2)"]
+        )
     }
 
     func testSSEFrameBufferReassemblesChunkedFrames() {
@@ -808,5 +957,16 @@ final class OpenAIStreamEventTranslatorTests: XCTestCase {
             error: message.map { ResponsesErrorDTO(message: $0) },
             message: message
         )
+    }
+
+    private func eventDescription(_ event: StreamEvent) -> String {
+        switch event {
+        case .responseCreated(let id):
+            return "responseCreated(\(id))"
+        case .sequenceUpdate(let sequence):
+            return "sequenceUpdate(\(sequence))"
+        default:
+            return String(describing: event)
+        }
     }
 }

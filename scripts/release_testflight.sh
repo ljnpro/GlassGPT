@@ -18,7 +18,7 @@ Usage:
   ./scripts/release_testflight.sh <marketing_version> <build_number> [--branch <name>] [--commit-message "<message>"] [--skip-ci] [--skip-readiness]
 
 Examples:
-  ./scripts/release_testflight.sh 4.4.0 20173 --branch codex/stable-4.4
+  ./scripts/release_testflight.sh 4.4.1 20174 --branch codex/stable-4.4
 EOF
 }
 

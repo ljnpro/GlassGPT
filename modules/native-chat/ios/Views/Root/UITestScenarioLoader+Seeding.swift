@@ -31,7 +31,7 @@ extension UITestScenarioLoader {
         scenario: UITestScenario
     ) -> [Conversation] {
         switch scenario {
-        case .empty, .settings, .settingsGateway:
+        case .empty, .settings, .settingsGateway, .reinstallSeed, .reinstallVerify, .freshInstall:
             return []
         case .seeded, .streaming, .preview:
             return [makeConversation(title: "Release Planning", timeOffset: 0, backgroundModeEnabled: false, in: modelContext)]

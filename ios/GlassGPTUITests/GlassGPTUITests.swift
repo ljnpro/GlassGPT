@@ -182,6 +182,120 @@ final class GlassGPTUITests: XCTestCase {
     }
 
     @MainActor
+    func testEmptyScenarioWithoutAPIKeyKeepsShellUsable() throws {
+        let app = launchApp(scenario: "empty")
+
+        XCTAssertTrue(app.buttons["chat.newChat"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Add your API key in Settings"].waitForExistence(timeout: 5))
+
+        app.tabBars.buttons["History"].tap()
+        XCTAssertTrue(app.navigationBars["History"].waitForExistence(timeout: 5))
+
+        app.tabBars.buttons["Settings"].tap()
+        let apiKeyField = app.secureTextFields["settings.apiKey"]
+        XCTAssertTrue(apiKeyField.waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["Save"].isEnabled)
+    }
+
+    @MainActor
+    func testAPIKeyPersistsAcrossAppRelaunch() throws {
+        let app = launchApp()
+
+        let apiKeyField = openSettings(in: app)
+        XCTAssertTrue(apiKeyField.waitForExistence(timeout: 10))
+
+        let saveButton = app.buttons["Save"]
+        if saveButton.isEnabled {
+            let clearButton = app.buttons["Clear"]
+            if clearButton.waitForExistence(timeout: 2) {
+                clearButton.tap()
+            }
+        }
+
+        apiKeyField.tap()
+        apiKeyField.typeText("sk-relaunch-ui")
+        XCTAssertTrue(saveButton.isEnabled)
+        saveButton.tap()
+
+        let saveAlert = app.alerts["API Key Saved"]
+        XCTAssertTrue(saveAlert.waitForExistence(timeout: 5))
+        saveAlert.buttons["OK"].tap()
+        XCTAssertTrue(waitForNonExistence(of: saveAlert, timeout: 5))
+
+        app.terminate()
+        XCTAssertTrue(app.wait(for: .notRunning, timeout: 5))
+
+        let relaunched = launchApp()
+        relaunched.tabBars.buttons["Settings"].tap()
+
+        let relaunchedField = relaunched.secureTextFields["settings.apiKey"]
+        let relaunchedSaveButton = relaunched.buttons["Save"]
+        XCTAssertTrue(relaunchedField.waitForExistence(timeout: 5))
+        XCTAssertTrue(relaunchedSaveButton.waitForExistence(timeout: 5))
+        XCTAssertTrue(relaunchedSaveButton.isEnabled)
+
+        let clearButton = relaunched.buttons["Clear"]
+        XCTAssertTrue(clearButton.waitForExistence(timeout: 5))
+        clearButton.tap()
+        XCTAssertFalse(relaunchedSaveButton.isEnabled)
+    }
+
+    @MainActor
+    func testPreparePersistedAPIKeyForReinstall() throws {
+        let app = launchApp(scenario: "reinstallSeed")
+        let apiKeyField = openSettings(in: app)
+        let saveButton = app.buttons["Save"]
+        clearPersistedAPIKeyIfPresent(in: app, saveButton: saveButton)
+
+        apiKeyField.tap()
+        apiKeyField.typeText("sk-reinstall-ui")
+        XCTAssertTrue(saveButton.isEnabled)
+        saveButton.tap()
+
+        let saveAlert = app.alerts["API Key Saved"]
+        XCTAssertTrue(saveAlert.waitForExistence(timeout: 5))
+        saveAlert.buttons["OK"].tap()
+        XCTAssertTrue(waitForNonExistence(of: saveAlert, timeout: 5))
+        XCTAssertTrue(app.buttons["Clear"].waitForExistence(timeout: 5))
+    }
+
+    @MainActor
+    func testReinstalledAppReadsPersistedAPIKeyWithoutRestoringHistory() throws {
+        let app = launchApp(scenario: "reinstallVerify")
+        let apiKeyField = openSettings(in: app)
+        let saveButton = app.buttons["Save"]
+        let clearButton = app.buttons["Clear"]
+
+        XCTAssertTrue(apiKeyField.waitForExistence(timeout: 10))
+        XCTAssertTrue(saveButton.waitForExistence(timeout: 5))
+        XCTAssertTrue(clearButton.waitForExistence(timeout: 5))
+        XCTAssertTrue(saveButton.isEnabled)
+
+        app.tabBars.buttons["Chat"].tap()
+        XCTAssertTrue(app.buttons["chat.newChat"].waitForExistence(timeout: 5))
+
+        app.tabBars.buttons["Settings"].tap()
+        clearButton.tap()
+        XCTAssertFalse(saveButton.isEnabled)
+    }
+
+    @MainActor
+    func testFreshInstallWithoutPersistedAPIKeyKeepsShellUsable() throws {
+        let app = launchApp(scenario: "freshInstall")
+
+        XCTAssertTrue(app.buttons["chat.newChat"].waitForExistence(timeout: 5))
+
+        app.tabBars.buttons["History"].tap()
+        XCTAssertTrue(app.navigationBars["History"].waitForExistence(timeout: 5))
+
+        let apiKeyField = openSettings(in: app)
+        let saveButton = app.buttons["Save"]
+        XCTAssertTrue(apiKeyField.waitForExistence(timeout: 10))
+        XCTAssertTrue(saveButton.waitForExistence(timeout: 5))
+        XCTAssertFalse(saveButton.isEnabled)
+    }
+
+    @MainActor
     func testSeededScenarioPreservesConversationAfterTabRoundTrip() throws {
         let app = launchApp(scenario: "seeded")
 
@@ -392,6 +506,22 @@ final class GlassGPTUITests: XCTestCase {
         while !element.exists && remainingSwipes > 0 {
             app.swipeUp()
             remainingSwipes -= 1
+        }
+    }
+
+    @MainActor
+    private func openSettings(in app: XCUIApplication) -> XCUIElement {
+        app.tabBars.buttons["Settings"].tap()
+        return app.secureTextFields["settings.apiKey"]
+    }
+
+    @MainActor
+    private func clearPersistedAPIKeyIfPresent(in app: XCUIApplication, saveButton: XCUIElement) {
+        let clearButton = app.buttons["Clear"]
+        if clearButton.waitForExistence(timeout: 2) {
+            clearButton.tap()
+        } else if saveButton.isEnabled {
+            app.tap()
         }
     }
 }

@@ -84,6 +84,17 @@ func makeInMemoryModelContainer() throws -> ModelContainer {
     return try ModelContainer(for: schema, configurations: [configuration])
 }
 
+func makeTestAsyncStream<Element>() -> (
+    stream: AsyncStream<Element>,
+    continuation: AsyncStream<Element>.Continuation
+) {
+    var capturedContinuation: AsyncStream<Element>.Continuation?
+    let stream = AsyncStream<Element> { continuation in
+        capturedContinuation = continuation
+    }
+    return (stream, capturedContinuation!)
+}
+
 @MainActor
 final class QueuedOpenAIStreamClient: OpenAIStreamClient {
     private(set) var recordedRequests: [URLRequest] = []

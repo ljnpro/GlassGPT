@@ -12,8 +12,8 @@ APP_BUNDLE_IDENTIFIER="space.manus.liquid.glass.chat.t20260308214621"
 UI_TEST_RUNNER_BUNDLE_IDENTIFIER="${APP_BUNDLE_IDENTIFIER}UITests.xctrunner"
 SIMULATOR_DEVICE_NAME="${SIMULATOR_DEVICE_NAME:-iPhone 17}"
 SIMULATOR_DEVICE_DESTINATION="platform=iOS Simulator,name=${SIMULATOR_DEVICE_NAME}"
-DEFAULT_RELEASE_VERSION="4.4.0"
-DEFAULT_RELEASE_BUILD="20173"
+DEFAULT_RELEASE_VERSION="4.4.1"
+DEFAULT_RELEASE_BUILD="20174"
 XCODEBUILD_RETRY_ATTEMPTS="${XCODEBUILD_RETRY_ATTEMPTS:-5}"
 XCODE_TEST_TIMEOUT_ALLOWANCE="${XCODE_TEST_TIMEOUT_ALLOWANCE:-180}"
 SIMULATOR_BOOT_TIMEOUT_SECONDS="${SIMULATOR_BOOT_TIMEOUT_SECONDS:-60}"
@@ -37,6 +37,8 @@ UI_TEST_CASES=(
   testSettingsScenarioPersistsThemeSelectionWithinSession
   testSettingsGatewayScenarioShowsCloudflareControlsAndMissingKeyFeedback
   testSettingsScenarioCanSaveAndClearAPIKeyLocally
+  testEmptyScenarioWithoutAPIKeyKeepsShellUsable
+  testAPIKeyPersistsAcrossAppRelaunch
   testSeededScenarioLoadsExistingConversationContent
   testSeededScenarioPreservesConversationAfterTabRoundTrip
   testStreamingScenarioCanOpenAndDismissModelSelector
@@ -47,7 +49,13 @@ UI_TEST_CASES=(
   testPreviewScenarioExposesDownloadAndShareActions
   testReplySplitScenarioKeepsOneAssistantSurface
 )
+REINSTALL_UI_TEST_CASES=(
+  testPreparePersistedAPIKeyForReinstall
+  testReinstalledAppReadsPersistedAPIKeyWithoutRestoringHistory
+  testFreshInstallWithoutPersistedAPIKeyKeepsShellUsable
+)
 UI_TEST_FILTER="${UI_TEST_FILTER:-}"
+UI_TEST_XCTESTRUN_RESOLVED_PATH=""
 
 cd "$ROOT_DIR"
 mkdir -p "$CI_OUTPUT_DIR"
@@ -412,14 +420,8 @@ function gate_core_tests() {
   gate_coverage_report
 }
 
-function gate_ui_tests() {
-  log "Running UI tests"
+function ensure_ui_test_xctestrun_path() {
   local xctestrun_path
-  local -a selected_ui_cases=("${UI_TEST_CASES[@]}")
-
-  if [[ -n "$UI_TEST_FILTER" ]]; then
-    IFS=',' read -rA selected_ui_cases <<< "$UI_TEST_FILTER"
-  fi
 
   if [[ -n "${UI_TEST_XCTESTRUN_PATH:-}" ]]; then
     xctestrun_path="$UI_TEST_XCTESTRUN_PATH"
@@ -451,22 +453,53 @@ function gate_ui_tests() {
     exit 1
   fi
 
-  local ui_case
+  UI_TEST_XCTESTRUN_RESOLVED_PATH="$xctestrun_path"
+}
+
+function run_ui_test_case() {
+  local xctestrun_path="$1"
+  local ui_case="$2"
+  local label_prefix="${3:-glassgpt-ui}"
   local result_bundle_name
+  result_bundle_name="$(result_bundle_slug "${label_prefix}-${ui_case}")"
+
+  log "Running UI test ${ui_case}"
+  run_checked_xcodebuild "$result_bundle_name" \
+    xcodebuild \
+    -quiet \
+    test-without-building \
+    -xctestrun "$xctestrun_path" \
+    -parallel-testing-enabled NO \
+    -test-timeouts-enabled YES \
+    -maximum-test-execution-time-allowance "$XCODE_TEST_TIMEOUT_ALLOWANCE" \
+    -destination "$SIMULATOR_DEVICE_DESTINATION" \
+    -resultBundlePath "$CI_OUTPUT_DIR/${result_bundle_name}.xcresult" \
+    -only-testing:"GlassGPTUITests/GlassGPTUITests/${ui_case}"
+}
+
+function gate_ui_tests() {
+  log "Running UI tests"
+  local -a selected_ui_cases=("${UI_TEST_CASES[@]}")
+
+  if [[ -n "$UI_TEST_FILTER" ]]; then
+    IFS=',' read -rA selected_ui_cases <<< "$UI_TEST_FILTER"
+  fi
+
+  ensure_ui_test_xctestrun_path
+
+  local ui_case
   for ui_case in "${selected_ui_cases[@]}"; do
-    result_bundle_name="$(result_bundle_slug "$ui_case")"
-    log "Running UI test ${ui_case}"
-    run_checked_xcodebuild "glassgpt-ui-${result_bundle_name}" \
-      xcodebuild \
-      -quiet \
-      test-without-building \
-      -xctestrun "$xctestrun_path" \
-      -parallel-testing-enabled NO \
-      -test-timeouts-enabled YES \
-      -maximum-test-execution-time-allowance "$XCODE_TEST_TIMEOUT_ALLOWANCE" \
-      -destination "$SIMULATOR_DEVICE_DESTINATION" \
-      -resultBundlePath "$CI_OUTPUT_DIR/${result_bundle_name}.xcresult" \
-      -only-testing:"GlassGPTUITests/GlassGPTUITests/${ui_case}"
+    run_ui_test_case "$UI_TEST_XCTESTRUN_RESOLVED_PATH" "$ui_case" "glassgpt-ui"
+  done
+}
+
+function gate_reinstall_compatibility() {
+  log "Running reinstall-compatibility checks"
+  ensure_ui_test_xctestrun_path
+
+  local ui_case
+  for ui_case in "${REINSTALL_UI_TEST_CASES[@]}"; do
+    run_ui_test_case "$UI_TEST_XCTESTRUN_RESOLVED_PATH" "$ui_case" "glassgpt-ui-reinstall"
   done
 }
 
@@ -548,7 +581,7 @@ function assert_release_readiness() {
   current_branch="${GITHUB_REF_NAME:-$(git rev-parse --abbrev-ref HEAD)}"
 
   case "$current_branch" in
-    main|codex/stable-4.1|codex/stable-4.2|codex/stable-4.3|codex/stable-4.4|HEAD)
+    main|codex/stable-4.1|codex/stable-4.2|codex/stable-4.3|codex/stable-4.4|codex/feature/4.4*|HEAD)
       ;;
     *)
       echo "Release-readiness gate does not permit branch '$current_branch'." >&2
@@ -561,8 +594,8 @@ function assert_release_readiness() {
     exit 1
   fi
 
-  if ! rg -q "4.3.1|4.4.0" "$ROOT_DIR/docs/parity-baseline.md"; then
-    echo "parity-baseline.md must include the active 4.3.1 or 4.4.0 baseline marker." >&2
+  if ! rg -q "4.3.1|4.4.0|4.4.1" "$ROOT_DIR/docs/parity-baseline.md"; then
+    echo "parity-baseline.md must include the active 4.3.1, 4.4.0, or 4.4.1 baseline marker." >&2
     exit 1
   fi
 
@@ -579,6 +612,8 @@ function assert_release_readiness() {
       exit 1
     fi
   fi
+
+  gate_reinstall_compatibility
 }
 
 function gate_maintainability() {
@@ -595,6 +630,18 @@ function gate_maintainability() {
     python3 ./scripts/check_maintainability.py | tee "$CI_OUTPUT_DIR/maintainability-report.txt"
 }
 
+function gate_source_share() {
+  log "Running source-share gate"
+  SOURCE_SHARE_SUMMARY_JSON="$CI_OUTPUT_DIR/source-share.json" \
+  MIN_SOURCE_SHARE_PERCENT="${MIN_SOURCE_SHARE_PERCENT:-17.0}" \
+    python3 ./scripts/check_source_share.py | tee "$CI_OUTPUT_DIR/source-share-report.txt"
+}
+
+function gate_module_boundary() {
+  log "Running module-boundary gate"
+  python3 ./scripts/check_module_boundaries.py | tee "$CI_OUTPUT_DIR/module-boundary-report.txt"
+}
+
 function run_gate() {
   local gate="$1"
 
@@ -608,10 +655,12 @@ function run_gate() {
     core-tests) gate_core_tests ;;
     ui-tests) gate_ui_tests ;;
     maintainability) gate_maintainability ;;
+    source-share) gate_source_share ;;
+    module-boundary) gate_module_boundary ;;
     release-readiness) assert_release_readiness ;;
     *)
       echo "Unknown gate: $gate" >&2
-      echo "Valid gates: lint, build, app-tests, snapshot-tests, package-tests, coverage-report, core-tests, ui-tests, maintainability, release-readiness" >&2
+      echo "Valid gates: lint, build, app-tests, snapshot-tests, package-tests, coverage-report, core-tests, ui-tests, maintainability, source-share, module-boundary, release-readiness" >&2
       exit 1
       ;;
   esac
@@ -620,13 +669,13 @@ function run_gate() {
 function usage() {
   cat <<'EOF'
 Usage:
-  ./scripts/ci.sh [all|lint|build|app-tests|snapshot-tests|package-tests|coverage-report|core-tests|ui-tests|maintainability|release-readiness|comma-separated list]
+  ./scripts/ci.sh [all|lint|build|app-tests|snapshot-tests|package-tests|coverage-report|core-tests|ui-tests|maintainability|source-share|module-boundary|release-readiness|comma-separated list]
 
 Examples:
   ./scripts/ci.sh
   ./scripts/ci.sh lint
   ./scripts/ci.sh app-tests,snapshot-tests,package-tests,coverage-report
-  ./scripts/ci.sh build,core-tests,ui-tests,maintainability
+  ./scripts/ci.sh build,core-tests,ui-tests,maintainability,source-share,module-boundary
 EOF
 }
 
@@ -641,7 +690,10 @@ function clean_outputs() {
     "$CI_OUTPUT_DIR/coverage-report.txt" \
     "$CI_OUTPUT_DIR/coverage-production.txt" \
     "$CI_OUTPUT_DIR/coverage-production.json" \
-    "$CI_OUTPUT_DIR/maintainability-report.txt"
+    "$CI_OUTPUT_DIR/maintainability-report.txt" \
+    "$CI_OUTPUT_DIR/source-share-report.txt" \
+    "$CI_OUTPUT_DIR/source-share.json" \
+    "$CI_OUTPUT_DIR/module-boundary-report.txt"
   find "$CI_OUTPUT_DIR" -maxdepth 1 -name 'glassgpt-snapshot-*.log' -delete
   find "$CI_OUTPUT_DIR" -maxdepth 1 -name 'glassgpt-ui-*.log' -delete
   find "$CI_OUTPUT_DIR" -maxdepth 1 -name 'test*.xcresult' -exec rm -rf {} + >/dev/null 2>&1 || true
@@ -656,7 +708,7 @@ if [[ $# -gt 1 ]]; then
 fi
 
 if [[ $# -eq 0 || "$1" == "all" ]]; then
-  requested_gates=(lint build core-tests ui-tests maintainability release-readiness)
+  requested_gates=(lint build core-tests ui-tests maintainability source-share module-boundary release-readiness)
 elif [[ "$1" == "help" || "$1" == "-h" || "$1" == "--help" ]]; then
   usage
   exit 0

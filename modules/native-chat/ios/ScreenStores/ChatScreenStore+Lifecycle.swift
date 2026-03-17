@@ -41,7 +41,9 @@ extension ChatScreenStore {
 
     func handleDidEnterBackground() {
         guard !sessionRegistry.allSessions.isEmpty else { return }
-        suspendActiveSessionsForAppBackground()
+        for session in sessionRegistry.allSessions {
+            saveSessionNow(session)
+        }
     }
 
     func handleReturnToForeground() {

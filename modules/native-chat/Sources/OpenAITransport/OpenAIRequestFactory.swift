@@ -29,8 +29,8 @@ public struct OpenAIRequestDescriptor: Sendable {
 }
 
 public struct OpenAIRequestFactory {
-    private let configuration: any OpenAIConfigurationProvider
-    private let requestAuthorizer: any OpenAIRequestAuthorizer
+    let configuration: any OpenAIConfigurationProvider
+    let requestAuthorizer: any OpenAIRequestAuthorizer
 
     public init(
         configuration: any OpenAIConfigurationProvider,
