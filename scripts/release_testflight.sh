@@ -18,7 +18,7 @@ Usage:
   ./scripts/release_testflight.sh <marketing_version> <build_number> [--branch <name>] [--commit-message "<message>"] [--skip-ci] [--skip-readiness]
 
 Examples:
-  ./scripts/release_testflight.sh 4.3.1 20172 --branch codex/stable-4.3
+  ./scripts/release_testflight.sh 4.4.0 20173 --branch codex/stable-4.4
 EOF
 }
 
@@ -78,7 +78,7 @@ if [[ -z "$TARGET_BRANCH" ]]; then
 fi
 
 case "$TARGET_BRANCH" in
-  main|codex/stable-4.1|codex/stable-4.2|codex/stable-4.3)
+  main|codex/stable-4.1|codex/stable-4.2|codex/stable-4.3|codex/stable-4.4)
     ;;
   *)
     echo "Release target branch must be a stable branch or main. Got: $TARGET_BRANCH" >&2
@@ -226,8 +226,20 @@ print(f"Verified IPA version: {actual_version} ({actual_build})")
 PY
 
 echo "==> Uploading to TestFlight"
-UPLOAD_OUTPUT="$(xcrun altool --upload-app --type ios --file "$IPA_PATH" --apiKey "$ASC_API_KEY_ID" --apiIssuer "$ASC_ISSUER_ID" | tee "$UPLOAD_LOG")"
+UPLOAD_OUTPUT="$(
+  xcrun altool \
+    --upload-app \
+    --type ios \
+    --file "$IPA_PATH" \
+    --apiKey "$ASC_API_KEY_ID" \
+    --apiIssuer "$ASC_ISSUER_ID" \
+    2>&1 | tee "$UPLOAD_LOG"
+)"
 DELIVERY_UUID="$(printf '%s\n' "$UPLOAD_OUTPUT" | awk -F'Delivery UUID: ' '/Delivery UUID:/ {print $2}' | tail -1)"
+
+if [[ -z "$DELIVERY_UUID" && -f "$UPLOAD_LOG" ]]; then
+  DELIVERY_UUID="$(awk -F'Delivery UUID: ' '/Delivery UUID:/ {print $2}' "$UPLOAD_LOG" | tail -1)"
+fi
 
 if [[ -z "$DELIVERY_UUID" ]]; then
   DELIVERY_UUID="unknown"
