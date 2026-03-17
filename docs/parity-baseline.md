@@ -1,15 +1,15 @@
-# 4.2.2 Parity Baseline
+# 4.2.4 Parity Baseline
 
-This document records the `4.2.1` release baseline that `4.2.2` must preserve.
+This document records the `4.2.3` release baseline that `4.2.4` must preserve.
 
 ## Stable Baseline
 
 - Source branch: `codex/stable-4.2`
-- Development branch: `codex/feature/4.2.2-maintainability`
-- Baseline app version: `4.2.1 (20167)`
+- Development branch: `codex/feature/4.2.4-maintainability`
+- Baseline app version: `4.2.3 (20169)`
 - App target: `GlassGPT`
 - Package target: `NativeChat`
-- Current package size: ~13k Swift LOC across 41 Swift files
+- Current package size: ~14k Swift LOC across 101 Swift files
 
 ## Verified Build
 
@@ -19,7 +19,7 @@ Last verified baseline command:
 xcodebuild -project ios/GlassGPT.xcodeproj -scheme GlassGPT -destination 'generic/platform=iOS Simulator' build
 ```
 
-Baseline result before 4.2.2 work:
+Baseline result before 4.2.4 work:
 
 - Build status: succeeded
 - Existing warnings:
@@ -38,13 +38,14 @@ The following must remain unchanged unless a release blocker forces a deviation:
 - History selection and deletion flows
 - Settings sections, toggles, pickers, labels, and validation flow
 - Streaming, recovery, and detached streaming bubble behavior
+- One logical assistant reply remains one visible assistant bubble even across paragraph breaks and recovery
 - Generated image/document cache behavior
 - Cloudflare gateway behavior and defaults
 - Keychain API key storage behavior
 
 ## Manual Acceptance Checklist
 
-Run this checklist against both `v4.2.1` and the current `4.2.2` candidate before release:
+Run this checklist against both `v4.2.3` and the current `4.2.4` candidate before release:
 
 1. Launch the app and confirm the initial empty state matches.
 2. Open Settings and confirm sections, ordering, labels, and controls match.
@@ -54,7 +55,7 @@ Run this checklist against both `v4.2.1` and the current `4.2.2` candidate befor
 6. Send an image attachment and confirm preview and send behavior match.
 7. Send a document attachment and confirm chip rendering and send behavior match.
 8. While streaming, confirm indicators, stop button, and live bubble behavior match.
-9. Force a recovery path and confirm recovery indicator, final output, and error handling match.
+9. Force a recovery path and confirm recovery indicator, final output, single-bubble behavior, and error handling match.
 10. Open History, select a conversation, delete one conversation, and delete all conversations.
 11. Open a generated file and confirm preview/share behavior matches.
 12. Clear image/document caches and confirm settings UI and results match.

@@ -120,4 +120,130 @@ final class ChatSessionDecisionsTests: XCTestCase {
             )
         )
     }
+
+    func testSessionVisibilityCoordinatorOnlyReturnsLiveDraftWhenVisibleMessageExists() {
+        let visibleID = UUID()
+        let messages = [
+            Message(id: visibleID, role: .assistant, content: "Visible"),
+            Message(role: .user, content: "Prompt")
+        ]
+
+        XCTAssertEqual(
+            SessionVisibilityCoordinator.liveDraftMessageID(
+                visibleMessageID: visibleID,
+                messages: messages
+            ),
+            visibleID
+        )
+        XCTAssertNil(
+            SessionVisibilityCoordinator.liveDraftMessageID(
+                visibleMessageID: UUID(),
+                messages: messages
+            )
+        )
+    }
+
+    func testSessionVisibilityCoordinatorFlagsDetachedBubbleOnlyWhenStreamingWithoutLiveDraft() {
+        XCTAssertTrue(
+            SessionVisibilityCoordinator.shouldShowDetachedStreamingBubble(
+                isStreaming: true,
+                liveDraftMessageID: nil
+            )
+        )
+        XCTAssertFalse(
+            SessionVisibilityCoordinator.shouldShowDetachedStreamingBubble(
+                isStreaming: false,
+                liveDraftMessageID: nil
+            )
+        )
+        XCTAssertFalse(
+            SessionVisibilityCoordinator.shouldShowDetachedStreamingBubble(
+                isStreaming: true,
+                liveDraftMessageID: UUID()
+            )
+        )
+    }
+
+    @MainActor
+    func testChatSessionRegistryCancelsSupersededSessionAndTracksVisibleSession() {
+        let registry = ChatSessionRegistry()
+        let conversation = Conversation()
+        let message = Message(role: .assistant, content: "")
+        message.conversation = conversation
+        let replacement = Message(id: message.id, role: .assistant, content: "")
+        replacement.conversation = conversation
+
+        let originalSession = ResponseSession(
+            message: message,
+            conversationID: conversation.id,
+            requestModel: .gpt5_4,
+            requestEffort: .high,
+            requestUsesBackgroundMode: true,
+            requestServiceTier: .standard
+        )
+        let replacementSession = ResponseSession(
+            message: replacement,
+            conversationID: conversation.id,
+            requestModel: .gpt5_4,
+            requestEffort: .high,
+            requestUsesBackgroundMode: true,
+            requestServiceTier: .standard
+        )
+
+        var cancelledSessionIDs: [UUID] = []
+
+        registry.register(originalSession, visible: true) { cancelled in
+            cancelledSessionIDs.append(cancelled.messageID)
+        }
+        registry.register(replacementSession, visible: true) { cancelled in
+            cancelledSessionIDs.append(cancelled.messageID)
+        }
+
+        XCTAssertEqual(cancelledSessionIDs, [originalSession.messageID])
+        XCTAssertTrue(registry.contains(replacementSession))
+        XCTAssertFalse(registry.contains(originalSession))
+        XCTAssertEqual(registry.visibleMessageID, replacementSession.messageID)
+        XCTAssertTrue(registry.currentVisibleSession === replacementSession)
+    }
+
+    @MainActor
+    func testStreamingTransitionReducerUpdatesSequenceAndAvoidsDuplicateTransientState() {
+        let conversation = Conversation()
+        let message = Message(role: .assistant, content: "")
+        message.conversation = conversation
+        let session = ResponseSession(
+            message: message,
+            conversationID: conversation.id,
+            requestModel: .gpt5_4,
+            requestEffort: .high,
+            requestUsesBackgroundMode: true,
+            requestServiceTier: .standard
+        )
+        let citation = URLCitation(
+            url: "https://example.com",
+            title: "Example",
+            startIndex: 0,
+            endIndex: 7
+        )
+        let annotation = FilePathAnnotation(
+            fileId: "file_123",
+            containerId: nil,
+            sandboxPath: "/mnt/data/example.pdf",
+            filename: "example.pdf",
+            startIndex: 0,
+            endIndex: 7
+        )
+
+        StreamingTransitionReducer.recordSequenceUpdate(4, for: session)
+        StreamingTransitionReducer.recordSequenceUpdate(2, for: session)
+        StreamingTransitionReducer.recordSequenceUpdate(8, for: session)
+        XCTAssertEqual(session.lastSequenceNumber, 8)
+
+        XCTAssertTrue(StreamingTransitionReducer.addCitationIfNeeded(in: session, citation: citation))
+        XCTAssertFalse(StreamingTransitionReducer.addCitationIfNeeded(in: session, citation: citation))
+        XCTAssertTrue(StreamingTransitionReducer.addFilePathAnnotationIfNeeded(in: session, annotation: annotation))
+        XCTAssertFalse(StreamingTransitionReducer.addFilePathAnnotationIfNeeded(in: session, annotation: annotation))
+        XCTAssertEqual(session.citations.count, 1)
+        XCTAssertEqual(session.filePathAnnotations.count, 1)
+    }
 }

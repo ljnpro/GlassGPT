@@ -135,4 +135,12 @@ final class OpenAIResponseParserTests: XCTestCase {
             "New Chat"
         )
     }
+
+    func testOpenAIServiceErrorDescriptionsMatchBehavior() {
+        XCTAssertEqual(OpenAIServiceError.noAPIKey.errorDescription, "No API key configured. Please add it in Settings.")
+        XCTAssertEqual(OpenAIServiceError.invalidURL.errorDescription, "Invalid API URL.")
+        XCTAssertEqual(OpenAIServiceError.httpError(500, "oops").errorDescription, "API error (500): oops")
+        XCTAssertEqual(OpenAIServiceError.requestFailed("broken").errorDescription, "broken")
+        XCTAssertEqual(OpenAIServiceError.cancelled.errorDescription, "Request was cancelled.")
+    }
 }

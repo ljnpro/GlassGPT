@@ -39,8 +39,8 @@ extension ChatViewModel {
     }
 
     func handleEnterBackground() {
-        if !activeResponseSessions.isEmpty {
-            for session in activeResponseSessions.values {
+        if !sessionRegistry.allSessions.isEmpty {
+            for session in sessionRegistry.allSessions {
                 saveSessionNow(session)
             }
 
@@ -67,7 +67,7 @@ extension ChatViewModel {
     }
 
     func handleDidEnterBackground() {
-        guard !activeResponseSessions.isEmpty else { return }
+        guard !sessionRegistry.allSessions.isEmpty else { return }
         suspendActiveSessionsForAppBackground()
     }
 
