@@ -48,10 +48,7 @@ struct MessageBubble: View {
             responseId: message.responseId,
             lastSequenceNumber: message.lastSequenceNumber,
             isComplete: message.isComplete,
-            annotationsData: message.annotationsData,
-            toolCallsData: message.toolCallsData,
-            fileAttachmentsData: message.fileAttachmentsData,
-            filePathAnnotationsData: message.filePathAnnotationsData,
+            payloadRenderDigest: message.payloadRenderDigest,
             liveContent: liveContent,
             liveThinking: liveThinking,
             activeToolCalls: activeToolCalls,
@@ -306,10 +303,7 @@ private extension MessageBubble {
         let responseId: String?
         let lastSequenceNumber: Int?
         let isComplete: Bool
-        let annotationsData: Data?
-        let toolCallsData: Data?
-        let fileAttachmentsData: Data?
-        let filePathAnnotationsData: Data?
+        let payloadRenderDigest: String
         let liveContent: String?
         let liveThinking: String?
         let activeToolCalls: [ToolCallInfo]

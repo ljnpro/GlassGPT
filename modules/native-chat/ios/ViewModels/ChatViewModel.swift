@@ -66,12 +66,19 @@ final class ChatViewModel {
 
     // MARK: - Dependencies
 
-    let openAIService = OpenAIService()
+    let configurationProvider: OpenAIConfigurationProvider
+    let requestBuilder: OpenAIRequestBuilder
+    let responseParser: OpenAIResponseParser
+    let transport: OpenAIDataTransport
+    let openAIService: OpenAIService
     let settingsStore: SettingsStore
     let apiKeyStore: APIKeyStore
     let conversationRepository: ConversationRepository
     let draftRepository: DraftRepository
     let generatedFileCoordinator = GeneratedFileCoordinator()
+    let messagePersistence = MessagePersistenceAdapter()
+    let backgroundTaskCoordinator = BackgroundTaskCoordinator()
+    let serviceFactory: () -> OpenAIService
     var modelContext: ModelContext
 
     // Visible live session state
@@ -85,23 +92,44 @@ final class ChatViewModel {
     var isApplyingConversationConfigurationBatch = false
     var didCompleteLaunchBootstrap = false
     var visibleRecoveryPhase: RecoveryPhase = .idle
-    let sessionRegistry = ChatSessionRegistry()
+    @ObservationIgnored
+    lazy var conversationRuntime = ConversationRuntime(viewModel: self)
 
-    // Background task
-    var backgroundTaskID: UIBackgroundTaskIdentifier = .invalid
+    var sessionRegistry: ChatSessionRegistry {
+        conversationRuntime.sessionStateStore.registry
+    }
 
     // MARK: - Init
 
     init(
         modelContext: ModelContext,
         settingsStore: SettingsStore = .shared,
-        apiKeyStore: APIKeyStore = .shared
+        apiKeyStore: APIKeyStore = .shared,
+        configurationProvider: OpenAIConfigurationProvider = DefaultOpenAIConfigurationProvider.shared,
+        transport: OpenAIDataTransport = OpenAIURLSessionTransport()
     ) {
+        let resolvedRequestBuilder = OpenAIRequestBuilder(configuration: configurationProvider)
+        let resolvedResponseParser = OpenAIResponseParser()
+        let resolvedServiceFactory = {
+            OpenAIService(
+                requestBuilder: resolvedRequestBuilder,
+                responseParser: resolvedResponseParser,
+                streamClient: SSEEventStream(),
+                transport: transport
+            )
+        }
+
         self.modelContext = modelContext
+        self.configurationProvider = configurationProvider
+        self.requestBuilder = resolvedRequestBuilder
+        self.responseParser = resolvedResponseParser
+        self.transport = transport
+        self.openAIService = resolvedServiceFactory()
         self.settingsStore = settingsStore
         self.apiKeyStore = apiKeyStore
         self.conversationRepository = ConversationRepository(modelContext: modelContext)
         self.draftRepository = DraftRepository(modelContext: modelContext)
+        self.serviceFactory = resolvedServiceFactory
         loadDefaultsFromSettings()
         restoreLastConversationIfAvailable()
 

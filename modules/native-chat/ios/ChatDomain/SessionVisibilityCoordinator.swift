@@ -56,10 +56,10 @@ enum SessionVisibilityCoordinator {
             activeRequestEffort: session.requestEffort,
             activeRequestUsesBackgroundMode: session.requestUsesBackgroundMode,
             activeRequestServiceTier: session.requestServiceTier,
-            isStreaming: session.isStreaming,
-            isRecovering: session.recoveryPhase == .streamResuming,
-            visibleRecoveryPhase: session.recoveryPhase,
-            isThinking: session.isThinking
+            isStreaming: session.runtimeState.isStreaming,
+            isRecovering: session.runtimeState.isRecovering,
+            visibleRecoveryPhase: session.runtimeState.recoveryPhase,
+            isThinking: session.runtimeState.isThinking
         )
     }
 

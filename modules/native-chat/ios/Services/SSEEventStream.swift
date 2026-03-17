@@ -1,7 +1,7 @@
 import Foundation
 
 @MainActor
-final class SSEEventStream {
+final class SSEEventStream: OpenAIStreamClient {
     private var currentDelegate: OpenAISSEDelegate?
 
     func makeStream(request: URLRequest) -> AsyncStream<StreamEvent> {

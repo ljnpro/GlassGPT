@@ -1,6 +1,8 @@
 #!/bin/zsh
 set -euo pipefail
 
+ALLOWED_WARNING_PATTERNS="${ALLOWED_WARNING_PATTERNS:-Metadata extraction skipped\\. No AppIntents\\.framework dependency found\\.}"
+
 if [[ $# -ne 1 ]]; then
   echo "usage: $0 <xcodebuild-log-file>" >&2
   exit 1
@@ -23,7 +25,7 @@ fi
 
 unexpected_warnings="$(
   printf '%s\n' "$warning_lines" \
-    | rg -v "Metadata extraction skipped\\. No AppIntents\\.framework dependency found\\." \
+    | rg -v -e "$ALLOWED_WARNING_PATTERNS" \
     || true
 )"
 

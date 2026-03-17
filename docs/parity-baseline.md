@@ -1,12 +1,12 @@
-# 4.2.4 Parity Baseline
+# 4.3.0 Parity Baseline
 
-This document records the `4.2.3` release baseline that `4.2.4` must preserve.
+This document records the `4.2.4` production baseline that `4.3.0` must preserve.
 
 ## Stable Baseline
 
-- Source branch: `codex/stable-4.2`
-- Development branch: `codex/feature/4.2.4-maintainability`
-- Baseline app version: `4.2.3 (20169)`
+- Source branch: `codex/stable-4.3`
+- Development branch: `codex/feature/4.3-maintainability`
+- Baseline app version: `4.2.4 (20170)`
 - App target: `GlassGPT`
 - Package target: `NativeChat`
 - Current package size: ~14k Swift LOC across 101 Swift files
@@ -45,7 +45,7 @@ The following must remain unchanged unless a release blocker forces a deviation:
 
 ## Manual Acceptance Checklist
 
-Run this checklist against both `v4.2.3` and the current `4.2.4` candidate before release:
+Run this checklist against both `v4.2.4` and the current `4.3.0` candidate before release:
 
 1. Launch the app and confirm the initial empty state matches.
 2. Open Settings and confirm sections, ordering, labels, and controls match.
@@ -63,8 +63,9 @@ Run this checklist against both `v4.2.3` and the current `4.2.4` candidate befor
 ## Release Gates
 
 - `scripts/ci.sh` passes
+- `scripts/ci.sh` release-readiness passes
 - `xcodebuild` build passes
-- package tests pass
+- package tests pass (`./scripts/ci.sh core-tests` / `ui-tests`)
 - manual parity checklist passes
 - Release archive/export succeeds
 - TestFlight upload succeeds

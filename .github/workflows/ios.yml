@@ -6,6 +6,7 @@ on:
       - main
       - codex/stable-4.1
       - codex/stable-4.2
+      - codex/stable-4.3
       - codex/feature/**
   pull_request:
 
@@ -25,5 +26,17 @@ jobs:
             HOMEBREW_NO_AUTO_UPDATE=1 brew install swiftlint
           fi
 
-      - name: CI Gate
+      - name: Lint Gate
+        run: ./scripts/ci.sh lint
+
+      - name: Build Gate
+        run: ./scripts/ci.sh build
+
+      - name: Core Tests Gate
+        run: ./scripts/ci.sh core-tests
+
+      - name: UI Tests Gate
+        run: ./scripts/ci.sh ui-tests
+
+      - name: Release Readiness Gate
         run: ./scripts/ci.sh

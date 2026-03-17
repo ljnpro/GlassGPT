@@ -1,23 +1,39 @@
 import Foundation
 
-struct OpenAIRequestBuilder {
+struct OpenAIRequestBuilder: Sendable {
+    let configuration: OpenAIConfigurationProvider
+    let requestAuthorizer: OpenAIRequestAuthorizer
+
+    init(
+        configuration: OpenAIConfigurationProvider = DefaultOpenAIConfigurationProvider.shared,
+        requestAuthorizer: OpenAIRequestAuthorizer? = nil
+    ) {
+        self.configuration = configuration
+        self.requestAuthorizer = requestAuthorizer ?? OpenAIStandardRequestAuthorizer(
+            configuration: configuration
+        )
+    }
+
     func responsesURL(useDirectBaseURL: Bool = false) -> String {
-        let baseURL = useDirectBaseURL ? FeatureFlags.directOpenAIBaseURL : FeatureFlags.openAIBaseURL
+        let baseURL = useDirectBaseURL ? configuration.directOpenAIBaseURL : configuration.openAIBaseURL
         return "\(baseURL)/responses"
     }
 
     func uploadRequest(data: Data, filename: String, apiKey: String) throws -> URLRequest {
-        guard let url = URL(string: "\(FeatureFlags.openAIBaseURL)/files") else {
+        guard let url = URL(string: "\(configuration.openAIBaseURL)/files") else {
             throw OpenAIServiceError.invalidURL
         }
 
         let boundary = "Boundary-\(UUID().uuidString)"
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
-        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
         request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
         request.timeoutInterval = 120
-        FeatureFlags.applyCloudflareAuthorization(to: &request)
+        requestAuthorizer.applyAuthorization(
+            to: &request,
+            apiKey: apiKey,
+            includeCloudflareAuthorization: configuration.useCloudflareGateway
+        )
 
         var body = Data()
         body.append("--\(boundary)\r\n".data(using: .utf8)!)
@@ -46,12 +62,13 @@ struct OpenAIRequestBuilder {
             throw OpenAIServiceError.invalidURL
         }
 
-        var request = try Self.makeJSONRequest(
+        var request = try makeJSONRequest(
             url: url,
             apiKey: apiKey,
             method: "POST",
             accept: "text/event-stream",
-            timeoutInterval: 300
+            timeoutInterval: 300,
+            includeCloudflareAuthorization: configuration.useCloudflareGateway
         )
 
         let input = Self.buildInputArray(messages: messages)
@@ -108,13 +125,13 @@ struct OpenAIRequestBuilder {
             include: nil
         )
 
-        return try Self.makeJSONRequest(
+        return try makeJSONRequest(
             url: url,
             apiKey: apiKey,
             method: "GET",
             accept: "text/event-stream",
             timeoutInterval: 300,
-            includeCloudflareAuthorization: !useDirectBaseURL
+            includeCloudflareAuthorization: !useDirectBaseURL && configuration.useCloudflareGateway
         )
     }
 
@@ -123,12 +140,14 @@ struct OpenAIRequestBuilder {
             throw OpenAIServiceError.invalidURL
         }
 
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.timeoutInterval = 30
-        FeatureFlags.applyCloudflareAuthorization(to: &request)
+        var request = try makeJSONRequest(
+            url: url,
+            apiKey: apiKey,
+            method: "POST",
+            accept: "application/json",
+            timeoutInterval: 30,
+            includeCloudflareAuthorization: configuration.useCloudflareGateway
+        )
 
         let body: [String: Any] = [
             "model": "gpt-5.4",
@@ -149,13 +168,13 @@ struct OpenAIRequestBuilder {
             throw OpenAIServiceError.invalidURL
         }
 
-        var request = try Self.makeJSONRequest(
+        var request = try makeJSONRequest(
             url: url,
             apiKey: apiKey,
             method: "POST",
             accept: "application/json",
             timeoutInterval: 30,
-            includeCloudflareAuthorization: !useDirectBaseURL
+            includeCloudflareAuthorization: !useDirectBaseURL && configuration.useCloudflareGateway
         )
         request.httpBody = Data()
         return request
@@ -174,13 +193,28 @@ struct OpenAIRequestBuilder {
             ]
         )
 
-        return try Self.makeJSONRequest(
+        return try makeJSONRequest(
             url: url,
             apiKey: apiKey,
             method: "GET",
             accept: "application/json",
             timeoutInterval: 30,
-            includeCloudflareAuthorization: !useDirectBaseURL
+            includeCloudflareAuthorization: !useDirectBaseURL && configuration.useCloudflareGateway
+        )
+    }
+
+    func modelsRequest(apiKey: String) throws -> URLRequest {
+        guard let url = URL(string: "\(configuration.openAIBaseURL)/models") else {
+            throw OpenAIServiceError.invalidURL
+        }
+
+        return try makeJSONRequest(
+            url: url,
+            apiKey: apiKey,
+            method: "GET",
+            accept: "application/json",
+            timeoutInterval: 10,
+            includeCloudflareAuthorization: configuration.useCloudflareGateway
         )
     }
 
@@ -250,26 +284,26 @@ struct OpenAIRequestBuilder {
         }
     }
 
-    static func makeJSONRequest(
+    func makeJSONRequest(
         url: URL,
         apiKey: String,
         method: String,
         accept: String,
         timeoutInterval: TimeInterval,
-        includeCloudflareAuthorization: Bool = FeatureFlags.useCloudflareGateway
+        includeCloudflareAuthorization: Bool
     ) throws -> URLRequest {
         var request = URLRequest(url: url)
         request.httpMethod = method
-        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
         request.setValue(accept, forHTTPHeaderField: "Accept")
         request.timeoutInterval = timeoutInterval
+        requestAuthorizer.applyAuthorization(
+            to: &request,
+            apiKey: apiKey,
+            includeCloudflareAuthorization: includeCloudflareAuthorization
+        )
 
         if method != "GET" {
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        }
-
-        if includeCloudflareAuthorization {
-            FeatureFlags.applyCloudflareAuthorization(to: &request)
         }
 
         return request

@@ -79,10 +79,10 @@ final class Message {
         self.lastSequenceNumber = lastSequenceNumber
         self.usedBackgroundMode = usedBackgroundMode
         self.isComplete = isComplete
-        self.annotationsData = Self.encode(annotations)
-        self.toolCallsData = Self.encode(toolCalls)
-        self.fileAttachmentsData = Self.encode(fileAttachments)
-        self.filePathAnnotationsData = Self.encode(filePathAnnotations)
+        self.annotationsData = MessagePayloadStore.encodeAnnotations(annotations)
+        self.toolCallsData = MessagePayloadStore.encodeToolCalls(toolCalls)
+        self.fileAttachmentsData = MessagePayloadStore.encodeFileAttachments(fileAttachments)
+        self.filePathAnnotationsData = MessagePayloadStore.encodeFilePathAnnotations(filePathAnnotations)
     }
 
     var role: MessageRole {
@@ -93,50 +93,32 @@ final class Message {
     // MARK: - Annotations
 
     var annotations: [URLCitation] {
-        get { Self.decode(annotationsData) ?? [] }
-        set { annotationsData = Self.encode(newValue.isEmpty ? nil : newValue) }
+        get { MessagePayloadStore.annotations(from: annotationsData) }
+        set { MessagePayloadStore.setAnnotations(newValue, on: self) }
     }
 
     // MARK: - Tool Calls
 
     var toolCalls: [ToolCallInfo] {
-        get { Self.decode(toolCallsData) ?? [] }
-        set { toolCallsData = Self.encode(newValue.isEmpty ? nil : newValue) }
+        get { MessagePayloadStore.toolCalls(from: toolCallsData) }
+        set { MessagePayloadStore.setToolCalls(newValue, on: self) }
     }
 
     // MARK: - File Attachments
 
     var fileAttachments: [FileAttachment] {
-        get { Self.decode(fileAttachmentsData) ?? [] }
-        set { fileAttachmentsData = Self.encode(newValue.isEmpty ? nil : newValue) }
+        get { MessagePayloadStore.fileAttachments(from: fileAttachmentsData) }
+        set { MessagePayloadStore.setFileAttachments(newValue, on: self) }
     }
 
     // MARK: - File Path Annotations
 
     var filePathAnnotations: [FilePathAnnotation] {
-        get { Self.decode(filePathAnnotationsData) ?? [] }
-        set { filePathAnnotationsData = Self.encode(newValue.isEmpty ? nil : newValue) }
+        get { MessagePayloadStore.filePathAnnotations(from: filePathAnnotationsData) }
+        set { MessagePayloadStore.setFilePathAnnotations(newValue, on: self) }
     }
 
-    // MARK: - JSON Helpers
-
-    private static func encode<T: Encodable>(_ value: T?) -> Data? {
-        guard let value = value else { return nil }
-        do {
-            return try JSONCoding.encode(value)
-        } catch {
-            Loggers.persistence.error("[Message.encode] \(error.localizedDescription)")
-            return nil
-        }
-    }
-
-    private static func decode<T: Decodable>(_ data: Data?) -> T? {
-        guard let data = data else { return nil }
-        do {
-            return try JSONCoding.decode(T.self, from: data)
-        } catch {
-            Loggers.persistence.error("[Message.decode] \(error.localizedDescription)")
-            return nil
-        }
+    var payloadRenderDigest: String {
+        MessagePayloadStore.renderDigest(for: self)
     }
 }
