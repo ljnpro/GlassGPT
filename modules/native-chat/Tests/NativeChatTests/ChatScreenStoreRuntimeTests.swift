@@ -199,6 +199,60 @@ final class ChatScreenStoreRuntimeTests: XCTestCase {
         XCTAssertEqual(requestedPaths, ["/v1/responses/resp_missing"])
     }
 
+    func testRecoverResponseInvisiblePollingFinalizesMessageWithoutBindingVisibleSession() async throws {
+        let streamClient = QueuedOpenAIStreamClient(scriptedStreams: [])
+        let transport = StubOpenAITransport()
+        await transport.enqueue(
+            data: try makeFetchResponseData(
+                status: .completed,
+                text: "Recovered via polling",
+                thinking: "Recovered hidden reasoning"
+            ),
+            url: URL(string: "https://api.test.openai.local/v1/responses/resp_hidden_resume")!
+        )
+
+        let store = try makeTestChatScreenStore(transport: transport, streamClient: streamClient)
+        let conversation = try seedConversation(in: store, title: "Invisible Recovery")
+        let draft = Message(
+            role: .assistant,
+            content: "",
+            thinking: nil,
+            conversation: conversation,
+            responseId: "resp_hidden_resume",
+            lastSequenceNumber: 2,
+            usedBackgroundMode: false,
+            isComplete: false
+        )
+        conversation.messages.append(draft)
+        store.modelContext.insert(draft)
+        try store.modelContext.save()
+
+        store.currentConversation = conversation
+        store.messages = [draft]
+        store.syncConversationProjection()
+
+        store.recoverResponse(
+            messageId: draft.id,
+            responseId: "resp_hidden_resume",
+            preferStreamingResume: false,
+            visible: false
+        )
+
+        try await waitUntil {
+            self.latestAssistantMessage(in: store)?.isComplete == true
+        }
+
+        let recovered = try XCTUnwrap(latestAssistantMessage(in: store))
+        XCTAssertEqual(recovered.content, "Recovered via polling")
+        XCTAssertEqual(recovered.thinking, "Recovered hidden reasoning")
+        XCTAssertTrue(recovered.isComplete)
+        XCTAssertNil(store.currentVisibleSession)
+        XCTAssertFalse(store.isRecovering)
+        let requestedPaths = await transport.requestedPaths()
+        XCTAssertEqual(requestedPaths, ["/v1/responses/resp_hidden_resume"])
+        XCTAssertTrue(streamClient.recordedRequests.isEmpty)
+    }
+
     func testHandleDidEnterBackgroundSuspendsActiveSessionAndPersistsInterruptionFallback() async throws {
         let streamClient = ControlledOpenAIStreamClient()
         let store = try makeTestChatScreenStore(streamClient: streamClient)

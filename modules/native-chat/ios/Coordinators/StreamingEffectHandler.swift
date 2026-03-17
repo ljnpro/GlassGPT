@@ -5,11 +5,11 @@ final class StreamingEffectHandler {
     static let maxReconnectAttempts = 3
     static let reconnectBaseDelay: UInt64 = 1_000_000_000
 
-    unowned let viewModel: ChatScreenStore
+    unowned let viewModel: any ChatRuntimeScreenStore
     let recoveryCoordinator: RecoveryEffectHandler
 
     init(
-        viewModel: ChatScreenStore,
+        viewModel: any ChatRuntimeScreenStore,
         recoveryCoordinator: RecoveryEffectHandler
     ) {
         self.viewModel = viewModel
@@ -82,10 +82,11 @@ final class StreamingEffectHandler {
         HapticService.shared.impact(.light)
 
         if !attachmentsToSend.isEmpty {
+            let viewModel = self.viewModel
             Task { @MainActor in
-                let uploadedAttachments = await self.viewModel.uploadAttachments(attachmentsToSend)
-                self.viewModel.messagePersistence.setFileAttachments(uploadedAttachments, on: userMessage)
-                self.viewModel.saveContextIfPossible("sendMessage.uploadedAttachments")
+                let uploadedAttachments = await viewModel.uploadAttachments(attachmentsToSend)
+                viewModel.messagePersistence.setFileAttachments(uploadedAttachments, on: userMessage)
+                viewModel.saveContextIfPossible("sendMessage.uploadedAttachments")
                 self.startStreamingRequest(for: session)
             }
         } else {

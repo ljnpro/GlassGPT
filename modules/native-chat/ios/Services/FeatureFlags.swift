@@ -1,4 +1,5 @@
 import Foundation
+import OpenAITransport
 
 enum FeatureFlags {
     nonisolated(unsafe) private static let configurationProvider = DefaultOpenAIConfigurationProvider.shared
@@ -27,7 +28,9 @@ enum FeatureFlags {
     }
 
     static func applyCloudflareAuthorization(to request: inout URLRequest) {
-        guard configurationProvider.useCloudflareGateway else {
+        let endpoint = configurationProvider.resolvedEndpoint()
+
+        guard endpoint.includeCloudflareAuthorization else {
             return
         }
 

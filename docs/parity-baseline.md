@@ -1,12 +1,12 @@
-# 4.3.1 Parity Baseline
+# 4.4.0 Parity Baseline
 
-This document records the `4.3.0` production baseline that `4.3.1` must preserve.
+This document records the `4.3.1` production baseline that `4.4.0` must preserve.
 
 ## Stable Baseline
 
 - Source branch: `codex/stable-4.3`
-- Development branch: `codex/feature/4.3.1-perfect-maintainability`
-- Baseline app version: `4.3.0 (20171)`
+- Development branch: `codex/feature/4.4.0-*`
+- Baseline app version: `4.3.1 (20172)`
 - App target: `GlassGPT`
 - Package target: `NativeChat`
 - Current package size: ~14k Swift LOC across 101 Swift files
@@ -19,7 +19,7 @@ Last verified baseline command:
 xcodebuild -project ios/GlassGPT.xcodeproj -scheme GlassGPT -destination 'generic/platform=iOS Simulator' build
 ```
 
-Baseline result before 4.3.1 work:
+Baseline result before 4.4.0 work:
 
 - Build status: succeeded
 - Existing warnings:
@@ -45,28 +45,34 @@ The following must remain unchanged unless a release blocker forces a deviation:
 
 ## Manual Acceptance Checklist
 
-Run this checklist against both `v4.3.0` and the current `4.3.1` candidate before release:
+Run this checklist against both `v4.3.1` and the current `4.4.0` candidate before release:
 
 1. Launch the app and confirm the initial empty state matches.
 2. Open Settings and confirm sections, ordering, labels, and controls match.
 3. Toggle theme, haptics, Cloudflare, Pro mode, Background mode, Flex mode, and confirm behavior matches.
-4. Start a new chat and confirm toolbar layout and model badge match.
-5. Send a text message and confirm user/assistant message presentation matches.
-6. Send an image attachment and confirm preview and send behavior match.
-7. Send a document attachment and confirm chip rendering and send behavior match.
-8. While streaming, confirm indicators, stop button, and live bubble behavior match.
-9. Force a recovery path and confirm recovery indicator, final output, single-bubble behavior, and error handling match.
-10. Open History, select a conversation, delete one conversation, and delete all conversations.
-11. Open a generated file and confirm preview/share behavior matches.
-12. Clear image/document caches and confirm settings UI and results match.
+4. Save and clear the API key and confirm the local validation flow and alerts match.
+5. Enable gateway mode without a saved key and confirm the missing-key feedback matches.
+6. Start a new chat and confirm toolbar layout and model badge match.
+7. Send a text message and confirm user/assistant message presentation matches.
+8. Send an image attachment and confirm preview and send behavior match.
+9. Send a document attachment and confirm chip rendering and send behavior match.
+10. While streaming, confirm indicators, stop button, and live bubble behavior match.
+11. Force a recovery path and confirm recovery indicator, final output, single-bubble behavior, and error handling match.
+12. Open History, search conversations, select a conversation, delete one conversation, and delete all conversations.
+13. Open a generated file and confirm preview/share behavior matches.
+14. Clear image/document caches and confirm settings UI and results match.
 
 ## Release Gates
 
 - `scripts/ci.sh` passes
+- `scripts/ci.sh app-tests` passes
+- `scripts/ci.sh snapshot-tests` passes
+- `scripts/ci.sh package-tests` passes
+- `scripts/ci.sh coverage-report` passes
 - `scripts/ci.sh maintainability` passes
 - `scripts/ci.sh` release-readiness passes
 - `xcodebuild` build passes
-- package tests pass (`./scripts/ci.sh core-tests` / `ui-tests`)
+- grouped tests pass (`./scripts/ci.sh core-tests` / `ui-tests`)
 - manual parity checklist passes
 - Release archive/export succeeds
 - TestFlight upload succeeds

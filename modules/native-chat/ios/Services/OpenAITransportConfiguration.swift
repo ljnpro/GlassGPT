@@ -1,66 +1,17 @@
 import Foundation
+import OpenAITransport
 
-protocol OpenAIConfigurationProvider {
-    var directOpenAIBaseURL: String { get }
-    var openAIBaseURL: String { get }
-    var cloudflareGatewayBaseURL: String { get }
-    var cloudflareAIGToken: String { get }
-    var useCloudflareGateway: Bool { get set }
-}
-
-protocol OpenAIRequestAuthorizer {
-    func applyAuthorization(
-        to request: inout URLRequest,
-        apiKey: String,
-        includeCloudflareAuthorization: Bool
-    )
-}
-
-protocol OpenAIDataTransport: Sendable {
-    func data(for request: URLRequest) async throws -> (Data, URLResponse)
-}
+typealias OpenAIConfigurationProvider = OpenAITransport.OpenAIConfigurationProvider
+typealias OpenAIResolvedEndpoint = OpenAITransport.OpenAIResolvedEndpoint
+typealias OpenAIRequestAuthorizer = OpenAITransport.OpenAIRequestAuthorizer
+typealias OpenAIDataTransport = OpenAITransport.OpenAIDataTransport
+typealias OpenAIStandardRequestAuthorizer = OpenAITransport.OpenAIStandardRequestAuthorizer
+typealias OpenAIURLSessionTransport = OpenAITransport.OpenAIURLSessionTransport
 
 @MainActor
 protocol OpenAIStreamClient: AnyObject {
     func makeStream(request: URLRequest) -> AsyncStream<StreamEvent>
     func cancel()
-}
-
-struct OpenAIStandardRequestAuthorizer: OpenAIRequestAuthorizer {
-    private let configuration: OpenAIConfigurationProvider
-
-    init(configuration: OpenAIConfigurationProvider) {
-        self.configuration = configuration
-    }
-
-    func applyAuthorization(
-        to request: inout URLRequest,
-        apiKey: String,
-        includeCloudflareAuthorization: Bool
-    ) {
-        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
-
-        guard includeCloudflareAuthorization, configuration.useCloudflareGateway else {
-            return
-        }
-
-        request.setValue(
-            "Bearer \(configuration.cloudflareAIGToken)",
-            forHTTPHeaderField: "cf-aig-authorization"
-        )
-    }
-}
-
-actor OpenAIURLSessionTransport: OpenAIDataTransport {
-    private let session: URLSession
-
-    init(session: URLSession = .shared) {
-        self.session = session
-    }
-
-    func data(for request: URLRequest) async throws -> (Data, URLResponse) {
-        try await session.data(for: request)
-    }
 }
 
 final class DefaultOpenAIConfigurationProvider: OpenAIConfigurationProvider {
@@ -75,10 +26,6 @@ final class DefaultOpenAIConfigurationProvider: OpenAIConfigurationProvider {
 
     init(settingsStore: SettingsStore = .shared) {
         self.settingsStore = settingsStore
-    }
-
-    var openAIBaseURL: String {
-        useCloudflareGateway ? cloudflareGatewayBaseURL : directOpenAIBaseURL
     }
 
     var directOpenAIBaseURL: String {

@@ -113,8 +113,9 @@ extension RecoveryEffectHandler {
         viewModel.removeSession(session)
 
         if let conversation {
+            let viewModel = self.viewModel
             Task { @MainActor in
-                await self.viewModel.generateTitleIfNeeded(for: conversation)
+                await viewModel.generateTitleIfNeeded(for: conversation)
             }
         }
 

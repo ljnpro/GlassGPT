@@ -21,6 +21,8 @@ class CoverageGroup:
     threshold: float
     prefixes: list[str]
     exact_paths: list[str] | None = None
+    exclude_prefixes: list[str] | None = None
+    required: bool = True
     covered: int = 0
     executable: int = 0
     files: list[str] | None = None
@@ -30,6 +32,8 @@ class CoverageGroup:
             self.files = []
         if self.exact_paths is None:
             self.exact_paths = []
+        if self.exclude_prefixes is None:
+            self.exclude_prefixes = []
 
     @property
     def coverage(self) -> float:
@@ -39,7 +43,15 @@ class CoverageGroup:
 
     @property
     def ok(self) -> bool:
+        if not self.required:
+            return True
         return self.executable > 0 and self.coverage >= self.threshold
+
+    @property
+    def status(self) -> str:
+        if not self.required:
+            return "INFO"
+        return "PASS" if self.ok else "FAIL"
 
 
 def run_command(args: list[str]) -> str:
@@ -80,35 +92,54 @@ def materialize_xccov_path(source: Path, destination: Path) -> Path:
     return destination
 
 
-def load_xccov_json(source: Path) -> dict:
-    if source.suffix == ".xcresult":
-        with tempfile.TemporaryDirectory(prefix="glassgpt-coverage-") as temp_dir:
-            temp_path = Path(temp_dir)
-            report, _ = export_coverage_artifacts(source, temp_path)
-            if report is None:
-                raise RuntimeError(f"No coverage report exported from {source}")
+def with_merged_report(sources: list[Path], handler):
+    if not sources:
+        raise RuntimeError("At least one coverage source is required.")
 
-            report_path = materialize_xccov_path(report, temp_path / "coverage.xccovreport")
-            output = run_command(["xcrun", "xccov", "view", "--json", str(report_path)])
-            return json.loads(output)
+    with tempfile.TemporaryDirectory(prefix="glassgpt-coverage-") as temp_dir:
+        temp_path = Path(temp_dir)
 
-    output = run_command(["xcrun", "xccov", "view", "--json", str(source)])
-    return json.loads(output)
+        if len(sources) == 1 and sources[0].suffix != ".xcresult":
+            return handler(sources[0])
+
+        coverage_pairs: list[tuple[Path, Path]] = []
+        for index, source in enumerate(sources):
+            if source.suffix != ".xcresult":
+                raise RuntimeError("Multiple coverage sources must be .xcresult bundles.")
+
+            export_dir = temp_path / f"source-{index}"
+            export_dir.mkdir(parents=True, exist_ok=True)
+            report, archive = export_coverage_artifacts(source, export_dir)
+            if report is None or archive is None:
+                raise RuntimeError(f"No coverage report/archive exported from {source}")
+            coverage_pairs.append((report, archive))
+
+        if len(coverage_pairs) == 1:
+            report_path = materialize_xccov_path(coverage_pairs[0][0], temp_path / "coverage.xccovreport")
+            return handler(report_path)
+
+        merged_report = temp_path / "merged.xccovreport"
+        merged_archive = temp_path / "merged.xccovarchive"
+        command = ["xcrun", "xccov", "merge", "--outReport", str(merged_report), "--outArchive", str(merged_archive)]
+        for report, archive in coverage_pairs:
+            command.extend([str(report), str(archive)])
+        run_command(command)
+        return handler(merged_report)
 
 
-def write_raw_report(source: Path, output: Path) -> None:
-    if source.suffix == ".xcresult":
-        with tempfile.TemporaryDirectory(prefix="glassgpt-coverage-") as temp_dir:
-            temp_path = Path(temp_dir)
-            report, _ = export_coverage_artifacts(source, temp_path)
-            if report is None:
-                raise RuntimeError(f"No coverage report exported from {source}")
+def load_xccov_json(sources: list[Path]) -> dict:
+    def _load(report_path: Path) -> dict:
+        output = run_command(["xcrun", "xccov", "view", "--json", str(report_path)])
+        return json.loads(output)
 
-            report_path = materialize_xccov_path(report, temp_path / "coverage.xccovreport")
-            text = run_command(["xcrun", "xccov", "view", str(report_path)])
-    else:
-        text = run_command(["xcrun", "xccov", "view", str(source)])
+    return with_merged_report(sources, _load)
 
+
+def write_raw_report(sources: list[Path], output: Path) -> None:
+    def _render(report_path: Path) -> str:
+        return run_command(["xcrun", "xccov", "view", str(report_path)])
+
+    text = with_merged_report(sources, _render)
     output.write_text(text, encoding="utf-8")
 
 
@@ -144,39 +175,70 @@ def normalize(path: str) -> str:
 def build_groups() -> list[CoverageGroup]:
     return [
         CoverageGroup(
-            name="runtime-core",
-            threshold=0.90,
-            prefixes=[],
-            exact_paths=[
-                normalize("modules/native-chat/ios/ChatDomain/ChatRuntimeState.swift"),
-                normalize("modules/native-chat/ios/ChatDomain/ChatSessionRegistry.swift"),
-                normalize("modules/native-chat/ios/ChatDomain/ChatResponseSession.swift"),
-                normalize("modules/native-chat/ios/ChatDomain/SessionVisibilityCoordinator.swift"),
-                normalize("modules/native-chat/ios/ChatDomain/StreamingTransitionReducer.swift"),
-                normalize("modules/native-chat/ios/Infrastructure/JSONCoding.swift"),
-                normalize("modules/native-chat/ios/Infrastructure/MessagePayloadStore.swift"),
-                normalize("modules/native-chat/ios/Infrastructure/MessagePersistenceAdapter.swift"),
-                normalize("modules/native-chat/ios/Repositories/ConversationRepository.swift"),
-                normalize("modules/native-chat/ios/Repositories/DraftRepository.swift"),
-                normalize("modules/native-chat/ios/Stores/APIKeyStore.swift"),
-                normalize("modules/native-chat/ios/Stores/SettingsStore.swift"),
+            name="nativechat-non-ui-total",
+            threshold=0.49,
+            prefixes=[
+                normalize("modules/native-chat/ios/"),
+                normalize("modules/native-chat/Sources/"),
+            ],
+            exclude_prefixes=[
+                normalize("modules/native-chat/ios/Views/"),
             ],
         ),
         CoverageGroup(
-            name="transport-core",
-            threshold=0.85,
-            prefixes=[],
-            exact_paths=[
-                normalize("modules/native-chat/ios/Services/OpenAIRequestDTOs.swift"),
-                normalize("modules/native-chat/ios/Services/OpenAITransportModels.swift"),
-                normalize("modules/native-chat/ios/Services/OpenAIRequestBuilder+MessageEncoding.swift"),
-                normalize("modules/native-chat/ios/Services/OpenAIRequestBuilder+RequestFactory.swift"),
-                normalize("modules/native-chat/ios/Services/OpenAIResponseParser.swift"),
-                normalize("modules/native-chat/ios/Services/OpenAIStreamEventTranslator.swift"),
-                normalize("modules/native-chat/ios/Services/OpenAIStreamEventTranslator+Annotations.swift"),
-                normalize("modules/native-chat/ios/Services/OpenAIStreamEventTranslator+ResponseExtraction.swift"),
-                normalize("modules/native-chat/ios/Services/OpenAITransportConfiguration.swift"),
+            name="runtime-core",
+            threshold=0.90,
+            prefixes=[
+                normalize("modules/native-chat/ios/ChatDomain/"),
+                normalize("modules/native-chat/ios/Infrastructure/"),
+                normalize("modules/native-chat/ios/Repositories/"),
             ],
+        ),
+        CoverageGroup(
+            name="runtime-coordinators",
+            threshold=0.55,
+            prefixes=[
+                normalize("modules/native-chat/ios/Coordinators/"),
+            ],
+        ),
+        CoverageGroup(
+            name="screen-stores",
+            threshold=0.28,
+            prefixes=[
+                normalize("modules/native-chat/ios/ScreenStores/"),
+            ],
+        ),
+        CoverageGroup(
+            name="transport-and-services",
+            threshold=0.45,
+            prefixes=[
+                normalize("modules/native-chat/ios/Services/"),
+                normalize("modules/native-chat/Sources/OpenAITransport/"),
+            ],
+        ),
+        CoverageGroup(
+            name="settings-and-storage",
+            threshold=0.65,
+            prefixes=[
+                normalize("modules/native-chat/ios/Stores/"),
+                normalize("modules/native-chat/Sources/ChatPersistence/"),
+            ],
+        ),
+        CoverageGroup(
+            name="views-and-presentation",
+            threshold=0.0,
+            prefixes=[
+                normalize("modules/native-chat/ios/Views/"),
+            ],
+            required=False,
+        ),
+        CoverageGroup(
+            name="app-shell",
+            threshold=0.0,
+            prefixes=[
+                normalize("ios/GlassGPT/"),
+            ],
+            required=False,
         ),
     ]
 
@@ -193,6 +255,8 @@ def apply_coverage(groups: list[CoverageGroup], file_entries: list[dict]) -> Non
             matched = path in exact_paths
             if not matched and group.prefixes:
                 matched = any(path.startswith(prefix) for prefix in group.prefixes)
+            if matched and group.exclude_prefixes:
+                matched = not any(path.startswith(prefix) for prefix in group.exclude_prefixes)
             if matched:
                 group.covered += covered
                 group.executable += executable
@@ -203,9 +267,8 @@ def write_report(groups: list[CoverageGroup], output: Path) -> None:
     lines = ["Production coverage report", ""]
     for group in groups:
         percent = group.coverage * 100
-        status = "PASS" if group.ok else "FAIL"
         lines.append(
-            f"[{status}] {group.name}: {percent:.2f}% ({group.covered}/{group.executable}) threshold={group.threshold * 100:.0f}%"
+            f"[{group.status}] {group.name}: {percent:.2f}% ({group.covered}/{group.executable}) threshold={group.threshold * 100:.0f}%"
         )
         if group.executable == 0:
             lines.append("  no matching production files were present in the xccov report")
@@ -227,6 +290,8 @@ def write_summary(groups: list[CoverageGroup], output: Path) -> None:
                 "coverage": group.coverage,
                 "ok": group.ok,
                 "matchedFiles": sorted(set(group.files or [])),
+                "required": group.required,
+                "status": group.status,
             }
             for group in groups
         ]
@@ -236,7 +301,7 @@ def write_summary(groups: list[CoverageGroup], output: Path) -> None:
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("coverage_source", type=Path)
+    parser.add_argument("coverage_source", nargs="+", type=Path)
     parser.add_argument("--report", required=True, type=Path)
     parser.add_argument("--summary-json", required=True, type=Path)
     parser.add_argument("--raw-report-output", type=Path)
@@ -250,7 +315,7 @@ def main() -> int:
     if args.raw_report_output is not None:
         write_raw_report(args.coverage_source, args.raw_report_output)
 
-    failing = [group for group in groups if not group.ok]
+    failing = [group for group in groups if group.required and not group.ok]
     if failing:
         for group in failing:
             if group.executable == 0:

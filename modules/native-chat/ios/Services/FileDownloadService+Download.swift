@@ -1,5 +1,6 @@
 import Foundation
 import ImageIO
+import OpenAITransport
 import PDFKit
 
 extension FileDownloadService {
@@ -81,7 +82,7 @@ extension FileDownloadService {
         apiKey: String
     ) async throws -> GeneratedFilePayload {
         var lastError: Error = FileDownloadError.invalidGeneratedFileData
-        let attemptDirectFlags: [Bool] = configurationProvider.useCloudflareGateway ? [false, true] : [false]
+        let attemptDirectFlags: [Bool] = configurationProvider.usesGatewayRouting ? [false, true] : [false]
 
         for useDirectBaseURL in attemptDirectFlags {
             do {
@@ -138,13 +139,13 @@ extension FileDownloadService {
         apiKey: String,
         useDirectBaseURL: Bool = false
     ) async throws -> (Data, URLResponse) {
-        let baseURL = useDirectBaseURL ? configurationProvider.directOpenAIBaseURL : configurationProvider.openAIBaseURL
+        let endpoint = configurationProvider.resolvedEndpoint(useDirectBaseURL: useDirectBaseURL)
         let urlString: String
 
         if let containerId, !containerId.isEmpty {
-            urlString = "\(baseURL)/containers/\(containerId)/files/\(fileId)/content"
+            urlString = "\(endpoint.baseURL)/containers/\(containerId)/files/\(fileId)/content"
         } else {
-            urlString = "\(baseURL)/files/\(fileId)/content"
+            urlString = "\(endpoint.baseURL)/files/\(fileId)/content"
         }
 
         guard let url = URL(string: urlString) else {
@@ -157,7 +158,7 @@ extension FileDownloadService {
         requestAuthorizer.applyAuthorization(
             to: &request,
             apiKey: apiKey,
-            includeCloudflareAuthorization: !useDirectBaseURL && configurationProvider.useCloudflareGateway
+            includeCloudflareAuthorization: endpoint.includeCloudflareAuthorization
         )
 
         let (data, response) = try await transport.data(for: request)

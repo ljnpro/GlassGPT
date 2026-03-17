@@ -1,6 +1,7 @@
 import PhotosUI
 import SwiftUI
 import UIKit
+import ChatUI
 
 struct ChatView: View {
     @Bindable var viewModel: ChatScreenStore

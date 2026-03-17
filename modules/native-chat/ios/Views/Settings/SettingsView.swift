@@ -81,193 +81,40 @@ struct SettingsView: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section {
-                    SecureField("sk-proj-...", text: $viewModel.apiKey)
-                        .textContentType(.password)
-                        .autocorrectionDisabled()
-                        .textInputAutocapitalization(.never)
-                        .accessibilityIdentifier("settings.apiKey")
-
-                    if let isValid = viewModel.isAPIKeyValid {
-                        HStack {
-                            Image(systemName: isValid ? "checkmark.circle.fill" : "xmark.circle.fill")
-                                .foregroundStyle(isValid ? .green : .red)
-                            Text(isValid ? "API key is valid" : "API key is invalid")
-                                .font(.caption)
-                                .foregroundStyle(isValid ? .green : .red)
-                        }
+                SettingsAPIConfigurationSection(viewModel: viewModel)
+                SettingsCloudflareSection(
+                    viewModel: viewModel,
+                    statusColor: cloudflareStatusColor,
+                    statusText: cloudflareStatusText
+                )
+                SettingsChatDefaultsSection(viewModel: viewModel)
+                SettingsAppearanceSection(viewModel: viewModel)
+                SettingsCacheSection(
+                    title: "Image Cache",
+                    usedValue: viewModel.generatedImageCacheSizeString,
+                    footerText: "Generated images are cached automatically so old download links still open later. Maximum cache size: \(viewModel.generatedImageCacheLimitString).",
+                    isClearing: viewModel.isClearingImageCache,
+                    hasCachedContent: viewModel.generatedImageCacheSizeBytes > 0,
+                    clearLabel: "Clear Image Cache",
+                    clearAction: {
+                        await viewModel.clearGeneratedImageCache()
                     }
-
-                    HStack {
-                        Button("Validate") {
-                            Task { @MainActor in
-                                await viewModel.validateAPIKey()
-                            }
-                        }
-                        .buttonStyle(.glass)
-                        .disabled(viewModel.apiKey.isEmpty || viewModel.isValidating)
-
-                        Spacer()
-
-                        Button("Clear", role: .destructive) {
-                            viewModel.clearAPIKey()
-                        }
-                        .buttonStyle(.glass)
-                        .tint(.red)
-
-                        Button("Save") {
-                            viewModel.saveAPIKey()
-                        }
-                        .buttonStyle(.glassProminent)
-                        .disabled(viewModel.apiKey.isEmpty)
+                )
+                SettingsCacheSection(
+                    title: "Document Cache",
+                    usedValue: viewModel.generatedDocumentCacheSizeString,
+                    footerText: "Generated PDFs and other files are cached automatically so old download links still open or share later. Maximum cache size: \(viewModel.generatedDocumentCacheLimitString).",
+                    isClearing: viewModel.isClearingDocumentCache,
+                    hasCachedContent: viewModel.generatedDocumentCacheSizeBytes > 0,
+                    clearLabel: "Clear Document Cache",
+                    clearAction: {
+                        await viewModel.clearGeneratedDocumentCache()
                     }
-                } header: {
-                    Text("API Configuration")
-                } footer: {
-                    Text("Your API key is stored securely in the device Keychain.")
-                }
-
-                Section {
-                    Toggle("Enable Cloudflare Gateway", isOn: $viewModel.cloudflareEnabled)
-                        .accessibilityIdentifier("settings.cloudflare")
-
-                    if viewModel.cloudflareEnabled {
-                        HStack(spacing: 10) {
-                            Image(systemName: "circle.fill")
-                                .font(.system(size: 10))
-                                .foregroundStyle(cloudflareStatusColor)
-
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("Connection Status")
-                                Text(cloudflareStatusText)
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                                    .multilineTextAlignment(.leading)
-                            }
-
-                            Spacer()
-
-                            if viewModel.isCheckingCloudflareHealth {
-                                ProgressView()
-                                    .controlSize(.small)
-                            }
-                        }
-
-                        Button("Check Connection") {
-                            Task { @MainActor in
-                                await viewModel.checkCloudflareHealth()
-                            }
-                        }
-                        .buttonStyle(.glass)
-                        .disabled(viewModel.isCheckingCloudflareHealth)
-                    }
-                } header: {
-                    Text("Cloudflare Gateway")
-                } footer: {
-                    Text("Route API requests through Cloudflare's global edge network for improved reliability and analytics.")
-                }
-
-                Section {
-                    Toggle("Default Pro Mode", isOn: Binding(
-                        get: { viewModel.defaultProModeEnabled },
-                        set: { viewModel.defaultProModeEnabled = $0 }
-                    ))
-
-                    Toggle("Default Background Mode", isOn: $viewModel.defaultBackgroundModeEnabled)
-
-                    Toggle("Default Flex Mode", isOn: Binding(
-                        get: { viewModel.defaultFlexModeEnabled },
-                        set: { viewModel.defaultFlexModeEnabled = $0 }
-                    ))
-
-                    Picker("Reasoning Effort", selection: $viewModel.defaultEffort) {
-                        ForEach(viewModel.availableDefaultEfforts) { effort in
-                            Text(effort.displayName).tag(effort)
-                        }
-                    }
-                } header: {
-                    Text("Chat Defaults")
-                } footer: {
-                    Text("These defaults are applied only when you start a new chat. Existing conversations keep their own model, background, and pricing settings.")
-                }
-
-                Section("Appearance") {
-                    Picker("Theme", selection: $viewModel.appTheme) {
-                        ForEach(AppTheme.allCases) { theme in
-                            Text(theme.displayName).tag(theme)
-                        }
-                    }
-                    .pickerStyle(.segmented)
-                    .accessibilityIdentifier("settings.themePicker")
-
-                    if UIDevice.current.userInterfaceIdiom == .phone {
-                        Toggle("Haptic Feedback", isOn: $viewModel.hapticEnabled)
-                            .accessibilityIdentifier("settings.haptics")
-                    }
-                }
-
-                Section {
-                    LabeledContent("Used", value: viewModel.generatedImageCacheSizeString)
-
-                    Button(role: .destructive) {
-                        Task { @MainActor in
-                            await viewModel.clearGeneratedImageCache()
-                        }
-                    } label: {
-                        HStack {
-                            if viewModel.isClearingImageCache {
-                                ProgressView()
-                                    .controlSize(.small)
-                            }
-                            Text("Clear Image Cache")
-                        }
-                    }
-                    .disabled(viewModel.isClearingImageCache || viewModel.generatedImageCacheSizeBytes == 0)
-                } header: {
-                    Text("Image Cache")
-                } footer: {
-                    Text("Generated images are cached automatically so old download links still open later. Maximum cache size: \(viewModel.generatedImageCacheLimitString).")
-                }
-
-                Section {
-                    LabeledContent("Used", value: viewModel.generatedDocumentCacheSizeString)
-
-                    Button(role: .destructive) {
-                        Task { @MainActor in
-                            await viewModel.clearGeneratedDocumentCache()
-                        }
-                    } label: {
-                        HStack {
-                            if viewModel.isClearingDocumentCache {
-                                ProgressView()
-                                    .controlSize(.small)
-                            }
-                            Text("Clear Document Cache")
-                        }
-                    }
-                    .disabled(viewModel.isClearingDocumentCache || viewModel.generatedDocumentCacheSizeBytes == 0)
-                } header: {
-                    Text("Document Cache")
-                } footer: {
-                    Text("Generated PDFs and other files are cached automatically so old download links still open or share later. Maximum cache size: \(viewModel.generatedDocumentCacheLimitString).")
-                }
-
-                Section("About") {
-                    LabeledContent("Version", value: appVersionString)
-                    LabeledContent("Platform", value: platformString)
-                    LabeledContent("Engine", value: "SwiftUI")
-
-                    if let supportURL = URL(string: "https://ljnpro.github.io/liquid-glass-chat-support/") {
-                        Link(destination: supportURL) {
-                            HStack {
-                                Text("Support Website")
-                                Spacer()
-                                Image(systemName: "safari")
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-                    }
-                }
+                )
+                SettingsAboutSection(
+                    appVersionString: appVersionString,
+                    platformString: platformString
+                )
             }
             .navigationTitle("Settings")
             .task {
