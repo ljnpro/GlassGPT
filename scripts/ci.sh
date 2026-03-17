@@ -8,8 +8,8 @@ XCODE_PROJECT="$ROOT_DIR/ios/GlassGPT.xcodeproj"
 SCHEME="GlassGPT"
 SIMULATOR_GENERIC_DESTINATION='generic/platform=iOS Simulator'
 SIMULATOR_DEVICE_DESTINATION='platform=iOS Simulator,name=iPhone 17'
-DEFAULT_RELEASE_VERSION="4.3.0"
-DEFAULT_RELEASE_BUILD="20171"
+DEFAULT_RELEASE_VERSION="4.3.1"
+DEFAULT_RELEASE_BUILD="20172"
 
 cd "$ROOT_DIR"
 mkdir -p "$CI_OUTPUT_DIR"
@@ -76,6 +76,10 @@ function gate_core_tests() {
 
   if [[ -d "$CI_OUTPUT_DIR/GlassGPTTests.xcresult" ]]; then
     xcrun xccov view --report "$CI_OUTPUT_DIR/GlassGPTTests.xcresult" > "$CI_OUTPUT_DIR/coverage-report.txt"
+    python3 ./scripts/report_production_coverage.py \
+      "$CI_OUTPUT_DIR/GlassGPTTests.xcresult" \
+      --report "$CI_OUTPUT_DIR/coverage-production.txt" \
+      --summary-json "$CI_OUTPUT_DIR/coverage-production.json"
   fi
 }
 
@@ -182,8 +186,8 @@ function assert_release_readiness() {
     exit 1
   fi
 
-  if ! rg -q "4.3.0" "$ROOT_DIR/docs/parity-baseline.md"; then
-    echo "parity-baseline.md does not include the 4.3.0 baseline marker." >&2
+  if ! rg -q "4.3.1" "$ROOT_DIR/docs/parity-baseline.md"; then
+    echo "parity-baseline.md does not include the 4.3.1 baseline marker." >&2
     exit 1
   fi
 
@@ -202,6 +206,11 @@ function assert_release_readiness() {
   fi
 }
 
+function gate_maintainability() {
+  log "Running maintainability gate"
+  python3 ./scripts/check_maintainability.py | tee "$CI_OUTPUT_DIR/maintainability-report.txt"
+}
+
 function run_gate() {
   local gate="$1"
 
@@ -210,10 +219,11 @@ function run_gate() {
     build) gate_build ;;
     core-tests) gate_core_tests ;;
     ui-tests) gate_ui_tests ;;
+    maintainability) gate_maintainability ;;
     release-readiness) assert_release_readiness ;;
     *)
       echo "Unknown gate: $gate" >&2
-      echo "Valid gates: lint, build, core-tests, ui-tests, release-readiness" >&2
+      echo "Valid gates: lint, build, core-tests, ui-tests, maintainability, release-readiness" >&2
       exit 1
       ;;
   esac
@@ -222,12 +232,12 @@ function run_gate() {
 function usage() {
   cat <<'EOF'
 Usage:
-  ./scripts/ci.sh [all|lint|build|core-tests|ui-tests|release-readiness|comma-separated list]
+  ./scripts/ci.sh [all|lint|build|core-tests|ui-tests|maintainability|release-readiness|comma-separated list]
 
 Examples:
   ./scripts/ci.sh
   ./scripts/ci.sh lint
-  ./scripts/ci.sh build,core-tests,ui-tests
+  ./scripts/ci.sh build,core-tests,ui-tests,maintainability
 EOF
 }
 
@@ -239,7 +249,10 @@ function clean_outputs() {
     "$CI_OUTPUT_DIR/glassgpt-build.log" \
     "$CI_OUTPUT_DIR/glassgpt-tests.log" \
     "$CI_OUTPUT_DIR/glassgpt-ui-tests.log" \
-    "$CI_OUTPUT_DIR/coverage-report.txt"
+    "$CI_OUTPUT_DIR/coverage-report.txt" \
+    "$CI_OUTPUT_DIR/coverage-production.txt" \
+    "$CI_OUTPUT_DIR/coverage-production.json" \
+    "$CI_OUTPUT_DIR/maintainability-report.txt"
 }
 
 clean_outputs
@@ -250,7 +263,7 @@ if [[ $# -gt 1 ]]; then
 fi
 
 if [[ $# -eq 0 || "$1" == "all" ]]; then
-  requested_gates=(lint build core-tests ui-tests release-readiness)
+  requested_gates=(lint build core-tests ui-tests maintainability release-readiness)
 elif [[ "$1" == "help" || "$1" == "-h" || "$1" == "--help" ]]; then
   usage
   exit 0
