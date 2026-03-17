@@ -1,0 +1,12 @@
+#include "Project-Release.xcconfig"
+
+BUNDLE_LOADER = $(TEST_HOST)
+GENERATE_INFOPLIST_FILE = YES
+LD_RUNPATH_SEARCH_PATHS = $(inherited) @executable_path/Frameworks @loader_path/Frameworks
+PRODUCT_BUNDLE_IDENTIFIER = space.manus.liquid.glass.chat.t20260308214621Tests
+PRODUCT_NAME = $(TARGET_NAME)
+SDKROOT = iphoneos
+SUPPORTED_PLATFORMS = iphoneos iphonesimulator
+TARGETED_DEVICE_FAMILY = 1,2
+TEST_HOST = $(BUILT_PRODUCTS_DIR)/GlassGPT.app/GlassGPT
+TEST_TARGET_NAME = GlassGPT

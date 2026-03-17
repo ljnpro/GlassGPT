@@ -5,13 +5,8 @@ struct HistoryView: View {
     @Environment(\.modelContext) private var modelContext
     @Query(sort: [SortDescriptor<Conversation>(\.updatedAt, order: .reverse)])
     private var conversations: [Conversation]
-
-    @State private var searchText = ""
     @State private var showDeleteConfirmation = false
-
-    var onSelectConversation: ((Conversation) -> Void)?
-    var onDeleteConversation: ((Conversation) -> Void)?
-    var onDeleteAllConversations: (() -> Void)?
+    @Bindable var store: HistoryScreenStore
 
     var body: some View {
         NavigationStack {
@@ -22,7 +17,7 @@ struct HistoryView: View {
                     List {
                         ForEach(filteredConversations) { conversation in
                             Button {
-                                onSelectConversation?(conversation)
+                                store.selectConversation(conversation)
                             } label: {
                                 HistoryRow(conversation: conversation)
                             }
@@ -35,7 +30,7 @@ struct HistoryView: View {
                 }
             }
             .navigationTitle("History")
-            .searchable(text: $searchText, prompt: "Search conversations")
+            .searchable(text: $store.searchText, prompt: "Search conversations")
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     if !conversations.isEmpty {
@@ -73,11 +68,11 @@ struct HistoryView: View {
     // MARK: - Filtered
 
     private var filteredConversations: [Conversation] {
-        if searchText.isEmpty {
+        if store.searchText.isEmpty {
             return conversations
         }
         return conversations.filter {
-            $0.title.localizedCaseInsensitiveContains(searchText)
+            $0.title.localizedCaseInsensitiveContains(store.searchText)
         }
     }
 
@@ -97,7 +92,7 @@ struct HistoryView: View {
         let toDelete = offsets.map { filteredConversations[$0] }
 
         for conversation in toDelete {
-            onDeleteConversation?(conversation)
+            store.deleteConversation(conversation)
             modelContext.delete(conversation)
         }
 
@@ -110,7 +105,7 @@ struct HistoryView: View {
     }
 
     private func deleteAllConversations() {
-        onDeleteAllConversations?()
+        store.deleteAllConversations()
 
         for conversation in conversations {
             modelContext.delete(conversation)

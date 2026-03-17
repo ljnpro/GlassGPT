@@ -1,7 +1,7 @@
 import Foundation
 
 @MainActor
-extension ChatViewModel {
+extension ChatScreenStore {
     func recoverIncompleteMessages() async {
         guard !apiKey.isEmpty else { return }
 

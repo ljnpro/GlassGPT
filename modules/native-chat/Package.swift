@@ -1,6 +1,48 @@
-// swift-tools-version: 6.0
+// swift-tools-version: 6.2
 
 import PackageDescription
+
+let boundaryTargets: [Target] = [
+    .target(
+        name: "ChatDomain",
+        path: "Sources/ChatDomain"
+    ),
+    .target(
+        name: "ChatPersistence",
+        dependencies: ["ChatDomain"],
+        path: "Sources/ChatPersistence"
+    ),
+    .target(
+        name: "OpenAITransport",
+        dependencies: ["ChatDomain"],
+        path: "Sources/OpenAITransport"
+    ),
+    .target(
+        name: "GeneratedFiles",
+        dependencies: ["ChatDomain"],
+        path: "Sources/GeneratedFiles"
+    ),
+    .target(
+        name: "ChatRuntime",
+        dependencies: [
+            "ChatDomain",
+            "ChatPersistence",
+            "OpenAITransport",
+            "GeneratedFiles"
+        ],
+        path: "Sources/ChatRuntime"
+    ),
+    .target(
+        name: "ChatFeatures",
+        dependencies: ["ChatRuntime"],
+        path: "Sources/ChatFeatures"
+    ),
+    .target(
+        name: "ChatUI",
+        dependencies: ["ChatFeatures"],
+        path: "Sources/ChatUI"
+    ),
+]
 
 let package = Package(
     name: "NativeChat",
@@ -19,9 +61,18 @@ let package = Package(
             from: "1.17.0"
         )
     ],
-    targets: [
+    targets: boundaryTargets + [
         .target(
             name: "NativeChat",
+            dependencies: [
+                "ChatDomain",
+                "ChatPersistence",
+                "OpenAITransport",
+                "GeneratedFiles",
+                "ChatRuntime",
+                "ChatFeatures",
+                "ChatUI",
+            ],
             path: "ios",
             resources: [
                 .process("Resources")
@@ -33,7 +84,9 @@ let package = Package(
                 "NativeChat",
                 .product(name: "SnapshotTesting", package: "swift-snapshot-testing")
             ],
-            path: "Tests/NativeChatTests"
+            path: "Tests/NativeChatTests",
+            exclude: ["__Snapshots__"]
         )
-    ]
+    ],
+    swiftLanguageModes: [.v6]
 )

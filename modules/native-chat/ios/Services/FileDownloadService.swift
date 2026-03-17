@@ -45,7 +45,7 @@ actor FileDownloadService {
     var inFlightGeneratedFileDownloads: [String: Task<GeneratedFileLocalResource, Error>] = [:]
     let configurationProvider: OpenAIConfigurationProvider
     let requestAuthorizer: OpenAIRequestAuthorizer
-    let transport: OpenAIDataTransport
+    nonisolated let transport: OpenAIDataTransport
     let fileManager: FileManager
     let cacheStore: GeneratedFileCacheStore
 
@@ -187,45 +187,6 @@ actor FileDownloadService {
 
     func clearGeneratedDocumentCache() {
         clearGeneratedFileCache(for: .document)
-    }
-
-    /// Backwards-compatible wrapper for image-only callers.
-    func prefetchGeneratedImage(
-        fileId: String,
-        containerId: String?,
-        suggestedFilename: String?,
-        apiKey: String
-    ) async throws -> URL {
-        let resource = try await prefetchGeneratedFile(
-            fileId: fileId,
-            containerId: containerId,
-            suggestedFilename: suggestedFilename,
-            apiKey: apiKey
-        )
-
-        guard resource.openBehavior == .imagePreview else {
-            throw FileDownloadError.invalidImageData
-        }
-
-        return resource.localURL
-    }
-
-    /// Backwards-compatible wrapper for image-only callers.
-    func cachedGeneratedImageURL(
-        fileId: String,
-        containerId: String?,
-        suggestedFilename: String?
-    ) -> URL? {
-        guard let resource = cachedGeneratedFile(
-            fileId: fileId,
-            containerId: containerId,
-            suggestedFilename: suggestedFilename
-        ),
-        resource.openBehavior == .imagePreview else {
-            return nil
-        }
-
-        return resource.localURL
     }
 }
 

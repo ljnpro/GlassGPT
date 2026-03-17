@@ -4,7 +4,7 @@ import XCTest
 final class OpenAIResponseParserTests: XCTestCase {
     func testParseUploadedFileIDReadsSuccessfulResponse() throws {
         let parser = OpenAIResponseParser()
-        let data = try JSONSerialization.data(withJSONObject: ["id": "file_123"])
+        let data = try JSONCoding.encode(UploadedFileResponseDTO(id: "file_123"))
         let response = try XCTUnwrap(
             HTTPURLResponse(
                 url: URL(string: "https://example.com/files")!,
@@ -24,58 +24,106 @@ final class OpenAIResponseParserTests: XCTestCase {
         let parser = OpenAIResponseParser()
         let outputText = "sandbox:/mnt/data/chart.png"
 
-        let payload: [String: Any] = [
-            "status": "completed",
-            "error": ["message": "Some warning"],
-            "output": [
-                [
-                    "type": "message",
-                    "content": [[
-                        "type": "output_text",
-                        "text": outputText,
-                        "annotations": [
-                            [
-                                "type": "url_citation",
-                                "url": "https://example.com",
-                                "title": "Example",
-                                "start_index": 0,
-                                "end_index": 7
-                            ],
-                            [
-                                "type": "file_path",
-                                "file_id": "file_chart",
-                                "container_id": "container_123",
-                                "filename": "chart.png",
-                                "start_index": 0,
-                                "end_index": outputText.count
+        let payload = ResponsesResponseDTO(
+            status: "completed",
+            output: [
+                ResponsesOutputItemDTO(
+                    type: "message",
+                    id: nil,
+                    content: [
+                        ResponsesContentPartDTO(
+                            type: "output_text",
+                            text: outputText,
+                            annotations: [
+                                ResponsesAnnotationDTO(
+                                    type: "url_citation",
+                                    url: "https://example.com",
+                                    title: "Example",
+                                    startIndex: 0,
+                                    endIndex: 7,
+                                    fileID: nil,
+                                    containerID: nil,
+                                    filename: nil
+                                ),
+                                ResponsesAnnotationDTO(
+                                    type: "file_path",
+                                    url: nil,
+                                    title: nil,
+                                    startIndex: 0,
+                                    endIndex: outputText.count,
+                                    fileID: "file_chart",
+                                    containerID: "container_123",
+                                    filename: "chart.png"
+                                )
                             ]
-                        ]
-                    ]]
-                ],
-                [
-                    "type": "reasoning",
-                    "summary": [["text": "Reasoning summary"]]
-                ],
-                [
-                    "type": "web_search_call",
-                    "id": "ws_1",
-                    "query": "glassgpt"
-                ],
-                [
-                    "type": "code_interpreter_call",
-                    "id": "ci_1",
-                    "code": "print(1)",
-                    "results": [["output": "1"]]
-                ],
-                [
-                    "type": "file_search_call",
-                    "id": "fs_1",
-                    "query": "notes"
-                ]
-            ]
-        ]
+                        )
+                    ],
+                    action: nil,
+                    query: nil,
+                    queries: nil,
+                    code: nil,
+                    results: nil,
+                    outputs: nil,
+                    text: nil,
+                    summary: nil
+                ),
+                ResponsesOutputItemDTO(
+                    type: "reasoning",
+                    id: nil,
+                    content: nil,
+                    action: nil,
+                    query: nil,
+                    queries: nil,
+                    code: nil,
+                    results: nil,
+                    outputs: nil,
+                    text: nil,
+                    summary: [ResponsesTextFragmentDTO(text: "Reasoning summary")]
+                ),
+                ResponsesOutputItemDTO(
+                    type: "web_search_call",
+                    id: "ws_1",
+                    content: nil,
+                    action: nil,
+                    query: "glassgpt",
+                    queries: nil,
+                    code: nil,
+                    results: nil,
+                    outputs: nil,
+                    text: nil,
+                    summary: nil
+                ),
+                ResponsesOutputItemDTO(
+                    type: "code_interpreter_call",
+                    id: "ci_1",
+                    content: nil,
+                    action: nil,
+                    query: nil,
+                    queries: nil,
+                    code: "print(1)",
+                    results: [ResponsesCodeInterpreterOutputDTO(output: "1", text: nil, logs: nil)],
+                    outputs: nil,
+                    text: nil,
+                    summary: nil
+                ),
+                ResponsesOutputItemDTO(
+                    type: "file_search_call",
+                    id: "fs_1",
+                    content: nil,
+                    action: nil,
+                    query: "notes",
+                    queries: nil,
+                    code: nil,
+                    results: nil,
+                    outputs: nil,
+                    text: nil,
+                    summary: nil
+                )
+            ],
+            error: ResponsesErrorDTO(message: "Some warning")
+        )
 
-        let data = try JSONSerialization.data(withJSONObject: payload)
+        let data = try JSONCoding.encode(payload)
         let response = try XCTUnwrap(
             HTTPURLResponse(
                 url: URL(string: "https://example.com/responses/resp_123")!,
@@ -120,7 +168,7 @@ final class OpenAIResponseParserTests: XCTestCase {
 
     func testParseGeneratedTitleFallsBackWhenTextMissing() throws {
         let parser = OpenAIResponseParser()
-        let data = try JSONSerialization.data(withJSONObject: ["output": []])
+        let data = try JSONCoding.encode(ResponsesResponseDTO(output: []))
         let response = try XCTUnwrap(
             HTTPURLResponse(
                 url: URL(string: "https://example.com/responses")!,
@@ -134,6 +182,329 @@ final class OpenAIResponseParserTests: XCTestCase {
             try parser.parseGeneratedTitle(data: data, response: response),
             "New Chat"
         )
+    }
+
+    func testParseGeneratedTitleTrimsQuotesAndLimitsToFiveWords() throws {
+        let parser = OpenAIResponseParser()
+        let data = try JSONCoding.encode(
+            ResponsesResponseDTO(
+                output: [
+                    ResponsesOutputItemDTO(
+                        type: "message",
+                        id: nil,
+                        content: [
+                            ResponsesContentPartDTO(
+                                type: "output_text",
+                                text: "\"One two three four five six\"",
+                                annotations: nil
+                            )
+                        ],
+                        action: nil,
+                        query: nil,
+                        queries: nil,
+                        code: nil,
+                        results: nil,
+                        outputs: nil,
+                        text: nil,
+                        summary: nil
+                    )
+                ]
+            )
+        )
+        let response = try XCTUnwrap(
+            HTTPURLResponse(
+                url: URL(string: "https://example.com/responses")!,
+                statusCode: 200,
+                httpVersion: nil,
+                headerFields: nil
+            )
+        )
+
+        XCTAssertEqual(
+            try parser.parseGeneratedTitle(data: data, response: response),
+            "One two three four five"
+        )
+    }
+
+    func testParseGeneratedTitleFallsBackWhenDecodingFailsAndThrowsOnBadResponse() throws {
+        let parser = OpenAIResponseParser()
+        let successResponse = try XCTUnwrap(
+            HTTPURLResponse(
+                url: URL(string: "https://example.com/responses")!,
+                statusCode: 200,
+                httpVersion: nil,
+                headerFields: nil
+            )
+        )
+        let failureResponse = try XCTUnwrap(
+            HTTPURLResponse(
+                url: URL(string: "https://example.com/responses")!,
+                statusCode: 503,
+                httpVersion: nil,
+                headerFields: nil
+            )
+        )
+
+        XCTAssertEqual(
+            try parser.parseGeneratedTitle(data: Data("not-json".utf8), response: successResponse),
+            "New Chat"
+        )
+
+        XCTAssertThrowsError(
+            try parser.parseGeneratedTitle(data: Data(), response: failureResponse)
+        ) { error in
+            guard case OpenAIServiceError.requestFailed(let message) = error else {
+                return XCTFail("Expected requestFailed, got \(error)")
+            }
+            XCTAssertEqual(message, "Title generation failed")
+        }
+    }
+
+    func testParseFetchedResponseThrowsHTTPErrorForFailureResponse() throws {
+        let parser = OpenAIResponseParser()
+        let response = try XCTUnwrap(
+            HTTPURLResponse(
+                url: URL(string: "https://example.com/responses/resp_123")!,
+                statusCode: 429,
+                httpVersion: nil,
+                headerFields: nil
+            )
+        )
+
+        XCTAssertThrowsError(
+            try parser.parseFetchedResponse(
+                data: Data("{\"error\":\"rate_limited\"}".utf8),
+                response: response
+            )
+        ) { error in
+            guard case OpenAIServiceError.httpError(let statusCode, let message) = error else {
+                return XCTFail("Expected httpError, got \(error)")
+            }
+            XCTAssertEqual(statusCode, 429)
+            XCTAssertEqual(message, #"{"error":"rate_limited"}"#)
+        }
+    }
+
+    func testParseFetchedResponseRejectsInvalidResponseAndMalformedPayload() throws {
+        let parser = OpenAIResponseParser()
+
+        XCTAssertThrowsError(
+            try parser.parseFetchedResponse(
+                data: Data(),
+                response: URLResponse()
+            )
+        ) { error in
+            guard case OpenAIServiceError.requestFailed(let message) = error else {
+                return XCTFail("Expected requestFailed, got \(error)")
+            }
+            XCTAssertEqual(message, "Invalid response")
+        }
+
+        let response = try XCTUnwrap(
+            HTTPURLResponse(
+                url: URL(string: "https://example.com/responses/resp_bad")!,
+                statusCode: 200,
+                httpVersion: nil,
+                headerFields: nil
+            )
+        )
+
+        XCTAssertThrowsError(
+            try parser.parseFetchedResponse(
+                data: Data("not-json".utf8),
+                response: response
+            )
+        ) { error in
+            guard case OpenAIServiceError.requestFailed(let message) = error else {
+                return XCTFail("Expected requestFailed, got \(error)")
+            }
+            XCTAssertEqual(message, "Failed to parse response")
+        }
+    }
+
+    func testParseFetchedResponseUsesActionQueriesAndOutputFallbacks() throws {
+        let parser = OpenAIResponseParser()
+        let payload = ResponsesResponseDTO(
+            status: "in_progress",
+            output: [
+                ResponsesOutputItemDTO(
+                    type: "message",
+                    id: nil,
+                    content: [
+                        ResponsesContentPartDTO(
+                            type: "output_text",
+                            text: "Primary response",
+                            annotations: nil
+                        ),
+                        ResponsesContentPartDTO(
+                            type: "input_text",
+                            text: "ignored",
+                            annotations: nil
+                        )
+                    ],
+                    action: nil,
+                    query: nil,
+                    queries: nil,
+                    code: nil,
+                    results: nil,
+                    outputs: nil,
+                    text: nil,
+                    summary: nil
+                ),
+                ResponsesOutputItemDTO(
+                    type: "web_search_call",
+                    id: "ws_action",
+                    content: nil,
+                    action: ResponsesActionDTO(query: nil, queries: ["swift", "ios"]),
+                    query: nil,
+                    queries: nil,
+                    code: nil,
+                    results: nil,
+                    outputs: nil,
+                    text: nil,
+                    summary: nil
+                ),
+                ResponsesOutputItemDTO(
+                    type: "code_interpreter_call",
+                    id: "ci_outputs",
+                    content: nil,
+                    action: nil,
+                    query: nil,
+                    queries: nil,
+                    code: "print(2)",
+                    results: nil,
+                    outputs: [
+                        ResponsesCodeInterpreterOutputDTO(output: nil, text: "", logs: "log line"),
+                        ResponsesCodeInterpreterOutputDTO(output: nil, text: "2", logs: nil)
+                    ],
+                    text: nil,
+                    summary: nil
+                ),
+                ResponsesOutputItemDTO(
+                    type: "file_search_call",
+                    id: "fs_queries",
+                    content: nil,
+                    action: nil,
+                    query: nil,
+                    queries: ["notes", "summary"],
+                    code: nil,
+                    results: nil,
+                    outputs: nil,
+                    text: nil,
+                    summary: nil
+                )
+            ],
+            reasoning: ResponsesReasoningDTO(
+                text: "analysis",
+                summary: [ResponsesTextFragmentDTO(text: " complete")]
+            ),
+            message: "still working"
+        )
+        let data = try JSONCoding.encode(payload)
+        let response = try XCTUnwrap(
+            HTTPURLResponse(
+                url: URL(string: "https://example.com/responses/resp_456")!,
+                statusCode: 200,
+                httpVersion: nil,
+                headerFields: nil
+            )
+        )
+
+        let result = try parser.parseFetchedResponse(data: data, response: response)
+
+        XCTAssertEqual(result.status, .inProgress)
+        XCTAssertEqual(result.text, "Primary response")
+        XCTAssertEqual(result.thinking, "analysis complete")
+        XCTAssertEqual(result.errorMessage, "still working")
+        XCTAssertEqual(result.toolCalls.count, 3)
+        XCTAssertEqual(result.toolCalls[0].queries, ["swift", "ios"])
+        XCTAssertEqual(result.toolCalls[1].code, "print(2)")
+        XCTAssertEqual(result.toolCalls[1].results ?? [], ["log line", "2"])
+        XCTAssertEqual(result.toolCalls[2].queries, ["notes", "summary"])
+    }
+
+    func testParseUploadedFileIDThrowsRequestFailedWhenPayloadCannotBeDecoded() throws {
+        let parser = OpenAIResponseParser()
+        let response = try XCTUnwrap(
+            HTTPURLResponse(
+                url: URL(string: "https://example.com/files")!,
+                statusCode: 200,
+                httpVersion: nil,
+                headerFields: nil
+            )
+        )
+
+        XCTAssertThrowsError(
+            try parser.parseUploadedFileID(
+                responseData: Data("{}".utf8),
+                response: response
+            )
+        ) { error in
+            guard case OpenAIServiceError.requestFailed(let message) = error else {
+                return XCTFail("Expected requestFailed, got \(error)")
+            }
+            XCTAssertEqual(message, "Failed to parse upload response")
+        }
+    }
+
+    func testParseUploadedFileIDRejectsNonHTTPResponseAndHTTPFailures() throws {
+        let parser = OpenAIResponseParser()
+
+        XCTAssertThrowsError(
+            try parser.parseUploadedFileID(
+                responseData: Data(),
+                response: URLResponse()
+            )
+        ) { error in
+            guard case OpenAIServiceError.requestFailed(let message) = error else {
+                return XCTFail("Expected requestFailed, got \(error)")
+            }
+            XCTAssertEqual(message, "Invalid response")
+        }
+
+        let response = try! XCTUnwrap(
+            HTTPURLResponse(
+                url: URL(string: "https://example.com/files")!,
+                statusCode: 500,
+                httpVersion: nil,
+                headerFields: nil
+            )
+        )
+
+        XCTAssertThrowsError(
+            try parser.parseUploadedFileID(
+                responseData: Data("upload-failed".utf8),
+                response: response
+            )
+        ) { error in
+            guard case OpenAIServiceError.httpError(let statusCode, let message) = error else {
+                return XCTFail("Expected httpError, got \(error)")
+            }
+            XCTAssertEqual(statusCode, 500)
+            XCTAssertEqual(message, "upload-failed")
+        }
+    }
+
+    func testResponsesErrorDTODecodesStringAndObjectPayloads() throws {
+        XCTAssertEqual(
+            try JSONCoding.decode(ResponsesErrorDTO.self, from: Data(#""plain failure""#.utf8)),
+            ResponsesErrorDTO(message: "plain failure")
+        )
+        XCTAssertEqual(
+            try JSONCoding.decode(ResponsesErrorDTO.self, from: Data(#"{"message":"structured failure"}"#.utf8)),
+            ResponsesErrorDTO(message: "structured failure")
+        )
+    }
+
+    func testResponsesStreamEnvelopeResolvesSequenceAndErrorFromTopLevelFields() throws {
+        let envelope = try JSONCoding.decode(
+            ResponsesStreamEnvelopeDTO.self,
+            from: Data(#"{"sequence_number":17,"message":"stream failed"}"#.utf8)
+        )
+
+        XCTAssertEqual(envelope.sequenceNumber, 17)
+        XCTAssertEqual(envelope.resolvedResponse.sequenceNumber, 17)
+        XCTAssertEqual(envelope.resolvedResponse.message, "stream failed")
     }
 
     func testOpenAIServiceErrorDescriptionsMatchBehavior() {
@@ -217,7 +588,7 @@ final class OpenAIResponseParserTests: XCTestCase {
         XCTAssertEqual(message.fileAttachments.first?.fileType, fileAttachments.first?.fileType)
         XCTAssertEqual(message.fileAttachments.first?.openAIFileId, fileAttachments.first?.openAIFileId)
 
-        let digest = message.payloadRenderDigest
+        let digest = MessagePayloadStore.renderDigest(for: message)
 
         let reconstructed = Message(role: .assistant, content: "initial")
         reconstructed.annotationsData = message.annotationsData
@@ -225,7 +596,7 @@ final class OpenAIResponseParserTests: XCTestCase {
         reconstructed.filePathAnnotationsData = message.filePathAnnotationsData
         reconstructed.fileAttachmentsData = message.fileAttachmentsData
 
-        XCTAssertEqual(reconstructed.payloadRenderDigest, digest)
+        XCTAssertEqual(MessagePayloadStore.renderDigest(for: reconstructed), digest)
         XCTAssertEqual(reconstructed.annotations, citations)
         XCTAssertEqual(reconstructed.toolCalls, toolCalls)
         XCTAssertEqual(reconstructed.filePathAnnotations, filePathAnnotations)
@@ -255,19 +626,28 @@ final class OpenAIResponseParserTests: XCTestCase {
             )
         ]
 
-        let directDigest = MessagePayloadStore.renderDigest(
-            annotations: annotations,
-            toolCalls: toolCalls,
-            fileAttachments: fileAttachments,
-            filePathAnnotations: []
-        )
-
         let message = Message(role: .assistant, content: "hello")
         MessagePayloadStore.setAnnotations(annotations, on: message)
         MessagePayloadStore.setToolCalls(toolCalls, on: message)
         MessagePayloadStore.setFileAttachments(fileAttachments, on: message)
+        MessagePayloadStore.setFilePathAnnotations([], on: message)
 
-        XCTAssertEqual(message.payloadRenderDigest, directDigest)
+        let baselineDigest = MessagePayloadStore.renderDigest(for: message)
+        MessagePayloadStore.setFilePathAnnotations(
+            [
+                FilePathAnnotation(
+                    fileId: "attachment-id",
+                    containerId: "container-1",
+                    sandboxPath: "/workspace/sample.pdf",
+                    filename: "sample.pdf",
+                    startIndex: 0,
+                    endIndex: 11
+                )
+            ],
+            on: message
+        )
+
+        XCTAssertNotEqual(MessagePayloadStore.renderDigest(for: message), baselineDigest)
     }
 
     func testInvalidPayloadDataFallsBackToEmptyCollections() {

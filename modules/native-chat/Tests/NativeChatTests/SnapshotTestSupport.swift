@@ -82,13 +82,14 @@ enum SnapshotTestThemeVariant: CaseIterable {
 @MainActor
 func assertViewSnapshots<V: View>(
     named baseName: String,
+    variants: [SnapshotTestThemeVariant] = SnapshotTestThemeVariant.allCases,
     delay: TimeInterval = 0,
     file: StaticString = #filePath,
     testName: String = #function,
     line: UInt = #line,
     @ViewBuilder makeView: () -> V
 ) {
-    for variant in SnapshotTestThemeVariant.allCases {
+    for variant in variants {
         let previousTheme = UserDefaults.standard.string(forKey: SettingsStore.Keys.appTheme)
         UserDefaults.standard.set(variant.appTheme.rawValue, forKey: SettingsStore.Keys.appTheme)
 
@@ -96,9 +97,16 @@ func assertViewSnapshots<V: View>(
             .preferredColorScheme(variant.appTheme.colorScheme)
 
         let controller = UIHostingController(rootView: hostedView)
+        let canvasSize = variant.imageConfig.size ?? CGSize(width: 1, height: 1)
+        controller.loadViewIfNeeded()
+        controller.view.backgroundColor = .clear
+        controller.preferredContentSize = canvasSize
+        controller.view.bounds = CGRect(origin: .zero, size: canvasSize)
+        controller.view.frame = CGRect(origin: .zero, size: canvasSize)
+        controller.view.setNeedsLayout()
+        controller.view.layoutIfNeeded()
 
         if delay > 0 {
-            controller.loadViewIfNeeded()
             pumpMainRunLoop(for: delay)
         }
 
@@ -120,7 +128,7 @@ func assertViewSnapshots<V: View>(
 }
 
 @MainActor
-func makeSnapshotChatViewModel(hasAPIKey: Bool = false) throws -> ChatViewModel {
+func makeSnapshotChatScreenStore(hasAPIKey: Bool = false) throws -> ChatScreenStore {
     let container = try makeInMemoryModelContainer()
     let context = ModelContext(container)
     let settingsValueStore = InMemorySettingsValueStore()
@@ -131,7 +139,7 @@ func makeSnapshotChatViewModel(hasAPIKey: Bool = false) throws -> ChatViewModel 
     let apiBackend = InMemoryAPIKeyBackend()
     apiBackend.storedKey = hasAPIKey ? "sk-snapshot" : nil
 
-    return ChatViewModel(
+    return ChatScreenStore(
         modelContext: context,
         settingsStore: SettingsStore(valueStore: settingsValueStore),
         apiKeyStore: APIKeyStore(backend: apiBackend)
@@ -139,7 +147,7 @@ func makeSnapshotChatViewModel(hasAPIKey: Bool = false) throws -> ChatViewModel 
 }
 
 @MainActor
-func makeConversationSamples(in viewModel: ChatViewModel) -> Conversation {
+func makeConversationSamples(in viewModel: ChatScreenStore) -> Conversation {
     let conversation = Conversation(
         title: "Release Planning",
         model: ModelType.gpt5_4.rawValue,
@@ -184,7 +192,7 @@ func makeConversationSamples(in viewModel: ChatViewModel) -> Conversation {
 }
 
 @MainActor
-func makeRichMarkdownConversationSamples(in viewModel: ChatViewModel) -> Conversation {
+func makeRichMarkdownConversationSamples(in viewModel: ChatScreenStore) -> Conversation {
     let conversation = RichAssistantReplyFixture.makeConversation()
     viewModel.currentConversation = conversation
     viewModel.messages = conversation.messages.sorted { $0.createdAt < $1.createdAt }
@@ -192,7 +200,7 @@ func makeRichMarkdownConversationSamples(in viewModel: ChatViewModel) -> Convers
 }
 
 @MainActor
-func makeRichMarkdownCodeBlockConversationSamples(in viewModel: ChatViewModel) -> Conversation {
+func makeRichMarkdownCodeBlockConversationSamples(in viewModel: ChatScreenStore) -> Conversation {
     let conversation = RichAssistantReplyFixture.makeConversation(
         title: RichAssistantReplyFixture.codeConversationTitle,
         assistantReply: RichAssistantReplyFixture.assistantReplyWithCodeBlock
@@ -203,7 +211,7 @@ func makeRichMarkdownCodeBlockConversationSamples(in viewModel: ChatViewModel) -
 }
 
 @MainActor
-func makeSettingsSnapshotViewModel() -> SettingsViewModel {
+func makeSettingsSnapshotViewModel() -> SettingsScreenStore {
     let settingsValueStore = InMemorySettingsValueStore()
     settingsValueStore.set(ModelType.gpt5_4_pro.rawValue, forKey: SettingsStore.Keys.defaultModel)
     settingsValueStore.set(ReasoningEffort.xhigh.rawValue, forKey: SettingsStore.Keys.defaultEffort)
@@ -215,7 +223,7 @@ func makeSettingsSnapshotViewModel() -> SettingsViewModel {
 
     let apiBackend = InMemoryAPIKeyBackend()
 
-    return SettingsViewModel(
+    return SettingsScreenStore(
         settingsStore: SettingsStore(valueStore: settingsValueStore),
         apiKeyStore: APIKeyStore(backend: apiBackend)
     )
@@ -248,6 +256,15 @@ func makeHistorySnapshotContainer() throws -> ModelContainer {
 
     try context.save()
     return container
+}
+
+@MainActor
+func makeHistoryScreenStore() -> HistoryScreenStore {
+    HistoryScreenStore(
+        onSelectConversation: { _ in },
+        onDeleteConversation: { _ in },
+        onDeleteAllConversations: {}
+    )
 }
 
 @MainActor

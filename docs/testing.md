@@ -61,7 +61,7 @@ xcodebuild -project ios/GlassGPT.xcodeproj -scheme GlassGPT -destination 'platfo
 ## Notes
 
 - Coverage reports are emitted to `.local/build/ci/coverage-report.txt` and `.local/build/ci/coverage-production.txt` during `./scripts/ci.sh core-tests`.
-- The production coverage gate is derived from `xccov` JSON and only counts files under `modules/native-chat/ios` and `ios/GlassGPT`.
+- The production coverage gate is derived from `xccov` JSON and only counts the tracked core file groups configured in `scripts/report_production_coverage.py`.
 - Warnings are gated by `scripts/check_warnings.sh`. The only currently allowed warning is the external `appintentsmetadataprocessor` metadata extraction notice if Xcode emits it.
 - Snapshot comparisons anchor to the `4.3.0` baseline set, and the release baseline is refreshed only when `docs/parity-baseline.md` is updated for `4.3.1`.
 - Runtime invariants are as important as visual parity. The highest-risk protected paths are:
@@ -81,7 +81,7 @@ xcodebuild -project ios/GlassGPT.xcodeproj -scheme GlassGPT -destination 'platfo
 `./scripts/ci.sh release-readiness` validates:
 
 - release branch/class is routable (`main`, `codex/stable-4.1`, `codex/stable-4.2`, `codex/stable-4.3`, `codex/feature/*`)
-- MARKETING_VERSION and CURRENT_PROJECT_VERSION are single-valued in `project.pbxproj`
+- MARKETING_VERSION and CURRENT_PROJECT_VERSION are single-valued in `ios/GlassGPT/Config/Versions.xcconfig`
 - expected release values through `RELEASE_EXPECT_MARKETING_VERSION` and `RELEASE_EXPECT_BUILD_NUMBER` (or CI defaults)
 - release docs and wrappers exist and are executable
 - worktree cleanliness when `RELEASE_REQUIRE_CLEAN_WORKTREE=1`

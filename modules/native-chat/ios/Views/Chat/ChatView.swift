@@ -3,7 +3,7 @@ import SwiftUI
 import UIKit
 
 struct ChatView: View {
-    @Bindable var viewModel: ChatViewModel
+    @Bindable var viewModel: ChatScreenStore
     @AppStorage("appTheme") private var appThemeRawValue: String = AppTheme.system.rawValue
     @State var showPhotoPicker = false
     @State var selectedPhotoItem: PhotosPickerItem?

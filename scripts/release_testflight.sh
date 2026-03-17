@@ -4,7 +4,7 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 LOCAL_RELEASE_SCRIPT="$ROOT_DIR/.local/one_click_release.sh"
 ENV_FILE="$ROOT_DIR/.local/publish.env"
-PBXPROJ_PATH="${XCODE_PBXPROJ_PATH:-$ROOT_DIR/ios/GlassGPT.xcodeproj/project.pbxproj}"
+VERSIONS_XCCONFIG_PATH="${VERSIONS_XCCONFIG_PATH:-$ROOT_DIR/ios/GlassGPT/Config/Versions.xcconfig}"
 PROJECT_PATH="${XCODE_PROJECT_PATH:-$ROOT_DIR/ios/GlassGPT.xcodeproj}"
 SCHEME="${XCODE_SCHEME:-GlassGPT}"
 BUILD_DIR="${LOCAL_BUILD_DIR:-$ROOT_DIR/.local/build}"
@@ -77,13 +77,28 @@ if [[ -z "$TARGET_BRANCH" ]]; then
   TARGET_BRANCH="$(git -C "$ROOT_DIR" rev-parse --abbrev-ref HEAD)"
 fi
 
+case "$TARGET_BRANCH" in
+  main|codex/stable-4.1|codex/stable-4.2|codex/stable-4.3)
+    ;;
+  *)
+    echo "Release target branch must be a stable branch or main. Got: $TARGET_BRANCH" >&2
+    exit 1
+    ;;
+esac
+
+CURRENT_BRANCH="$(git -C "$ROOT_DIR" rev-parse --abbrev-ref HEAD)"
+if [[ "$CURRENT_BRANCH" != "HEAD" && "$CURRENT_BRANCH" != "$TARGET_BRANCH" ]]; then
+  echo "Run the release wrapper from the target branch. Current: $CURRENT_BRANCH, target: $TARGET_BRANCH" >&2
+  exit 1
+fi
+
 if [[ ! -x "$LOCAL_RELEASE_SCRIPT" ]]; then
   echo "Missing executable local release helper: $LOCAL_RELEASE_SCRIPT" >&2
   exit 1
 fi
 
-if [[ ! -f "$PBXPROJ_PATH" ]]; then
-  echo "Missing project file: $PBXPROJ_PATH" >&2
+if [[ ! -f "$VERSIONS_XCCONFIG_PATH" ]]; then
+  echo "Missing version config: $VERSIONS_XCCONFIG_PATH" >&2
   exit 1
 fi
 
@@ -109,7 +124,7 @@ if (( SKIP_CI == 0 )); then
   ./scripts/ci.sh
 fi
 
-python3 - "$PBXPROJ_PATH" "$VERSION" "$BUILD_NUMBER" <<'PY'
+python3 - "$VERSIONS_XCCONFIG_PATH" "$VERSION" "$BUILD_NUMBER" <<'PY'
 import pathlib
 import re
 import sys
@@ -118,19 +133,27 @@ path = pathlib.Path(sys.argv[1])
 version = sys.argv[2]
 build = sys.argv[3]
 text = path.read_text()
-text, build_count = re.subn(r"CURRENT_PROJECT_VERSION = \d+;", f"CURRENT_PROJECT_VERSION = {build};", text)
-text, version_count = re.subn(r"MARKETING_VERSION = [^;]+;", f"MARKETING_VERSION = {version};", text)
-if build_count < 2 or version_count < 2:
-    sys.exit("Failed to update version values in project.pbxproj")
+text, build_count = re.subn(
+    r"(?m)^(\s*CURRENT_PROJECT_VERSION\s*=\s*).+$",
+    rf"\g<1>{build}",
+    text
+)
+text, version_count = re.subn(
+    r"(?m)^(\s*MARKETING_VERSION\s*=\s*).+$",
+    rf"\g<1>{version}",
+    text
+)
+if build_count != 1 or version_count != 1:
+    sys.exit("Failed to update version values in Versions.xcconfig")
 path.write_text(text)
 PY
 
-if ! rg -q "MARKETING_VERSION = ${VERSION};" "$PBXPROJ_PATH"; then
+if ! rg -q "^MARKETING_VERSION = ${VERSION}$" "$VERSIONS_XCCONFIG_PATH"; then
   echo "Failed to set MARKETING_VERSION to $VERSION." >&2
   exit 1
 fi
 
-if ! rg -q "CURRENT_PROJECT_VERSION = ${BUILD_NUMBER};" "$PBXPROJ_PATH"; then
+if ! rg -q "^CURRENT_PROJECT_VERSION = ${BUILD_NUMBER}$" "$VERSIONS_XCCONFIG_PATH"; then
   echo "Failed to set CURRENT_PROJECT_VERSION to $BUILD_NUMBER." >&2
   exit 1
 fi
@@ -210,9 +233,9 @@ if [[ -z "$DELIVERY_UUID" ]]; then
   DELIVERY_UUID="unknown"
 fi
 
-if [[ -n "$(git -C "$ROOT_DIR" status --short "$PBXPROJ_PATH")" ]]; then
+if [[ -n "$(git -C "$ROOT_DIR" status --short "$VERSIONS_XCCONFIG_PATH")" ]]; then
   echo "==> Committing release metadata"
-  git -C "$ROOT_DIR" add "$PBXPROJ_PATH"
+  git -C "$ROOT_DIR" add "$VERSIONS_XCCONFIG_PATH"
   git -C "$ROOT_DIR" commit -m "$COMMIT_MESSAGE"
 fi
 

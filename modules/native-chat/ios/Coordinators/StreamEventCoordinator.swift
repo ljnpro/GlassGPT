@@ -11,9 +11,9 @@ enum StreamEventDisposition {
 
 @MainActor
 final class StreamEventCoordinator {
-    unowned let viewModel: ChatViewModel
+    unowned let viewModel: ChatScreenStore
 
-    init(viewModel: ChatViewModel) {
+    init(viewModel: ChatScreenStore) {
         self.viewModel = viewModel
     }
 

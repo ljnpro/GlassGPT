@@ -56,7 +56,9 @@ public enum NativeChatPersistence {
             let configuration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
             return try ModelContainer(for: schema, configurations: [configuration])
         } catch {
-            preconditionFailure("[NativeChatPersistence] Cannot create fallback in-memory ModelContainer: \(error)")
+            assertionFailure("[NativeChatPersistence] Cannot create fallback in-memory ModelContainer: \(error)")
+            let configuration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
+            return try! ModelContainer(for: schema, configurations: [configuration])
         }
     }
 

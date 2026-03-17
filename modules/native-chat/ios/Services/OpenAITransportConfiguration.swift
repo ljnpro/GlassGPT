@@ -1,6 +1,6 @@
 import Foundation
 
-protocol OpenAIConfigurationProvider: Sendable {
+protocol OpenAIConfigurationProvider {
     var directOpenAIBaseURL: String { get }
     var openAIBaseURL: String { get }
     var cloudflareGatewayBaseURL: String { get }
@@ -8,7 +8,7 @@ protocol OpenAIConfigurationProvider: Sendable {
     var useCloudflareGateway: Bool { get set }
 }
 
-protocol OpenAIRequestAuthorizer: Sendable {
+protocol OpenAIRequestAuthorizer {
     func applyAuthorization(
         to request: inout URLRequest,
         apiKey: String,
@@ -51,7 +51,7 @@ struct OpenAIStandardRequestAuthorizer: OpenAIRequestAuthorizer {
     }
 }
 
-final class OpenAIURLSessionTransport: OpenAIDataTransport, @unchecked Sendable {
+actor OpenAIURLSessionTransport: OpenAIDataTransport {
     private let session: URLSession
 
     init(session: URLSession = .shared) {
@@ -63,7 +63,7 @@ final class OpenAIURLSessionTransport: OpenAIDataTransport, @unchecked Sendable 
     }
 }
 
-final class DefaultOpenAIConfigurationProvider: OpenAIConfigurationProvider, @unchecked Sendable {
+final class DefaultOpenAIConfigurationProvider: OpenAIConfigurationProvider {
     private static let defaultOpenAIBaseURL = "https://api.openai.com/v1"
     private static let bundledCloudflareGatewayBaseURL =
         "https://gateway.ai.cloudflare.com/v1/887b39f387990e7ef89e400eb228e193/glass-gpt/openai"
@@ -71,7 +71,7 @@ final class DefaultOpenAIConfigurationProvider: OpenAIConfigurationProvider, @un
 
     private let settingsStore: SettingsStore
 
-    static let shared = DefaultOpenAIConfigurationProvider()
+    nonisolated(unsafe) static let shared = DefaultOpenAIConfigurationProvider()
 
     init(settingsStore: SettingsStore = .shared) {
         self.settingsStore = settingsStore

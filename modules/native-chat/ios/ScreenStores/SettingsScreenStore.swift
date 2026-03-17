@@ -10,7 +10,7 @@ enum CloudflareHealthStatus: Equatable {
 
 @Observable
 @MainActor
-final class SettingsViewModel {
+final class SettingsScreenStore {
     // MARK: - State
 
     var apiKey: String = ""
@@ -115,7 +115,7 @@ final class SettingsViewModel {
     private let settingsStore: SettingsStore
     private let openAIService: OpenAIService
     private let requestBuilder: OpenAIRequestBuilder
-    private let transport: OpenAIDataTransport
+    private nonisolated let transport: OpenAIDataTransport
     private var configurationProvider: OpenAIConfigurationProvider
     private static let byteCountFormatter: ByteCountFormatter = {
         let formatter = ByteCountFormatter()
@@ -292,27 +292,23 @@ final class SettingsViewModel {
     // MARK: - Helpers
 
     private static func parseErrorMessage(from data: Data) -> String? {
-        let json: [String: Any]
         do {
-            json = try JSONCoding.jsonObject(from: data)
+            let payload = try JSONCoding.decode(SettingsErrorResponseDTO.self, from: data)
+            if let message = payload.message, !message.isEmpty {
+                return message
+            }
+            if let message = payload.error?.message, !message.isEmpty {
+                return message
+            }
         } catch {
             return String(data: data, encoding: .utf8)
         }
 
-        if let message = json["message"] as? String, !message.isEmpty {
-            return message
-        }
-
-        if let error = json["error"] as? [String: Any],
-           let message = error["message"] as? String,
-           !message.isEmpty {
-            return message
-        }
-
-        if let error = json["error"] as? String, !error.isEmpty {
-            return error
-        }
-
         return String(data: data, encoding: .utf8)
     }
+}
+
+private struct SettingsErrorResponseDTO: Decodable {
+    let message: String?
+    let error: ResponsesErrorDTO?
 }

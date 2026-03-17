@@ -1,7 +1,7 @@
 import Foundation
 
 @MainActor
-extension ChatViewModel {
+extension ChatScreenStore {
 
     // MARK: - Session Management
 
@@ -177,5 +177,22 @@ extension ChatViewModel {
         isThinking = state.isThinking
         visibleRecoveryPhase = state.visibleRecoveryPhase
         isRecovering = state.isRecovering
+        let projection = ChatVisibleProjection(state: state)
+        let currentVisibleMessageID = visibleSessionMessageID
+        Task {
+            _ = await storeActor.send(
+                .applyVisibleProjection(
+                    visibleMessageID: currentVisibleMessageID,
+                    projection: projection
+                )
+            )
+        }
+    }
+
+    func syncConversationProjection() {
+        let conversationID = currentConversation?.id
+        Task {
+            _ = await storeActor.send(.setConversation(conversationID))
+        }
     }
 }

@@ -1,6 +1,6 @@
 import Foundation
 
-struct OpenAIRequestBuilder: Sendable {
+struct OpenAIRequestBuilder {
     let configuration: OpenAIConfigurationProvider
     let requestAuthorizer: OpenAIRequestAuthorizer
 
@@ -71,43 +71,40 @@ struct OpenAIRequestBuilder: Sendable {
             includeCloudflareAuthorization: configuration.useCloudflareGateway
         )
 
-        let input = Self.buildInputArray(messages: messages)
-        var tools: [[String: Any]] = [
-            ["type": "web_search_preview"],
-            [
-                "type": "code_interpreter",
-                "container": ["type": "auto"]
-            ]
+        var tools: [ResponsesToolDTO] = [
+            ResponsesToolDTO(type: "web_search_preview"),
+            ResponsesToolDTO(
+                type: "code_interpreter",
+                container: .init(type: "auto")
+            )
         ]
 
         if !vectorStoreIds.isEmpty {
-            tools.append([
-                "type": "file_search",
-                "vector_store_ids": vectorStoreIds
-            ])
+            tools.append(
+                ResponsesToolDTO(
+                    type: "file_search",
+                    vectorStoreIDs: vectorStoreIds
+                )
+            )
         }
 
-        var body: [String: Any] = [
-            "model": model.rawValue,
-            "input": input,
-            "stream": true,
-            "store": true,
-            "service_tier": serviceTier.rawValue,
-            "tools": tools
-        ]
+        let body = ResponsesStreamRequestDTO(
+            model: model.rawValue,
+            input: Self.buildInputMessages(messages: messages),
+            stream: true,
+            store: true,
+            serviceTier: serviceTier.rawValue,
+            tools: tools,
+            background: backgroundModeEnabled ? true : nil,
+            reasoning: reasoningEffort == .none
+                ? nil
+                : ResponsesReasoningRequestDTO(
+                    effort: reasoningEffort.rawValue,
+                    summary: "auto"
+                )
+        )
 
-        if backgroundModeEnabled {
-            body["background"] = true
-        }
-
-        if reasoningEffort != .none {
-            body["reasoning"] = [
-                "effort": reasoningEffort.rawValue,
-                "summary": "auto"
-            ]
-        }
-
-        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+        request.httpBody = try JSONCoding.encode(body)
         return request
     }
 
@@ -149,17 +146,20 @@ struct OpenAIRequestBuilder: Sendable {
             includeCloudflareAuthorization: configuration.useCloudflareGateway
         )
 
-        let body: [String: Any] = [
-            "model": "gpt-5.4",
-            "instructions": "Generate a very short title (2-4 words max) for this conversation. Return only the title, no quotes, no punctuation at the end.",
-            "input": [
-                ["role": "user", "content": conversationPreview]
+        let body = ResponsesTitleRequestDTO(
+            model: "gpt-5.4",
+            instructions: "Generate a very short title (2-4 words max) for this conversation. Return only the title, no quotes, no punctuation at the end.",
+            input: [
+                ResponsesInputMessageDTO(
+                    role: "user",
+                    content: .text(conversationPreview)
+                )
             ],
-            "stream": false,
-            "max_output_tokens": 16
-        ]
+            stream: false,
+            maxOutputTokens: 16
+        )
 
-        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+        request.httpBody = try JSONCoding.encode(body)
         return request
     }
 
@@ -216,132 +216,5 @@ struct OpenAIRequestBuilder: Sendable {
             timeoutInterval: 10,
             includeCloudflareAuthorization: configuration.useCloudflareGateway
         )
-    }
-
-    static func buildInputArray(messages: [APIMessage]) -> [[String: Any]] {
-        var input: [[String: Any]] = []
-
-        for message in messages {
-            let role = message.role == .user ? "user" : "assistant"
-
-            var contentArray: [[String: Any]] = []
-            var hasMultiContent = false
-
-            if !message.content.isEmpty {
-                contentArray.append([
-                    "type": "input_text",
-                    "text": message.content
-                ])
-            }
-
-            if let imageData = message.imageData {
-                hasMultiContent = true
-                contentArray.append([
-                    "type": "input_image",
-                    "image_url": "data:image/jpeg;base64,\(imageData.base64EncodedString())"
-                ])
-            }
-
-            for attachment in message.fileAttachments {
-                if let fileId = attachment.fileId {
-                    hasMultiContent = true
-                    contentArray.append([
-                        "type": "input_file",
-                        "file_id": fileId
-                    ])
-                }
-            }
-
-            if hasMultiContent || contentArray.count > 1 {
-                input.append([
-                    "role": role,
-                    "content": contentArray
-                ])
-            } else if !message.content.isEmpty {
-                input.append([
-                    "role": role,
-                    "content": message.content
-                ])
-            }
-        }
-
-        return input
-    }
-
-    static func mimeType(for filename: String) -> String {
-        let ext = (filename as NSString).pathExtension.lowercased()
-        switch ext {
-        case "pdf": return "application/pdf"
-        case "docx": return "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-        case "doc": return "application/msword"
-        case "pptx": return "application/vnd.openxmlformats-officedocument.presentationml.presentation"
-        case "ppt": return "application/vnd.ms-powerpoint"
-        case "xlsx": return "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        case "xls": return "application/vnd.ms-excel"
-        case "csv": return "text/csv"
-        case "txt": return "text/plain"
-        default: return "application/octet-stream"
-        }
-    }
-
-    func makeJSONRequest(
-        url: URL,
-        apiKey: String,
-        method: String,
-        accept: String,
-        timeoutInterval: TimeInterval,
-        includeCloudflareAuthorization: Bool
-    ) throws -> URLRequest {
-        var request = URLRequest(url: url)
-        request.httpMethod = method
-        request.setValue(accept, forHTTPHeaderField: "Accept")
-        request.timeoutInterval = timeoutInterval
-        requestAuthorizer.applyAuthorization(
-            to: &request,
-            apiKey: apiKey,
-            includeCloudflareAuthorization: includeCloudflareAuthorization
-        )
-
-        if method != "GET" {
-            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        }
-
-        return request
-    }
-
-    static func makeResponseURL(
-        baseURL: String,
-        responseId: String,
-        stream: Bool,
-        startingAfter: Int?,
-        include: [String]?
-    ) throws -> URL {
-        guard var components = URLComponents(string: "\(baseURL)/\(responseId)") else {
-            throw OpenAIServiceError.invalidURL
-        }
-
-        var queryItems: [URLQueryItem] = []
-
-        if stream {
-            queryItems.append(URLQueryItem(name: "stream", value: "true"))
-        }
-
-        if let startingAfter {
-            queryItems.append(URLQueryItem(name: "starting_after", value: String(startingAfter)))
-        }
-
-        if let include {
-            queryItems.append(contentsOf: include.map { URLQueryItem(name: "include[]", value: $0) })
-        }
-
-        if !queryItems.isEmpty {
-            components.queryItems = queryItems
-        }
-
-        guard let url = components.url else {
-            throw OpenAIServiceError.invalidURL
-        }
-
-        return url
     }
 }

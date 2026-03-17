@@ -1,0 +1,16 @@
+#include "Project-Debug.xcconfig"
+
+ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon
+CODE_SIGN_ENTITLEMENTS = GlassGPT/GlassGPT.entitlements
+ENABLE_BITCODE = NO
+GCC_PREPROCESSOR_DEFINITIONS = $(inherited) FB_SONARKIT_ENABLED=1
+INFOPLIST_FILE = GlassGPT/Info.plist
+LD_RUNPATH_SEARCH_PATHS = $(inherited) @executable_path/Frameworks
+OTHER_LDFLAGS = $(inherited) -ObjC -lc++
+PRODUCT_BUNDLE_IDENTIFIER = space.manus.liquid.glass.chat.t20260308214621
+PRODUCT_NAME = GlassGPT
+SDKROOT = iphoneos
+SUPPORTED_PLATFORMS = iphoneos iphonesimulator
+SWIFT_OPTIMIZATION_LEVEL = -Onone
+TARGETED_DEVICE_FAMILY = 1,2
+VERSIONING_SYSTEM = apple-generic

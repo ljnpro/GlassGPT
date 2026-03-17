@@ -2,9 +2,27 @@ import SwiftUI
 import SwiftData
 import UIKit
 
+struct ChatScreenStoreBootstrapPolicy {
+    let restoreLastConversation: Bool
+    let setupLifecycleObservers: Bool
+    let runLaunchTasks: Bool
+
+    static let live = ChatScreenStoreBootstrapPolicy(
+        restoreLastConversation: true,
+        setupLifecycleObservers: true,
+        runLaunchTasks: true
+    )
+
+    static let testing = ChatScreenStoreBootstrapPolicy(
+        restoreLastConversation: false,
+        setupLifecycleObservers: false,
+        runLaunchTasks: false
+    )
+}
+
 @Observable
 @MainActor
-final class ChatViewModel {
+final class ChatScreenStore {
 
     // MARK: - State
 
@@ -59,10 +77,7 @@ final class ChatViewModel {
     var pendingAttachments: [FileAttachment] = []
 
     // File preview state
-    var filePreviewItem: FilePreviewItem?
-    var sharedGeneratedFileItem: SharedGeneratedFileItem?
-    var isDownloadingFile: Bool = false
-    var fileDownloadError: String?
+    let filePreviewStore = FilePreviewStore()
 
     // MARK: - Dependencies
 
@@ -78,7 +93,7 @@ final class ChatViewModel {
     let generatedFileCoordinator = GeneratedFileCoordinator()
     let messagePersistence = MessagePersistenceAdapter()
     let backgroundTaskCoordinator = BackgroundTaskCoordinator()
-    let serviceFactory: () -> OpenAIService
+    let serviceFactory: @MainActor () -> OpenAIService
     var modelContext: ModelContext
 
     // Visible live session state
@@ -93,7 +108,9 @@ final class ChatViewModel {
     var didCompleteLaunchBootstrap = false
     var visibleRecoveryPhase: RecoveryPhase = .idle
     @ObservationIgnored
-    lazy var conversationRuntime = ConversationRuntime(viewModel: self)
+    lazy var conversationRuntime = ChatRuntimeEngine(viewModel: self)
+    @ObservationIgnored
+    let storeActor = NativeChatStoreActor()
 
     var sessionRegistry: ChatSessionRegistry {
         conversationRuntime.sessionStateStore.registry
@@ -106,11 +123,13 @@ final class ChatViewModel {
         settingsStore: SettingsStore = .shared,
         apiKeyStore: APIKeyStore = .shared,
         configurationProvider: OpenAIConfigurationProvider = DefaultOpenAIConfigurationProvider.shared,
-        transport: OpenAIDataTransport = OpenAIURLSessionTransport()
+        transport: OpenAIDataTransport = OpenAIURLSessionTransport(),
+        serviceFactory: (@MainActor () -> OpenAIService)? = nil,
+        bootstrapPolicy: ChatScreenStoreBootstrapPolicy = .live
     ) {
         let resolvedRequestBuilder = OpenAIRequestBuilder(configuration: configurationProvider)
         let resolvedResponseParser = OpenAIResponseParser()
-        let resolvedServiceFactory = {
+        let resolvedServiceFactory = serviceFactory ?? {
             OpenAIService(
                 requestBuilder: resolvedRequestBuilder,
                 responseParser: resolvedResponseParser,
@@ -130,17 +149,25 @@ final class ChatViewModel {
         self.conversationRepository = ConversationRepository(modelContext: modelContext)
         self.draftRepository = DraftRepository(modelContext: modelContext)
         self.serviceFactory = resolvedServiceFactory
+        self.didCompleteLaunchBootstrap = !bootstrapPolicy.runLaunchTasks
         loadDefaultsFromSettings()
-        restoreLastConversationIfAvailable()
+        if bootstrapPolicy.restoreLastConversation {
+            restoreLastConversationIfAvailable()
+        }
+        syncConversationProjection()
 
-        setupLifecycleObservers()
+        if bootstrapPolicy.setupLifecycleObservers {
+            setupLifecycleObservers()
+        }
 
-        Task { @MainActor in
-            await recoverIncompleteMessagesInCurrentConversation()
-            await recoverIncompleteMessages()
-            await resendOrphanedDrafts()
-            self.didCompleteLaunchBootstrap = true
-            await generateTitlesForUntitledConversations()
+        if bootstrapPolicy.runLaunchTasks {
+            Task { @MainActor in
+                await recoverIncompleteMessagesInCurrentConversation()
+                await recoverIncompleteMessages()
+                await resendOrphanedDrafts()
+                self.didCompleteLaunchBootstrap = true
+                await generateTitlesForUntitledConversations()
+            }
         }
     }
 
@@ -184,6 +211,26 @@ final class ChatViewModel {
             backgroundModeEnabled: backgroundModeEnabled,
             serviceTier: serviceTier
         )
+    }
+
+    var filePreviewItem: FilePreviewItem? {
+        get { filePreviewStore.filePreviewItem }
+        set { filePreviewStore.filePreviewItem = newValue }
+    }
+
+    var sharedGeneratedFileItem: SharedGeneratedFileItem? {
+        get { filePreviewStore.sharedGeneratedFileItem }
+        set { filePreviewStore.sharedGeneratedFileItem = newValue }
+    }
+
+    var isDownloadingFile: Bool {
+        get { filePreviewStore.isDownloadingFile }
+        set { filePreviewStore.isDownloadingFile = newValue }
+    }
+
+    var fileDownloadError: String? {
+        get { filePreviewStore.fileDownloadError }
+        set { filePreviewStore.fileDownloadError = newValue }
     }
 
     func applyConversationConfiguration(_ configuration: ConversationConfiguration) {

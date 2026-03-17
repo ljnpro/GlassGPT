@@ -24,10 +24,11 @@ enum UITestScenario: String {
 }
 
 struct UITestBootstrap {
-    let chatViewModel: ChatViewModel
-    let settingsViewModel: SettingsViewModel
+    let chatScreenStore: ChatScreenStore
+    let settingsScreenStore: SettingsScreenStore
     let initialTab: Int
     let scenario: UITestScenario
+    let initialPreviewItem: FilePreviewItem?
 }
 
 @MainActor
@@ -46,12 +47,12 @@ enum UITestScenarioLoader {
         clearAllConversations(in: modelContext)
         let seededConversations = seedConversationsIfNeeded(in: modelContext, scenario: scenario)
 
-        let chatViewModel = ChatViewModel(
+        let chatScreenStore = ChatScreenStore(
             modelContext: modelContext,
             settingsStore: settingsStore,
             apiKeyStore: apiKeyStore
         )
-        let settingsViewModel = SettingsViewModel(
+        let settingsScreenStore = SettingsScreenStore(
             settingsStore: settingsStore,
             apiKeyStore: apiKeyStore
         )
@@ -59,14 +60,15 @@ enum UITestScenarioLoader {
         applyScenario(
             scenario,
             conversations: seededConversations,
-            to: chatViewModel
+            to: chatScreenStore
         )
 
         return UITestBootstrap(
-            chatViewModel: chatViewModel,
-            settingsViewModel: settingsViewModel,
+            chatScreenStore: chatScreenStore,
+            settingsScreenStore: settingsScreenStore,
             initialTab: scenario.initialTab,
-            scenario: scenario
+            scenario: scenario,
+            initialPreviewItem: scenario == .preview ? chatScreenStore.filePreviewItem : nil
         )
     }
 
@@ -195,7 +197,7 @@ enum UITestScenarioLoader {
     private static func applyScenario(
         _ scenario: UITestScenario,
         conversations: [Conversation],
-        to viewModel: ChatViewModel
+        to viewModel: ChatScreenStore
     ) {
         switch scenario {
         case .empty, .history, .settings:
@@ -272,41 +274,5 @@ enum UITestScenarioLoader {
             Loggers.files.error("[UITestScenarioLoader] Failed to write preview image: \(error.localizedDescription)")
             return nil
         }
-    }
-}
-
-private final class ScenarioSettingsValueStore: SettingsValueStore {
-    private var values: [String: Any] = [:]
-
-    func object(forKey defaultName: String) -> Any? {
-        values[defaultName]
-    }
-
-    func string(forKey defaultName: String) -> String? {
-        values[defaultName] as? String
-    }
-
-    func bool(forKey defaultName: String) -> Bool {
-        values[defaultName] as? Bool ?? false
-    }
-
-    func set(_ value: Any?, forKey defaultName: String) {
-        values[defaultName] = value
-    }
-}
-
-private final class ScenarioAPIKeyBackend: APIKeyPersisting {
-    private var storedKey: String?
-
-    func saveAPIKey(_ apiKey: String) throws {
-        storedKey = apiKey
-    }
-
-    func loadAPIKey() -> String? {
-        storedKey
-    }
-
-    func deleteAPIKey() {
-        storedKey = nil
     }
 }
