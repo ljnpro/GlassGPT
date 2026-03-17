@@ -1,23 +1,31 @@
 import Foundation
+import Synchronization
 
 final class OpenAISSEDelegate: NSObject, URLSessionDataDelegate {
     private let continuation: AsyncStream<StreamEvent>.Continuation
-    private let lock = NSLock()
-
-    private var buffer = SSEFrameBuffer()
-    private var decoder = SSEEventDecoder()
-    private var finished = false
-
-    weak var session: URLSession?
-    weak var task: URLSessionDataTask?
+    private let buffer = Mutex(SSEFrameBuffer())
+    private let decoder = Mutex(SSEEventDecoder())
+    private let finished = Mutex(false)
+    private let session = Mutex(Optional<URLSession>.none)
+    private let task = Mutex(Optional<URLSessionDataTask>.none)
 
     init(continuation: AsyncStream<StreamEvent>.Continuation) {
         self.continuation = continuation
         super.init()
     }
 
+    func bind(session: URLSession) {
+        self.session.withLock { $0 = session }
+    }
+
+    func bind(task: URLSessionDataTask) {
+        self.task.withLock { $0 = task }
+    }
+
     func cancel() {
         let shouldFinish = markFinishedIfNeeded()
+        let task = takeTask()
+        let session = takeSession()
 
         task?.cancel()
         session?.invalidateAndCancel()
@@ -65,12 +73,14 @@ final class OpenAISSEDelegate: NSObject, URLSessionDataDelegate {
         guard !isFinished else { return }
 
         #if DEBUG
-        if !decoder.emittedAnyOutput && chunk.count < 200 {
+        let emittedAnyOutput = decoder.withLock { $0.emittedAnyOutput }
+        if !emittedAnyOutput && chunk.count < 200 {
             Loggers.openAI.debug("[SSE] Chunk (\(data.count) bytes): \(String(chunk.prefix(200)))")
         }
         #endif
 
-        if process(frames: buffer.append(chunk)) {
+        let frames = buffer.withLock { $0.append(chunk) }
+        if process(frames: frames) {
             return
         }
     }
@@ -78,7 +88,8 @@ final class OpenAISSEDelegate: NSObject, URLSessionDataDelegate {
     func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
         guard !isFinished else { return }
 
-        if process(frames: buffer.finishPendingFrames()) {
+        let pendingFrames = buffer.withLock { $0.finishPendingFrames() }
+        if process(frames: pendingFrames) {
             return
         }
 
@@ -106,37 +117,43 @@ final class OpenAISSEDelegate: NSObject, URLSessionDataDelegate {
                 NSURLErrorSecureConnectionFailed
             ].contains(nsError.code)
 
-            decoder.yieldThinkingFinishedIfNeeded(continuation: continuation)
+            let emittedAnyOutput = decoder.withLock {
+                $0.yieldThinkingFinishedIfNeeded(continuation: continuation)
+                return $0.emittedAnyOutput
+            }
 
-            if isNetworkError || decoder.emittedAnyOutput {
+            if isNetworkError || emittedAnyOutput {
                 continuation.yield(.connectionLost)
             } else {
                 continuation.yield(.error(.requestFailed(error.localizedDescription)))
             }
 
             continuation.finish()
-            session.invalidateAndCancel()
+            cleanupTransport()
             return
         }
 
-        if !decoder.sawTerminalEvent {
-            decoder.yieldThinkingFinishedIfNeeded(continuation: continuation)
+        let sawTerminalEvent = decoder.withLock { $0.sawTerminalEvent }
+        if !sawTerminalEvent {
+            decoder.withLock {
+                $0.yieldThinkingFinishedIfNeeded(continuation: continuation)
+            }
             continuation.yield(.connectionLost)
         }
 
         continuation.finish()
-        session.invalidateAndCancel()
+        cleanupTransport()
     }
 
     private var isFinished: Bool {
-        lock.lock()
-        defer { lock.unlock() }
-        return finished
+        finished.withLock { $0 }
     }
 
     private func process(frames: [SSEFrame]) -> Bool {
         for frame in frames {
-            let result = decoder.decode(frame: frame, continuation: continuation)
+            let result = decoder.withLock { state in
+                state.decode(frame: frame, continuation: continuation)
+            }
             if handleTerminalResult(result) {
                 return true
             }
@@ -152,41 +169,54 @@ final class OpenAISSEDelegate: NSObject, URLSessionDataDelegate {
 
         case .terminalCompleted:
             guard markFinishedIfNeeded() else { return true }
-            decoder.yieldThinkingFinishedIfNeeded(continuation: continuation)
+            let snapshot = decoder.withLock { state in
+                state.yieldThinkingFinishedIfNeeded(continuation: continuation)
+                return (
+                    state.accumulatedText,
+                    state.terminalThinking,
+                    state.terminalFilePathAnnotations
+                )
+            }
             continuation.yield(
                 .completed(
-                    decoder.accumulatedText,
-                    decoder.terminalThinking,
-                    decoder.terminalFilePathAnnotations
+                    snapshot.0,
+                    snapshot.1,
+                    snapshot.2
                 )
             )
             continuation.finish()
-            task?.cancel()
-            session?.invalidateAndCancel()
+            cleanupTransport()
             return true
 
         case .terminalIncomplete(let message):
             guard markFinishedIfNeeded() else { return true }
-            decoder.yieldThinkingFinishedIfNeeded(continuation: continuation)
+            let snapshot = decoder.withLock { state in
+                state.yieldThinkingFinishedIfNeeded(continuation: continuation)
+                return (
+                    state.accumulatedText,
+                    state.terminalThinking,
+                    state.terminalFilePathAnnotations
+                )
+            }
             continuation.yield(
                 .incomplete(
-                    decoder.accumulatedText,
-                    decoder.terminalThinking,
-                    decoder.terminalFilePathAnnotations,
+                    snapshot.0,
+                    snapshot.1,
+                    snapshot.2,
                     message
                 )
             )
             continuation.finish()
-            task?.cancel()
-            session?.invalidateAndCancel()
+            cleanupTransport()
             return true
 
         case .terminalError:
             guard markFinishedIfNeeded() else { return true }
-            decoder.yieldThinkingFinishedIfNeeded(continuation: continuation)
+            decoder.withLock {
+                $0.yieldThinkingFinishedIfNeeded(continuation: continuation)
+            }
             continuation.finish()
-            task?.cancel()
-            session?.invalidateAndCancel()
+            cleanupTransport()
             return true
         }
     }
@@ -195,14 +225,35 @@ final class OpenAISSEDelegate: NSObject, URLSessionDataDelegate {
         guard markFinishedIfNeeded() else { return }
         continuation.yield(.error(error))
         continuation.finish()
+        cleanupTransport()
     }
 
     private func markFinishedIfNeeded() -> Bool {
-        lock.lock()
-        defer { lock.unlock() }
+        finished.withLock { state in
+            guard !state else { return false }
+            state = true
+            return true
+        }
+    }
 
-        guard !finished else { return false }
-        finished = true
-        return true
+    private func cleanupTransport() {
+        let task = takeTask()
+        let session = takeSession()
+        task?.cancel()
+        session?.invalidateAndCancel()
+    }
+
+    private func takeTask() -> URLSessionDataTask? {
+        task.withLock { state in
+            defer { state = nil }
+            return state
+        }
+    }
+
+    private func takeSession() -> URLSession? {
+        session.withLock { state in
+            defer { state = nil }
+            return state
+        }
     }
 }

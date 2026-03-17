@@ -14,10 +14,10 @@ final class SSEEventStream: OpenAIStreamClient {
                 delegate: delegate,
                 delegateQueue: Self.makeDelegateQueue()
             )
-            delegate.session = session
+            delegate.bind(session: session)
 
             let task = session.dataTask(with: request)
-            delegate.task = task
+            delegate.bind(task: task)
             task.resume()
 
             continuation.onTermination = { @Sendable _ in
