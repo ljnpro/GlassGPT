@@ -1,6 +1,9 @@
 import Foundation
+import OpenAITransport
 
 // MARK: - Sendable DTOs for transport layer
+
+typealias OpenAIServiceError = OpenAITransport.OpenAIServiceError
 
 struct APIMessage: Sendable {
     let role: MessageRole
@@ -44,31 +47,6 @@ enum StreamEvent: Sendable {
 
     case annotationAdded(URLCitation)
     case filePathAnnotationAdded(FilePathAnnotation)
-}
-
-// MARK: - Errors
-
-enum OpenAIServiceError: Error, Sendable, LocalizedError {
-    case noAPIKey
-    case invalidURL
-    case httpError(Int, String)
-    case requestFailed(String)
-    case cancelled
-
-    var errorDescription: String? {
-        switch self {
-        case .noAPIKey:
-            return "No API key configured. Please add it in Settings."
-        case .invalidURL:
-            return "Invalid API URL."
-        case .httpError(let code, let msg):
-            return "API error (\(code)): \(msg)"
-        case .requestFailed(let msg):
-            return msg
-        case .cancelled:
-            return "Request was cancelled."
-        }
-    }
 }
 
 // MARK: - Polling Fetch Result

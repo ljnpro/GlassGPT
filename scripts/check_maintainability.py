@@ -16,8 +16,9 @@ PRODUCTION_ROOTS = [
     ROOT / "ios" / "GlassGPT",
 ]
 
-NON_UI_MAX_LINES = int(os.environ.get("MAX_NON_UI_SWIFT_LINES", "250"))
-UI_MAX_LINES = int(os.environ.get("MAX_UI_SWIFT_LINES", "325"))
+NON_UI_MAX_LINES = int(os.environ.get("MAX_NON_UI_SWIFT_LINES", "220"))
+UI_MAX_LINES = int(os.environ.get("MAX_UI_SWIFT_LINES", "280"))
+SCREEN_STORE_MAX_LINES = int(os.environ.get("MAX_SCREEN_STORE_SWIFT_LINES", "180"))
 MAX_TRY_OPTIONAL = int(os.environ.get("MAX_TRY_OPTIONAL", "0"))
 MAX_STRINGLY_TYPED = int(os.environ.get("MAX_STRINGLY_TYPED_JSON", "0"))
 MAX_JSON_SERIALIZATION = int(os.environ.get("MAX_JSON_SERIALIZATION", "0"))
@@ -106,13 +107,21 @@ def classify_ui(path: Path) -> bool:
     return "/Views/" in relative_path or "/ScreenStores/" in relative_path
 
 
+def classify_screen_store(path: Path) -> bool:
+    relative_path = f"/{relative(path)}/"
+    return "/ScreenStores/" in relative_path
+
+
 def line_length_results(files: list[Path]) -> list[CheckResult]:
     ui_over: list[str] = []
     non_ui_over: list[str] = []
+    screen_store_over: list[str] = []
 
     for path in files:
         line_count = sum(1 for _ in path.open("r", encoding="utf-8"))
         entry = f"{line_count}\t{relative(path)}"
+        if classify_screen_store(path) and line_count > SCREEN_STORE_MAX_LINES:
+            screen_store_over.append(entry)
         if classify_ui(path):
             if line_count > UI_MAX_LINES:
                 ui_over.append(entry)
@@ -131,6 +140,12 @@ def line_length_results(files: list[Path]) -> list[CheckResult]:
             count=len(ui_over),
             limit=0,
             matches=sorted(ui_over, reverse=True)[:20],
+        ),
+        CheckResult(
+            label=f"ScreenStore files > {SCREEN_STORE_MAX_LINES} LOC",
+            count=len(screen_store_over),
+            limit=0,
+            matches=sorted(screen_store_over, reverse=True)[:20],
         ),
     ]
 

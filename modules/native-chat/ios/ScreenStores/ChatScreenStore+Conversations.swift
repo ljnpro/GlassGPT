@@ -125,8 +125,7 @@ extension ChatScreenStore {
 
     func restoreLastConversationIfAvailable() {
         do {
-            if let lastConversation = try conversationRepository.fetchMostRecentConversation(),
-               !lastConversation.messages.isEmpty {
+            if let lastConversation = try conversationRepository.fetchMostRecentConversationWithMessages() {
                 currentConversation = lastConversation
                 messages = visibleMessages(for: lastConversation)
 
@@ -140,95 +139,6 @@ extension ChatScreenStore {
             Loggers.persistence.error("[restoreLastConversationIfAvailable] \(error.localizedDescription)")
         }
     }
-
-    func generateTitlesForUntitledConversations() async {
-        guard !apiKey.isEmpty else { return }
-
-        let untitled: [Conversation]
-        do {
-            untitled = try conversationRepository.fetchUntitledConversations()
-        } catch {
-            Loggers.chat.error("[Title] Failed to fetch untitled conversations: \(error.localizedDescription)")
-            return
-        }
-
-        for conversation in untitled {
-            guard conversation.messages.count >= 2 else { continue }
-
-            let preview = conversation.messages
-                .sorted { $0.createdAt < $1.createdAt }
-                .prefix(4)
-                .map { "\($0.roleRawValue): \($0.content.prefix(200))" }
-                .joined(separator: "\n")
-
-            do {
-                let title = try await openAIService.generateTitle(
-                    for: preview,
-                    apiKey: apiKey
-                )
-                conversation.title = title
-                saveContextIfPossible("generateTitlesForUntitledConversations")
-
-                if conversation.id == currentConversation?.id {
-                    currentConversation?.title = title
-                }
-
-                #if DEBUG
-                Loggers.chat.debug("[Title] Generated title for conversation \(conversation.id): \(title)")
-                #endif
-            } catch {
-                #if DEBUG
-                Loggers.chat.debug("[Title] Failed to generate title: \(error.localizedDescription)")
-                #endif
-            }
-        }
-    }
-
-    func generateTitleIfNeeded(for conversation: Conversation) async {
-        guard !apiKey.isEmpty else { return }
-        guard conversation.title == "New Chat", conversation.messages.count >= 2 else { return }
-
-        let preview = conversation.messages
-            .sorted { $0.createdAt < $1.createdAt }
-            .prefix(4)
-            .map { "\($0.roleRawValue): \($0.content.prefix(200))" }
-            .joined(separator: "\n")
-
-        do {
-            let title = try await openAIService.generateTitle(
-                for: preview,
-                apiKey: apiKey
-            )
-            conversation.title = title
-            saveContextIfPossible("generateTitleIfNeeded")
-        } catch {
-            #if DEBUG
-            Loggers.chat.debug("[Title] Failed to generate title: \(error.localizedDescription)")
-            #endif
-        }
-    }
-
-    func generateTitle() async {
-        guard let conversation = currentConversation else { return }
-
-        let preview = messages.prefix(4).map { msg in
-            "\(msg.role.rawValue): \(msg.content.prefix(200))"
-        }.joined(separator: "\n")
-
-        do {
-            let title = try await openAIService.generateTitle(
-                for: preview,
-                apiKey: apiKey
-            )
-            conversation.title = title
-            saveContextIfPossible("generateTitle")
-        } catch {
-            #if DEBUG
-            Loggers.chat.debug("[Title] Failed to generate title: \(error.localizedDescription)")
-            #endif
-        }
-    }
-
     func activeIncompleteAssistantDraft() -> Message? {
         if let draft = draftMessage, !draft.isComplete, draft.role == .assistant {
             return draft

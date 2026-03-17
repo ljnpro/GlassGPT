@@ -1,21 +1,33 @@
 import Foundation
 
 /// Lightweight helper that owns all generated-file cache filesystem operations.
-struct GeneratedFileCacheStore {
-    struct CachedEntry {
-        let directoryURL: URL
-        let fileURL: URL
-        let size: Int64
-        let modifiedAt: Date
+package struct GeneratedFileCacheStore {
+    package struct CachedEntry {
+        package let directoryURL: URL
+        package let fileURL: URL
+        package let size: Int64
+        package let modifiedAt: Date
+
+        package init(
+            directoryURL: URL,
+            fileURL: URL,
+            size: Int64,
+            modifiedAt: Date
+        ) {
+            self.directoryURL = directoryURL
+            self.fileURL = fileURL
+            self.size = size
+            self.modifiedAt = modifiedAt
+        }
     }
 
-    let fileManager: FileManager
+    package let fileManager: FileManager
 
-    init(fileManager: FileManager = .default) {
+    package init(fileManager: FileManager = .default) {
         self.fileManager = fileManager
     }
 
-    func cacheRootURL(
+    package func cacheRootURL(
         for bucket: GeneratedFileCacheBucket,
         createIfNeeded: Bool
     ) -> URL? {
@@ -28,25 +40,25 @@ struct GeneratedFileCacheStore {
             do {
                 try fileManager.createDirectory(at: rootURL, withIntermediateDirectories: true)
             } catch {
-                Loggers.files.error("[cacheRootURL] \(error.localizedDescription)")
+                GeneratedFilesLogger.error("[cacheRootURL] \(error.localizedDescription)")
                 return nil
             }
         }
         return rootURL
     }
 
-    func cacheDirectoryURL(
+    package func cacheDirectoryURL(
         for cacheKey: String,
         bucket: GeneratedFileCacheBucket
     ) throws -> URL {
         guard let rootURL = cacheRootURL(for: bucket, createIfNeeded: true) else {
-            throw FileDownloadError.invalidURL
+            throw GeneratedFileStoreError.invalidCacheRoot
         }
 
         return rootURL.appendingPathComponent(sanitizedCacheKey(cacheKey), isDirectory: true)
     }
 
-    func storeGeneratedFile(
+    package func storeGeneratedFile(
         data: Data,
         filename: String,
         cacheKey: String,
@@ -62,7 +74,7 @@ struct GeneratedFileCacheStore {
         return fileURL
     }
 
-    func existingCacheEntry(
+    package func existingCacheEntry(
         cacheKey: String,
         suggestedFilename: String?,
         bucket: GeneratedFileCacheBucket
@@ -95,7 +107,7 @@ struct GeneratedFileCacheStore {
         return nil
     }
 
-    func cacheEntries(for bucket: GeneratedFileCacheBucket) -> [CachedEntry] {
+    package func cacheEntries(for bucket: GeneratedFileCacheBucket) -> [CachedEntry] {
         guard let rootURL = cacheRootURL(for: bucket, createIfNeeded: false) else {
             return []
         }
@@ -116,63 +128,57 @@ struct GeneratedFileCacheStore {
         }
     }
 
-    func cacheSize(for bucket: GeneratedFileCacheBucket) -> Int64 {
+    package func cacheSize(for bucket: GeneratedFileCacheBucket) -> Int64 {
         cacheEntries(for: bucket).reduce(into: Int64(0)) { partialResult, entry in
             partialResult += entry.size
         }
     }
 
-    func trimCacheIfNeeded(for bucket: GeneratedFileCacheBucket, limitBytes: Int64) {
-        var entries = cacheEntries(for: bucket).sorted { lhs, rhs in
-            lhs.modifiedAt < rhs.modifiedAt
-        }
+    package func trimCacheIfNeeded(for bucket: GeneratedFileCacheBucket, limitBytes: Int64) {
+        let entries = cacheEntries(for: bucket)
+            .sorted { $0.modifiedAt < $1.modifiedAt }
 
-        var totalSize = entries.reduce(into: Int64(0)) { partialResult, entry in
+        var runningSize = entries.reduce(into: Int64(0)) { partialResult, entry in
             partialResult += entry.size
         }
 
-        while totalSize > limitBytes, entries.count > 1 {
-            let entry = entries.removeFirst()
-            totalSize -= entry.size
-            removeItemIfExists(at: entry.directoryURL, logContext: "trimCacheIfNeeded.removeOldest")
+        guard runningSize > limitBytes else { return }
+
+        for entry in entries where runningSize > limitBytes {
+            removeItemIfExists(at: entry.directoryURL, logContext: "trimCacheIfNeeded")
+            runningSize -= entry.size
         }
     }
 
-    func touchCacheEntry(_ entry: CachedEntry) {
+    package func touchCacheEntry(_ entry: CachedEntry) {
         touchGeneratedFile(at: entry.fileURL)
     }
 
-    func touchGeneratedFile(at fileURL: URL) {
-        let now = Date()
-        setItemModificationDate(now, atPath: fileURL.path, logContext: "touchGeneratedFile.file")
-        setItemModificationDate(now, atPath: fileURL.deletingLastPathComponent().path, logContext: "touchGeneratedFile.directory")
+    package func touchGeneratedFile(at fileURL: URL) {
+        setItemModificationDate(Date(), atPath: fileURL.path, logContext: "touchGeneratedFile")
     }
 
-    func clearCache(for bucket: GeneratedFileCacheBucket) {
-        guard let cacheRoot = cacheRootURL(for: bucket, createIfNeeded: false) else {
+    package func clearCache(for bucket: GeneratedFileCacheBucket) {
+        guard let rootURL = cacheRootURL(for: bucket, createIfNeeded: false) else {
             return
         }
 
-        removeItemIfExists(at: cacheRoot, logContext: "clearCache")
+        removeItemIfExists(at: rootURL, logContext: "clearCache")
     }
 
-    func cleanupTempPreviews() {
-        let tempDir = fileManager.temporaryDirectory
-            .appendingPathComponent("file_previews", isDirectory: true)
-        removeItemIfExists(at: tempDir, logContext: "cleanupCache")
+    package func cleanupTempPreviews() {
+        let tempDir = fileManager.temporaryDirectory.appendingPathComponent("file_previews", isDirectory: true)
+        removeItemIfExists(at: tempDir, logContext: "cleanupTempPreviews")
     }
 
-    func sanitizedCacheKey(_ cacheKey: String) -> String {
-        cacheKey.replacingOccurrences(
-            of: #"[^A-Za-z0-9._-]"#,
-            with: "_",
-            options: .regularExpression
-        )
+    package func sanitizedCacheKey(_ cacheKey: String) -> String {
+        cacheKey
+            .replacingOccurrences(of: "/", with: "_")
+            .replacingOccurrences(of: ":", with: "_")
     }
 
-    func isDirectoryURL(_ url: URL) -> Bool {
+    package func isDirectoryURL(_ url: URL) -> Bool {
         var isDirectory: ObjCBool = false
-        fileManager.fileExists(atPath: url.path, isDirectory: &isDirectory)
-        return isDirectory.boolValue
+        return fileManager.fileExists(atPath: url.path, isDirectory: &isDirectory) && isDirectory.boolValue
     }
 }

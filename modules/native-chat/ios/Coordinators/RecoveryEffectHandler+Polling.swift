@@ -3,6 +3,7 @@ import Foundation
 @MainActor
 extension RecoveryEffectHandler {
     func pollResponseUntilTerminal(session: ResponseSession, responseId: String) async {
+        let viewModel = self.viewModel
         guard !viewModel.apiKey.isEmpty else { return }
         session.beginRecoveryPoll()
         viewModel.setRecoveryPhase(.pollingTerminal, for: session)
@@ -95,6 +96,7 @@ extension RecoveryEffectHandler {
     }
 
     func cancelBackgroundResponseAndSync(responseId: String, messageId: UUID) async {
+        let viewModel = self.viewModel
         guard !viewModel.apiKey.isEmpty else { return }
 
         do {

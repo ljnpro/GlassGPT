@@ -2,35 +2,7 @@ import Foundation
 
 @MainActor
 extension ChatScreenStore {
-
     // MARK: - Session Management
-
-    func sessionRequestConfiguration(for conversation: Conversation?) -> (ModelType, ReasoningEffort, ServiceTier) {
-        guard let conversation else {
-            let effort = selectedModel.availableEfforts.contains(reasoningEffort) ? reasoningEffort : selectedModel.defaultEffort
-            return (selectedModel, effort, serviceTier)
-        }
-
-        let model = ModelType(rawValue: conversation.model) ?? .gpt5_4
-        let storedEffort = ReasoningEffort(rawValue: conversation.reasoningEffort) ?? .high
-        let resolvedEffort = model.availableEfforts.contains(storedEffort) ? storedEffort : model.defaultEffort
-        let resolvedTier = ServiceTier(rawValue: conversation.serviceTierRawValue) ?? .standard
-        return (model, resolvedEffort, resolvedTier)
-    }
-
-    func buildRequestMessages(for conversation: Conversation, excludingDraft draftID: UUID) -> [APIMessage] {
-        conversation.messages
-            .filter { $0.id != draftID && ($0.isComplete || $0.role == .user) }
-            .sorted(by: { $0.createdAt < $1.createdAt })
-            .map {
-                APIMessage(
-                    role: $0.role,
-                    content: $0.content,
-                    imageData: $0.imageData,
-                    fileAttachments: $0.fileAttachments
-                )
-            }
-    }
 
     func makeStreamingSession(for draft: Message) -> ResponseSession? {
         conversationRuntime.sessionStateStore.makeStreamingSession(for: draft)
@@ -178,21 +150,10 @@ extension ChatScreenStore {
         visibleRecoveryPhase = state.visibleRecoveryPhase
         isRecovering = state.isRecovering
         let projection = ChatVisibleProjection(state: state)
-        let currentVisibleMessageID = visibleSessionMessageID
-        Task {
-            _ = await storeActor.send(
-                .applyVisibleProjection(
-                    visibleMessageID: currentVisibleMessageID,
-                    projection: projection
-                )
-            )
-        }
+        conversationRuntime.applyVisibleProjection(projection, visibleMessageID: visibleSessionMessageID)
     }
 
     func syncConversationProjection() {
-        let conversationID = currentConversation?.id
-        Task {
-            _ = await storeActor.send(.setConversation(conversationID))
-        }
+        conversationRuntime.setConversationProjection(currentConversation?.id)
     }
 }

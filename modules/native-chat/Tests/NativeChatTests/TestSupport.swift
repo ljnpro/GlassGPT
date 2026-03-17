@@ -183,6 +183,19 @@ actor StubOpenAITransport: OpenAIDataTransport {
     func requestedPaths() -> [String] {
         recordedRequests.compactMap { $0.url?.path }
     }
+
+    func requests() -> [URLRequest] {
+        recordedRequests
+    }
+}
+
+@MainActor
+struct SettingsScreenStoreHarness {
+    let store: SettingsScreenStore
+    let settingsValueStore: InMemorySettingsValueStore
+    let apiKeyBackend: InMemoryAPIKeyBackend
+    let configurationProvider: RuntimeTestOpenAIConfigurationProvider
+    let transport: OpenAIDataTransport
 }
 
 @MainActor
@@ -222,6 +235,63 @@ func makeTestChatScreenStore(
         transport: transport,
         serviceFactory: { sharedService },
         bootstrapPolicy: bootstrapPolicy
+    )
+}
+
+@MainActor
+func makeTestSettingsScreenStore(
+    apiKey: String? = nil,
+    configurationProvider: RuntimeTestOpenAIConfigurationProvider = RuntimeTestOpenAIConfigurationProvider(),
+    transport: OpenAIDataTransport = StubOpenAITransport()
+) -> SettingsScreenStore {
+    makeTestSettingsScreenStoreHarness(
+        apiKey: apiKey,
+        configurationProvider: configurationProvider,
+        transport: transport
+    ).store
+}
+
+@MainActor
+func makeTestSettingsScreenStoreHarness(
+    apiKey: String? = nil,
+    configurationProvider: RuntimeTestOpenAIConfigurationProvider = RuntimeTestOpenAIConfigurationProvider(),
+    transport: OpenAIDataTransport = StubOpenAITransport()
+) -> SettingsScreenStoreHarness {
+    let settingsValueStore = InMemorySettingsValueStore()
+    settingsValueStore.set(ModelType.gpt5_4_pro.rawValue, forKey: SettingsStore.Keys.defaultModel)
+    settingsValueStore.set(ReasoningEffort.xhigh.rawValue, forKey: SettingsStore.Keys.defaultEffort)
+    settingsValueStore.set(false, forKey: SettingsStore.Keys.defaultBackgroundModeEnabled)
+    settingsValueStore.set(ServiceTier.standard.rawValue, forKey: SettingsStore.Keys.defaultServiceTier)
+    settingsValueStore.set(AppTheme.light.rawValue, forKey: SettingsStore.Keys.appTheme)
+    settingsValueStore.set(true, forKey: SettingsStore.Keys.hapticEnabled)
+    settingsValueStore.set(configurationProvider.useCloudflareGateway, forKey: SettingsStore.Keys.cloudflareGatewayEnabled)
+
+    let apiBackend = InMemoryAPIKeyBackend()
+    apiBackend.storedKey = apiKey
+
+    let settingsStore = SettingsStore(valueStore: settingsValueStore)
+    let apiKeyStore = APIKeyStore(backend: apiBackend)
+    let requestBuilder = OpenAIRequestBuilder(configuration: configurationProvider)
+    let openAIService = OpenAIService(
+        requestBuilder: requestBuilder,
+        responseParser: OpenAIResponseParser(),
+        streamClient: QueuedOpenAIStreamClient(scriptedStreams: []),
+        transport: transport
+    )
+
+    return SettingsScreenStoreHarness(
+        store: SettingsScreenStore(
+            settingsStore: settingsStore,
+            apiKeyStore: apiKeyStore,
+            openAIService: openAIService,
+            requestBuilder: requestBuilder,
+            transport: transport,
+            configurationProvider: configurationProvider
+        ),
+        settingsValueStore: settingsValueStore,
+        apiKeyBackend: apiBackend,
+        configurationProvider: configurationProvider,
+        transport: transport
     )
 }
 

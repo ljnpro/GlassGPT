@@ -1,5 +1,6 @@
 import SwiftUI
 import UIKit
+import ChatUI
 
 struct ModelBadge: View {
     let model: ModelType

@@ -1,4 +1,5 @@
 import Foundation
+import OpenAITransport
 
 @MainActor
 extension OpenAIService {
@@ -14,7 +15,7 @@ extension OpenAIService {
                 useDirectBaseURL: false
             )
         } catch {
-            guard requestBuilder.configuration.useCloudflareGateway else {
+            guard requestBuilder.configuration.usesGatewayRouting else {
                 throw error
             }
 
@@ -49,7 +50,7 @@ extension OpenAIService {
                 useDirectBaseURL: false
             )
         } catch {
-            guard requestBuilder.configuration.useCloudflareGateway else {
+            guard requestBuilder.configuration.usesGatewayRouting else {
                 throw error
             }
 
