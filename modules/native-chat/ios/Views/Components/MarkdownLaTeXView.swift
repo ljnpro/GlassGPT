@@ -127,7 +127,7 @@ struct BlockLaTeXWebView: UIViewRepresentable {
     }
 
     @MainActor
-    final class Coordinator: NSObject, WKNavigationDelegate, WKScriptMessageHandler, @unchecked Sendable {
+    final class Coordinator: NSObject, WKNavigationDelegate, WKScriptMessageHandler {
         @Binding var height: CGFloat
         var displayScale: CGFloat
         var lastKey: String = ""
@@ -144,24 +144,20 @@ struct BlockLaTeXWebView: UIViewRepresentable {
             didReceive message: WKScriptMessage
         ) {
             Task { @MainActor in
-                guard let payload = message.body as? [String: Any],
-                      let token = payload["token"] as? String
+                guard let payload = message.body as? [String: NSObject],
+                      let token = payload["token"] as? NSString
                 else {
                     return
                 }
 
                 let newHeight: CGFloat
-                if let value = payload["height"] as? CGFloat {
-                    newHeight = max(value, 20)
-                } else if let value = payload["height"] as? Int {
-                    newHeight = max(CGFloat(value), 20)
-                } else if let value = payload["height"] as? Double {
-                    newHeight = max(CGFloat(value), 20)
+                if let value = payload["height"] as? NSNumber {
+                    newHeight = max(CGFloat(truncating: value), 20)
                 } else {
                     return
                 }
 
-                guard token == self.expectedMeasurementToken else { return }
+                guard token as String == self.expectedMeasurementToken else { return }
 
                 let screenScale = max(self.displayScale, 1)
                 let roundedHeight = max((newHeight * screenScale).rounded(.up) / screenScale, 20)

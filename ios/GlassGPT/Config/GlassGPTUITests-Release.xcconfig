@@ -1,0 +1,10 @@
+#include "Project-Release.xcconfig"
+
+CLANG_ENABLE_OBJC_WEAK = NO
+GENERATE_INFOPLIST_FILE = YES
+PRODUCT_BUNDLE_IDENTIFIER = space.manus.liquid.glass.chat.t20260308214621UITests
+PRODUCT_NAME = $(TARGET_NAME)
+SDKROOT = iphoneos
+SUPPORTED_PLATFORMS = iphoneos iphonesimulator
+TARGETED_DEVICE_FAMILY = 1,2
+TEST_TARGET_NAME = GlassGPT

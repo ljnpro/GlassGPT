@@ -102,7 +102,7 @@
 - [x] FIX: LaTeX rendering already present (WKWebView + KaTeX)
 - [x] FIX: Image JPEG auto-conversion + base64 upload already present
 - [x] REWRITE: OpenAIService - ChatGPT-native-level streaming with auto fallback to non-streaming
-- [x] REWRITE: ChatViewModel - robust streaming/fallback flow with thinking UI
+- [x] REWRITE: ChatScreenStore - robust streaming/fallback flow with thinking UI
 - [x] FIX: Thinking/reasoning UI during streaming (ThinkingIndicator + ThinkingView)
 - [x] FIX: Ensure output never lost - auto fallback to non-streaming if stream fails
 - [x] FIX: Optional chaining on non-optional OpenAIService - moved self?.currentTask into @MainActor Task
@@ -113,13 +113,13 @@
 - [x] BUG: LaTeX block formulas - reduced spacing, block-only WKWebView, inline uses Unicode text
 - [x] BUG: Inline LaTeX now rendered as Unicode text inline with surrounding markdown
 - [x] BUG: Settings default model - replaced @ObservationIgnored @AppStorage with direct UserDefaults
-- [x] BUG: Default model now reads from UserDefaults on ChatViewModel init, default is gpt-5.4 medium
+- [x] BUG: Default model now reads from UserDefaults on ChatScreenStore init, default is gpt-5.4 medium
 - [x] FIX: Initial default is now gpt-5.4 medium
 - [x] BUG: Input bar - safeAreaInset(edge: .bottom, spacing: 0) pins it to bottom
 - [x] BUG: Keyboard gap - removed glassEffect from input bar container, simplified padding
 - [x] FIX: MarkdownContentView build errors - GPT-5.4 high rewrote with fileprivate enums, Sendable, ForEach id path, Int IDs
 - [x] FIX: Removed duplicate CodeBlockView from MarkdownContentView.swift (already defined in CodeBlockView.swift)
-- [x] BUG: Settings Chat Default model - rewrote SettingsViewModel with stored properties + didSet for @Observable tracking
+- [x] BUG: Settings Chat Default model - rewrote SettingsScreenStore with stored properties + didSet for @Observable tracking
 - [x] BUG: Block LaTeX spacing - reduced initial height to 24, removed .padding(.vertical), added margin:0 to CSS body
 - [x] FEATURE: Interactive keyboard dismiss - .scrollDismissesKeyboard(.interactively) on both message list and empty state
 - [x] BUG: Navigation title - changed to .principal placement for always-centered title

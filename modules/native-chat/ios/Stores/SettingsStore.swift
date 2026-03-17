@@ -7,7 +7,7 @@ protocol SettingsValueStore: AnyObject {
     func set(_ value: Any?, forKey defaultName: String)
 }
 
-final class UserDefaultsSettingsValueStore: SettingsValueStore, @unchecked Sendable {
+final class UserDefaultsSettingsValueStore: SettingsValueStore {
     private let defaults: UserDefaults
 
     init(defaults: UserDefaults) {
@@ -31,7 +31,7 @@ final class UserDefaultsSettingsValueStore: SettingsValueStore, @unchecked Senda
     }
 }
 
-final class SettingsStore: @unchecked Sendable {
+final class SettingsStore {
     enum Keys {
         static let defaultModel = "defaultModel"
         static let defaultEffort = "defaultEffort"
@@ -42,7 +42,7 @@ final class SettingsStore: @unchecked Sendable {
         static let cloudflareGatewayEnabled = "cloudflareGatewayEnabled"
     }
 
-    static let shared = SettingsStore()
+    nonisolated(unsafe) static let shared = SettingsStore()
 
     private let valueStore: SettingsValueStore
 

@@ -16,7 +16,7 @@ if [[ ! -f "$log_file" ]]; then
 fi
 
 warning_lines="$(
-  rg "^.*warning:" "$log_file" || true
+  rg --text --no-messages "^.*warning:" "$log_file" || true
 )"
 
 if [[ -z "$warning_lines" ]]; then
@@ -25,7 +25,7 @@ fi
 
 unexpected_warnings="$(
   printf '%s\n' "$warning_lines" \
-    | rg -v -e "$ALLOWED_WARNING_PATTERNS" \
+    | rg --text --no-messages -v -e "$ALLOWED_WARNING_PATTERNS" \
     || true
 )"
 

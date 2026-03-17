@@ -1,6 +1,6 @@
 import Foundation
 
-enum ConversationRuntimePhase: Equatable {
+enum ChatRuntimeEnginePhase: Equatable {
     case idle
     case submitting
     case streaming
@@ -12,8 +12,8 @@ enum ConversationRuntimePhase: Equatable {
     case failed
 }
 
-struct ConversationRuntimeState: Equatable {
-    var phase: ConversationRuntimePhase
+struct ChatRuntimeState: Equatable {
+    var phase: ChatRuntimeEnginePhase
     var recoveryPhase: RecoveryPhase
     var responseId: String?
     var lastSequenceNumber: Int?
@@ -22,7 +22,7 @@ struct ConversationRuntimeState: Equatable {
     var isThinking: Bool
 
     init(
-        phase: ConversationRuntimePhase = .idle,
+        phase: ChatRuntimeEnginePhase = .idle,
         recoveryPhase: RecoveryPhase = .idle,
         responseId: String? = nil,
         lastSequenceNumber: Int? = nil,

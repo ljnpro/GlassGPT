@@ -1,6 +1,6 @@
 import Foundation
 
-final class OpenAISSEDelegate: NSObject, URLSessionDataDelegate, @unchecked Sendable {
+final class OpenAISSEDelegate: NSObject, URLSessionDataDelegate {
     private let continuation: AsyncStream<StreamEvent>.Continuation
     private let lock = NSLock()
 

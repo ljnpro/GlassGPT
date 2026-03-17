@@ -1,7 +1,7 @@
 import Foundation
 
 @MainActor
-extension ChatViewModel {
+extension ChatScreenStore {
 
     // MARK: - Send Message
 
@@ -12,8 +12,8 @@ extension ChatViewModel {
 
     // MARK: - Core Streaming Logic
 
-    static let maxReconnectAttempts = StreamingCoordinator.maxReconnectAttempts
-    static let reconnectBaseDelay: UInt64 = StreamingCoordinator.reconnectBaseDelay
+    static let maxReconnectAttempts = StreamingEffectHandler.maxReconnectAttempts
+    static let reconnectBaseDelay: UInt64 = StreamingEffectHandler.reconnectBaseDelay
 
     func startStreamingRequest(reconnectAttempt: Int = 0) {
         conversationRuntime.streamingCoordinator.startStreamingRequest(reconnectAttempt: reconnectAttempt)

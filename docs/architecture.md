@@ -27,12 +27,12 @@ Refactor the app for maintainability while preserving the exact 4.2.3 user exper
   - response session state, session registry, visible-state projection, stream transition reduction, recovery decisions
   - implemented through `ChatDomain/*` plus `ChatSessionDecisions`
 - `UI`
-  - `ChatViewModel` façade, settings façade, SwiftUI/UIKit views, KaTeX rendering, haptics, and test scenario bootstrapping
+  - `ChatScreenStore` façade, settings façade, SwiftUI/UIKit views, KaTeX rendering, haptics, and test scenario bootstrapping
 
 ## Design Rules
 
 - Preserve view output and interaction behavior. Extract logic out of views and view models; do not redesign UI.
-- Keep `ChatViewModel` as the single facade consumed by chat views.
+- Keep `ChatScreenStore` as the single facade consumed by chat views.
 - Keep `OpenAIService` as the public facade consumed by view models while pushing implementation details into collaborators.
 - Keep one logical assistant reply mapped to one visible assistant surface. Paragraph breaks, reconnects, and recovery must not create duplicate bubbles.
 - Avoid schema changes to SwiftData models in 4.2.x unless a release blocker requires them.

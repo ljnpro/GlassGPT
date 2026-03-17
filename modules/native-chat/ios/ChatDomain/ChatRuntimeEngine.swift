@@ -1,19 +1,19 @@
 import Foundation
 
 @MainActor
-final class ConversationRuntime {
-    unowned let viewModel: ChatViewModel
-    let sessionStateStore: SessionStateStore
+final class ChatRuntimeEngine {
+    unowned let viewModel: ChatScreenStore
+    let sessionStateStore: SessionProjectionStore
     let streamEventCoordinator: StreamEventCoordinator
-    let recoveryCoordinator: RecoveryCoordinator
-    let streamingCoordinator: StreamingCoordinator
+    let recoveryCoordinator: RecoveryEffectHandler
+    let streamingCoordinator: StreamingEffectHandler
 
-    init(viewModel: ChatViewModel) {
+    init(viewModel: ChatScreenStore) {
         self.viewModel = viewModel
-        let sessionStateStore = SessionStateStore(viewModel: viewModel)
+        let sessionStateStore = SessionProjectionStore(viewModel: viewModel)
         let streamEventCoordinator = StreamEventCoordinator(viewModel: viewModel)
-        let recoveryCoordinator = RecoveryCoordinator(viewModel: viewModel)
-        let streamingCoordinator = StreamingCoordinator(
+        let recoveryCoordinator = RecoveryEffectHandler(viewModel: viewModel)
+        let streamingCoordinator = StreamingEffectHandler(
             viewModel: viewModel,
             recoveryCoordinator: recoveryCoordinator
         )

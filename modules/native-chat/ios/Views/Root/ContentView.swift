@@ -3,16 +3,13 @@ import SwiftData
 
 struct ContentView: View {
     @Environment(\.modelContext) private var modelContext
-    @State private var selectedTab = 0
-    @State private var chatViewModel: ChatViewModel?
-    @State private var settingsViewModel: SettingsViewModel?
-    @State private var uiTestScenario: UITestScenario?
-    @State private var uiTestPreviewItem: FilePreviewItem?
+    @State private var appStore: NativeChatAppStore?
 
     var body: some View {
-        TabView(selection: $selectedTab) {
+        TabView(selection: selectedTabBinding) {
             Tab("Chat", systemImage: "bubble.left.and.bubble.right.fill", value: 0) {
-                if let vm = chatViewModel {
+                if let appStore {
+                    let vm = appStore.chatScreenStore
                     ChatView(viewModel: vm)
                 } else {
                     ProgressView()
@@ -20,24 +17,16 @@ struct ContentView: View {
             }
 
             Tab("History", systemImage: "clock.fill", value: 1) {
-                HistoryView(
-                    onSelectConversation: { conversation in
-                        chatViewModel?.loadConversation(conversation)
-                        selectedTab = 0
-                    },
-                    onDeleteConversation: { deletedConversation in
-                        if chatViewModel?.currentConversation?.id == deletedConversation.id {
-                            chatViewModel?.startNewChat()
-                        }
-                    },
-                    onDeleteAllConversations: {
-                        chatViewModel?.startNewChat()
-                    }
-                )
+                if let appStore {
+                    HistoryView(store: appStore.historyScreenStore)
+                } else {
+                    ProgressView()
+                }
             }
 
             Tab("Settings", systemImage: "gearshape.fill", value: 2) {
-                if let viewModel = settingsViewModel {
+                if let appStore {
+                    let viewModel = appStore.settingsScreenStore
                     SettingsView(viewModel: viewModel)
                 } else {
                     ProgressView()
@@ -45,8 +34,8 @@ struct ContentView: View {
             }
         }
         .tabBarMinimizeBehavior(.never)
-        .fullScreenCover(item: $uiTestPreviewItem, onDismiss: handleUITestPreviewDismiss) { previewItem in
-            if uiTestScenario == .preview {
+        .fullScreenCover(item: uiTestPreviewItemBinding, onDismiss: handleUITestPreviewDismiss) { previewItem in
+            if appStore?.uiTestScenario == .preview {
                 FilePreviewSheet(
                     previewItem: previewItem,
                     onRequestDismiss: handleUITestPreviewDismiss
@@ -57,29 +46,27 @@ struct ContentView: View {
             }
         }
         .onAppear {
-            if chatViewModel == nil {
-                if let bootstrap = UITestScenarioLoader.makeBootstrap(modelContext: modelContext) {
-                    chatViewModel = bootstrap.chatViewModel
-                    settingsViewModel = bootstrap.settingsViewModel
-                    selectedTab = bootstrap.initialTab
-                    uiTestScenario = bootstrap.scenario
-                    if bootstrap.scenario == .preview {
-                        uiTestPreviewItem = nil
-                        Task { @MainActor in
-                            await Task.yield()
-                            uiTestPreviewItem = bootstrap.chatViewModel.filePreviewItem
-                        }
-                    }
-                } else {
-                    chatViewModel = ChatViewModel(modelContext: modelContext)
-                    settingsViewModel = SettingsViewModel()
-                }
+            if appStore == nil {
+                appStore = NativeChatAppStore(modelContext: modelContext)
             }
         }
     }
 
     private func handleUITestPreviewDismiss() {
-        uiTestPreviewItem = nil
-        chatViewModel?.filePreviewItem = nil
+        appStore?.handleUITestPreviewDismiss()
+    }
+
+    private var selectedTabBinding: Binding<Int> {
+        Binding(
+            get: { appStore?.selectedTab ?? 0 },
+            set: { appStore?.selectedTab = $0 }
+        )
+    }
+
+    private var uiTestPreviewItemBinding: Binding<FilePreviewItem?> {
+        Binding(
+            get: { appStore?.uiTestPreviewItem },
+            set: { appStore?.uiTestPreviewItem = $0 }
+        )
     }
 }

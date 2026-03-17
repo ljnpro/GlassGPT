@@ -1,7 +1,7 @@
 import Foundation
 
 @MainActor
-extension ChatViewModel {
+extension ChatScreenStore {
 
     // MARK: - API Key
 
@@ -216,6 +216,9 @@ extension ChatViewModel {
 
     func uploadAttachments(_ attachments: [FileAttachment]) async -> [FileAttachment] {
         var uploadedAttachments = attachments
+        let requestBuilder = openAIService.requestBuilder
+        let responseParser = openAIService.responseParser
+        let transport = openAIService.transport
 
         for index in uploadedAttachments.indices {
             uploadedAttachments[index].uploadStatus = .uploading
@@ -226,10 +229,15 @@ extension ChatViewModel {
             }
 
             do {
-                let fileId = try await openAIService.uploadFile(
+                let request = try requestBuilder.uploadRequest(
                     data: data,
                     filename: uploadedAttachments[index].filename,
                     apiKey: apiKey
+                )
+                let (responseData, response) = try await transport.data(for: request)
+                let fileId = try responseParser.parseUploadedFileID(
+                    responseData: responseData,
+                    response: response
                 )
 
                 uploadedAttachments[index].openAIFileId = fileId

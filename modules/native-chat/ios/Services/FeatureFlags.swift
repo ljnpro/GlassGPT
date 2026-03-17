@@ -1,7 +1,7 @@
 import Foundation
 
 enum FeatureFlags {
-    private static let configurationProvider = DefaultOpenAIConfigurationProvider.shared
+    nonisolated(unsafe) private static let configurationProvider = DefaultOpenAIConfigurationProvider.shared
 
     static var cloudflareGatewayBaseURL: String {
         configurationProvider.cloudflareGatewayBaseURL

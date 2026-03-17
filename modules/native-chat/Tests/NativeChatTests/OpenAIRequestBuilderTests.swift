@@ -48,40 +48,63 @@ final class OpenAIRequestBuilderTests: XCTestCase {
         XCTAssertEqual(request.timeoutInterval, 300)
 
         let body = try XCTUnwrap(request.httpBody)
-        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [String: Any])
-        let tools = try XCTUnwrap(json["tools"] as? [[String: Any]])
-        let input = try XCTUnwrap(json["input"] as? [[String: Any]])
-        let reasoning = try XCTUnwrap(json["reasoning"] as? [String: Any])
+        let payload = try JSONCoding.decode(ResponsesStreamRequestDTO.self, from: body)
 
-        XCTAssertEqual(json["model"] as? String, ModelType.gpt5_4.rawValue)
-        XCTAssertEqual(json["stream"] as? Bool, true)
-        XCTAssertEqual(json["store"] as? Bool, true)
-        XCTAssertEqual(json["background"] as? Bool, true)
-        XCTAssertEqual(json["service_tier"] as? String, ServiceTier.flex.rawValue)
-        XCTAssertEqual(reasoning["effort"] as? String, ReasoningEffort.high.rawValue)
-        XCTAssertEqual(reasoning["summary"] as? String, "auto")
+        XCTAssertEqual(payload.model, ModelType.gpt5_4.rawValue)
+        XCTAssertEqual(payload.stream, true)
+        XCTAssertEqual(payload.store, true)
+        XCTAssertEqual(payload.background, true)
+        XCTAssertEqual(payload.serviceTier, ServiceTier.flex.rawValue)
+        XCTAssertEqual(payload.reasoning?.effort, ReasoningEffort.high.rawValue)
+        XCTAssertEqual(payload.reasoning?.summary, "auto")
+        let tools = payload.tools
         XCTAssertEqual(tools.count, 3)
-        XCTAssertEqual(tools.compactMap { $0["type"] as? String }, [
+        XCTAssertEqual(tools.map(\.type), [
             "web_search_preview",
             "code_interpreter",
             "file_search"
         ])
-        XCTAssertEqual((tools.last?["vector_store_ids"] as? [String]) ?? [], ["vs_123"])
+        XCTAssertEqual(tools.last?.vectorStoreIDs ?? [], ["vs_123"])
+        let input = payload.input
         XCTAssertEqual(input.count, 2)
-        XCTAssertEqual(input[0]["role"] as? String, "user")
-        XCTAssertNotNil(input[0]["content"] as? [[String: Any]])
-        XCTAssertEqual(input[1]["content"] as? String, "Sure")
+        XCTAssertEqual(input[0].role, "user")
+        switch input[0].content {
+        case .items(let items):
+            XCTAssertEqual(items, [
+                .inputText("Describe this file"),
+                .inputImage("data:image/jpeg;base64,AQI="),
+                .inputFile("file_report")
+            ])
+        default:
+            XCTFail("Expected multi-part content")
+        }
+        switch input[1].content {
+        case .text(let content):
+            XCTAssertEqual(content, "Sure")
+        default:
+            XCTFail("Expected single text content")
+        }
     }
 
-    func testBuildInputArrayLeavesSingleTextMessagesAsPlainStrings() {
-        let input = OpenAIRequestBuilder.buildInputArray(messages: [
+    func testBuildInputMessagesLeavesSingleTextMessagesAsPlainStrings() {
+        let input = OpenAIRequestBuilder.buildInputMessages(messages: [
             APIMessage(role: .user, content: "Hello"),
             APIMessage(role: .assistant, content: "World")
         ])
 
         XCTAssertEqual(input.count, 2)
-        XCTAssertEqual(input[0]["content"] as? String, "Hello")
-        XCTAssertEqual(input[1]["content"] as? String, "World")
+        switch input[0].content {
+        case .text(let content):
+            XCTAssertEqual(content, "Hello")
+        default:
+            XCTFail("Expected text content")
+        }
+        switch input[1].content {
+        case .text(let content):
+            XCTAssertEqual(content, "World")
+        default:
+            XCTFail("Expected text content")
+        }
     }
 
     func testStreamingRequestOmitsBackgroundFieldWhenDisabled() throws {
@@ -96,10 +119,10 @@ final class OpenAIRequestBuilderTests: XCTestCase {
         )
 
         let body = try XCTUnwrap(request.httpBody)
-        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [String: Any])
+        let payload = try JSONCoding.decode(ResponsesStreamRequestDTO.self, from: body)
 
-        XCTAssertNil(json["background"])
-        XCTAssertEqual(json["service_tier"] as? String, ServiceTier.standard.rawValue)
+        XCTAssertNil(payload.background)
+        XCTAssertEqual(payload.serviceTier, ServiceTier.standard.rawValue)
     }
 
     func testFetchRequestIncludesRecoveryQueryParameters() throws {
