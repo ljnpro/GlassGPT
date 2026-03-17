@@ -145,7 +145,7 @@ extension ChatViewModel {
             }
 
             registerSession(session, visible: true)
-            session.isStreaming = true
+            session.beginSubmitting()
             session.isThinking = true
             setRecoveryPhase(.idle, for: session)
             syncVisibleState(from: session)

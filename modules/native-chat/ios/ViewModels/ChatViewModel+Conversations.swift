@@ -75,8 +75,7 @@ extension ChatViewModel {
         }
 
         registerSession(session, visible: true)
-        session.isStreaming = true
-        session.isThinking = false
+        session.beginSubmitting()
         syncVisibleState(from: session)
 
         HapticService.shared.impact(.medium)

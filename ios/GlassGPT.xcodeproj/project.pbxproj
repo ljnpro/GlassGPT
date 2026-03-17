@@ -16,6 +16,8 @@
 		00E357061AD99517003FC87E /* OpenAIStreamEventTranslatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00E356FC1AD99517003FC87E /* OpenAIStreamEventTranslatorTests.swift */; };
 		00E357071AD99517003FC87E /* GeneratedFileCoordinatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00E356FD1AD99517003FC87E /* GeneratedFileCoordinatorTests.swift */; };
 		00E357081AD99517003FC87E /* RepositoryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00E356FE1AD99517003FC87E /* RepositoryTests.swift */; };
+		4E8BF1E10DCE42B1AF301A8C /* OpenAITransportConfigurationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4E8BF1E00DCE42B1AF301A8C /* OpenAITransportConfigurationTests.swift */; };
+		20C8E5953A2C4A9BAA0D2FD1 /* ChatSessionDecisionsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20C8E5943A2C4A9BAA0D2FD1 /* ChatSessionDecisionsTests.swift */; };
 		02FB76D317231FE3C3FE9C26 /* SnapshotTestSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = AEB7DA53CC27898C943EE0C9 /* SnapshotTestSupport.swift */; };
 		13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB51A68108700A75B9A /* Images.xcassets */; };
 		15FE2F91277A79575837BA7F /* GlassGPTUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CC5500B0A1EE5BC8728B919 /* GlassGPTUITests.swift */; };
@@ -55,6 +57,8 @@
 		00E356FC1AD99517003FC87E /* OpenAIStreamEventTranslatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenAIStreamEventTranslatorTests.swift; sourceTree = "<group>"; };
 		00E356FD1AD99517003FC87E /* GeneratedFileCoordinatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeneratedFileCoordinatorTests.swift; sourceTree = "<group>"; };
 		00E356FE1AD99517003FC87E /* RepositoryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RepositoryTests.swift; sourceTree = "<group>"; };
+		4E8BF1E00DCE42B1AF301A8C /* OpenAITransportConfigurationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenAITransportConfigurationTests.swift; sourceTree = "<group>"; };
+		20C8E5943A2C4A9BAA0D2FD1 /* ChatSessionDecisionsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatSessionDecisionsTests.swift; sourceTree = "<group>"; };
 		13B07F961A680F5B00A75B9A /* GlassGPT.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = GlassGPT.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		13B07FB51A68108700A75B9A /* Images.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; name = Images.xcassets; path = GlassGPT/Images.xcassets; sourceTree = "<group>"; };
 		13B07FB61A68108700A75B9A /* Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = Info.plist; path = GlassGPT/Info.plist; sourceTree = "<group>"; };
@@ -108,6 +112,8 @@
 				00E356FC1AD99517003FC87E /* OpenAIStreamEventTranslatorTests.swift */,
 				00E356FD1AD99517003FC87E /* GeneratedFileCoordinatorTests.swift */,
 				00E356FE1AD99517003FC87E /* RepositoryTests.swift */,
+				4E8BF1E00DCE42B1AF301A8C /* OpenAITransportConfigurationTests.swift */,
+				20C8E5943A2C4A9BAA0D2FD1 /* ChatSessionDecisionsTests.swift */,
 				AEB7DA53CC27898C943EE0C9 /* SnapshotTestSupport.swift */,
 				5991E9E08763AFDD43672213 /* SnapshotViewTests.swift */,
 			);
@@ -330,6 +336,8 @@
 				00E357051AD99517003FC87E /* OpenAIResponseParserTests.swift in Sources */,
 				00E357061AD99517003FC87E /* OpenAIStreamEventTranslatorTests.swift in Sources */,
 				00E357081AD99517003FC87E /* RepositoryTests.swift in Sources */,
+				4E8BF1E10DCE42B1AF301A8C /* OpenAITransportConfigurationTests.swift in Sources */,
+				20C8E5953A2C4A9BAA0D2FD1 /* ChatSessionDecisionsTests.swift in Sources */,
 				00E357021AD99517003FC87E /* SettingsStoreTests.swift in Sources */,
 				00E357011AD99517003FC87E /* TestSupport.swift in Sources */,
 				02FB76D317231FE3C3FE9C26 /* SnapshotTestSupport.swift in Sources */,
@@ -376,7 +384,7 @@
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 20170;
+				CURRENT_PROJECT_VERSION = 20171;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -384,7 +392,7 @@
 					"@executable_path/Frameworks",
 					"@loader_path/Frameworks",
 				);
-				MARKETING_VERSION = 4.2.4;
+				MARKETING_VERSION = 4.3.0;
 				PRODUCT_BUNDLE_IDENTIFIER = space.manus.liquid.glass.chat.t20260308214621Tests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
@@ -401,7 +409,7 @@
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 20170;
+				CURRENT_PROJECT_VERSION = 20171;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -409,7 +417,7 @@
 					"@executable_path/Frameworks",
 					"@loader_path/Frameworks",
 				);
-				MARKETING_VERSION = 4.2.4;
+				MARKETING_VERSION = 4.3.0;
 				PRODUCT_BUNDLE_IDENTIFIER = space.manus.liquid.glass.chat.t20260308214621Tests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_VERSION = 5.0;
@@ -425,7 +433,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = GlassGPT/GlassGPT.entitlements;
-				CURRENT_PROJECT_VERSION = 20170;
+				CURRENT_PROJECT_VERSION = 20171;
 				ENABLE_BITCODE = NO;
 				GCC_PREPROCESSOR_DEFINITIONS = (
 					"$(inherited)",
@@ -437,7 +445,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 4.2.4;
+				MARKETING_VERSION = 4.3.0;
 				OTHER_LDFLAGS = (
 					"$(inherited)",
 					"-ObjC",
@@ -458,14 +466,14 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = GlassGPT/GlassGPT.entitlements;
-				CURRENT_PROJECT_VERSION = 20170;
+				CURRENT_PROJECT_VERSION = 20171;
 				INFOPLIST_FILE = GlassGPT/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 4.2.4;
+				MARKETING_VERSION = 4.3.0;
 				OTHER_LDFLAGS = (
 					"$(inherited)",
 					"-ObjC",
@@ -484,10 +492,10 @@
 			buildSettings = {
 				CLANG_ENABLE_OBJC_WEAK = NO;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 20170;
+				CURRENT_PROJECT_VERSION = 20171;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 4.2.4;
+				MARKETING_VERSION = 4.3.0;
 				PRODUCT_BUNDLE_IDENTIFIER = space.manus.liquid.glass.chat.t20260308214621UITests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
@@ -502,10 +510,10 @@
 			buildSettings = {
 				CLANG_ENABLE_OBJC_WEAK = NO;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 20170;
+				CURRENT_PROJECT_VERSION = 20171;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 4.2.4;
+				MARKETING_VERSION = 4.3.0;
 				PRODUCT_BUNDLE_IDENTIFIER = space.manus.liquid.glass.chat.t20260308214621UITests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;

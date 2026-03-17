@@ -116,7 +116,7 @@ extension ChatViewModel {
             persistedAnnotations.append(refreshedAnnotation)
         }
 
-        message.filePathAnnotations = persistedAnnotations
+        messagePersistence.refreshFileAnnotations(persistedAnnotations, on: message)
         saveContextIfPossible("resolveDownloadAnnotation")
         return refreshedAnnotation
     }
@@ -154,7 +154,7 @@ extension ChatViewModel {
                         annotationsToPrefetch = refreshedAnnotations
 
                         if let persistedMessage = findMessage(byId: messageID) {
-                            persistedMessage.filePathAnnotations = refreshedAnnotations
+                            self.messagePersistence.refreshFileAnnotations(refreshedAnnotations, on: persistedMessage)
                             saveContextIfPossible("prefetchGeneratedFilesIfNeeded.refreshAnnotations")
 
                             if persistedMessage.conversation?.id == currentConversation?.id {

@@ -79,7 +79,7 @@ final class SettingsViewModel {
     var cloudflareEnabled: Bool {
         didSet {
             guard cloudflareEnabled != oldValue else { return }
-            FeatureFlags.useCloudflareGateway = cloudflareEnabled
+            configurationProvider.useCloudflareGateway = cloudflareEnabled
             if !cloudflareEnabled {
                 cloudflareHealthStatus = .unknown
                 isCheckingCloudflareHealth = false
@@ -113,7 +113,10 @@ final class SettingsViewModel {
 
     private let apiKeyStore: APIKeyStore
     private let settingsStore: SettingsStore
-    private let openAIService = OpenAIService()
+    private let openAIService: OpenAIService
+    private let requestBuilder: OpenAIRequestBuilder
+    private let transport: OpenAIDataTransport
+    private var configurationProvider: OpenAIConfigurationProvider
     private static let byteCountFormatter: ByteCountFormatter = {
         let formatter = ByteCountFormatter()
         formatter.countStyle = .file
@@ -124,10 +127,23 @@ final class SettingsViewModel {
 
     init(
         settingsStore: SettingsStore = .shared,
-        apiKeyStore: APIKeyStore = .shared
+        apiKeyStore: APIKeyStore = .shared,
+        openAIService: OpenAIService? = nil,
+        requestBuilder: OpenAIRequestBuilder? = nil,
+        transport: OpenAIDataTransport = OpenAIURLSessionTransport(),
+        configurationProvider: OpenAIConfigurationProvider = DefaultOpenAIConfigurationProvider.shared
     ) {
+        let resolvedRequestBuilder = requestBuilder ?? OpenAIRequestBuilder(configuration: configurationProvider)
         self.settingsStore = settingsStore
         self.apiKeyStore = apiKeyStore
+        self.configurationProvider = configurationProvider
+        self.requestBuilder = resolvedRequestBuilder
+        self.transport = transport
+        self.openAIService = openAIService ?? OpenAIService(
+            requestBuilder: resolvedRequestBuilder,
+            streamClient: SSEEventStream(),
+            transport: transport
+        )
         self.defaultModel = settingsStore.defaultModel
         self.defaultEffort = settingsStore.defaultEffort
         self.defaultBackgroundModeEnabled = settingsStore.defaultBackgroundModeEnabled
@@ -209,7 +225,10 @@ final class SettingsViewModel {
             return
         }
 
-        guard let url = URL(string: "\(FeatureFlags.cloudflareGatewayBaseURL)/models") else {
+        let gatewayRequest: URLRequest
+        do {
+            gatewayRequest = try requestBuilder.modelsRequest(apiKey: trimmedKey)
+        } catch {
             cloudflareHealthStatus = .error("Invalid gateway URL")
             isCheckingCloudflareHealth = false
             return
@@ -217,16 +236,11 @@ final class SettingsViewModel {
 
         isCheckingCloudflareHealth = true
         cloudflareHealthStatus = .checking
+        var request = gatewayRequest
+        request.url = URL(string: "\(configurationProvider.cloudflareGatewayBaseURL)/models")
 
         do {
-            var request = URLRequest(url: url)
-            request.httpMethod = "GET"
-            request.setValue("Bearer \(trimmedKey)", forHTTPHeaderField: "Authorization")
-            request.setValue("application/json", forHTTPHeaderField: "Accept")
-            request.timeoutInterval = 10
-            FeatureFlags.applyCloudflareAuthorization(to: &request)
-
-            let (data, response) = try await URLSession.shared.data(for: request)
+            let (data, response) = try await transport.data(for: request)
 
             guard let httpResponse = response as? HTTPURLResponse else {
                 cloudflareHealthStatus = .error("Invalid gateway response")
