@@ -4,9 +4,172 @@ import ChatPersistence
 import ChatFeatures
 import GeneratedFiles
 import ChatRuntime
+import ChatUI
 import OpenAITransport
 
 final class SourceTargetBoundaryTests: XCTestCase {
+    func testChatDomainPayloadModelsRoundTripAcrossSourceTargetBoundary() throws {
+        let citations = [
+            URLCitation(url: "https://example.com/a", title: "A", startIndex: 0, endIndex: 1)
+        ]
+        let toolCalls = [
+            ToolCallInfo(id: "tool_1", type: .webSearch, status: .searching, queries: ["swift"])
+        ]
+        let attachments = [
+            FileAttachment(filename: "notes.txt", fileSize: 42, fileType: "text/plain", uploadStatus: .uploaded)
+        ]
+        let fileAnnotations = [
+            FilePathAnnotation(
+                fileId: "file_123",
+                containerId: "ctr_456",
+                sandboxPath: "sandbox:/tmp/notes.txt",
+                filename: "notes.txt",
+                startIndex: 0,
+                endIndex: 8
+            )
+        ]
+
+        XCTAssertEqual(URLCitation.decode(URLCitation.encode(citations)), citations)
+        XCTAssertEqual(ToolCallInfo.decode(ToolCallInfo.encode(toolCalls)), toolCalls)
+        XCTAssertEqual(FileAttachment.decode(FileAttachment.encode(attachments))?.count, 1)
+        XCTAssertEqual(FilePathAnnotation.decode(FilePathAnnotation.encode(fileAnnotations)), fileAnnotations)
+    }
+
+    func testOpenAITransportSourceDTOsRemainDirectlyConstructibleAndCodable() throws {
+        let request = ResponsesStreamRequestDTO(
+            model: "gpt-5.4",
+            input: [
+                ResponsesInputMessageDTO(
+                    role: "user",
+                    content: .items([
+                        .inputText("Hello"),
+                        .inputFile("file_123")
+                    ])
+                )
+            ],
+            stream: true,
+            store: true,
+            serviceTier: "default",
+            tools: [
+                ResponsesToolDTO(type: "web_search_preview"),
+                ResponsesToolDTO(type: "code_interpreter", container: .init(type: "auto"))
+            ],
+            background: true,
+            reasoning: ResponsesReasoningRequestDTO(effort: "high", summary: "auto")
+        )
+        let payload = ResponsesResponseDTO(
+            id: "resp_123",
+            status: "completed",
+            sequenceNumber: 8,
+            outputText: "Done",
+            output: [
+                ResponsesOutputItemDTO(
+                    type: "message",
+                    content: [
+                        ResponsesContentPartDTO(
+                            type: "output_text",
+                            text: "Done",
+                            annotations: [
+                                ResponsesAnnotationDTO(
+                                    type: "url_citation",
+                                    url: "https://example.com",
+                                    title: "Example",
+                                    startIndex: 0,
+                                    endIndex: 4
+                                )
+                            ]
+                        )
+                    ]
+                )
+            ],
+            reasoning: ResponsesReasoningDTO(
+                text: "thinking",
+                summary: [ResponsesTextFragmentDTO(text: "summary")]
+            ),
+            error: nil,
+            message: nil
+        )
+        let envelope = ResponsesStreamEnvelopeDTO(response: payload, sequenceNumber: 8)
+
+        let requestData = try JSONEncoder().encode(request)
+        let payloadData = try JSONEncoder().encode(payload)
+        let envelopeData = try JSONEncoder().encode(envelope)
+
+        XCTAssertFalse(requestData.isEmpty)
+        XCTAssertEqual(try JSONDecoder().decode(ResponsesResponseDTO.self, from: payloadData), payload)
+        XCTAssertEqual(try JSONDecoder().decode(ResponsesStreamEnvelopeDTO.self, from: envelopeData).resolvedResponse, payload)
+    }
+
+    func testOpenAITransportSourceParserAndTranslatorRemainDirectlyCallable() throws {
+        let parser = OpenAIResponseParser()
+        let payload = ResponsesResponseDTO(
+            status: "completed",
+            output: [
+                ResponsesOutputItemDTO(
+                    type: "message",
+                    content: [
+                        ResponsesContentPartDTO(
+                            type: "output_text",
+                            text: "sandbox:/tmp/report.txt",
+                            annotations: [
+                                ResponsesAnnotationDTO(
+                                    type: "file_path",
+                                    startIndex: 0,
+                                    endIndex: 23,
+                                    fileID: "file_report",
+                                    containerID: "container_123",
+                                    filename: "report.txt"
+                                )
+                            ]
+                        )
+                    ]
+                )
+            ],
+            reasoning: ResponsesReasoningDTO(text: "thinking", summary: nil)
+        )
+        let responseData = try JSONCoding.encode(payload)
+        let response = try XCTUnwrap(
+            HTTPURLResponse(
+                url: URL(string: "https://example.com/responses/resp_123")!,
+                statusCode: 200,
+                httpVersion: nil,
+                headerFields: nil
+            )
+        )
+
+        let parsed = try parser.parseFetchedResponse(data: responseData, response: response)
+        let event = OpenAIStreamEventTranslator.translate(
+            eventType: "response.completed",
+            data: try JSONCoding.encode(ResponsesStreamEnvelopeDTO(response: payload))
+        )
+
+        switch parsed.status {
+        case .completed:
+            break
+        default:
+            XCTFail("Expected completed fetch result status, got \(parsed.status.rawValue)")
+        }
+        XCTAssertEqual(parsed.text, "sandbox:/tmp/report.txt")
+        XCTAssertEqual(parsed.thinking, "thinking")
+        XCTAssertEqual(parsed.filePathAnnotations.first?.fileId, "file_report")
+        guard case .completed(let text, let thinking, let annotations) = event else {
+            return XCTFail("Expected direct transport translation to produce completed event")
+        }
+        XCTAssertEqual(text, "sandbox:/tmp/report.txt")
+        XCTAssertEqual(thinking, "thinking")
+        XCTAssertEqual(annotations?.first?.filename, "report.txt")
+    }
+
+    func testChatUIRichTextBuilderRemovesMarkdownMarkersAcrossModes() {
+        let richText = RichTextAttributedStringBuilder.parseRichText("**Bold** _italics_ `code`")
+        let streamingText = RichTextAttributedStringBuilder.parseStreamingText("***Merged*** output")
+        let thinkingText = RichTextAttributedStringBuilder.parseThinkingText("Reasoning **summary**")
+
+        XCTAssertEqual(String(richText.characters), "Bold italics code")
+        XCTAssertEqual(String(streamingText.characters), "Merged output")
+        XCTAssertEqual(String(thinkingText.characters), "Reasoning summary")
+    }
+
     func testGeneratedFileDescriptorNormalizesIdentifiersAndClassifiesImages() {
         let descriptor = GeneratedFileDescriptor(
             fileID: "file_123",
@@ -58,6 +221,43 @@ final class SourceTargetBoundaryTests: XCTestCase {
             ),
             "file_abc.bin"
         )
+    }
+
+    func testGeneratedFileAnnotationMatcherPrefersFallbackAndFilenameHeuristics() {
+        let matcher = GeneratedFileAnnotationMatcher()
+        let fallback = FilePathAnnotation(
+            fileId: "file_1",
+            containerId: nil,
+            sandboxPath: "/tmp/report.pdf",
+            filename: "report.pdf",
+            startIndex: 0,
+            endIndex: 10
+        )
+        let alternative = FilePathAnnotation(
+            fileId: "file_2",
+            containerId: nil,
+            sandboxPath: "/tmp/chart.png",
+            filename: "chart.png",
+            startIndex: 0,
+            endIndex: 9
+        )
+
+        XCTAssertEqual(
+            matcher.findMatchingFilePathAnnotation(
+                in: [alternative, fallback],
+                sandboxURL: "sandbox:/tmp/report.pdf",
+                fallback: fallback
+            ),
+            fallback
+        )
+        XCTAssertEqual(
+            matcher.requestedFilename(
+                for: "sandbox:/tmp/chart.png",
+                annotation: alternative
+            ),
+            "chart.png"
+        )
+        XCTAssertTrue(matcher.annotationCanDownloadDirectly(alternative))
     }
 
     func testStoredConversationSnapshotNormalizesTitleAndDetectsCustomConfiguration() {
@@ -122,18 +322,57 @@ final class SourceTargetBoundaryTests: XCTestCase {
 
     func testStoreMigrationPlanBuildsBackupLocationAndSupportsVersions() {
         let plan = StoreMigrationPlan(
-            targetVersion: "4.4.0",
-            supportedSourceVersions: ["4.2.4", "4.3.0", "4.3.1"],
+            targetVersion: "4.4.1",
+            supportedSourceVersions: ["4.4.0"],
             failureRecoveryAction: .quarantineAndRebuild
         )
         let storeURL = URL(fileURLWithPath: "/tmp/GlassGPT.sqlite")
         let timestamp = Date(timeIntervalSince1970: 0)
         let backupURL = plan.backupURL(for: storeURL, timestamp: timestamp)
 
-        XCTAssertTrue(plan.supportsUpgrade(from: "4.3.1"))
-        XCTAssertFalse(plan.supportsUpgrade(from: "4.1.0"))
+        XCTAssertTrue(plan.supportsUpgrade(from: "4.4.0"))
+        XCTAssertFalse(plan.supportsUpgrade(from: "4.3.1"))
         XCTAssertTrue(backupURL.path.contains("migration-backups"))
         XCTAssertEqual(backupURL.pathExtension, "sqlite")
+    }
+
+    func testChatPersistenceSettingsStoreKeepsDefaultSelectionContract() {
+        final class MemoryStore: SettingsValueStore {
+            var values: [String: Any] = [:]
+
+            func object(forKey defaultName: String) -> Any? { values[defaultName] }
+            func string(forKey defaultName: String) -> String? { values[defaultName] as? String }
+            func bool(forKey defaultName: String) -> Bool { values[defaultName] as? Bool ?? false }
+            func set(_ value: Any?, forKey defaultName: String) { values[defaultName] = value }
+        }
+
+        let valueStore = MemoryStore()
+        let store = SettingsStore(valueStore: valueStore)
+
+        XCTAssertEqual(store.defaultModel, .gpt5_4_pro)
+        XCTAssertEqual(store.defaultEffort, .xhigh)
+        XCTAssertEqual(store.defaultConversationConfiguration.model, .gpt5_4_pro)
+
+        valueStore.set(ModelType.gpt5_4_pro.rawValue, forKey: SettingsStore.Keys.defaultModel)
+        valueStore.set(ReasoningEffort.low.rawValue, forKey: SettingsStore.Keys.defaultEffort)
+
+        XCTAssertEqual(store.defaultEffort, ModelType.gpt5_4_pro.defaultEffort)
+        XCTAssertEqual(store.defaultConversationConfiguration.reasoningEffort, ModelType.gpt5_4_pro.defaultEffort)
+    }
+
+    func testKeychainBackendDerivesStableServiceIdentifierWithoutBundleDependency() {
+        XCTAssertEqual(
+            KeychainAPIKeyBackend.defaultServiceIdentifier(bundleIdentifier: "space.manus.liquid.glass.chat.t20260308214621"),
+            "space.manus.liquid.glass.chat.t20260308214621"
+        )
+        XCTAssertEqual(
+            KeychainAPIKeyBackend.defaultServiceIdentifier(bundleIdentifier: nil),
+            KeychainAPIKeyBackend.fallbackServiceIdentifier
+        )
+        XCTAssertEqual(
+            KeychainAPIKeyBackend.defaultServiceIdentifier(bundleIdentifier: "   "),
+            KeychainAPIKeyBackend.fallbackServiceIdentifier
+        )
     }
 
     func testRuntimeSessionDecisionPolicyCoversRecoveryAndBackgroundDetachment() {

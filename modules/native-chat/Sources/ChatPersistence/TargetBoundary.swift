@@ -1,12 +1,12 @@
 public enum ChatPersistenceBoundary {
-    public struct Scope<ModelContext, ConversationRepository, DraftRepository, MessagePersistence> {
-        public let modelContext: ModelContext
+    public struct Scope<PersistenceContext, ConversationRepository, DraftRepository, MessagePersistence> {
+        public let modelContext: PersistenceContext
         public let conversationRepository: ConversationRepository
         public let draftRepository: DraftRepository
         public let messagePersistence: MessagePersistence
 
         public init(
-            modelContext: ModelContext,
+            modelContext: PersistenceContext,
             conversationRepository: ConversationRepository,
             draftRepository: DraftRepository,
             messagePersistence: MessagePersistence

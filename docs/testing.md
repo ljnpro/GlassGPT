@@ -2,13 +2,13 @@
 
 ## Principle
 
-4.4.0 prioritizes parity, maintainability, and release reliability. Tests exist to prevent behavioral drift while proving that the refactor improved the production codebase rather than only the test bundle.
+4.4.1 prioritizes parity, maintainability, release reliability, and real module boundaries. Tests exist to prevent behavioral drift while proving that more of the production code now lives in directly testable source targets rather than only inside the app target.
 
 ## Coverage
 
 - Unit tests
   - settings/defaults persistence
-  - API key store behavior via test doubles
+  - API key store behavior via test doubles, including reinstall/keychain compatibility semantics
   - request builder output
   - response parser behavior
   - repository CRUD and draft queries
@@ -24,12 +24,14 @@
 - UI tests
   - app launch reachability
   - scenario-driven smoke coverage for history open/search/delete flows
-  - settings theme persistence, API key save/clear, and gateway feedback
+  - settings theme persistence, API key save/clear, relaunch persistence, and gateway feedback
   - seeded conversation rendering, streaming indicators, model selection, file preview, and reply-split single-surface behavior
+  - empty-install shell behavior with no seeded API key
 - Maintainability gates
   - production code must stay free of `try?`, `[String: Any]`, and `JSONSerialization`
   - operational `fatalError` and `preconditionFailure` are forbidden
   - non-UI and UI file-size ceilings are enforced in CI
+  - source-share and module-boundary gates prevent pure logic from drifting back into `modules/native-chat/ios`
 - Manual parity checks
   - see [parity-baseline.md](/Applications/GlassGPT/docs/parity-baseline.md)
 
@@ -49,6 +51,8 @@
 ./scripts/ci.sh core-tests
 ./scripts/ci.sh ui-tests
 ./scripts/ci.sh maintainability
+./scripts/ci.sh source-share
+./scripts/ci.sh module-boundary
 ./scripts/ci.sh release-readiness
 ```
 
@@ -84,13 +88,17 @@ xcodebuild -project ios/GlassGPT.xcodeproj -scheme GlassGPT -destination 'platfo
   - `views-and-presentation`
   - `app-shell`
 - Warnings are gated by `scripts/check_warnings.sh`. The only currently allowed warning is the external `appintentsmetadataprocessor` metadata extraction notice if Xcode emits it.
-- Snapshot comparisons anchor to the `4.3.1` production baseline set, and the release baseline is refreshed only when `docs/parity-baseline.md` is updated for `4.4.0`.
+- Snapshot comparisons anchor to the `4.4.0` production baseline set, and the release baseline is refreshed only when `docs/parity-baseline.md` is updated for `4.4.1`.
+- Before treating simulator launch failures as product regressions, check local machine load first.
+  - If CPU is saturated, `SBMainWorkspace` launch denials, `BUILD INTERRUPTED`, or transient simulator install/launch failures can be host-pressure artifacts rather than app bugs.
+  - When load is high, temporarily stop extra Codex subagents, shut down unused simulators, and rerun the failing gate serially before debugging production code.
 - Runtime invariants are as important as visual parity. The highest-risk protected paths are:
   - one assistant reply -> one visible bubble
   - stale stream tasks cannot write after reconnect/recovery/cancel
-  - background-mode resume vs polling remains branch-equivalent to the 4.3.1 maintained baseline
+  - background-mode resume vs polling remains branch-equivalent to the 4.4.0 maintained baseline
+  - uninstall/reinstall must preserve the API key via Keychain without requiring a recovery flow
 
-## 4.4.0 Gates
+## 4.4.1 Gates
 
 `./scripts/ci.sh app-tests` validates:
 
@@ -120,6 +128,16 @@ xcodebuild -project ios/GlassGPT.xcodeproj -scheme GlassGPT -destination 'platfo
 - non-UI files stay at or below `220 LOC`
 - UI files stay at or below `280 LOC`
 - `ScreenStores` stay at or below `180 LOC`
+
+`./scripts/ci.sh source-share` validates:
+
+- non-boundary code under `modules/native-chat/Sources` stays at or above the configured share threshold of the product package (`17.0%` for 4.4.1)
+- `TargetBoundary.swift` placeholders do not count toward the score
+
+`./scripts/ci.sh module-boundary` validates:
+
+- each real source target only imports modules allowed by the intended package dependency graph
+- `ChatDomain` remains free of UI, persistence, and process-environment framework imports
 
 `./scripts/ci.sh release-readiness` validates:
 

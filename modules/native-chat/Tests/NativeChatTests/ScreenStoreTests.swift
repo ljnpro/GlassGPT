@@ -4,6 +4,41 @@ import SwiftData
 
 @MainActor
 final class ScreenStoreTests: XCTestCase {
+    func testChatScreenStoreFreshInstallStartsEmptyButUsableWithoutAPIKey() throws {
+        let store = try makeTestChatScreenStore(
+            apiKey: "",
+            streamClient: QueuedOpenAIStreamClient(scriptedStreams: [])
+        )
+
+        XCTAssertNil(store.currentConversation)
+        XCTAssertTrue(store.messages.isEmpty)
+        XCTAssertEqual(store.currentStreamingText, "")
+        XCTAssertEqual(store.currentThinkingText, "")
+        XCTAssertFalse(store.isStreaming)
+        XCTAssertFalse(store.isThinking)
+        XCTAssertFalse(store.isRecovering)
+        XCTAssertTrue(store.pendingAttachments.isEmpty)
+        XCTAssertNil(store.errorMessage)
+        XCTAssertFalse(store.hasAPIKey)
+        XCTAssertEqual(store.apiKey, "")
+        XCTAssertNil(store.filePreviewItem)
+        XCTAssertNil(store.sharedGeneratedFileItem)
+        XCTAssertNil(store.fileDownloadError)
+    }
+
+    func testChatScreenStoreReinstallPathReadsPreexistingAPIKeyWithoutRestoringHistory() throws {
+        let store = try makeTestChatScreenStore(
+            apiKey: "sk-existing-keychain",
+            streamClient: QueuedOpenAIStreamClient(scriptedStreams: [])
+        )
+
+        XCTAssertTrue(store.hasAPIKey)
+        XCTAssertEqual(store.apiKey, "sk-existing-keychain")
+        XCTAssertNil(store.currentConversation)
+        XCTAssertTrue(store.messages.isEmpty)
+        XCTAssertFalse(store.isRestoringConversation)
+    }
+
     func testChatScreenStoreHasAPIKeyReflectsBackendValue() throws {
         let populatedStore = try makeTestChatScreenStore(
             apiKey: "sk-present",

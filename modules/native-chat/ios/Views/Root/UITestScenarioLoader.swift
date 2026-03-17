@@ -4,17 +4,31 @@ import SwiftData
 @MainActor
 enum UITestScenarioLoader {
     static func makeBootstrap(modelContext: ModelContext) -> UITestBootstrap? {
-        guard let scenario = currentScenario else { return nil }
+        let processInfo = ProcessInfo.processInfo
+        guard let scenario = currentScenario(
+            arguments: processInfo.arguments,
+            environment: processInfo.environment
+        ) else {
+            return nil
+        }
 
+        return makeBootstrap(for: scenario, modelContext: modelContext)
+    }
+
+    static func makeBootstrap(
+        for scenario: UITestScenario,
+        modelContext: ModelContext
+    ) -> UITestBootstrap {
         let settingsValueStore = ScenarioSettingsValueStore()
-        let apiKeyBackend = ScenarioAPIKeyBackend()
         let settingsStore = SettingsStore(valueStore: settingsValueStore)
+        let apiKeyBackend: APIKeyPersisting = scenario.usesLiveKeychain ? KeychainService() : ScenarioAPIKeyBackend()
         let apiKeyStore = APIKeyStore(backend: apiKeyBackend)
 
         seedDefaultSettings(into: settingsStore)
         FeatureFlags.useCloudflareGateway = false
 
         clearAllConversations(in: modelContext)
+        resetAPIKeyIfNeeded(for: scenario, store: apiKeyStore)
         let seededConversations = seedConversationsIfNeeded(in: modelContext, scenario: scenario)
 
         let chatScreenStore = ChatScreenStore(
@@ -47,13 +61,15 @@ enum UITestScenarioLoader {
         )
     }
 
-    private static var currentScenario: UITestScenario? {
-        let processInfo = ProcessInfo.processInfo
-        if let argument = processInfo.arguments.first(where: { $0.hasPrefix("UITestScenario=") }) {
+    static func currentScenario(
+        arguments: [String],
+        environment: [String: String]
+    ) -> UITestScenario? {
+        if let argument = arguments.first(where: { $0.hasPrefix("UITestScenario=") }) {
             return UITestScenario(rawValue: String(argument.dropFirst("UITestScenario=".count)))
         }
 
-        if let environmentScenario = processInfo.environment["UITestScenario"] {
+        if let environmentScenario = environment["UITestScenario"] {
             return UITestScenario(rawValue: environmentScenario)
         }
 
@@ -76,7 +92,7 @@ enum UITestScenarioLoader {
         to viewModel: ChatScreenStore
     ) {
         switch scenario {
-        case .empty, .history, .settings, .settingsGateway:
+        case .empty, .history, .settings, .settingsGateway, .reinstallSeed, .reinstallVerify, .freshInstall:
             return
 
         case .seeded, .replySplit:
@@ -116,6 +132,15 @@ enum UITestScenarioLoader {
                     viewerFilename: "chart.png"
                 )
             }
+        }
+    }
+
+    private static func resetAPIKeyIfNeeded(for scenario: UITestScenario, store: APIKeyStore) {
+        switch scenario {
+        case .reinstallSeed, .freshInstall:
+            store.deleteAPIKey()
+        default:
+            return
         }
     }
 }

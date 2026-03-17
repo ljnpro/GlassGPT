@@ -1,8 +1,27 @@
 import XCTest
+import SwiftData
 @testable import NativeChat
 
 @MainActor
 final class ChatScreenStoreRuntimeTests: XCTestCase {
+    func testSendMessageWithoutStoredAPIKeyFailsFastAndLeavesFreshInstallStateUsable() async throws {
+        let streamClient = QueuedOpenAIStreamClient(scriptedStreams: [])
+        let store = try makeTestChatScreenStore(apiKey: "", streamClient: streamClient)
+        let conversation = try seedConversation(in: store, title: "Missing Key")
+
+        store.currentConversation = conversation
+        store.messages = []
+        store.syncConversationProjection()
+
+        XCTAssertFalse(store.sendMessage(text: "This should not start"))
+        XCTAssertEqual(store.errorMessage, "Please add your OpenAI API key in Settings.")
+        XCTAssertTrue(store.messages.isEmpty)
+        XCTAssertNil(store.currentVisibleSession)
+        XCTAssertFalse(store.isStreaming)
+        XCTAssertFalse(store.isThinking)
+        XCTAssertTrue(streamClient.recordedRequests.isEmpty)
+    }
+
     func testSendMessageStreamsThroughStoreAndFinalizesAssistantDraft() async throws {
         let streamClient = QueuedOpenAIStreamClient(
             scriptedStreams: [[
@@ -253,7 +272,7 @@ final class ChatScreenStoreRuntimeTests: XCTestCase {
         XCTAssertTrue(streamClient.recordedRequests.isEmpty)
     }
 
-    func testHandleDidEnterBackgroundSuspendsActiveSessionAndPersistsInterruptionFallback() async throws {
+    func testHandleDidEnterBackgroundDoesNotInterruptActiveSessionImmediately() async throws {
         let streamClient = ControlledOpenAIStreamClient()
         let store = try makeTestChatScreenStore(streamClient: streamClient)
         let conversation = try seedConversation(in: store, title: "Background Session")
@@ -267,33 +286,231 @@ final class ChatScreenStoreRuntimeTests: XCTestCase {
             store.currentVisibleSession != nil && streamClient.activeStreamCount > 0
         }
 
-        streamClient.yield(.textDelta("Partial output"))
-
-        try await waitUntil {
-            store.currentStreamingText == "Partial output"
-        }
-
+        let cancelCallsBeforeBackground = streamClient.cancelCallCount
         store.handleDidEnterBackground()
+
+        XCTAssertNotNil(store.currentVisibleSession)
+        XCTAssertFalse(latestAssistantMessage(in: store)?.isComplete ?? true)
+        XCTAssertEqual(streamClient.cancelCallCount, cancelCallsBeforeBackground)
+
+        streamClient.yield(.responseCreated("resp_background_live"))
+        streamClient.yield(.sequenceUpdate(3))
+        streamClient.yield(.textDelta("Background completion"))
+        streamClient.yield(.completed("", nil, nil))
 
         try await waitUntil {
             self.latestAssistantMessage(in: store)?.isComplete == true && store.currentVisibleSession == nil
         }
 
         let assistantMessage = try XCTUnwrap(latestAssistantMessage(in: store))
-        XCTAssertTrue(assistantMessage.content.contains("Partial output"))
-        XCTAssertTrue(assistantMessage.content.contains("Response interrupted because the app was closed before completion."))
+        XCTAssertEqual(assistantMessage.content, "Background completion")
+        XCTAssertEqual(assistantMessage.responseId, "resp_background_live")
         XCTAssertNil(assistantMessage.lastSequenceNumber)
         XCTAssertTrue(assistantMessage.isComplete)
-        XCTAssertGreaterThanOrEqual(streamClient.cancelCallCount, 1)
+        XCTAssertFalse(assistantMessage.content.contains("Response interrupted because the app was closed before completion."))
         XCTAssertFalse(store.isStreaming)
     }
 
-    private func seedConversation(in store: ChatScreenStore, title: String) throws -> Conversation {
+    func testRelaunchedStoreFetchesCompletedResponseDirectlyAfterBackgroundDetachment() async throws {
+        let container = try makeInMemoryModelContainer()
+        let settingsValueStore = InMemorySettingsValueStore()
+        settingsValueStore.set(AppTheme.light.rawValue, forKey: SettingsStore.Keys.appTheme)
+        settingsValueStore.set(false, forKey: SettingsStore.Keys.defaultBackgroundModeEnabled)
+        settingsValueStore.set(false, forKey: SettingsStore.Keys.cloudflareGatewayEnabled)
+
+        let apiBackend = InMemoryAPIKeyBackend()
+        apiBackend.storedKey = "sk-test"
+        let configurationProvider = RuntimeTestOpenAIConfigurationProvider()
+
+        let initialStreamClient = ControlledOpenAIStreamClient()
+        let initialStore = makeRelaunchableStore(
+            container: container,
+            settingsValueStore: settingsValueStore,
+            apiBackend: apiBackend,
+            configurationProvider: configurationProvider,
+            transport: StubOpenAITransport(),
+            streamClient: initialStreamClient,
+            bootstrapPolicy: .testing
+        )
+        let conversation = try seedConversation(
+            in: initialStore,
+            title: "Completed After Relaunch",
+            backgroundModeEnabled: false
+        )
+
+        initialStore.currentConversation = conversation
+        initialStore.messages = []
+        initialStore.backgroundModeEnabled = false
+        initialStore.syncConversationProjection()
+
+        XCTAssertTrue(initialStore.sendMessage(text: "Fetch the completed result"))
+        try await waitUntil {
+            initialStore.currentVisibleSession != nil && initialStreamClient.activeStreamCount > 0
+        }
+
+        initialStreamClient.yield(.responseCreated("resp_relaunch_completed"))
+        initialStreamClient.yield(.textDelta("Partial"))
+
+        try await waitUntil {
+            self.latestAssistantMessage(in: initialStore)?.responseId == "resp_relaunch_completed"
+        }
+
+        initialStore.handleEnterBackground()
+        initialStore.suspendActiveSessionsForAppBackground()
+
+        let suspendedMessage = try XCTUnwrap(latestAssistantMessage(in: initialStore))
+        XCTAssertEqual(suspendedMessage.responseId, "resp_relaunch_completed")
+        XCTAssertFalse(suspendedMessage.isComplete)
+
+        let relaunchTransport = StubOpenAITransport()
+        await relaunchTransport.enqueue(
+            data: try makeFetchResponseData(
+                status: .completed,
+                text: "Fetched after relaunch",
+                thinking: "Server-side completion"
+            ),
+            url: URL(string: "https://api.test.openai.local/v1/responses/resp_relaunch_completed")!
+        )
+
+        let relaunchStreamClient = QueuedOpenAIStreamClient(scriptedStreams: [])
+        let relaunchStore = makeRelaunchableStore(
+            container: container,
+            settingsValueStore: settingsValueStore,
+            apiBackend: apiBackend,
+            configurationProvider: configurationProvider,
+            transport: relaunchTransport,
+            streamClient: relaunchStreamClient,
+            bootstrapPolicy: .init(
+                restoreLastConversation: true,
+                setupLifecycleObservers: false,
+                runLaunchTasks: true
+            )
+        )
+
+        try await waitUntil {
+            self.latestAssistantMessage(in: relaunchStore)?.isComplete == true
+        }
+
+        let recovered = try XCTUnwrap(latestAssistantMessage(in: relaunchStore))
+        XCTAssertEqual(recovered.content, "Fetched after relaunch")
+        XCTAssertEqual(recovered.thinking, "Server-side completion")
+        XCTAssertTrue(recovered.isComplete)
+        XCTAssertNil(relaunchStore.currentVisibleSession)
+        XCTAssertFalse(relaunchStore.isRecovering)
+        let requestedPaths = await relaunchTransport.requestedPaths()
+        XCTAssertEqual(requestedPaths, ["/v1/responses/resp_relaunch_completed"])
+        XCTAssertTrue(relaunchStreamClient.recordedRequests.isEmpty)
+    }
+
+    func testRelaunchedBackgroundModeSessionResumesStreamingWhenResponseStillInProgress() async throws {
+        let container = try makeInMemoryModelContainer()
+        let settingsValueStore = InMemorySettingsValueStore()
+        settingsValueStore.set(AppTheme.light.rawValue, forKey: SettingsStore.Keys.appTheme)
+        settingsValueStore.set(false, forKey: SettingsStore.Keys.defaultBackgroundModeEnabled)
+        settingsValueStore.set(false, forKey: SettingsStore.Keys.cloudflareGatewayEnabled)
+
+        let apiBackend = InMemoryAPIKeyBackend()
+        apiBackend.storedKey = "sk-test"
+        let configurationProvider = RuntimeTestOpenAIConfigurationProvider()
+
+        let initialStreamClient = ControlledOpenAIStreamClient()
+        let initialStore = makeRelaunchableStore(
+            container: container,
+            settingsValueStore: settingsValueStore,
+            apiBackend: apiBackend,
+            configurationProvider: configurationProvider,
+            transport: StubOpenAITransport(),
+            streamClient: initialStreamClient,
+            bootstrapPolicy: .testing
+        )
+        let conversation = try seedConversation(
+            in: initialStore,
+            title: "Resume After Relaunch",
+            backgroundModeEnabled: true
+        )
+
+        initialStore.currentConversation = conversation
+        initialStore.messages = []
+        initialStore.backgroundModeEnabled = true
+        initialStore.syncConversationProjection()
+
+        XCTAssertTrue(initialStore.sendMessage(text: "Resume the stream"))
+        try await waitUntil {
+            initialStore.currentVisibleSession != nil && initialStreamClient.activeStreamCount > 0
+        }
+
+        initialStreamClient.yield(.responseCreated("resp_relaunch_stream"))
+        initialStreamClient.yield(.sequenceUpdate(7))
+        initialStreamClient.yield(.textDelta("Partial "))
+
+        try await waitUntil {
+            let message = self.latestAssistantMessage(in: initialStore)
+            return message?.responseId == "resp_relaunch_stream" && message?.lastSequenceNumber == 7
+        }
+
+        initialStore.handleEnterBackground()
+        initialStore.suspendActiveSessionsForAppBackground()
+
+        let suspendedMessage = try XCTUnwrap(latestAssistantMessage(in: initialStore))
+        XCTAssertEqual(suspendedMessage.responseId, "resp_relaunch_stream")
+        XCTAssertEqual(suspendedMessage.lastSequenceNumber, 7)
+        XCTAssertFalse(suspendedMessage.isComplete)
+
+        let relaunchTransport = StubOpenAITransport()
+        await relaunchTransport.enqueue(
+            data: try makeFetchResponseData(status: .inProgress, text: ""),
+            url: URL(string: "https://api.test.openai.local/v1/responses/resp_relaunch_stream")!
+        )
+
+        let relaunchStreamClient = QueuedOpenAIStreamClient(
+            scriptedStreams: [[
+                .sequenceUpdate(8),
+                .textDelta("continued"),
+                .completed("Partial continued", "Recovered thinking", nil)
+            ]]
+        )
+        let relaunchStore = makeRelaunchableStore(
+            container: container,
+            settingsValueStore: settingsValueStore,
+            apiBackend: apiBackend,
+            configurationProvider: configurationProvider,
+            transport: relaunchTransport,
+            streamClient: relaunchStreamClient,
+            bootstrapPolicy: .init(
+                restoreLastConversation: true,
+                setupLifecycleObservers: false,
+                runLaunchTasks: true
+            )
+        )
+
+        try await waitUntil {
+            self.latestAssistantMessage(in: relaunchStore)?.isComplete == true
+        }
+
+        let recovered = try XCTUnwrap(latestAssistantMessage(in: relaunchStore))
+        XCTAssertEqual(recovered.content, "Partial continued")
+        XCTAssertEqual(recovered.thinking, "Recovered thinking")
+        XCTAssertTrue(recovered.isComplete)
+        XCTAssertNil(recovered.lastSequenceNumber)
+        XCTAssertNil(relaunchStore.currentVisibleSession)
+        XCTAssertFalse(relaunchStore.isRecovering)
+        let requestedPaths = await relaunchTransport.requestedPaths()
+        XCTAssertEqual(requestedPaths, ["/v1/responses/resp_relaunch_stream"])
+        XCTAssertEqual(relaunchStreamClient.recordedRequests.count, 1)
+        let resumeURL = try XCTUnwrap(relaunchStreamClient.recordedRequests.first?.url?.absoluteString)
+        XCTAssertTrue(resumeURL.contains("starting_after=7"))
+    }
+
+    private func seedConversation(
+        in store: ChatScreenStore,
+        title: String,
+        backgroundModeEnabled: Bool = false
+    ) throws -> Conversation {
         let conversation = Conversation(
             title: title,
             model: ModelType.gpt5_4.rawValue,
             reasoningEffort: ReasoningEffort.high.rawValue,
-            backgroundModeEnabled: false,
+            backgroundModeEnabled: backgroundModeEnabled,
             serviceTierRawValue: ServiceTier.standard.rawValue
         )
         store.modelContext.insert(conversation)
@@ -306,5 +523,37 @@ final class ChatScreenStoreRuntimeTests: XCTestCase {
             .filter { $0.role == .assistant }
             .sorted { $0.createdAt < $1.createdAt }
             .last
+    }
+
+    private func makeRelaunchableStore(
+        container: ModelContainer,
+        settingsValueStore: InMemorySettingsValueStore,
+        apiBackend: InMemoryAPIKeyBackend,
+        configurationProvider: RuntimeTestOpenAIConfigurationProvider,
+        transport: OpenAIDataTransport,
+        streamClient: OpenAIStreamClient,
+        bootstrapPolicy: ChatScreenStoreBootstrapPolicy
+    ) -> ChatScreenStore {
+        let context = ModelContext(container)
+        let settingsStore = SettingsStore(valueStore: settingsValueStore)
+        let apiKeyStore = APIKeyStore(backend: apiBackend)
+        let requestBuilder = OpenAIRequestBuilder(configuration: configurationProvider)
+        let responseParser = OpenAIResponseParser()
+        let service = OpenAIService(
+            requestBuilder: requestBuilder,
+            responseParser: responseParser,
+            streamClient: streamClient,
+            transport: transport
+        )
+
+        return ChatScreenStore(
+            modelContext: context,
+            settingsStore: settingsStore,
+            apiKeyStore: apiKeyStore,
+            configurationProvider: configurationProvider,
+            transport: transport,
+            serviceFactory: { service },
+            bootstrapPolicy: bootstrapPolicy
+        )
     }
 }

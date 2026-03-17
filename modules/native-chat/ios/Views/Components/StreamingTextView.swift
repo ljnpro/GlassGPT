@@ -25,6 +25,10 @@ struct StreamingTextView: View {
     /// Strip LaTeX delimiters and fenced code-block markers so the
     /// inline Markdown parser doesn't choke on them.
     private var sanitisedText: String {
+        Self.sanitiseText(text)
+    }
+
+    static func sanitiseText(_ text: String) -> String {
         var result = text
 
         // Replace block LaTeX delimiters with placeholder

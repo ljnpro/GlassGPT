@@ -86,6 +86,7 @@ let package = Package(
                 "ChatPersistence",
                 "ChatRuntime",
                 "ChatFeatures",
+                "ChatUI",
                 "OpenAITransport",
                 "GeneratedFiles",
                 .product(name: "SnapshotTesting", package: "swift-snapshot-testing")

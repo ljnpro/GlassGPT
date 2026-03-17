@@ -22,6 +22,22 @@ final class SettingsScreenStoreTests: XCTestCase {
         XCTAssertFalse(store.saveConfirmation)
     }
 
+    func testInitializerLoadsPreexistingAPIKeyForReinstallCompatibility() {
+        let store = makeTestSettingsScreenStore(apiKey: "sk-restored")
+
+        XCTAssertEqual(store.apiKey, "sk-restored")
+        XCTAssertNil(store.isAPIKeyValid)
+        XCTAssertFalse(store.saveConfirmation)
+    }
+
+    func testInitializerLeavesAPIKeyEmptyForFreshInstall() {
+        let store = makeTestSettingsScreenStore(apiKey: nil)
+
+        XCTAssertEqual(store.apiKey, "")
+        XCTAssertNil(store.isAPIKeyValid)
+        XCTAssertFalse(store.saveConfirmation)
+    }
+
     func testSaveAPIKeyTrimsWhitespaceAndShowsConfirmation() {
         let harness = makeTestSettingsScreenStoreHarness()
         let store = harness.store

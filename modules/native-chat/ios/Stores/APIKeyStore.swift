@@ -1,31 +1,27 @@
-import Foundation
+import ChatPersistence
 
-protocol APIKeyPersisting: Sendable {
-    func saveAPIKey(_ apiKey: String) throws
-    func loadAPIKey() -> String?
-    func deleteAPIKey()
-}
+typealias APIKeyPersisting = ChatPersistence.APIKeyPersisting
 
 extension KeychainService: APIKeyPersisting {}
 
 final class APIKeyStore {
     nonisolated(unsafe) static let shared = APIKeyStore()
 
-    private let backend: APIKeyPersisting
+    private let store: PersistedAPIKeyStore
 
-    init(backend: APIKeyPersisting = KeychainService()) {
-        self.backend = backend
+    init(backend: any APIKeyPersisting = KeychainService()) {
+        self.store = PersistedAPIKeyStore(backend: backend)
     }
 
     func loadAPIKey() -> String? {
-        backend.loadAPIKey()
+        store.loadAPIKey()
     }
 
     func saveAPIKey(_ apiKey: String) throws {
-        try backend.saveAPIKey(apiKey)
+        try store.saveAPIKey(apiKey)
     }
 
     func deleteAPIKey() {
-        backend.deleteAPIKey()
+        store.deleteAPIKey()
     }
 }
