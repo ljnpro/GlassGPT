@@ -1,0 +1,125 @@
+import Foundation
+
+public enum ReleaseResetCoordinator {
+    public static let targetVersion = "4.5.0"
+    public static let resetMarkerKey = "release_reset_completed_version"
+
+    private static let persistentStoreFilenames = [
+        "default.store",
+        "default.store-shm",
+        "default.store-wal",
+    ]
+
+    private static let recoveredStoreDirectory = ["NativeChat", "RecoveredStores"]
+    private static let generatedFileCacheDirectories = ["generated-images", "generated-documents"]
+    private static let previewDirectory = ["file_previews"]
+
+    @discardableResult
+    public static func performIfNeeded(
+        userDefaults: UserDefaults = .standard,
+        bundleIdentifier: String?,
+        applicationSupportDirectory: URL? = nil,
+        cachesDirectory: URL? = nil,
+        temporaryDirectory: URL? = nil,
+        fileManager: FileManager = .default,
+        apiKeyReset: ((String) -> Void)? = nil
+    ) -> Bool {
+        if userDefaults.string(forKey: resetMarkerKey) == targetVersion {
+            return false
+        }
+
+        let resolvedBundleIdentifier = bundleIdentifier?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let resolvedKeychainService = KeychainAPIKeyBackend.defaultServiceIdentifier(bundleIdentifier: resolvedBundleIdentifier)
+
+        if let applicationSupportDirectory = resolvedApplicationSupportDirectory(
+            explicit: applicationSupportDirectory,
+            fileManager: fileManager
+        ) {
+            deletePersistentStoreFiles(in: applicationSupportDirectory, fileManager: fileManager)
+            deleteDirectory(
+                pathComponents: recoveredStoreDirectory,
+                baseURL: applicationSupportDirectory,
+                fileManager: fileManager
+            )
+        }
+
+        if let cachesDirectory = resolvedCachesDirectory(explicit: cachesDirectory, fileManager: fileManager) {
+            for directoryName in generatedFileCacheDirectories {
+                deleteDirectory(
+                    pathComponents: [directoryName],
+                    baseURL: cachesDirectory,
+                    fileManager: fileManager
+                )
+            }
+        }
+
+        let temporaryDirectory = temporaryDirectory ?? fileManager.temporaryDirectory
+        deleteDirectory(
+            pathComponents: previewDirectory,
+            baseURL: temporaryDirectory,
+            fileManager: fileManager
+        )
+
+        if let resolvedBundleIdentifier, !resolvedBundleIdentifier.isEmpty {
+            userDefaults.removePersistentDomain(forName: resolvedBundleIdentifier)
+        }
+        userDefaults.set(targetVersion, forKey: resetMarkerKey)
+
+        let reset = apiKeyReset ?? { service in
+            KeychainAPIKeyBackend(service: service).deleteAPIKey()
+        }
+        reset(resolvedKeychainService)
+
+        return true
+    }
+
+    private static func resolvedApplicationSupportDirectory(
+        explicit: URL?,
+        fileManager: FileManager
+    ) -> URL? {
+        if let explicit {
+            return explicit
+        }
+        return fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
+    }
+
+    private static func resolvedCachesDirectory(
+        explicit: URL?,
+        fileManager: FileManager
+    ) -> URL? {
+        if let explicit {
+            return explicit
+        }
+        return fileManager.urls(for: .cachesDirectory, in: .userDomainMask).first
+    }
+
+    private static func deletePersistentStoreFiles(in applicationSupportDirectory: URL, fileManager: FileManager) {
+        for filename in persistentStoreFilenames {
+            let fileURL = applicationSupportDirectory.appendingPathComponent(filename)
+            removeIfExists(fileURL, fileManager: fileManager)
+        }
+    }
+
+    private static func deleteDirectory(
+        pathComponents: [String],
+        baseURL: URL,
+        fileManager: FileManager
+    ) {
+        let targetURL = pathComponents.reduce(baseURL) { partialResult, component in
+            partialResult.appendingPathComponent(component, isDirectory: true)
+        }
+        removeIfExists(targetURL, fileManager: fileManager)
+    }
+
+    private static func removeIfExists(_ url: URL, fileManager: FileManager) {
+        guard fileManager.fileExists(atPath: url.path) else {
+            return
+        }
+
+        do {
+            try fileManager.removeItem(at: url)
+        } catch {
+            Loggers.persistence.error("[ReleaseResetCoordinator] Failed to remove \(url.path): \(error.localizedDescription)")
+        }
+    }
+}

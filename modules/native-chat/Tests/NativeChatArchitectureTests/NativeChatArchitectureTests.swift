@@ -9,6 +9,7 @@ import ChatRuntimeWorkflows
 import ChatApplication
 import ChatPresentation
 import ChatUIComponents
+import NativeChat
 import NativeChatUI
 import NativeChatComposition
 import ChatDomain
@@ -46,6 +47,7 @@ final class NativeChatArchitectureTests: XCTestCase {
             "ChatUIComponents",
             "NativeChatUI",
             "NativeChatComposition",
+            "NativeChat",
             "NativeChatArchitectureTests",
         ]
 
@@ -55,9 +57,14 @@ final class NativeChatArchitectureTests: XCTestCase {
                 "Package.swift should declare \(target)"
             )
         }
+
+        XCTAssertFalse(
+            manifest.contains("name: \"NativeChatLegacy\""),
+            "Package.swift should not retain the deprecated NativeChatLegacy target"
+        )
     }
 
-    func testNewSourceTargetsContainNonBoundarySwift() throws {
+    func testNewSourceTargetsContainProductionSwift() throws {
         let targets = [
             "ChatPersistenceContracts",
             "ChatPersistenceCore",
@@ -72,6 +79,7 @@ final class NativeChatArchitectureTests: XCTestCase {
             "ChatUIComponents",
             "NativeChatUI",
             "NativeChatComposition",
+            "NativeChat",
         ]
         let fileManager = FileManager.default
 
@@ -81,9 +89,9 @@ final class NativeChatArchitectureTests: XCTestCase {
 
             let swiftFiles = try fileManager.contentsOfDirectory(at: targetURL, includingPropertiesForKeys: nil)
                 .filter { $0.pathExtension == "swift" }
-            XCTAssertTrue(
-                swiftFiles.contains(where: { $0.lastPathComponent != "TargetBoundary.swift" }),
-                "\(target) should include at least one non-boundary Swift file"
+            XCTAssertFalse(
+                swiftFiles.isEmpty,
+                "\(target) should include at least one production Swift file"
             )
         }
     }
@@ -102,6 +110,30 @@ final class NativeChatArchitectureTests: XCTestCase {
             encoding: .utf8
         )
         XCTAssertTrue(swiftlint.contains("modules/native-chat/Sources"))
+    }
+
+    func testNativeChatUmbrellaNoLongerImportsLegacyImplementationDirectly() throws {
+        let umbrella = try String(
+            contentsOf: packageRoot.appendingPathComponent("Sources/NativeChat/NativeChatRootView.swift"),
+            encoding: .utf8
+        )
+
+        XCTAssertFalse(
+            umbrella.contains("import NativeChatLegacy"),
+            "NativeChat umbrella should re-export composition, not import NativeChatLegacy directly"
+        )
+        XCTAssertTrue(
+            umbrella.contains("import NativeChatComposition"),
+            "NativeChat umbrella should route through NativeChatComposition"
+        )
+    }
+
+    func testLegacyIOSLayerIsDeleted() {
+        let iosRoot = packageRoot.appendingPathComponent("ios", isDirectory: true)
+        XCTAssertFalse(
+            FileManager.default.fileExists(atPath: iosRoot.path),
+            "modules/native-chat/ios must be deleted in the final architecture"
+        )
     }
 
     func testNewArchitectureModulesAreDirectlyCallable() async throws {
@@ -154,8 +186,8 @@ final class NativeChatArchitectureTests: XCTestCase {
         let registryContainsReply = await registry.contains(startedReplyID)
         XCTAssertTrue(registryContainsReply)
 
-        let streamingText = RichTextAttributedStringBuilder.parseStreamingText("**Ship** 4.4.2")
-        XCTAssertEqual(String(streamingText.characters), "Ship 4.4.2")
+        let streamingText = RichTextAttributedStringBuilder.parseStreamingText("**Ship** 4.5.0")
+        XCTAssertEqual(String(streamingText.characters), "Ship 4.5.0")
 
         let presenter = await MainActor.run {
             ChatPresenter(bootstrapPolicy: .live)

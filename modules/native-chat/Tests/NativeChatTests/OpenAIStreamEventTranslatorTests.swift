@@ -1,5 +1,8 @@
+import ChatDomain
+import ChatPersistenceSwiftData
+import OpenAITransport
 import XCTest
-@testable import NativeChat
+@testable import NativeChatComposition
 
 final class OpenAIStreamEventTranslatorTests: XCTestCase {
     func testTranslateRecognizesResponseCreatedAndTextDelta() throws {

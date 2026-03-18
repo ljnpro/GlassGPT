@@ -1,6 +1,14 @@
+import ChatApplication
+import ChatDomain
+import ChatPersistenceSwiftData
+import ChatPresentation
+import ChatRuntimeModel
+import GeneratedFilesCore
+import NativeChatComposition
+import NativeChatUI
 import XCTest
 import SwiftData
-@testable import NativeChat
+@testable import NativeChatComposition
 
 @MainActor
 final class ScreenStoreTests: XCTestCase {
@@ -533,7 +541,7 @@ final class ScreenStoreTests: XCTestCase {
 
     func testChatSessionDecisionsReturnExpectedRecoveryAndDetachmentChoices() {
         XCTAssertEqual(
-            ChatSessionDecisions.recoveryResumeMode(
+            RuntimeSessionDecisionPolicy.recoveryResumeMode(
                 preferStreamingResume: true,
                 usedBackgroundMode: true,
                 lastSequenceNumber: 9
@@ -541,7 +549,7 @@ final class ScreenStoreTests: XCTestCase {
             .stream(lastSequenceNumber: 9)
         )
         XCTAssertEqual(
-            ChatSessionDecisions.recoveryResumeMode(
+            RuntimeSessionDecisionPolicy.recoveryResumeMode(
                 preferStreamingResume: true,
                 usedBackgroundMode: false,
                 lastSequenceNumber: 9
@@ -549,7 +557,7 @@ final class ScreenStoreTests: XCTestCase {
             .poll
         )
         XCTAssertTrue(
-            ChatSessionDecisions.shouldFallbackToDirectRecoveryStream(
+            RuntimeSessionDecisionPolicy.shouldFallbackToDirectRecoveryStream(
                 cloudflareGatewayEnabled: true,
                 useDirectEndpoint: false,
                 gatewayResumeTimedOut: false,
@@ -557,7 +565,7 @@ final class ScreenStoreTests: XCTestCase {
             )
         )
         XCTAssertFalse(
-            ChatSessionDecisions.shouldFallbackToDirectRecoveryStream(
+            RuntimeSessionDecisionPolicy.shouldFallbackToDirectRecoveryStream(
                 cloudflareGatewayEnabled: false,
                 useDirectEndpoint: false,
                 gatewayResumeTimedOut: true,
@@ -565,7 +573,7 @@ final class ScreenStoreTests: XCTestCase {
             )
         )
         XCTAssertTrue(
-            ChatSessionDecisions.shouldPollAfterRecoveryStream(
+            RuntimeSessionDecisionPolicy.shouldPollAfterRecoveryStream(
                 encounteredRecoverableFailure: false,
                 responseId: "resp_1"
             )
@@ -573,22 +581,22 @@ final class ScreenStoreTests: XCTestCase {
 
         let messageID = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
         XCTAssertEqual(
-            ChatSessionDecisions.pendingBackgroundCancellation(
+            RuntimeSessionDecisionPolicy.pendingBackgroundCancellation(
                 requestUsesBackgroundMode: true,
                 responseId: "resp_2",
                 messageId: messageID
             ),
-            PendingBackgroundCancellation(responseId: "resp_2", messageId: messageID)
+            RuntimePendingBackgroundCancellation(responseId: "resp_2", messageId: messageID)
         )
         XCTAssertTrue(
-            ChatSessionDecisions.canDetachBackgroundResponse(
+            RuntimeSessionDecisionPolicy.canDetachBackgroundResponse(
                 hasVisibleSession: true,
                 usedBackgroundMode: true,
                 responseId: "resp_3"
             )
         )
         XCTAssertFalse(
-            ChatSessionDecisions.canDetachBackgroundResponse(
+            RuntimeSessionDecisionPolicy.canDetachBackgroundResponse(
                 hasVisibleSession: true,
                 usedBackgroundMode: false,
                 responseId: "resp_3"
@@ -596,21 +604,24 @@ final class ScreenStoreTests: XCTestCase {
         )
     }
 
-    func testHistoryScreenStoreInvokesSelectionAndDeletionCallbacks() {
+    func testHistoryPresenterInvokesSelectionAndDeletionCallbacks() {
         let conversation = Conversation(title: "Selected Conversation")
         var selectedConversationID: UUID?
         var deletedConversationID: UUID?
         var deleteAllCount = 0
 
-        let store = HistoryScreenStore(
-            onSelectConversation: { selectedConversationID = $0.id },
-            onDeleteConversation: { deletedConversationID = $0.id },
-            onDeleteAllConversations: { deleteAllCount += 1 }
+        let store = HistoryPresenter(
+            controller: HistorySceneController(
+                loadConversations: { [] },
+                selectConversation: { selectedConversationID = $0 },
+                deleteConversation: { deletedConversationID = $0 },
+                deleteAllConversations: { deleteAllCount += 1 }
+            )
         )
 
         store.searchText = "Release"
-        store.selectConversation(conversation)
-        store.deleteConversation(conversation)
+        store.selectConversation(id: conversation.id)
+        store.deleteConversation(id: conversation.id)
         store.deleteAllConversations()
 
         XCTAssertEqual(store.searchText, "Release")
@@ -619,12 +630,15 @@ final class ScreenStoreTests: XCTestCase {
         XCTAssertEqual(deleteAllCount, 1)
     }
 
-    func testHistoryScreenStoreDeleteAllDoesNotDisturbSearchState() {
+    func testHistoryPresenterDeleteAllDoesNotDisturbSearchState() {
         var deleteAllCount = 0
-        let store = HistoryScreenStore(
-            onSelectConversation: { _ in XCTFail("selection should not be called") },
-            onDeleteConversation: { _ in XCTFail("single delete should not be called") },
-            onDeleteAllConversations: { deleteAllCount += 1 }
+        let store = HistoryPresenter(
+            controller: HistorySceneController(
+                loadConversations: { [] },
+                selectConversation: { _ in XCTFail("selection should not be called") },
+                deleteConversation: { _ in XCTFail("single delete should not be called") },
+                deleteAllConversations: { deleteAllCount += 1 }
+            )
         )
 
         store.searchText = "Archive"
@@ -644,27 +658,29 @@ final class ScreenStoreTests: XCTestCase {
         modelContext.insert(conversation)
         modelContext.insert(message)
         try modelContext.save()
+        appStore.historyPresenter.refresh()
 
         appStore.selectedTab = 1
-        appStore.historyScreenStore.selectConversation(conversation)
+        appStore.historyPresenter.selectConversation(id: conversation.id)
 
         XCTAssertEqual(appStore.selectedTab, 0)
-        XCTAssertEqual(appStore.chatScreenStore.currentConversation?.id, conversation.id)
-        XCTAssertEqual(appStore.chatScreenStore.messages.map(\.id), [message.id])
+        XCTAssertEqual(appStore.chatController.currentConversation?.id, conversation.id)
+        XCTAssertEqual(appStore.chatController.messages.map(\.id), [message.id])
 
-        appStore.chatScreenStore.currentStreamingText = "partial"
-        appStore.historyScreenStore.deleteConversation(conversation)
+        appStore.chatController.currentStreamingText = "partial"
+        appStore.historyPresenter.deleteConversation(id: conversation.id)
 
-        XCTAssertNil(appStore.chatScreenStore.currentConversation)
-        XCTAssertTrue(appStore.chatScreenStore.messages.isEmpty)
-        XCTAssertEqual(appStore.chatScreenStore.currentStreamingText, "")
+        XCTAssertNil(appStore.chatController.currentConversation)
+        XCTAssertTrue(appStore.chatController.messages.isEmpty)
+        XCTAssertEqual(appStore.chatController.currentStreamingText, "")
 
-        appStore.chatScreenStore.currentConversation = conversation
-        appStore.chatScreenStore.messages = [message]
-        appStore.historyScreenStore.deleteAllConversations()
+        appStore.chatController.currentConversation = conversation
+        appStore.chatController.messages = [message]
+        appStore.historyPresenter.deleteAllConversations()
 
-        XCTAssertNil(appStore.chatScreenStore.currentConversation)
-        XCTAssertTrue(appStore.chatScreenStore.messages.isEmpty)
+        XCTAssertNil(appStore.chatController.currentConversation)
+        XCTAssertTrue(appStore.chatController.messages.isEmpty)
+        XCTAssertTrue(appStore.historyPresenter.conversations.isEmpty)
     }
 
     func testNativeChatAppStoreDismissesUITestPreviewStateAcrossStoreAndAppProjection() throws {
@@ -678,12 +694,12 @@ final class ScreenStoreTests: XCTestCase {
         )
 
         appStore.uiTestPreviewItem = preview
-        appStore.chatScreenStore.filePreviewItem = preview
+        appStore.chatController.filePreviewItem = preview
 
         appStore.handleUITestPreviewDismiss()
 
         XCTAssertNil(appStore.uiTestPreviewItem)
-        XCTAssertNil(appStore.chatScreenStore.filePreviewItem)
+        XCTAssertNil(appStore.chatController.filePreviewItem)
     }
 
     func testFilePreviewStoreClearResetsTransientPresentationState() {
@@ -723,7 +739,7 @@ final class ScreenStoreTests: XCTestCase {
 
     @MainActor
     private func seedConversation(
-        in store: ChatScreenStore,
+        in store: ChatController,
         title: String,
         model: ModelType = .gpt5_4,
         reasoningEffort: ReasoningEffort = .high,

@@ -1,6 +1,9 @@
+import ChatDomain
+import ChatPersistenceSwiftData
+import ChatPersistenceCore
 import XCTest
 import GeneratedFilesCore
-@testable import NativeChat
+@testable import NativeChatComposition
 
 @MainActor
 final class SettingsScreenStoreTests: XCTestCase {

@@ -1,8 +1,12 @@
+import ChatApplication
 import XCTest
+import ChatPersistenceCore
+import ChatPersistenceSwiftData
+import OpenAITransport
 import SwiftData
 import ChatDomain
 import ChatRuntimeModel
-@testable import NativeChat
+@testable import NativeChatComposition
 
 @MainActor
 final class ChatScreenStoreRuntimeTests: XCTestCase {
@@ -522,7 +526,7 @@ final class ChatScreenStoreRuntimeTests: XCTestCase {
     }
 
     private func seedConversation(
-        in store: ChatScreenStore,
+        in store: ChatController,
         title: String,
         backgroundModeEnabled: Bool = false
     ) throws -> Conversation {
@@ -538,7 +542,7 @@ final class ChatScreenStoreRuntimeTests: XCTestCase {
         return conversation
     }
 
-    private func latestAssistantMessage(in store: ChatScreenStore) -> Message? {
+    private func latestAssistantMessage(in store: ChatController) -> Message? {
         store.messages
             .filter { $0.role == .assistant }
             .sorted { $0.createdAt < $1.createdAt }
@@ -552,11 +556,11 @@ final class ChatScreenStoreRuntimeTests: XCTestCase {
         configurationProvider: RuntimeTestOpenAIConfigurationProvider,
         transport: OpenAIDataTransport,
         streamClient: OpenAIStreamClient,
-        bootstrapPolicy: ChatScreenStoreBootstrapPolicy
-    ) -> ChatScreenStore {
+        bootstrapPolicy: FeatureBootstrapPolicy
+    ) -> ChatController {
         let context = ModelContext(container)
         let settingsStore = SettingsStore(valueStore: settingsValueStore)
-        let apiKeyStore = APIKeyStore(backend: apiBackend)
+        let apiKeyStore = PersistedAPIKeyStore(backend: apiBackend)
         let requestBuilder = OpenAIRequestBuilder(configuration: configurationProvider)
         let responseParser = OpenAIResponseParser()
         let service = OpenAIService(
@@ -566,7 +570,7 @@ final class ChatScreenStoreRuntimeTests: XCTestCase {
             transport: transport
         )
 
-        return ChatScreenStore(
+        return ChatController(
             modelContext: context,
             settingsStore: settingsStore,
             apiKeyStore: apiKeyStore,
@@ -577,7 +581,7 @@ final class ChatScreenStoreRuntimeTests: XCTestCase {
         )
     }
 
-    private func sessionMessageID(for store: ChatScreenStore) -> UUID {
+    private func sessionMessageID(for store: ChatController) -> UUID {
         if let session = store.currentVisibleSession {
             return session.messageID
         }

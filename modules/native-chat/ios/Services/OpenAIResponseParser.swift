@@ -1,3 +1,0 @@
-import OpenAITransport
-
-typealias OpenAIResponseParser = OpenAITransport.OpenAIResponseParser

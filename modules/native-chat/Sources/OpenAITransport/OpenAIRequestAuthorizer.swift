@@ -1,6 +1,6 @@
 import Foundation
 
-public protocol OpenAIRequestAuthorizer {
+public protocol OpenAIRequestAuthorizer: Sendable {
     func applyAuthorization(
         to request: inout URLRequest,
         apiKey: String,

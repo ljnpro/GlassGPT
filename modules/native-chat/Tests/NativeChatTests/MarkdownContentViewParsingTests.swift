@@ -1,5 +1,6 @@
 import XCTest
-@testable import NativeChat
+import NativeChatUI
+@testable import NativeChatComposition
 
 @MainActor
 final class MarkdownContentViewParsingTests: XCTestCase {

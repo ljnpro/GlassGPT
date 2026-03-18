@@ -29,6 +29,7 @@ ACTIVE_SOURCE_TARGETS = (
     "ChatUIComponents",
     "NativeChatUI",
     "NativeChatComposition",
+    "NativeChat",
 )
 
 
@@ -37,8 +38,6 @@ class TargetSummary:
     name: str
     files: int
     loc: int
-    non_boundary_files: int
-    non_boundary_loc: int
 
 
 def swift_loc(path: Path) -> int:
@@ -48,19 +47,16 @@ def swift_loc(path: Path) -> int:
 
 def summarize_target(path: Path) -> TargetSummary:
     swift_files = sorted(path.rglob("*.swift"))
-    non_boundary_files = [candidate for candidate in swift_files if candidate.name != "TargetBoundary.swift"]
     return TargetSummary(
         name=path.name,
         files=len(swift_files),
         loc=sum(swift_loc(candidate) for candidate in swift_files),
-        non_boundary_files=len(non_boundary_files),
-        non_boundary_loc=sum(swift_loc(candidate) for candidate in non_boundary_files),
     )
 
 
 def main() -> int:
-    if not SOURCES_ROOT.is_dir() or not IOS_ROOT.is_dir():
-        print("Missing source-share roots.", file=sys.stderr)
+    if not SOURCES_ROOT.is_dir():
+        print("Missing Sources root.", file=sys.stderr)
         return 1
 
     target_summaries: list[TargetSummary] = []
@@ -70,27 +66,33 @@ def main() -> int:
             print(f"Missing source target directory: {target_path}", file=sys.stderr)
             return 1
         target_summaries.append(summarize_target(target_path))
-    ios_files = sorted(IOS_ROOT.rglob("*.swift"))
+    ios_files = sorted(IOS_ROOT.rglob("*.swift")) if IOS_ROOT.is_dir() else []
+    ios_residual_files = sorted(path for path in IOS_ROOT.rglob("*") if path.is_file()) if IOS_ROOT.is_dir() else []
     ios_loc = sum(swift_loc(candidate) for candidate in ios_files)
     sources_total_loc = sum(summary.loc for summary in target_summaries)
-    sources_non_boundary_loc = sum(summary.non_boundary_loc for summary in target_summaries)
-    denominator = sources_non_boundary_loc + ios_loc
-    source_share_percent = 0.0 if denominator == 0 else (sources_non_boundary_loc * 100.0 / denominator)
+    denominator = sources_total_loc + ios_loc
+    source_share_percent = 0.0 if denominator == 0 else (sources_total_loc * 100.0 / denominator)
 
     failures: list[str] = []
+    if ios_loc != 0:
+        failures.append(f"legacy ios production code must be empty, found {ios_loc} LOC")
     if source_share_percent < MIN_SOURCE_SHARE_PERCENT:
         failures.append(
             f"source_share_pct {source_share_percent:.2f} is below required floor {MIN_SOURCE_SHARE_PERCENT:.2f}"
         )
 
+    if ios_residual_files:
+        failures.append("modules/native-chat/ios still contains residual files; final architecture requires deleting the directory")
+
     for summary in target_summaries:
-        if summary.non_boundary_loc == 0:
-            failures.append(f"{summary.name} contains no non-boundary production Swift code")
+        if summary.loc == 0:
+            failures.append(f"{summary.name} contains no production Swift code")
 
     report = {
         "sources_total_loc": sources_total_loc,
-        "sources_non_boundary_loc": sources_non_boundary_loc,
+        "sources_non_boundary_loc": sources_total_loc,
         "ios_loc": ios_loc,
+        "ios_residual_file_count": len(ios_residual_files),
         "source_share_pct": round(source_share_percent, 2),
         "minimum_required_pct": MIN_SOURCE_SHARE_PERCENT,
         "targets": [
@@ -98,8 +100,8 @@ def main() -> int:
                 "name": summary.name,
                 "files": summary.files,
                 "loc": summary.loc,
-                "non_boundary_files": summary.non_boundary_files,
-                "non_boundary_loc": summary.non_boundary_loc,
+                "non_boundary_files": summary.files,
+                "non_boundary_loc": summary.loc,
             }
             for summary in target_summaries
         ],
@@ -109,15 +111,16 @@ def main() -> int:
 
     print("Source-share report")
     print(f"sources_total_loc: {sources_total_loc}")
-    print(f"sources_non_boundary_loc: {sources_non_boundary_loc}")
+    print(f"sources_non_boundary_loc: {sources_total_loc}")
     print(f"ios_loc: {ios_loc}")
+    print(f"ios_residual_file_count: {len(ios_residual_files)}")
     print(f"source_share_pct: {source_share_percent:.2f}")
     print(f"minimum_required_pct: {MIN_SOURCE_SHARE_PERCENT:.2f}")
     print("")
     for summary in target_summaries:
         print(
             f"- {summary.name}: files={summary.files}, loc={summary.loc}, "
-            f"non_boundary_files={summary.non_boundary_files}, non_boundary_loc={summary.non_boundary_loc}"
+            f"non_boundary_files={summary.files}, non_boundary_loc={summary.loc}"
         )
     print("")
 

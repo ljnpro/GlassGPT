@@ -1,3 +1,0 @@
-import ChatDomain
-
-typealias ConversationConfiguration = ChatDomain.ConversationConfiguration

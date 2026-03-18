@@ -1,7 +1,11 @@
+import ChatDomain
+import ChatPersistenceSwiftData
+import NativeChatUI
 import SnapshotTesting
 import SwiftUI
+import GeneratedFilesCore
 import XCTest
-@testable import NativeChat
+@testable import NativeChatComposition
 
 @MainActor
 final class SnapshotViewTests: XCTestCase {
@@ -101,21 +105,17 @@ final class SnapshotViewTests: XCTestCase {
     }
 
     func testHistorySnapshots() throws {
-        let container = try makeHistorySnapshotContainer()
+        _ = try makeHistorySnapshotContainer()
         let store = makeHistoryScreenStore()
         assertViewSnapshots(named: "history-list") {
             HistoryView(store: store)
-                .modelContainer(container)
         }
     }
 
     func testSettingsSnapshots() {
         let viewModel = makeSettingsSnapshotViewModel()
         assertViewSnapshots(named: "settings") {
-            SettingsView(
-                viewModel: viewModel,
-                appVersionStringOverride: "4.2.1 (20167)"
-            )
+            SettingsView(viewModel: viewModel)
         }
     }
 

@@ -12,8 +12,8 @@ APP_BUNDLE_IDENTIFIER="space.manus.liquid.glass.chat.t20260308214621"
 UI_TEST_RUNNER_BUNDLE_IDENTIFIER="${APP_BUNDLE_IDENTIFIER}UITests.xctrunner"
 SIMULATOR_DEVICE_NAME="${SIMULATOR_DEVICE_NAME:-iPhone 17}"
 SIMULATOR_DEVICE_DESTINATION="platform=iOS Simulator,name=${SIMULATOR_DEVICE_NAME}"
-DEFAULT_RELEASE_VERSION="4.4.2"
-DEFAULT_RELEASE_BUILD="20175"
+DEFAULT_RELEASE_VERSION="4.5.0"
+DEFAULT_RELEASE_BUILD="20176"
 XCODEBUILD_RETRY_ATTEMPTS="${XCODEBUILD_RETRY_ATTEMPTS:-5}"
 XCODE_TEST_TIMEOUT_ALLOWANCE="${XCODE_TEST_TIMEOUT_ALLOWANCE:-180}"
 SIMULATOR_BOOT_TIMEOUT_SECONDS="${SIMULATOR_BOOT_TIMEOUT_SECONDS:-60}"
@@ -353,22 +353,21 @@ function gate_app_tests() {
 }
 
 function gate_snapshot_tests() {
-  ensure_ui_test_xctestrun_path
-
-  for snapshot_case in "${SNAPSHOT_CASES[@]}"; do
-    log "Running snapshot test ${snapshot_case}"
-    run_checked_xcodebuild "glassgpt-snapshot-${snapshot_case}" \
-      xcodebuild \
-      -quiet \
-      test-without-building \
-      -xctestrun "$UI_TEST_XCTESTRUN_RESOLVED_PATH" \
-      -parallel-testing-enabled NO \
-      -test-timeouts-enabled YES \
-      -maximum-test-execution-time-allowance "$XCODE_TEST_TIMEOUT_ALLOWANCE" \
-      -destination "$SIMULATOR_DEVICE_DESTINATION" \
-      -resultBundlePath "$CI_OUTPUT_DIR/${snapshot_case}.xcresult" \
-      -only-testing:"GlassGPTTests/SnapshotViewTests/${snapshot_case}"
-  done
+  log "Running snapshot test suite"
+  run_checked_xcodebuild "glassgpt-snapshot-suite" \
+    xcodebuild \
+    -quiet \
+    -project "$XCODE_PROJECT" \
+    -scheme "$SCHEME" \
+    -clonedSourcePackagesDirPath "$CI_SOURCE_PACKAGES_DIR" \
+    -enableCodeCoverage YES \
+    -parallel-testing-enabled NO \
+    -test-timeouts-enabled YES \
+    -maximum-test-execution-time-allowance "$XCODE_TEST_TIMEOUT_ALLOWANCE" \
+    -destination "$SIMULATOR_DEVICE_DESTINATION" \
+    -resultBundlePath "$CI_OUTPUT_DIR/snapshot-suite.xcresult" \
+    -only-testing:GlassGPTTests/SnapshotViewTests \
+    test
 }
 
 function gate_package_tests() {
@@ -402,11 +401,9 @@ function gate_coverage_report() {
     coverage_sources+=("$CI_OUTPUT_DIR/GlassGPTUnitTests.xcresult")
   fi
 
-  for snapshot_case in "${SNAPSHOT_CASES[@]}"; do
-    if [[ -d "$CI_OUTPUT_DIR/${snapshot_case}.xcresult" ]]; then
-      coverage_sources+=("$CI_OUTPUT_DIR/${snapshot_case}.xcresult")
-    fi
-  done
+  if [[ -d "$CI_OUTPUT_DIR/snapshot-suite.xcresult" ]]; then
+    coverage_sources+=("$CI_OUTPUT_DIR/snapshot-suite.xcresult")
+  fi
 
   if [[ -d "$CI_OUTPUT_DIR/NativeChatCoverageTests.xcresult" ]]; then
     coverage_sources+=("$CI_OUTPUT_DIR/NativeChatCoverageTests.xcresult")
@@ -507,7 +504,7 @@ function gate_ui_tests() {
 }
 
 function gate_reinstall_compatibility() {
-  log "Running reinstall-compatibility checks"
+  log "Running first-launch-reset checks"
   ensure_ui_test_xctestrun_path
 
   local ui_case
@@ -594,7 +591,7 @@ function assert_release_readiness() {
   current_branch="${GITHUB_REF_NAME:-$(git rev-parse --abbrev-ref HEAD)}"
 
   case "$current_branch" in
-    main|codex/stable-4.1|codex/stable-4.2|codex/stable-4.3|codex/stable-4.4|codex/feature/4.4*|HEAD)
+    main|codex/stable-4.1|codex/stable-4.2|codex/stable-4.3|codex/stable-4.4|codex/stable-4.5|codex/feature/4.5*|HEAD)
       ;;
     *)
       echo "Release-readiness gate does not permit branch '$current_branch'." >&2
@@ -602,13 +599,13 @@ function assert_release_readiness() {
       ;;
   esac
 
-  if ! rg -q "codex/stable-4.3" "$ROOT_DIR/docs/branch-strategy.md"; then
-    echo "branch-strategy.md does not include codex/stable-4.3." >&2
+  if ! rg -q "codex/stable-4.5" "$ROOT_DIR/docs/branch-strategy.md"; then
+    echo "branch-strategy.md does not include codex/stable-4.5." >&2
     exit 1
   fi
 
-  if ! rg -q "4.3.1|4.4.0|4.4.1|4.4.2" "$ROOT_DIR/docs/parity-baseline.md"; then
-    echo "parity-baseline.md must include the active 4.3.1, 4.4.0, 4.4.1, or 4.4.2 baseline marker." >&2
+  if ! rg -q "4.3.1|4.4.0|4.4.1|4.4.2|4.5.0" "$ROOT_DIR/docs/parity-baseline.md"; then
+    echo "parity-baseline.md must include the active 4.3.1, 4.4.0, 4.4.1, 4.4.2, or 4.5.0 baseline marker." >&2
     exit 1
   fi
 
@@ -710,8 +707,10 @@ function clean_outputs() {
     "$CI_OUTPUT_DIR/source-share.json" \
     "$CI_OUTPUT_DIR/module-boundary-report.txt"
   find "$CI_OUTPUT_DIR" -maxdepth 1 -name 'glassgpt-snapshot-*.log' -delete
+  rm -f "$CI_OUTPUT_DIR/glassgpt-snapshot-suite.log"
   find "$CI_OUTPUT_DIR" -maxdepth 1 -name 'glassgpt-ui-*.log' -delete
   find "$CI_OUTPUT_DIR" -maxdepth 1 -name 'test*.xcresult' -exec rm -rf {} + >/dev/null 2>&1 || true
+  force_remove_path "$CI_OUTPUT_DIR/snapshot-suite.xcresult"
   if [[ "${PRESERVE_CI_DERIVED_DATA:-0}" != "1" ]]; then
     force_remove_path "$CI_DERIVED_DATA_DIR"
   fi

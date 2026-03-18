@@ -1,6 +1,7 @@
+import ChatPersistenceCore
 import Security
 import XCTest
-@testable import NativeChat
+@testable import NativeChatComposition
 
 final class KeychainServiceIntegrationTests: XCTestCase {
     private var serviceName: String!
@@ -19,10 +20,10 @@ final class KeychainServiceIntegrationTests: XCTestCase {
 
     func testKeychainServicePersistsAPIKeyAcrossStoreInstances() throws {
         try skipWhenKeychainEntitlementIsUnavailable {
-            let firstStore = APIKeyStore(backend: makeService())
+            let firstStore = PersistedAPIKeyStore(backend: makeService())
             try firstStore.saveAPIKey("sk-reinstall-compatible")
 
-            let reloadedStore = APIKeyStore(backend: makeService())
+            let reloadedStore = PersistedAPIKeyStore(backend: makeService())
 
             XCTAssertEqual(reloadedStore.loadAPIKey(), "sk-reinstall-compatible")
         }
@@ -30,10 +31,10 @@ final class KeychainServiceIntegrationTests: XCTestCase {
 
     func testDeleteRemovesPersistedKeyForSharedServiceIdentifier() throws {
         try skipWhenKeychainEntitlementIsUnavailable {
-            let firstStore = APIKeyStore(backend: makeService())
+            let firstStore = PersistedAPIKeyStore(backend: makeService())
             try firstStore.saveAPIKey("sk-delete-me")
 
-            let secondStore = APIKeyStore(backend: makeService())
+            let secondStore = PersistedAPIKeyStore(backend: makeService())
             XCTAssertEqual(secondStore.loadAPIKey(), "sk-delete-me")
 
             secondStore.deleteAPIKey()
@@ -43,14 +44,14 @@ final class KeychainServiceIntegrationTests: XCTestCase {
         }
     }
 
-    private func makeService() -> KeychainService {
-        KeychainService(service: serviceName)
+    private func makeService() -> KeychainAPIKeyBackend {
+        KeychainAPIKeyBackend(service: serviceName)
     }
 
     private func skipWhenKeychainEntitlementIsUnavailable(_ block: () throws -> Void) throws {
         do {
             try block()
-        } catch KeychainService.KeychainError.unexpectedStatus(let status) where status == errSecMissingEntitlement {
+        } catch KeychainAPIKeyBackend.KeychainError.unexpectedStatus(let status) where status == errSecMissingEntitlement {
             throw XCTSkip("Package test bundles do not always receive Keychain entitlements on simulator hosts.")
         }
     }

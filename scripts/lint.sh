@@ -18,7 +18,7 @@ swiftlint lint --strict --config "$ROOT_DIR/.swiftlint.yml"
 
 critical_try_hits="$(
   rg -n -P '\btry\?' \
-    "$ROOT_DIR/modules/native-chat/ios" \
+    "$ROOT_DIR/modules/native-chat/Sources" \
     "$ROOT_DIR/ios/GlassGPT" \
     || true
 )"

@@ -1,5 +1,8 @@
+import ChatPersistenceSwiftData
+import ChatDomain
+import OpenAITransport
 import XCTest
-@testable import NativeChat
+@testable import NativeChatComposition
 
 final class OpenAIResponseParserTests: XCTestCase {
     func testParseUploadedFileIDReadsSuccessfulResponse() throws {

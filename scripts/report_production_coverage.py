@@ -178,57 +178,60 @@ def build_groups() -> list[CoverageGroup]:
             name="nativechat-non-ui-total",
             threshold=0.49,
             prefixes=[
-                normalize("modules/native-chat/ios/"),
                 normalize("modules/native-chat/Sources/"),
             ],
             exclude_prefixes=[
-                normalize("modules/native-chat/ios/Views/"),
+                normalize("modules/native-chat/Sources/NativeChatUI/"),
+                normalize("modules/native-chat/Sources/ChatUIComponents/"),
+                normalize("modules/native-chat/Sources/NativeChatComposition/Views/"),
             ],
         ),
         CoverageGroup(
             name="runtime-core",
             threshold=0.90,
             prefixes=[
-                normalize("modules/native-chat/ios/ChatDomain/"),
-                normalize("modules/native-chat/ios/Infrastructure/"),
-                normalize("modules/native-chat/ios/Repositories/"),
+                normalize("modules/native-chat/Sources/ChatRuntimeModel/"),
+                normalize("modules/native-chat/Sources/ChatRuntimePorts/"),
+                normalize("modules/native-chat/Sources/ChatRuntimeWorkflows/"),
             ],
         ),
         CoverageGroup(
             name="runtime-coordinators",
             threshold=0.55,
             prefixes=[
-                normalize("modules/native-chat/ios/Coordinators/"),
+                normalize("modules/native-chat/Sources/NativeChatComposition/Controllers/"),
             ],
         ),
         CoverageGroup(
             name="screen-stores",
             threshold=0.28,
             prefixes=[
-                normalize("modules/native-chat/ios/ScreenStores/"),
+                normalize("modules/native-chat/Sources/ChatPresentation/"),
             ],
         ),
         CoverageGroup(
             name="transport-and-services",
             threshold=0.45,
             prefixes=[
-                normalize("modules/native-chat/ios/Services/"),
                 normalize("modules/native-chat/Sources/OpenAITransport/"),
+                normalize("modules/native-chat/Sources/GeneratedFilesInfra/"),
             ],
         ),
         CoverageGroup(
             name="settings-and-storage",
             threshold=0.65,
             prefixes=[
-                normalize("modules/native-chat/ios/Stores/"),
-                normalize("modules/native-chat/Sources/ChatPersistence/"),
+                normalize("modules/native-chat/Sources/ChatPersistenceCore/"),
+                normalize("modules/native-chat/Sources/ChatPersistenceSwiftData/"),
             ],
         ),
         CoverageGroup(
             name="views-and-presentation",
             threshold=0.0,
             prefixes=[
-                normalize("modules/native-chat/ios/Views/"),
+                normalize("modules/native-chat/Sources/NativeChatUI/"),
+                normalize("modules/native-chat/Sources/ChatUIComponents/"),
+                normalize("modules/native-chat/Sources/NativeChatComposition/Views/"),
             ],
             required=False,
         ),

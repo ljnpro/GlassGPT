@@ -1,3 +1,0 @@
-import ChatUIComponents
-
-typealias RichTextAttributedStringBuilder = ChatUIComponents.RichTextAttributedStringBuilder
