@@ -1,13 +1,13 @@
 import Foundation
 
-public enum FileUploadStatus: String, Codable, Sendable {
+public enum FileUploadStatus: String, Codable, Sendable, Equatable {
     case pending
     case uploading
     case uploaded
     case failed
 }
 
-public struct FileAttachment: Codable, Sendable, Identifiable {
+public struct FileAttachment: Codable, Sendable, Identifiable, Equatable {
     public var id: UUID
     public var filename: String
     public var fileSize: Int64

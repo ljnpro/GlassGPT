@@ -1,6 +1,6 @@
 import SwiftUI
 import XCTest
-import ChatUI
+import ChatUIComponents
 
 @MainActor
 final class ChatUISourceTargetTests: XCTestCase {

@@ -1,3 +1,3 @@
-import ChatFeatures
+import ChatApplication
 
 typealias ChatScreenStoreBootstrapPolicy = FeatureBootstrapPolicy

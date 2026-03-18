@@ -1,4 +1,4 @@
-# 4.4.1 Architecture
+# 4.4.2 Architecture
 
 ## Goal
 
@@ -12,7 +12,7 @@ Refactor the app for maintainability while preserving the exact `4.4.0` user exp
   - still ships a single `NativeChat` product to the app target
   - internally split into real source targets with direct tests and explicit dependency boundaries
 
-## 4.4.1 Internal Boundaries
+## 4.4.2 Internal Boundaries
 
 - `ChatDomain`
   - stable value types and payload models such as themes, model selection, attachments, annotations, tool calls, and generated-file descriptors
@@ -45,4 +45,4 @@ Refactor the app for maintainability while preserving the exact `4.4.0` user exp
 
 - `NativeChat` remains the only product imported by `ios/GlassGPT`, but newly extracted pure types should land in `Sources/*` instead of `ios`.
 - `TargetBoundary.swift` files are no longer treated as sufficient evidence of modularity. CI tracks source-share and module-boundary health directly.
-- `4.4.1` only promises migration compatibility from `4.4.0+`. Reinstall parity focuses on immediate usability through preserved Keychain credentials, not on retaining the local conversation database after uninstall.
+- `4.4.2` only promises migration compatibility from `4.4.0+`. Reinstall parity focuses on immediate usability through preserved Keychain credentials, not on retaining the local conversation database after uninstall.

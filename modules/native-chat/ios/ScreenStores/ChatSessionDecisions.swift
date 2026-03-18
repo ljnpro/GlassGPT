@@ -1,4 +1,4 @@
-import ChatRuntime
+import ChatRuntimeModel
 
 typealias ChatRecoveryResumeMode = RuntimeRecoveryResumeMode
 typealias PendingBackgroundCancellation = RuntimePendingBackgroundCancellation

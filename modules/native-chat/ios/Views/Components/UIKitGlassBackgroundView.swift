@@ -1,6 +1,6 @@
 import SwiftUI
 import UIKit
-import ChatUI
+import ChatUIComponents
 
 struct UIKitGlassBackgroundView: UIViewRepresentable {
     let cornerRadius: CGFloat

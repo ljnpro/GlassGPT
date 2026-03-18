@@ -19,6 +19,9 @@ final class StreamEventCoordinator {
 
     func apply(_ event: StreamEvent, to session: ResponseSession, animated: Bool) -> StreamEventDisposition {
         let shouldAnimate = animated && viewModel.visibleSessionMessageID == session.messageID
+        defer {
+            viewModel.syncRuntimeSession(from: session)
+        }
 
         switch event {
         case .responseCreated(let responseId):
