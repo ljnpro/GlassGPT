@@ -1,9 +1,12 @@
 import ChatDomain
 import NativeChatUI
+import SwiftData
 import SwiftUI
 
 public struct NativeChatRootView: View {
+    @Environment(\.modelContext) private var modelContext
     @AppStorage("appTheme") private var appThemeRawValue: String = AppTheme.system.rawValue
+    @State private var appStore: NativeChatAppStore?
 
     public init() {}
 
@@ -12,7 +15,18 @@ public struct NativeChatRootView: View {
     }
 
     public var body: some View {
-        ContentView()
-            .preferredColorScheme(selectedTheme.colorScheme)
+        Group {
+            if let appStore {
+                ContentView(appStore: appStore)
+            } else {
+                ProgressView()
+            }
+        }
+        .task {
+            if appStore == nil {
+                appStore = NativeChatCompositionRoot(modelContext: modelContext).makeAppStore()
+            }
+        }
+        .preferredColorScheme(selectedTheme.colorScheme)
     }
 }

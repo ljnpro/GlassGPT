@@ -17,7 +17,6 @@ struct ChatVisibleSessionState {
     var activeRequestServiceTier: ServiceTier
     var isStreaming: Bool
     var isRecovering: Bool
-    var visibleRecoveryPhase: RecoveryPhase
     var isThinking: Bool
 
     static func empty() -> ChatVisibleSessionState {
@@ -35,7 +34,6 @@ struct ChatVisibleSessionState {
             activeRequestServiceTier: .standard,
             isStreaming: false,
             isRecovering: false,
-            visibleRecoveryPhase: .idle,
             isThinking: false
         )
     }
@@ -65,24 +63,24 @@ enum SessionVisibilityCoordinator {
     @MainActor
     static func visibleState(
         from session: ReplySession,
+        runtimeState: ReplyRuntimeState,
         draftMessage: Message?
     ) -> ChatVisibleSessionState {
         ChatVisibleSessionState(
             draftMessage: draftMessage,
-            currentStreamingText: session.currentText,
-            currentThinkingText: session.currentThinking,
-            activeToolCalls: session.toolCalls,
-            liveCitations: session.citations,
-            liveFilePathAnnotations: session.filePathAnnotations,
-            lastSequenceNumber: session.lastSequenceNumber,
+            currentStreamingText: runtimeState.buffer.text,
+            currentThinkingText: runtimeState.buffer.thinking,
+            activeToolCalls: runtimeState.buffer.toolCalls,
+            liveCitations: runtimeState.buffer.citations,
+            liveFilePathAnnotations: runtimeState.buffer.filePathAnnotations,
+            lastSequenceNumber: runtimeState.lastSequenceNumber,
             activeRequestModel: session.request.model,
             activeRequestEffort: session.request.effort,
             activeRequestUsesBackgroundMode: session.request.usesBackgroundMode,
             activeRequestServiceTier: session.request.serviceTier,
-            isStreaming: session.runtimeState.isStreaming,
-            isRecovering: session.runtimeState.isRecovering,
-            visibleRecoveryPhase: session.runtimeState.recoveryPhase,
-            isThinking: session.runtimeState.isThinking
+            isStreaming: runtimeState.isStreaming,
+            isRecovering: runtimeState.isRecovering,
+            isThinking: runtimeState.isThinking
         )
     }
 

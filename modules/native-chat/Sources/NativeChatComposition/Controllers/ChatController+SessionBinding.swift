@@ -68,28 +68,18 @@ extension ChatController {
         errorMessage = nil
     }
 
-    func setVisibleRecoveryPhase(_ phase: RecoveryPhase) {
-        visibleRecoveryPhase = phase
-        isRecovering = phase == .streamResuming
-    }
-
-    func setRecoveryPhase(_ phase: RecoveryPhase, for session: ReplySession) {
-        session.setRecoveryPhase(phase)
-        syncRuntimeSession(from: session)
-        if visibleSessionMessageID == session.messageID {
-            setVisibleRecoveryPhase(phase)
-        }
-    }
-
     func syncVisibleState(from session: ReplySession) {
-        syncRuntimeSession(from: session)
-        guard visibleSessionMessageID == session.messageID else { return }
+        Task { @MainActor in
+            guard visibleSessionMessageID == session.messageID else { return }
+            guard let runtimeState = await runtimeState(for: session) else { return }
 
-        let state = SessionVisibilityCoordinator.visibleState(
-            from: session,
-            draftMessage: findMessage(byId: session.messageID)
-        )
-        applyVisibleState(state)
+            let state = SessionVisibilityCoordinator.visibleState(
+                from: session,
+                runtimeState: runtimeState,
+                draftMessage: findMessage(byId: session.messageID)
+            )
+            applyVisibleState(state)
+        }
     }
 
     func refreshVisibleBindingForCurrentConversation() {
@@ -130,7 +120,6 @@ extension ChatController {
         activeRequestServiceTier = state.activeRequestServiceTier
         isStreaming = state.isStreaming
         isThinking = state.isThinking
-        visibleRecoveryPhase = state.visibleRecoveryPhase
         isRecovering = state.isRecovering
     }
 

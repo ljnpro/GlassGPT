@@ -18,7 +18,7 @@ Usage:
   ./scripts/release_testflight.sh <marketing_version> <build_number> [--branch <name>] [--commit-message "<message>"] [--skip-ci] [--skip-readiness]
 
 Examples:
-  ./scripts/release_testflight.sh 4.5.0 20176 --branch codex/stable-4.5
+  ./scripts/release_testflight.sh 4.6.0 20177 --branch codex/stable-4.6
 EOF
 }
 
@@ -78,7 +78,7 @@ if [[ -z "$TARGET_BRANCH" ]]; then
 fi
 
 case "$TARGET_BRANCH" in
-  main|codex/stable-4.1|codex/stable-4.2|codex/stable-4.3|codex/stable-4.4|codex/stable-4.5)
+  main|codex/stable-4.1|codex/stable-4.2|codex/stable-4.3|codex/stable-4.4|codex/stable-4.5|codex/stable-4.6)
     ;;
   *)
     echo "Release target branch must be a stable branch or main. Got: $TARGET_BRANCH" >&2

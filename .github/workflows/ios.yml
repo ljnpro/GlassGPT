@@ -4,9 +4,7 @@ on:
   push:
     branches:
       - main
-      - codex/stable-4.1
-      - codex/stable-4.2
-      - codex/stable-4.3
+      - codex/stable-4.6
       - codex/feature/**
   pull_request:
 

@@ -3,48 +3,33 @@
 ## Long-Lived Branches
 
 - `main`
-  - default GitHub branch
   - always points to the latest released stable build
 - `codex/stable-4.1`
-  - frozen historical stable line
-  - read-only unless a data-safety or release-blocking emergency requires a one-off patch
+  - frozen historical line
 - `codex/stable-4.2`
-  - maintenance branch for post-4.3 hot-fixes only
-  - no feature development
+  - frozen historical line
 - `codex/stable-4.3`
-  - maintenance branch for post-4.4 hot-fixes only
-  - no feature development
+  - frozen historical line
 - `codex/stable-4.4`
-  - archived 4.4.x release line
-  - no new feature development
+  - frozen historical line
 - `codex/stable-4.5`
-  - active 4.5.x release line
-  - every 4.5.x release lands here first, beginning with the 4.5.0 terminal cutover line
+  - frozen pre-4.6 baseline
+- `codex/stable-4.6`
+  - active stable release line
 
 ## Short-Lived Branches
 
 - `codex/feature/<topic>`
-  - implementation branches only
-  - branch from `codex/stable-4.5`
-  - merge to `codex/stable-4.5` through PR/review only
-  - delete after the release commit lands on `codex/stable-4.5`
-
-## Archival Policy
-
-- Do not keep backup, beta, or fix branches alive after they have been superseded.
-- Preserve historical pointers with annotated tags under:
-  - `archive/default/...`
-  - `archive/branch/...`
-- After archive tags are pushed, delete the original branches locally and on GitHub.
+  - branch from `codex/stable-4.6`
+  - merge back to `codex/stable-4.6` through review
+  - delete after the release commit lands
 
 ## Release Alignment
 
-- Release tags use `v<marketing-version>`.
-- Before a large refactor release, create an annotated backup tag and a local source bundle from the previous stable commit.
-- After a stable release succeeds on TestFlight:
-  - verify `scripts/ci.sh release-readiness` passes on `codex/stable-4.5`
-  - verify `scripts/ci.sh maintainability` passes on `codex/stable-4.5`
-  - tag the release commit
-  - push `codex/stable-4.5`
+- release tags use `v<marketing-version>`
+- keep the pre-4.6 backup tag and source bundle
+- after TestFlight publication:
+  - verify `./scripts/ci.sh release-readiness` on `codex/stable-4.6`
+  - verify `./scripts/ci.sh maintainability` on `codex/stable-4.6`
+  - push `codex/stable-4.6`
   - fast-forward `main` to the same commit
-  - keep `main` and `codex/stable-4.5` aligned until the next development cycle starts

@@ -306,12 +306,10 @@ func makeHistoryScreenStore() -> HistoryPresenter {
                 modelDisplayName: "GPT-5.4"
             )
         ],
-        controller: HistorySceneController(
-            loadConversations: { [] },
-            selectConversation: { _ in },
-            deleteConversation: { _ in },
-            deleteAllConversations: {}
-        )
+        loadConversations: { [] },
+        selectConversation: { _ in },
+        deleteConversation: { _ in },
+        deleteAllConversations: {}
     )
 }
 
