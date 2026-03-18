@@ -25,6 +25,7 @@ package struct CodeBlockView: View {
 
     @State private var isCopied = false
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.hapticsEnabled) private var hapticsEnabled
 
     package var body: some View {
         Group {
@@ -45,6 +46,10 @@ package struct CodeBlockView: View {
                 chrome
             }
         }
+    }
+
+    private var hapticService: HapticService {
+        HapticService()
     }
 
     private var chrome: some View {
@@ -76,7 +81,7 @@ package struct CodeBlockView: View {
                             isCopied = false
                         }
                     }
-                    HapticService.shared.impact(.light)
+                    hapticService.impact(.light, isEnabled: hapticsEnabled)
                 } label: {
                     Label(
                         isCopied ? "Copied" : "Copy",

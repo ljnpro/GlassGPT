@@ -87,7 +87,7 @@ extension FilePreviewSheet {
                 originalFilename: previewItem.viewerFilename
             )
             saveState = .idle
-            HapticService.shared.notify(.success)
+            hapticService.notify(.success, isEnabled: hapticsEnabled)
             UIAccessibility.post(notification: .announcement, argument: "Saved to Photos")
             showSaveSuccessFeedback()
         } catch {

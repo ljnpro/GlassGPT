@@ -3,6 +3,7 @@ import ChatDomain
 import ChatPersistenceCore
 import ChatPresentation
 import ChatPersistenceSwiftData
+import ChatUIComponents
 import GeneratedFilesInfra
 import Foundation
 import OpenAITransport
@@ -216,6 +217,46 @@ struct SettingsScreenStoreHarness {
     let transport: OpenAIDataTransport
 }
 
+private func releaseVersionsConfigURL() -> URL {
+    URL(fileURLWithPath: #filePath)
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+        .appendingPathComponent("ios/GlassGPT/Config/Versions.xcconfig")
+}
+
+private func releaseVersionsConfigValues() -> (marketing: String, build: String) {
+    let configURL = releaseVersionsConfigURL()
+    guard let text = try? String(contentsOf: configURL, encoding: .utf8) else {
+        return ("Unknown", "?")
+    }
+
+    func value(for key: String) -> String? {
+        text
+            .split(separator: "\n")
+            .compactMap { line -> String? in
+                let parts = line.split(separator: "=", maxSplits: 1).map {
+                    $0.trimmingCharacters(in: .whitespacesAndNewlines)
+                }
+                guard parts.count == 2, parts[0] == key else { return nil }
+                return parts[1]
+            }
+            .first
+    }
+
+    return (
+        value(for: "MARKETING_VERSION") ?? "Unknown",
+        value(for: "CURRENT_PROJECT_VERSION") ?? "?"
+    )
+}
+
+func currentReleaseVersionString() -> String {
+    let values = releaseVersionsConfigValues()
+    return "\(values.marketing) (\(values.build))"
+}
+
 @MainActor
 func makeTestChatScreenStore(
     apiKey: String = "sk-test",
@@ -236,6 +277,7 @@ func makeTestChatScreenStore(
 
     let settingsStore = SettingsStore(valueStore: settingsValueStore)
     let apiKeyStore = PersistedAPIKeyStore(backend: apiBackend)
+    let hapticService = HapticService()
     let requestBuilder = OpenAIRequestBuilder(configuration: configurationProvider)
     let responseParser = OpenAIResponseParser()
     let sharedService = OpenAIService(
@@ -251,6 +293,7 @@ func makeTestChatScreenStore(
         apiKeyStore: apiKeyStore,
         configurationProvider: configurationProvider,
         transport: transport,
+        hapticService: hapticService,
         serviceFactory: { sharedService },
         bootstrapPolicy: bootstrapPolicy
     )
@@ -320,7 +363,7 @@ func makeTestSettingsScreenStoreHarness(
             transport: transport,
             configurationProvider: configurationProvider,
             fileDownloadService: fileDownloadService,
-            appVersionString: "4.5.0 (20176)",
+            appVersionString: currentReleaseVersionString(),
             platformString: "iOS 26.0 · Liquid Glass"
         ),
         settingsValueStore: settingsValueStore,

@@ -43,8 +43,6 @@ public final class SettingsStore {
         public static let cloudflareGatewayEnabled = "cloudflareGatewayEnabled"
     }
 
-    public nonisolated(unsafe) static let shared = SettingsStore()
-
     private let valueStore: any SettingsValueStore
 
     public init(valueStore: any SettingsValueStore = UserDefaultsSettingsValueStore(defaults: .standard)) {

@@ -65,11 +65,11 @@ extension FileDownloadService {
 
     func inferredFileExtension(from response: URLResponse, data: Data) -> String? {
         if let mimeType = response.mimeType,
-           let ext = Self.extensionForMimeType(mimeType) {
+           let ext = GeneratedFileTypeInspector.extensionForMimeType(mimeType) {
             return ext
         }
 
-        return Self.extensionForFileSignature(data)
+        return GeneratedFileTypeInspector.extensionForFileSignature(data)
     }
 
     public static func openBehavior(for filename: String?) -> GeneratedFileOpenBehavior {

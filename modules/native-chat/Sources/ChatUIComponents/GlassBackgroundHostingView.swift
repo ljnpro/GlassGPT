@@ -54,7 +54,7 @@ public final class GlassBackgroundHostingView: UIView {
         fatalError("init(coder:) has not been implemented")
     }
 
-    public override func layoutSubviews() {
+    override public func layoutSubviews() {
         super.layoutSubviews()
 
         effectView.frame = bounds

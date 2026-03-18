@@ -129,7 +129,7 @@ final class ScreenStoreTests: XCTestCase {
         )
         store.fileDownloadError = "Expired"
 
-        store.startNewChat()
+        store.conversationCoordinator.startNewChat()
 
         XCTAssertNil(store.currentConversation)
         XCTAssertTrue(store.messages.isEmpty)
@@ -210,7 +210,7 @@ final class ScreenStoreTests: XCTestCase {
         )
         store.fileDownloadError = "Expired"
 
-        store.loadConversation(conversation)
+        store.conversationCoordinator.loadConversation(conversation)
 
         XCTAssertEqual(store.currentConversation?.id, conversation.id)
         XCTAssertEqual(store.messages.map(\.id), [userMessage.id, assistantMessage.id])
@@ -238,7 +238,7 @@ final class ScreenStoreTests: XCTestCase {
         store.reasoningEffort = .medium
         store.serviceTier = .flex
 
-        let currentSelection = store.sessionRequestConfiguration(for: nil)
+        let currentSelection = store.conversationCoordinator.sessionRequestConfiguration(for: nil)
         XCTAssertEqual(currentSelection.0, .gpt5_4_pro)
         XCTAssertEqual(currentSelection.1, .medium)
         XCTAssertEqual(currentSelection.2, .flex)
@@ -251,7 +251,7 @@ final class ScreenStoreTests: XCTestCase {
             serviceTierRawValue: "unknown"
         )
 
-        let storedSelection = store.sessionRequestConfiguration(for: storedConversation)
+        let storedSelection = store.conversationCoordinator.sessionRequestConfiguration(for: storedConversation)
         XCTAssertEqual(storedSelection.0, .gpt5_4_pro)
         XCTAssertEqual(storedSelection.1, .xhigh)
         XCTAssertEqual(storedSelection.2, .standard)
@@ -265,7 +265,7 @@ final class ScreenStoreTests: XCTestCase {
         let draftAssistant = Message(role: .assistant, content: "", conversation: conversation, isComplete: false)
         conversation.messages.append(contentsOf: [userMessage, assistantMessage, draftAssistant])
 
-        let apiMessages = store.buildRequestMessages(for: conversation, excludingDraft: draftAssistant.id)
+        let apiMessages = store.conversationCoordinator.buildRequestMessages(for: conversation, excludingDraft: draftAssistant.id)
 
         XCTAssertEqual(apiMessages.count, 2)
         XCTAssertEqual(apiMessages[0].role, .user)
@@ -282,10 +282,10 @@ final class ScreenStoreTests: XCTestCase {
         let thinkingDraft = Message(role: .assistant, content: "", thinking: "Working", isComplete: false)
         let userMessage = Message(role: .user, content: "", isComplete: false)
 
-        XCTAssertTrue(store.shouldHideMessage(hiddenDraft))
-        XCTAssertFalse(store.shouldHideMessage(responseDraft))
-        XCTAssertFalse(store.shouldHideMessage(thinkingDraft))
-        XCTAssertFalse(store.shouldHideMessage(userMessage))
+        XCTAssertTrue(store.conversationCoordinator.shouldHideMessage(hiddenDraft))
+        XCTAssertFalse(store.conversationCoordinator.shouldHideMessage(responseDraft))
+        XCTAssertFalse(store.conversationCoordinator.shouldHideMessage(thinkingDraft))
+        XCTAssertFalse(store.conversationCoordinator.shouldHideMessage(userMessage))
     }
 
     func testChatScreenStoreProjectionTogglesAndConfigurationStayInSync() throws {
@@ -419,7 +419,7 @@ final class ScreenStoreTests: XCTestCase {
         store.modelContext.insert(restoredMessage)
         try store.modelContext.save()
 
-        store.restoreLastConversationIfAvailable()
+        store.conversationCoordinator.restoreLastConversationIfAvailable()
 
         XCTAssertEqual(store.currentConversation?.id, restoredConversation.id)
         XCTAssertEqual(store.messages.map(\.id), [restoredMessage.id])
@@ -456,8 +456,8 @@ final class ScreenStoreTests: XCTestCase {
         store.currentConversation = conversation
         store.messages = [third, secondOriginal]
 
-        store.upsertMessage(first)
-        store.upsertMessage(secondUpdated)
+        store.conversationCoordinator.upsertMessage(first)
+        store.conversationCoordinator.upsertMessage(secondUpdated)
 
         XCTAssertEqual(store.messages.map(\.id), [first.id, secondOriginal.id, third.id])
         XCTAssertEqual(store.messages[1].content, "Middle updated")
@@ -530,12 +530,12 @@ final class ScreenStoreTests: XCTestCase {
         conversation.messages.append(contentsOf: [olderDraft, newestConversationDraft])
         store.currentConversation = conversation
 
-        XCTAssertEqual(store.activeIncompleteAssistantDraft()?.id, newestConversationDraft.id)
+        XCTAssertEqual(store.conversationCoordinator.activeIncompleteAssistantDraft()?.id, newestConversationDraft.id)
 
         let boundDraft = Message(role: .assistant, content: "", conversation: conversation, isComplete: false)
         store.draftMessage = boundDraft
 
-        XCTAssertEqual(store.activeIncompleteAssistantDraft()?.id, boundDraft.id)
+        XCTAssertEqual(store.conversationCoordinator.activeIncompleteAssistantDraft()?.id, boundDraft.id)
     }
 
     func testChatSessionDecisionsReturnExpectedRecoveryAndDetachmentChoices() {

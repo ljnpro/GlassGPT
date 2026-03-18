@@ -63,7 +63,7 @@ public struct SSEEventDecoder {
                 yieldSequenceIfNeeded(sequenceNumber, continuation: continuation)
                 return .continued
 
-            case .sequenceUpdate(_):
+            case .sequenceUpdate:
                 yieldResponseIdentifierIfNeeded(responseID, continuation: continuation)
                 yieldSequenceIfNeeded(sequenceNumber, continuation: continuation)
                 return .continued

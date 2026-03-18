@@ -113,12 +113,12 @@ final class ChatLifecycleCoordinator {
     func handleEnterBackground() {
         if !controller.sessionRegistry.allSessions.isEmpty {
             for session in controller.sessionRegistry.allSessions {
-                controller.saveSessionNow(session)
+                controller.sessionCoordinator.saveSessionNow(session)
             }
 
             controller.backgroundTaskCoordinator.beginLongRunningTask(named: "StreamCompletion") { [weak controller] in
                 guard let controller else { return }
-                controller.suspendActiveSessionsForAppBackground()
+                controller.sessionCoordinator.suspendActiveSessionsForAppBackground()
                 controller.endBackgroundTask()
             }
         }
@@ -136,7 +136,7 @@ final class ChatLifecycleCoordinator {
     func handleDidEnterBackground() {
         guard !controller.sessionRegistry.allSessions.isEmpty else { return }
         for session in controller.sessionRegistry.allSessions {
-            controller.saveSessionNow(session)
+            controller.sessionCoordinator.saveSessionNow(session)
         }
     }
 
@@ -144,7 +144,7 @@ final class ChatLifecycleCoordinator {
         guard controller.didCompleteLaunchBootstrap else { return }
 
         endBackgroundTask()
-        controller.refreshVisibleBindingForCurrentConversation()
+        controller.sessionCoordinator.refreshVisibleBindingForCurrentConversation()
 
         Task { @MainActor in
             await controller.recoverIncompleteMessagesInCurrentConversation()

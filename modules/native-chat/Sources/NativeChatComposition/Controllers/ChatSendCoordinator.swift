@@ -41,14 +41,14 @@ final class ChatSendCoordinator {
         let session = ReplySession(preparedReply: preparedReply)
         let execution = SessionExecutionState(service: controller.serviceFactory())
 
-        controller.registerSession(session, execution: execution, visible: true)
+        controller.sessionCoordinator.registerSession(session, execution: execution, visible: true)
         let controller = controller
         Task { @MainActor in
-            _ = await controller.applyRuntimeTransition(.beginSubmitting, to: session)
-            controller.syncVisibleState(from: session)
+            _ = await controller.sessionCoordinator.applyRuntimeTransition(.beginSubmitting, to: session)
+            controller.sessionCoordinator.syncVisibleState(from: session)
         }
 
-        HapticService.shared.impact(.light)
+        controller.hapticService.impact(.light, isEnabled: controller.hapticsEnabled)
 
         if !preparedReply.attachmentsToUpload.isEmpty {
             let preparedReply = preparedReply
@@ -110,7 +110,7 @@ final class ChatSendCoordinator {
         conversation.updatedAt = .now
         controller.messages.append(userMessage)
 
-        guard controller.saveContext(
+        guard controller.conversationCoordinator.saveContext(
             reportingUserError: "Failed to save your message.",
             logContext: "prepareSendMessage.userMessage"
         ) else {
@@ -131,10 +131,10 @@ final class ChatSendCoordinator {
         )
         draft.conversation = conversation
         conversation.messages.append(draft)
-        controller.saveContextIfPossible("prepareSendMessage.draft")
+        controller.conversationCoordinator.saveContextIfPossible("prepareSendMessage.draft")
 
-        let requestMessages = controller.buildRequestMessages(for: conversation, excludingDraft: draft.id)
-        let configuration = controller.sessionRequestConfiguration(for: conversation)
+        let requestMessages = controller.conversationCoordinator.buildRequestMessages(for: conversation, excludingDraft: draft.id)
+        let configuration = controller.conversationCoordinator.sessionRequestConfiguration(for: conversation)
 
         return PreparedAssistantReply(
             apiKey: apiKey,
@@ -151,10 +151,10 @@ final class ChatSendCoordinator {
     }
 
     func persistUploadedAttachments(_ attachments: [ChatDomain.FileAttachment], onUserMessageID messageID: UUID) {
-        guard let userMessage = controller.findMessage(byId: messageID) else { return }
+        guard let userMessage = controller.conversationCoordinator.findMessage(byId: messageID) else { return }
         controller.messagePersistence.setFileAttachments(attachments, on: userMessage)
-        controller.saveContextIfPossible("prepareSendMessage.uploadedAttachments")
-        controller.upsertMessage(userMessage)
+        controller.conversationCoordinator.saveContextIfPossible("prepareSendMessage.uploadedAttachments")
+        controller.conversationCoordinator.upsertMessage(userMessage)
     }
 
     func prepareExistingDraft(_ draft: Message) throws -> PreparedAssistantReply {
@@ -167,8 +167,8 @@ final class ChatSendCoordinator {
             throw SendMessagePreparationError.failedToCreateDraft
         }
 
-        let requestMessages = controller.buildRequestMessages(for: conversation, excludingDraft: draft.id)
-        let configuration = controller.sessionRequestConfiguration(for: conversation)
+        let requestMessages = controller.conversationCoordinator.buildRequestMessages(for: conversation, excludingDraft: draft.id)
+        let configuration = controller.conversationCoordinator.sessionRequestConfiguration(for: conversation)
 
         return PreparedAssistantReply(
             apiKey: apiKey,

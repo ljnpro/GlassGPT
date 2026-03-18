@@ -11,7 +11,6 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 PRODUCTION_ROOTS = [
-    ROOT / "modules" / "native-chat" / "ios",
     ROOT / "modules" / "native-chat" / "Sources",
     ROOT / "ios" / "GlassGPT",
 ]
@@ -28,12 +27,6 @@ MAX_UNCHECKED_SENDABLE = int(os.environ.get("MAX_UNCHECKED_SENDABLE", "0"))
 MAX_NON_UI_FAMILY_LINES = int(os.environ.get("MAX_NON_UI_FAMILY_LINES", "600"))
 MAX_UI_FAMILY_LINES = int(os.environ.get("MAX_UI_FAMILY_LINES", "900"))
 MAX_SCREEN_STORE_FAMILY_LINES = int(os.environ.get("MAX_SCREEN_STORE_FAMILY_LINES", "260"))
-
-FAMILY_LINE_LIMIT_OVERRIDES = {
-    "ChatController": 1200,
-    "FileDownloadService": 750,
-}
-
 
 @dataclass
 class CheckResult:
@@ -186,7 +179,7 @@ def family_length_results(files: list[Path]) -> list[CheckResult]:
         is_screen_store = any(classify_screen_store(path) for path in family_files)
         is_ui = any(classify_ui(path) for path in family_files)
 
-        limit = FAMILY_LINE_LIMIT_OVERRIDES.get(name)
+        limit = None
         if is_screen_store:
             family_limit = limit if limit is not None else MAX_SCREEN_STORE_FAMILY_LINES
             if total_lines > family_limit:
@@ -205,19 +198,19 @@ def family_length_results(files: list[Path]) -> list[CheckResult]:
 
     return [
         CheckResult(
-            label=f"non-UI type families > {MAX_NON_UI_FAMILY_LINES} LOC (with overrides)",
+            label=f"non-UI type families > {MAX_NON_UI_FAMILY_LINES} LOC",
             count=len(non_ui_over),
             limit=0,
             matches=sorted(non_ui_over, reverse=True)[:20],
         ),
         CheckResult(
-            label=f"UI type families > {MAX_UI_FAMILY_LINES} LOC (with overrides)",
+            label=f"UI type families > {MAX_UI_FAMILY_LINES} LOC",
             count=len(ui_over),
             limit=0,
             matches=sorted(ui_over, reverse=True)[:20],
         ),
         CheckResult(
-            label=f"ScreenStore type families > {MAX_SCREEN_STORE_FAMILY_LINES} LOC (with overrides)",
+            label=f"ScreenStore type families > {MAX_SCREEN_STORE_FAMILY_LINES} LOC",
             count=len(screen_store_over),
             limit=0,
             matches=sorted(screen_store_over, reverse=True)[:20],

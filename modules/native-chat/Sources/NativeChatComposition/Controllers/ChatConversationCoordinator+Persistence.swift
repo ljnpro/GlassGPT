@@ -130,9 +130,9 @@ extension ChatConversationCoordinator {
             return false
         }
 
-        controller.saveSessionNow(session)
+        controller.sessionCoordinator.saveSessionNow(session)
         controller.errorMessage = nil
-        controller.detachVisibleSessionBinding()
+        controller.sessionCoordinator.detachVisibleSessionBinding()
         controller.endBackgroundTask()
 
         #if DEBUG

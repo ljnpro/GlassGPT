@@ -11,14 +11,14 @@ extension ChatRecoveryCoordinator {
         visible: Bool = false
     ) {
         guard !controller.apiKey.isEmpty else { return }
-        guard let message = controller.findMessage(byId: messageId) else { return }
+        guard let message = controller.conversationCoordinator.findMessage(byId: messageId) else { return }
 
         let session: ReplySession
         if let existing = controller.sessionRegistry.session(for: messageId) {
             session = existing
-        } else if let created = controller.makeRecoverySession(for: message) {
+        } else if let created = controller.sessionCoordinator.makeRecoverySession(for: message) {
             session = created
-            controller.registerSession(
+            controller.sessionCoordinator.registerSession(
                 created,
                 execution: SessionExecutionState(service: controller.serviceFactory()),
                 visible: visible
@@ -27,32 +27,32 @@ extension ChatRecoveryCoordinator {
             return
         }
 
-        if controller.isSessionActive(session),
+        if controller.sessionCoordinator.isSessionActive(session),
            controller.sessionRegistry.execution(for: messageId)?.task != nil,
-           controller.cachedRuntimeState(for: session)?.responseID == responseId {
+           controller.sessionCoordinator.cachedRuntimeState(for: session)?.responseID == responseId {
             if visible {
-                controller.bindVisibleSession(messageID: messageId)
+                controller.sessionCoordinator.bindVisibleSession(messageID: messageId)
             }
             return
         }
 
         let controller = controller
         Task { @MainActor in
-            _ = await controller.applyRuntimeTransition(
+            _ = await controller.sessionCoordinator.applyRuntimeTransition(
                 .beginRecoveryStatus(
                     responseID: responseId,
                     lastSequenceNumber: message.lastSequenceNumber,
                     usedBackgroundMode: message.usedBackgroundMode,
-                    route: controller.runtimeRoute(for: session)
+                    route: controller.sessionCoordinator.runtimeRoute(for: session)
                 ),
                 to: session
             )
-            controller.syncVisibleState(from: session)
+            controller.sessionCoordinator.syncVisibleState(from: session)
         }
 
         if visible {
             controller.errorMessage = nil
-            controller.bindVisibleSession(messageID: messageId)
+            controller.sessionCoordinator.bindVisibleSession(messageID: messageId)
         }
 
         let execution = controller.sessionRegistry.execution(for: messageId) ?? SessionExecutionState(service: controller.serviceFactory())
@@ -63,7 +63,7 @@ extension ChatRecoveryCoordinator {
 
         execution.task?.cancel()
         execution.task = Task { @MainActor in
-            guard controller.isSessionActive(session) else { return }
+            guard controller.sessionCoordinator.isSessionActive(session) else { return }
             let apiKey = self.activeAPIKey(for: session)
 
             do {

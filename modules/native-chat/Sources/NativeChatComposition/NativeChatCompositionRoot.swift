@@ -32,6 +32,7 @@ package struct NativeChatCompositionRoot {
                     deleteConversation: { _ in },
                     deleteAllConversations: {}
                 ),
+                hapticService: bootstrap.hapticService,
                 selectedTab: bootstrap.initialTab,
                 uiTestScenario: bootstrap.scenario,
                 uiTestPreviewItem: bootstrap.initialPreviewItem
@@ -45,15 +46,15 @@ package struct NativeChatCompositionRoot {
             return store
         }
 
-        let settingsStore = SettingsStore.shared
-        configureSharedServices()
+        let settingsStore = SettingsStore()
+        let hapticService = HapticService()
 
         let apiKeyStore = PersistedAPIKeyStore(
             backend: KeychainAPIKeyBackend(
                 service: KeychainAPIKeyBackend.defaultServiceIdentifier(bundleIdentifier: Bundle.main.bundleIdentifier)
             )
         )
-        let configurationProvider = DefaultOpenAIConfigurationProvider.shared
+        let configurationProvider = makeConfigurationProvider(settingsStore: settingsStore)
         let requestBuilder = OpenAIRequestBuilder(configuration: configurationProvider)
         let responseParser = OpenAIResponseParser()
         let transport = OpenAIURLSessionTransport()
@@ -74,6 +75,7 @@ package struct NativeChatCompositionRoot {
             apiKeyStore: apiKeyStore,
             configurationProvider: configurationProvider,
             transport: transport,
+            hapticService: hapticService,
             serviceFactory: serviceFactory,
             bootstrapPolicy: bootstrapPolicy
         )
@@ -94,7 +96,8 @@ package struct NativeChatCompositionRoot {
                 selectConversation: { _ in },
                 deleteConversation: { _ in },
                 deleteAllConversations: {}
-            )
+            ),
+            hapticService: hapticService
         )
         let historyCoordinator = NativeChatHistoryCoordinator(
             modelContext: modelContext,
@@ -105,44 +108,38 @@ package struct NativeChatCompositionRoot {
         return store
     }
 
-    private func configureSharedServices() {
-        HapticService.isEnabledProvider = { SettingsStore.shared.hapticEnabled }
-        DefaultOpenAIConfigurationProvider.shared.configure(
-            directOpenAIBaseURL: {
-                DefaultOpenAIConfigurationProvider.defaultOpenAIBaseURL
-            },
-            cloudflareGatewayBaseURL: {
-                if let infoValue = Bundle.main.object(forInfoDictionaryKey: "CloudflareGatewayBaseURL") as? String,
-                   !infoValue.isEmpty {
-                    return infoValue
-                }
-
-                if let environmentValue = ProcessInfo.processInfo.environment["CLOUDFLARE_GATEWAY_BASE_URL"],
-                   !environmentValue.isEmpty {
-                    return environmentValue
-                }
-
-                return DefaultOpenAIConfigurationProvider.bundledCloudflareGatewayBaseURL
-            },
-            cloudflareAIGToken: {
-                if let infoValue = Bundle.main.object(forInfoDictionaryKey: "CloudflareAIGToken") as? String,
-                   !infoValue.isEmpty {
-                    return infoValue
-                }
-
-                if let environmentValue = ProcessInfo.processInfo.environment["CLOUDFLARE_AIG_TOKEN"],
-                   !environmentValue.isEmpty {
-                    return environmentValue
-                }
-
-                return DefaultOpenAIConfigurationProvider.bundledCloudflareAIGToken
-            },
-            useCloudflareGateway: {
-                SettingsStore.shared.cloudflareGatewayEnabled
-            },
-            setUseCloudflareGateway: { enabled in
-                SettingsStore.shared.cloudflareGatewayEnabled = enabled
-            }
+    private func makeConfigurationProvider(settingsStore: SettingsStore) -> DefaultOpenAIConfigurationProvider {
+        DefaultOpenAIConfigurationProvider(
+            directOpenAIBaseURL: DefaultOpenAIConfigurationProvider.defaultOpenAIBaseURL,
+            cloudflareGatewayBaseURL: resolvedConfigurationValue(
+                infoKey: "CloudflareGatewayBaseURL",
+                environmentKey: "CLOUDFLARE_GATEWAY_BASE_URL",
+                fallback: DefaultOpenAIConfigurationProvider.defaultCloudflareGatewayBaseURL
+            ),
+            cloudflareAIGToken: resolvedConfigurationValue(
+                infoKey: "CloudflareAIGToken",
+                environmentKey: "CLOUDFLARE_AIG_TOKEN",
+                fallback: ""
+            ),
+            useCloudflareGateway: settingsStore.cloudflareGatewayEnabled
         )
+    }
+
+    private func resolvedConfigurationValue(
+        infoKey: String,
+        environmentKey: String,
+        fallback: String
+    ) -> String {
+        if let infoValue = Bundle.main.object(forInfoDictionaryKey: infoKey) as? String,
+           !infoValue.isEmpty {
+            return infoValue
+        }
+
+        if let environmentValue = ProcessInfo.processInfo.environment[environmentKey],
+           !environmentValue.isEmpty {
+            return environmentValue
+        }
+
+        return fallback
     }
 }

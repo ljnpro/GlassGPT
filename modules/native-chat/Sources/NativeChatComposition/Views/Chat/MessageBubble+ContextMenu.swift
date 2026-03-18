@@ -8,7 +8,7 @@ extension MessageBubble {
     var copyButton: some View {
         Button {
             UIPasteboard.general.string = displayedContent
-            HapticService.shared.impact(.light)
+            hapticService.impact(.light, isEnabled: hapticsEnabled)
         } label: {
             Label("Copy Text", systemImage: "doc.on.doc")
         }

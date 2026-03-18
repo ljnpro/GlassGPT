@@ -188,8 +188,8 @@ final class NativeChatArchitectureTests: XCTestCase {
         XCTAssertEqual(runtimeState.responseID, "resp_architecture")
         XCTAssertTrue(runtimeState.isRecovering)
 
-        let streamingText = RichTextAttributedStringBuilder.parseStreamingText("**Ship** 4.5.0")
-        XCTAssertEqual(String(streamingText.characters), "Ship 4.5.0")
+        let streamingText = RichTextAttributedStringBuilder.parseStreamingText("**Ship** release")
+        XCTAssertEqual(String(streamingText.characters), "Ship release")
 
         await MainActor.run {
             let container = try! ModelContainer(

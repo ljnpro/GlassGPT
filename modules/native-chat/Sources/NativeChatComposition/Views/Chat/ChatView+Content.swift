@@ -74,7 +74,7 @@ extension ChatView {
         return MessageBubble(
             message: message,
             onRegenerate: message.role == .assistant ? {
-                viewModel.regenerateMessage(message)
+                viewModel.conversationCoordinator.regenerateMessage(message)
             } : nil,
             liveContent: isLiveDraft ? viewModel.currentStreamingText : nil,
             liveThinking: isLiveDraft ? viewModel.currentThinkingText : nil,

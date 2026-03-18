@@ -1,5 +1,6 @@
 import ChatPersistenceCore
 import ChatPersistenceSwiftData
+import ChatUIComponents
 import GeneratedFilesInfra
 import OpenAITransport
 import SwiftData
@@ -20,5 +21,7 @@ extension ChatController {
     var messagePersistence: MessagePersistenceAdapter { services.messagePersistence }
     var backgroundTaskCoordinator: BackgroundTaskCoordinator { services.backgroundTaskCoordinator }
     var fileDownloadService: FileDownloadService { services.fileDownloadService }
+    var hapticsEnabled: Bool { settingsStore.hapticEnabled }
+    var hapticService: HapticService { services.hapticService }
     var serviceFactory: @MainActor () -> OpenAIService { services.serviceFactory }
 }

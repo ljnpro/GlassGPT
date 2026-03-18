@@ -21,6 +21,7 @@ struct ContentView: View {
                 NativeChatUI.SettingsView(viewModel: appStore.settingsPresenter)
             }
         }
+        .environment(\.hapticsEnabled, appStore.settingsPresenter.hapticEnabled)
         .tabBarMinimizeBehavior(.never)
         .fullScreenCover(item: uiTestPreviewItemBinding, onDismiss: handleUITestPreviewDismiss) { previewItem in
             if appStore.uiTestScenario == .preview {
