@@ -23,7 +23,6 @@ extension ChatController {
     func finalizeDraft() {
         guard let session = currentVisibleSession else {
             clearLiveGenerationState(clearDraft: true)
-            setVisibleRecoveryPhase(.idle)
             return
         }
         finalizeSession(session)
@@ -41,29 +40,32 @@ extension ChatController {
 
     func stopGeneration(savePartial: Bool = true) {
         guard let session = currentVisibleSession else { return }
+        let runtimeState = cachedRuntimeState(for: session)
 
         let pendingBackgroundCancellation = RuntimeSessionDecisionPolicy.pendingBackgroundCancellation(
             requestUsesBackgroundMode: session.request.usesBackgroundMode,
-            responseId: session.responseId,
+            responseId: runtimeState?.responseID,
             messageId: session.messageID
         )
 
-        session.cancelStreaming()
+        Task { @MainActor in
+            _ = await applyRuntimeTransition(.cancelStreaming, to: session)
+        }
         if let execution = sessionRegistry.execution(for: session.messageID) {
             execution.service.cancelStream()
             execution.task?.cancel()
         }
         errorMessage = nil
 
-        if savePartial && !session.currentText.isEmpty {
+        if savePartial && !(runtimeState?.buffer.text.isEmpty ?? true) {
             persistToolCallsAndCitations()
             finalizeSession(session)
         } else if let draft = findMessage(byId: session.messageID) {
-            if !session.currentText.isEmpty {
-                draft.content = session.currentText
+            if let runtimeState, !runtimeState.buffer.text.isEmpty {
+                draft.content = runtimeState.buffer.text
             }
-            if !session.currentThinking.isEmpty {
-                draft.thinking = session.currentThinking
+            if let runtimeState, !runtimeState.buffer.thinking.isEmpty {
+                draft.thinking = runtimeState.buffer.thinking
             }
             if !draft.content.isEmpty {
                 draft.isComplete = true
@@ -76,7 +78,6 @@ extension ChatController {
             }
         }
 
-        setVisibleRecoveryPhase(.idle)
         endBackgroundTask()
         HapticService.shared.impact(.medium)
 

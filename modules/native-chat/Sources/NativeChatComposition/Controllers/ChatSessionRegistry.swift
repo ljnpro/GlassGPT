@@ -20,6 +20,7 @@ final class SessionExecutionState {
 final class ChatSessionRegistry {
     private var sessions: [UUID: ReplySession] = [:]
     private var executions: [UUID: SessionExecutionState] = [:]
+    private var runtimeStates: [UUID: ReplyRuntimeState] = [:]
     private(set) var visibleMessageID: UUID?
 
     var currentVisibleSession: ReplySession? {
@@ -78,12 +79,21 @@ final class ChatSessionRegistry {
         visibleMessageID = messageID
     }
 
+    func runtimeState(for messageID: UUID) -> ReplyRuntimeState? {
+        runtimeStates[messageID]
+    }
+
+    func updateRuntimeState(_ state: ReplyRuntimeState, for messageID: UUID) {
+        runtimeStates[messageID] = state
+    }
+
     func remove(_ session: ReplySession, cancel: (SessionExecutionState) -> Void) {
         if let execution = executions[session.messageID] {
             cancel(execution)
         }
         sessions.removeValue(forKey: session.messageID)
         executions.removeValue(forKey: session.messageID)
+        runtimeStates.removeValue(forKey: session.messageID)
 
         if visibleMessageID == session.messageID {
             visibleMessageID = nil
@@ -94,6 +104,7 @@ final class ChatSessionRegistry {
         let executionsToCancel = Array(executions.values)
         sessions.removeAll()
         executions.removeAll()
+        runtimeStates.removeAll()
         visibleMessageID = nil
 
         for execution in executionsToCancel {
@@ -133,15 +144,15 @@ final class ChatSessionRegistry {
 
 @MainActor
 extension ReplySessionSnapshot {
-    init(_ session: ReplySession) {
+    init(session: ReplySession, runtimeState: ReplyRuntimeState) {
         self.init(
-            currentText: session.currentText,
-            currentThinking: session.currentThinking,
-            toolCalls: session.toolCalls,
-            citations: session.citations,
-            filePathAnnotations: session.filePathAnnotations,
-            lastSequenceNumber: session.lastSequenceNumber,
-            responseId: session.responseId,
+            currentText: runtimeState.buffer.text,
+            currentThinking: runtimeState.buffer.thinking,
+            toolCalls: runtimeState.buffer.toolCalls,
+            citations: runtimeState.buffer.citations,
+            filePathAnnotations: runtimeState.buffer.filePathAnnotations,
+            lastSequenceNumber: runtimeState.lastSequenceNumber,
+            responseId: runtimeState.responseID,
             requestUsesBackgroundMode: session.request.usesBackgroundMode
         )
     }

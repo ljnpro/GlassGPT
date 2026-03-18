@@ -1,8 +1,10 @@
+import ChatDomain
 import ChatRuntimeModel
 import Foundation
 
 public actor ReplySessionActor {
-    private var state: ReplyRuntimeState
+    var state: ReplyRuntimeState
+    var activeStreamID: UUID?
 
     public init(initialState: ReplyRuntimeState) {
         self.state = initialState
@@ -12,16 +14,12 @@ public actor ReplySessionActor {
         state
     }
 
-    public func transition(to lifecycle: ReplyLifecycle, cursor: StreamCursor? = nil) {
-        state.lifecycle = lifecycle
-        state.cursor = cursor
-    }
-
-    public func updateBuffer(_ buffer: ReplyBuffer) {
-        state.buffer = buffer
-    }
-
     public func replaceState(with nextState: ReplyRuntimeState) {
         state = nextState
+        activeStreamID = nil
+    }
+
+    public func isActiveStream(_ streamID: UUID) -> Bool {
+        activeStreamID == streamID
     }
 }

@@ -1,64 +1,71 @@
-# 4.5.0 Architecture
+# 4.6.0 Architecture
 
 ## Goal
 
-Refactor the app for terminal maintainability while removing the legacy app-facing business layer.
+`4.6.0` is the terminal ownership cutover release. The final system removes split runtime mutation, composition-root drift, and controller-centric orchestration.
 
-## Layering
+## Production Topology
 
 - App shell: `ios/GlassGPT`
-  - owns the iOS app entrypoint and target-specific plist/resources
+  - app entry points, assets, plist, entitlements, and release settings
 - Product package: `modules/native-chat`
-  - still ships a single `NativeChat` product to the app target
-  - internally split into real source targets with direct tests and explicit dependency boundaries
+  - all production logic lives in `Sources/*`
+  - `NativeChat` remains the only library product imported by the app target
 
-## 4.5.0 Internal Boundaries
+## Boundaries
 
 - `ChatDomain`
-  - stable value types and payload models such as themes, model selection, attachments, annotations, tool calls, and generated-file descriptors
+  - pure product value types
 - `ChatPersistenceContracts`
-  - store snapshots, draft checkpoints, and persistence-facing contracts
+  - persistence-facing contracts and snapshots
 - `ChatPersistenceCore`
-  - settings, keychain, reset, and release bootstrap concerns
+  - settings, keychain, reset, and logging concerns
 - `ChatPersistenceSwiftData`
-  - concrete SwiftData entities, repositories, payload codecs, and container wiring
+  - SwiftData entities, repositories, and persistence adapters
 - `OpenAITransport`
-  - request DTOs, response DTOs, request factories, transport configuration, stream envelopes, and service errors
+  - typed request building, parsing, streaming, and service operations
 - `GeneratedFilesCore`
-  - generated-file descriptors, cache policy, and open-behavior models
+  - generated-file models and policy
 - `GeneratedFilesInfra`
-  - generated-file cache storage, downloads, and concrete presentation mapping
+  - generated-file caching, downloads, inference, and presentation mapping
 - `ChatRuntimeModel`
-  - runtime state, reply identity, lifecycle, cursor, and pure policies
+  - reply identity, cursor, lifecycle, buffer, and pure runtime policy
 - `ChatRuntimePorts`
-  - narrow effect boundaries consumed by workflows
+  - narrow runtime-facing contracts
 - `ChatRuntimeWorkflows`
-  - actor-owned runtime kernel and side-effect orchestration
+  - actor-owned runtime transitions and registry
 - `ChatApplication`
-  - scene controllers and feature orchestration
+  - bootstrap policy only
 - `ChatPresentation`
-  - MainActor presenters and visible projection mapping
+  - view-facing presenters and file-preview state
 - `ChatUIComponents`
-  - UIKit/SwiftUI hosts and reusable presentation primitives
+  - reusable UIKit/SwiftUI primitives
 - `NativeChatUI`
   - feature views only
 - `NativeChatComposition`
-  -唯一 concrete wiring 层
+  - composition root, chat coordinators, app-store shell, and production assembly
 - `NativeChat`
-  - pure umbrella export
+  - umbrella export
 
-## Design Rules
+## Ownership Model
 
-- Preserve view output and interaction behavior where practical, but prioritize full ownership cutover over legacy structure retention.
-- Delete `ChatScreenStore`, `SettingsScreenStore`, `HistoryScreenStore`, and `FilePreviewStore` as production abstractions.
-- Use typed transport and workflow boundaries directly instead of screen-store orchestration.
-- Keep one logical assistant reply mapped to one visible assistant surface. Paragraph breaks, reconnects, and recovery must not create duplicate bubbles.
-- Persist API keys only through `ChatPersistenceCore`; `4.5.0` first launch clears any pre-existing key.
-- Prefer typed request/response helpers over ad hoc parsing in feature code.
-- No production logic remains in `modules/native-chat/ios`.
-
-## Notes
-
-- `NativeChat` remains the only product imported by `ios/GlassGPT`, and all production logic must live in `Sources/*`.
-- `TargetBoundary.swift` files are no longer treated as sufficient evidence of modularity. CI tracks source-share and module-boundary health directly.
-- `4.5.0` is a terminal cutover release. It does not preserve local conversation state or Keychain credentials from prior versions.
+- Runtime
+  - `ReplySessionActor` owns lifecycle, stream cursor, buffer accumulation, recovery state, and terminal status.
+  - `RuntimeRegistryActor` only registers and looks up runtime sessions.
+- Chat feature
+  - `ChatController` owns observable projection state only.
+  - behavior lives in the coordinator set:
+    - `ChatConversationCoordinator`
+    - `ChatSendCoordinator`
+    - `ChatStreamingCoordinator`
+    - `ChatRecoveryCoordinator`
+    - `ChatRecoveryMaintenanceCoordinator`
+    - `ChatFileInteractionCoordinator`
+    - `ChatLifecycleCoordinator`
+- Composition
+  - `NativeChatCompositionRoot` configures shared services and assembles the production graph once.
+  - `NativeChatRootView` creates the app store from the composition root.
+  - `ContentView` renders the shell only and does not mutate app-scope services.
+- Persistence
+  - SwiftData repositories and adapters are final production boundaries.
+  - no production type self-describes as “legacy” or “mid-cutover”.

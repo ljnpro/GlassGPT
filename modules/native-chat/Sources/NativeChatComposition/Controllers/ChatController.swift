@@ -74,35 +74,7 @@ package final class ChatController {
     // MARK: - Dependencies
 
     @ObservationIgnored
-    let modelContext: ModelContext
-    @ObservationIgnored
-    let settingsStore: SettingsStore
-    @ObservationIgnored
-    let apiKeyStore: PersistedAPIKeyStore
-    @ObservationIgnored
-    let configurationProvider: OpenAIConfigurationProvider
-    @ObservationIgnored
-    let requestBuilder: OpenAIRequestBuilder
-    @ObservationIgnored
-    let responseParser: OpenAIResponseParser
-    @ObservationIgnored
-    let transport: OpenAIDataTransport
-    @ObservationIgnored
-    let openAIService: OpenAIService
-    @ObservationIgnored
-    let conversationRepository: ConversationRepository
-    @ObservationIgnored
-    let draftRepository: DraftRepository
-    @ObservationIgnored
-    let generatedFileCoordinator: GeneratedFileCoordinator
-    @ObservationIgnored
-    let messagePersistence: ChatPersistenceSwiftData.MessagePersistenceAdapter
-    @ObservationIgnored
-    let backgroundTaskCoordinator: BackgroundTaskCoordinator
-    @ObservationIgnored
-    let fileDownloadService: GeneratedFilesInfra.FileDownloadService
-    @ObservationIgnored
-    let serviceFactory: @MainActor () -> OpenAIService
+    let services: ChatControllerServices
 
     // Visible live session state
     var draftMessage: Message?
@@ -114,16 +86,24 @@ package final class ChatController {
     var isApplyingStoredConversationConfiguration = false
     var isApplyingConversationConfigurationBatch = false
     var didCompleteLaunchBootstrap = false
-    var visibleRecoveryPhase: RecoveryPhase = .idle
     @ObservationIgnored
     let sessionRegistry = ChatSessionRegistry()
     @ObservationIgnored
     lazy var runtimeRegistry = RuntimeRegistryActor()
     @ObservationIgnored
-    lazy var chatSceneController = ChatSceneController(
-        registry: runtimeRegistry,
-        preparationPort: self
-    )
+    lazy var sendCoordinator = ChatSendCoordinator(controller: self)
+    @ObservationIgnored
+    lazy var conversationCoordinator = ChatConversationCoordinator(controller: self)
+    @ObservationIgnored
+    lazy var fileInteractionCoordinator = ChatFileInteractionCoordinator(controller: self)
+    @ObservationIgnored
+    lazy var lifecycleCoordinator = ChatLifecycleCoordinator(controller: self)
+    @ObservationIgnored
+    lazy var streamingCoordinator = ChatStreamingCoordinator(controller: self)
+    @ObservationIgnored
+    lazy var recoveryCoordinator = ChatRecoveryCoordinator(controller: self)
+    @ObservationIgnored
+    lazy var recoveryMaintenanceCoordinator = ChatRecoveryMaintenanceCoordinator(controller: self)
     // MARK: - Init
 
     package init(
@@ -151,21 +131,17 @@ package final class ChatController {
         }
         let resolvedOpenAIService = resolvedServiceFactory()
 
-        self.modelContext = modelContext
-        self.settingsStore = settingsStore
-        self.apiKeyStore = apiKeyStore
-        self.configurationProvider = configurationProvider
-        self.requestBuilder = resolvedRequestBuilder
-        self.responseParser = resolvedResponseParser
-        self.transport = transport
-        self.openAIService = resolvedOpenAIService
-        self.conversationRepository = ConversationRepository(modelContext: modelContext)
-        self.draftRepository = DraftRepository(modelContext: modelContext)
-        self.generatedFileCoordinator = GeneratedFileCoordinator()
-        self.messagePersistence = ChatPersistenceSwiftData.MessagePersistenceAdapter()
-        self.backgroundTaskCoordinator = BackgroundTaskCoordinator()
-        self.fileDownloadService = GeneratedFilesInfra.FileDownloadService(configurationProvider: configurationProvider)
-        self.serviceFactory = resolvedServiceFactory
+        self.services = ChatControllerServices(
+            modelContext: modelContext,
+            settingsStore: settingsStore,
+            apiKeyStore: apiKeyStore,
+            configurationProvider: configurationProvider,
+            requestBuilder: resolvedRequestBuilder,
+            responseParser: resolvedResponseParser,
+            transport: transport,
+            openAIService: resolvedOpenAIService,
+            serviceFactory: resolvedServiceFactory
+        )
         self.didCompleteLaunchBootstrap = !bootstrapPolicy.runLaunchTasks
         loadDefaultsFromSettings()
         if bootstrapPolicy.restoreLastConversation {

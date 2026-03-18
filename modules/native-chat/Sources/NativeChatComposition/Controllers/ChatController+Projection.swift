@@ -67,18 +67,6 @@ extension ChatController {
     }
 
     func applyConversationConfiguration(_ configuration: ConversationConfiguration) {
-        isApplyingConversationConfigurationBatch = true
-        defer { isApplyingConversationConfigurationBatch = false }
-
-        selectedModel = configuration.model
-        reasoningEffort = configuration.reasoningEffort
-        backgroundModeEnabled = configuration.backgroundModeEnabled
-        serviceTier = configuration.serviceTier
-
-        if !selectedModel.availableEfforts.contains(reasoningEffort) {
-            reasoningEffort = selectedModel.defaultEffort
-        }
-
-        syncConversationConfiguration()
+        conversationCoordinator.applyConversationConfiguration(configuration)
     }
 }

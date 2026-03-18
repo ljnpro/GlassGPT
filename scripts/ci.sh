@@ -12,8 +12,8 @@ APP_BUNDLE_IDENTIFIER="space.manus.liquid.glass.chat.t20260308214621"
 UI_TEST_RUNNER_BUNDLE_IDENTIFIER="${APP_BUNDLE_IDENTIFIER}UITests.xctrunner"
 SIMULATOR_DEVICE_NAME="${SIMULATOR_DEVICE_NAME:-iPhone 17}"
 SIMULATOR_DEVICE_DESTINATION="platform=iOS Simulator,name=${SIMULATOR_DEVICE_NAME}"
-DEFAULT_RELEASE_VERSION="4.5.0"
-DEFAULT_RELEASE_BUILD="20176"
+DEFAULT_RELEASE_VERSION="4.6.0"
+DEFAULT_RELEASE_BUILD="20177"
 XCODEBUILD_RETRY_ATTEMPTS="${XCODEBUILD_RETRY_ATTEMPTS:-5}"
 XCODE_TEST_TIMEOUT_ALLOWANCE="${XCODE_TEST_TIMEOUT_ALLOWANCE:-180}"
 SIMULATOR_BOOT_TIMEOUT_SECONDS="${SIMULATOR_BOOT_TIMEOUT_SECONDS:-60}"
@@ -591,7 +591,7 @@ function assert_release_readiness() {
   current_branch="${GITHUB_REF_NAME:-$(git rev-parse --abbrev-ref HEAD)}"
 
   case "$current_branch" in
-    main|codex/stable-4.1|codex/stable-4.2|codex/stable-4.3|codex/stable-4.4|codex/stable-4.5|codex/feature/4.5*|HEAD)
+    main|codex/stable-4.1|codex/stable-4.2|codex/stable-4.3|codex/stable-4.4|codex/stable-4.5|codex/stable-4.6|codex/feature/4.6*|HEAD)
       ;;
     *)
       echo "Release-readiness gate does not permit branch '$current_branch'." >&2
@@ -599,13 +599,13 @@ function assert_release_readiness() {
       ;;
   esac
 
-  if ! rg -q "codex/stable-4.5" "$ROOT_DIR/docs/branch-strategy.md"; then
-    echo "branch-strategy.md does not include codex/stable-4.5." >&2
+  if ! rg -q "codex/stable-4.6" "$ROOT_DIR/docs/branch-strategy.md"; then
+    echo "branch-strategy.md does not include codex/stable-4.6." >&2
     exit 1
   fi
 
-  if ! rg -q "4.3.1|4.4.0|4.4.1|4.4.2|4.5.0" "$ROOT_DIR/docs/parity-baseline.md"; then
-    echo "parity-baseline.md must include the active 4.3.1, 4.4.0, 4.4.1, 4.4.2, or 4.5.0 baseline marker." >&2
+  if ! rg -q "4.4.2|4.6.0" "$ROOT_DIR/docs/parity-baseline.md"; then
+    echo "parity-baseline.md must include the active 4.4.2 or 4.6.0 baseline marker." >&2
     exit 1
   fi
 
