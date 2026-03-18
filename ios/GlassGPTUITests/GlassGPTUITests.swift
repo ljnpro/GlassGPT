@@ -39,8 +39,7 @@ final class GlassGPTUITests: XCTestCase {
     @MainActor
     func testHistoryScenarioCanOpenConversationAndDeleteAll() throws {
         let app = launchApp(scenario: "history")
-
-        XCTAssertTrue(app.navigationBars["History"].waitForExistence(timeout: 5))
+        openHistory(in: app)
 
         let releasePlanningRow = app.buttons["history.row.Release Planning"]
         XCTAssertTrue(releasePlanningRow.waitForExistence(timeout: 5))
@@ -60,6 +59,7 @@ final class GlassGPTUITests: XCTestCase {
     @MainActor
     func testHistoryScenarioOpeningConversationShowsSeededMessages() throws {
         let app = launchApp(scenario: "history")
+        openHistory(in: app)
 
         let releasePlanningRow = app.buttons["history.row.Release Planning"]
         XCTAssertTrue(releasePlanningRow.waitForExistence(timeout: 5))
@@ -75,6 +75,7 @@ final class GlassGPTUITests: XCTestCase {
     @MainActor
     func testHistoryScenarioCanDeleteSingleConversationWithoutDeletingOthers() throws {
         let app = launchApp(scenario: "history")
+        openHistory(in: app)
 
         let archiveAuditRow = app.buttons["history.row.Archive Audit"]
         let releasePlanningRow = app.buttons["history.row.Release Planning"]
@@ -97,6 +98,7 @@ final class GlassGPTUITests: XCTestCase {
     @MainActor
     func testHistoryScenarioSearchFiltersSeededConversations() throws {
         let app = launchApp(scenario: "history")
+        openHistory(in: app)
 
         let searchField = app.searchFields.firstMatch
         XCTAssertTrue(searchField.waitForExistence(timeout: 5))
@@ -116,6 +118,7 @@ final class GlassGPTUITests: XCTestCase {
     func testSettingsScenarioPersistsThemeSelectionWithinSession() throws {
         let app = launchApp(scenario: "settings")
 
+        _ = openSettings(in: app)
         let themePicker = app.segmentedControls["settings.themePicker"]
         XCTAssertTrue(themePicker.waitForExistence(timeout: 5))
 
@@ -136,6 +139,7 @@ final class GlassGPTUITests: XCTestCase {
     @MainActor
     func testSettingsGatewayScenarioShowsCloudflareControlsAndMissingKeyFeedback() throws {
         let app = launchApp(scenario: "settingsGateway")
+        _ = openSettings(in: app)
 
         XCTAssertTrue(app.switches["settings.cloudflare"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.staticTexts["Connection Status"].waitForExistence(timeout: 5))
@@ -151,6 +155,7 @@ final class GlassGPTUITests: XCTestCase {
     @MainActor
     func testHistoryScenarioShowsDeleteAllActionWhenSeeded() throws {
         let app = launchApp(scenario: "history")
+        openHistory(in: app)
 
         XCTAssertTrue(app.buttons["history.deleteAll"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.buttons["history.row.Release Planning"].waitForExistence(timeout: 5))
@@ -507,9 +512,31 @@ final class GlassGPTUITests: XCTestCase {
     }
 
     @MainActor
+    private func openHistory(in app: XCUIApplication) {
+        let historyBar = app.navigationBars["History"]
+        if historyBar.waitForExistence(timeout: 2) {
+            return
+        }
+
+        let historyTab = app.tabBars.buttons["History"]
+        XCTAssertTrue(historyTab.waitForExistence(timeout: 5))
+        historyTab.tap()
+        XCTAssertTrue(historyBar.waitForExistence(timeout: 5))
+    }
+
+    @MainActor
     private func openSettings(in app: XCUIApplication) -> XCUIElement {
-        app.tabBars.buttons["Settings"].tap()
-        return app.secureTextFields["settings.apiKey"]
+        let settingsBar = app.navigationBars["Settings"]
+        if !settingsBar.waitForExistence(timeout: 2) {
+            let settingsTab = app.tabBars.buttons["Settings"]
+            XCTAssertTrue(settingsTab.waitForExistence(timeout: 5))
+            settingsTab.tap()
+            XCTAssertTrue(settingsBar.waitForExistence(timeout: 5))
+        }
+
+        let apiKeyField = app.secureTextFields["settings.apiKey"]
+        XCTAssertTrue(apiKeyField.waitForExistence(timeout: 5))
+        return apiKeyField
     }
 
     @MainActor

@@ -4,10 +4,14 @@ import GeneratedFilesCore
 import NativeChatUI
 import SwiftUI
 
-struct ContentView: View {
+package struct ContentView: View {
     @Bindable var appStore: NativeChatAppStore
 
-    var body: some View {
+    package init(appStore: NativeChatAppStore) {
+        self.appStore = appStore
+    }
+
+    package var body: some View {
         TabView(selection: selectedTabBinding) {
             Tab("Chat", systemImage: "bubble.left.and.bubble.right.fill", value: 0) {
                 ChatView(viewModel: appStore.chatController)
@@ -24,7 +28,7 @@ struct ContentView: View {
         .environment(\.hapticsEnabled, appStore.settingsPresenter.hapticEnabled)
         .tabBarMinimizeBehavior(.never)
         .fullScreenCover(item: uiTestPreviewItemBinding, onDismiss: handleUITestPreviewDismiss) { previewItem in
-            if appStore.uiTestScenario == .preview {
+            if appStore.isUITestPreviewMode {
                 FilePreviewSheet(
                     previewItem: previewItem,
                     onRequestDismiss: handleUITestPreviewDismiss

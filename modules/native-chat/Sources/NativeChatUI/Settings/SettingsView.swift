@@ -15,7 +15,11 @@ public struct SettingsView: View {
             return .green
         case .checking:
             return .yellow
-        case .error:
+        case .missingAPIKey:
+            return .orange
+        case .gatewayUnavailable:
+            return .gray
+        case .invalidGatewayURL, .remoteError:
             return .red
         case .unknown:
             return .gray
@@ -28,7 +32,13 @@ public struct SettingsView: View {
             return "Connected"
         case .checking:
             return "Checking connection…"
-        case .error(let message):
+        case .gatewayUnavailable:
+            return "Gateway unavailable in this build"
+        case .missingAPIKey:
+            return "No API key configured"
+        case .invalidGatewayURL:
+            return "Invalid gateway URL"
+        case .remoteError(let message):
             return message
         case .unknown:
             return "Not checked"

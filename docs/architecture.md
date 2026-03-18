@@ -1,8 +1,8 @@
-# 4.6.1 Architecture
+# 4.7.0 Architecture
 
 ## Goal
 
-`4.6.1` is the hardened cutover release. The final system removes split runtime mutation, composition-root drift, and controller-centric orchestration while tightening credential and governance hygiene.
+`4.7.0` is the 20/20 baseline release. The final system removes split runtime mutation, composition-root drift, and controller-centric orchestration while tightening credential, lifecycle, and governance hygiene.
 
 ## Production Topology
 

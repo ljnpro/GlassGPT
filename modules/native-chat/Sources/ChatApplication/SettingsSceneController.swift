@@ -5,7 +5,10 @@ public enum CloudflareHealthStatus: Equatable, Sendable {
     case unknown
     case checking
     case connected
-    case error(String)
+    case gatewayUnavailable
+    case missingAPIKey
+    case invalidGatewayURL
+    case remoteError(String)
 }
 
 @MainActor
@@ -14,6 +17,7 @@ public final class SettingsSceneController {
     private let saveAPIKeyHandler: (String) throws -> Void
     private let clearAPIKeyHandler: () -> Void
     private let validateAPIKeyHandler: (String) async -> Bool
+    private let resolveCloudflareHealthHandler: (_ typedAPIKey: String, _ gatewayEnabled: Bool) -> CloudflareHealthStatus
     private let checkCloudflareHealthHandler: (_ typedAPIKey: String, _ gatewayEnabled: Bool) async -> CloudflareHealthStatus
     private let refreshGeneratedImageCacheSizeHandler: () async -> Int64
     private let refreshGeneratedDocumentCacheSizeHandler: () async -> Int64
@@ -32,6 +36,7 @@ public final class SettingsSceneController {
         saveAPIKey: @escaping (String) throws -> Void,
         clearAPIKey: @escaping () -> Void,
         validateAPIKey: @escaping (String) async -> Bool,
+        resolveCloudflareHealth: @escaping (_ typedAPIKey: String, _ gatewayEnabled: Bool) -> CloudflareHealthStatus,
         checkCloudflareHealth: @escaping (_ typedAPIKey: String, _ gatewayEnabled: Bool) async -> CloudflareHealthStatus,
         refreshGeneratedImageCacheSize: @escaping () async -> Int64,
         refreshGeneratedDocumentCacheSize: @escaping () async -> Int64,
@@ -49,6 +54,7 @@ public final class SettingsSceneController {
         self.saveAPIKeyHandler = saveAPIKey
         self.clearAPIKeyHandler = clearAPIKey
         self.validateAPIKeyHandler = validateAPIKey
+        self.resolveCloudflareHealthHandler = resolveCloudflareHealth
         self.checkCloudflareHealthHandler = checkCloudflareHealth
         self.refreshGeneratedImageCacheSizeHandler = refreshGeneratedImageCacheSize
         self.refreshGeneratedDocumentCacheSizeHandler = refreshGeneratedDocumentCacheSize
@@ -77,6 +83,10 @@ public final class SettingsSceneController {
 
     public func validateAPIKey(_ apiKey: String) async -> Bool {
         await validateAPIKeyHandler(apiKey)
+    }
+
+    public func resolveCloudflareHealth(typedAPIKey: String, gatewayEnabled: Bool) -> CloudflareHealthStatus {
+        resolveCloudflareHealthHandler(typedAPIKey, gatewayEnabled)
     }
 
     public func checkCloudflareHealth(typedAPIKey: String, gatewayEnabled: Bool) async -> CloudflareHealthStatus {

@@ -23,6 +23,7 @@
 		3E461D99554A48A4959DE609 /* SplashScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */; };
 		4E8BF1E10DCE42B1AF301A8C /* OpenAITransportConfigurationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4E8BF1E00DCE42B1AF301A8C /* OpenAITransportConfigurationTests.swift */; };
 		5776C307D8D36530E5D5481C /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 69358B5C464810283E740D47 /* PrivacyInfo.xcprivacy */; };
+		5F67A87C4A7E4BE9A0E24F61 /* NativeChatUITestSupport in Frameworks */ = {isa = PBXBuildFile; productRef = 5F67A87D4A7E4BE9A0E24F61 /* NativeChatUITestSupport */; };
 		A76E6426109752E59235E252 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 29704E88068307A76C6154BB /* Foundation.framework */; };
 		B3846B13491743A06766F455 /* SnapshotViewTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5991E9E08763AFDD43672213 /* SnapshotViewTests.swift */; };
 		DC5C06CA6D6493BE30877ED5 /* NativeChat in Frameworks */ = {isa = PBXBuildFile; productRef = 081B1C62D4C7E5F6EC724606 /* NativeChat */; };
@@ -96,6 +97,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				5F67A87C4A7E4BE9A0E24F61 /* NativeChatUITestSupport in Frameworks */,
 				DC5C06CA6D6493BE30877ED5 /* NativeChat in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -256,6 +258,7 @@
 			name = GlassGPT;
 			packageProductDependencies = (
 				081B1C62D4C7E5F6EC724606 /* NativeChat */,
+				5F67A87D4A7E4BE9A0E24F61 /* NativeChatUITestSupport */,
 			);
 			productName = GlassGPT;
 			productReference = 13B07F961A680F5B00A75B9A /* GlassGPT.app */;
@@ -451,6 +454,7 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = A1B2C3D70123456789ABCDE0 /* Project-Debug.xcconfig */;
 			buildSettings = {
+				DEVELOPMENT_TEAM = R4RP4C66XQ;
 			};
 			name = Debug;
 		};
@@ -458,6 +462,7 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = A1B2C3D80123456789ABCDE0 /* Project-Release.xcconfig */;
 			buildSettings = {
+				DEVELOPMENT_TEAM = R4RP4C66XQ;
 			};
 			name = Release;
 		};
@@ -530,6 +535,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = A0CB518C08B10B4C0AD51712 /* XCRemoteSwiftPackageReference "swift-snapshot-testing" */;
 			productName = SnapshotTesting;
+		};
+		5F67A87D4A7E4BE9A0E24F61 /* NativeChatUITestSupport */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 7AC00F0D6B5AC673A4D44A7B /* XCLocalSwiftPackageReference "../modules/native-chat" */;
+			productName = NativeChatUITestSupport;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

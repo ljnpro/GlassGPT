@@ -12,7 +12,9 @@ public final class OpenAIService {
         requestBuilder: OpenAIRequestBuilder = OpenAIRequestBuilder(),
         responseParser: OpenAIResponseParser = OpenAIResponseParser(),
         streamClient: OpenAIStreamClient? = nil,
-        transport: OpenAIDataTransport = OpenAIURLSessionTransport()
+        transport: OpenAIDataTransport = OpenAIURLSessionTransport(
+            session: OpenAITransportSessionFactory.makeRequestSession()
+        )
     ) {
         self.requestBuilder = requestBuilder
         self.responseParser = responseParser

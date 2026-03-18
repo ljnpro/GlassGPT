@@ -4,7 +4,7 @@ on:
   push:
     branches:
       - main
-      - codex/stable-4.6
+      - codex/stable-4.7
       - codex/feature/**
   pull_request:
 
@@ -47,6 +47,9 @@ jobs:
 
       - name: Source Share Gate
         run: ./scripts/ci.sh source-share
+
+      - name: Infra Safety Gate
+        run: ./scripts/ci.sh infra-safety
 
       - name: Module Boundary Gate
         run: ./scripts/ci.sh module-boundary

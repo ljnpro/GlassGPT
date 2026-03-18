@@ -3,9 +3,9 @@ import ChatDomain
 import Foundation
 import ChatPersistenceCore
 import ChatPresentation
-import ChatUIComponents
 import GeneratedFilesCore
 import GeneratedFilesInfra
+import NativeChatComposition
 import OpenAITransport
 import SwiftData
 
@@ -29,7 +29,6 @@ package enum UITestScenarioLoader {
     ) -> UITestBootstrap {
         let settingsValueStore = ScenarioSettingsValueStore()
         let settingsStore = SettingsStore(valueStore: settingsValueStore)
-        let hapticService = HapticService()
         let apiKeyBackend: APIKeyPersisting = scenario.usesLiveKeychain
             ? KeychainAPIKeyBackend(
                 service: KeychainAPIKeyBackend.defaultServiceIdentifier(bundleIdentifier: Bundle.main.bundleIdentifier)
@@ -41,7 +40,7 @@ package enum UITestScenarioLoader {
         let configurationProvider = DefaultOpenAIConfigurationProvider(
             directOpenAIBaseURL: DefaultOpenAIConfigurationProvider.defaultOpenAIBaseURL,
             cloudflareGatewayBaseURL: "https://gateway.test.openai.local/v1",
-            cloudflareAIGToken: "",
+            cloudflareAIGToken: scenario == .settingsGateway ? "cf-ui-test-token" : "",
             useCloudflareGateway: false
         )
 
@@ -49,14 +48,15 @@ package enum UITestScenarioLoader {
         resetAPIKeyIfNeeded(for: scenario, store: apiKeyStore)
         let seededConversations = seedConversationsIfNeeded(in: modelContext, scenario: scenario)
 
-        let transport = OpenAIURLSessionTransport()
+        let transport = OpenAIURLSessionTransport(
+            session: OpenAITransportSessionFactory.makeRequestSession()
+        )
         let chatController = ChatController(
             modelContext: modelContext,
             settingsStore: settingsStore,
             apiKeyStore: apiKeyStore,
             configurationProvider: configurationProvider,
             transport: transport,
-            hapticService: hapticService,
             bootstrapPolicy: .testing
         )
         let requestBuilder = OpenAIRequestBuilder(configuration: configurationProvider)
@@ -88,7 +88,6 @@ package enum UITestScenarioLoader {
         return UITestBootstrap(
             chatController: chatController,
             settingsPresenter: settingsPresenter,
-            hapticService: hapticService,
             initialTab: scenario.initialTab,
             scenario: scenario,
             initialPreviewItem: scenario == .preview ? chatController.filePreviewItem : nil

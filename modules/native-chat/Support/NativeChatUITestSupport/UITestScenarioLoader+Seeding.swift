@@ -2,6 +2,7 @@ import ChatPersistenceSwiftData
 import ChatDomain
 import ChatPersistenceCore
 import Foundation
+import NativeChatComposition
 import SwiftData
 import UIKit
 
@@ -33,27 +34,44 @@ extension UITestScenarioLoader {
         in modelContext: ModelContext,
         scenario: UITestScenario
     ) -> [Conversation] {
+        let conversations: [Conversation]
         switch scenario {
         case .empty, .settings, .settingsGateway, .reinstallSeed, .reinstallVerify, .freshInstall:
             return []
         case .seeded, .streaming, .preview:
-            return [makeConversation(title: "Release Planning", timeOffset: 0, backgroundModeEnabled: false, in: modelContext)]
+            conversations = [
+                makeConversation(title: "Release Planning", timeOffset: 0, backgroundModeEnabled: false)
+            ]
         case .replySplit:
             return [makeRichMarkdownConversation(in: modelContext)]
         case .history:
-            return [
-                makeConversation(title: "Release Planning", timeOffset: 0, backgroundModeEnabled: false, in: modelContext),
-                makeConversation(title: "Archive Audit", timeOffset: -120, backgroundModeEnabled: true, in: modelContext),
-                makeConversation(title: "Snapshot Review", timeOffset: -240, backgroundModeEnabled: false, in: modelContext)
+            conversations = [
+                makeConversation(title: "Release Planning", timeOffset: 0, backgroundModeEnabled: false),
+                makeConversation(title: "Archive Audit", timeOffset: -120, backgroundModeEnabled: true),
+                makeConversation(title: "Snapshot Review", timeOffset: -240, backgroundModeEnabled: false)
             ]
         }
+
+        for conversation in conversations {
+            modelContext.insert(conversation)
+            for message in conversation.messages {
+                modelContext.insert(message)
+            }
+        }
+
+        do {
+            try modelContext.save()
+        } catch {
+            Loggers.persistence.error("[UITestScenarioLoader] Failed to save seeded conversations: \(error.localizedDescription)")
+        }
+
+        return conversations
     }
 
     static func makeConversation(
         title: String,
         timeOffset: TimeInterval,
-        backgroundModeEnabled: Bool,
-        in modelContext: ModelContext
+        backgroundModeEnabled: Bool
     ) -> Conversation {
         let createdAt = Date(timeIntervalSinceNow: timeOffset)
         let updatedAt = Date(timeIntervalSinceNow: timeOffset)
@@ -80,16 +98,6 @@ extension UITestScenarioLoader {
         conversation.messages = [userMessage, assistantMessage]
         userMessage.conversation = conversation
         assistantMessage.conversation = conversation
-
-        modelContext.insert(conversation)
-        modelContext.insert(userMessage)
-        modelContext.insert(assistantMessage)
-
-        do {
-            try modelContext.save()
-        } catch {
-            Loggers.persistence.error("[UITestScenarioLoader] Failed to save seeded conversation: \(error.localizedDescription)")
-        }
 
         return conversation
     }

@@ -64,12 +64,12 @@ extension ChatSessionCoordinator {
         )
         controller.conversationCoordinator.upsertMessage(message)
         controller.conversationCoordinator.saveContextIfPossible("finalizeSession")
-        controller.fileInteractionCoordinator.prefetchGeneratedFilesIfNeeded(for: message)
 
         let finishedConversation = message.conversation
         let wasVisible = controller.visibleSessionMessageID == session.messageID
 
         removeSession(session)
+        controller.fileInteractionCoordinator.prefetchGeneratedFilesIfNeeded(for: message)
 
         if let finishedConversation,
            finishedConversation.title == "New Chat",
@@ -98,8 +98,8 @@ extension ChatSessionCoordinator {
         )
         controller.conversationCoordinator.upsertMessage(message)
         controller.conversationCoordinator.saveContextIfPossible("finalizeSessionAsPartial")
-        controller.fileInteractionCoordinator.prefetchGeneratedFilesIfNeeded(for: message)
         removeSession(session)
+        controller.fileInteractionCoordinator.prefetchGeneratedFilesIfNeeded(for: message)
     }
 
     func removeEmptyMessage(_ message: Message, for session: ReplySession) {
@@ -119,6 +119,9 @@ extension ChatSessionCoordinator {
 
     func removeSession(_ session: ReplySession) {
         let wasVisible = controller.visibleSessionMessageID == session.messageID
+        controller.cancelGeneratedFilePrefetches(
+            controller.generatedFilePrefetchRegistry.cancel(messageID: session.messageID)
+        )
         controller.sessionRegistry.remove(session) { target in
             target.task?.cancel()
             target.service.cancelStream()

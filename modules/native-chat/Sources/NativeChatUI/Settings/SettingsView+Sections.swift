@@ -61,6 +61,15 @@ struct SettingsCloudflareSection: View {
     let statusColor: Color
     let statusText: String
 
+    var canCheckConnection: Bool {
+        switch viewModel.cloudflareHealthStatus {
+        case .gatewayUnavailable, .invalidGatewayURL:
+            return false
+        default:
+            return true
+        }
+    }
+
     var body: some View {
         Section {
             Toggle("Enable Cloudflare Gateway", isOn: $viewModel.cloudflareEnabled)
@@ -94,7 +103,7 @@ struct SettingsCloudflareSection: View {
                     }
                 }
                 .buttonStyle(.glass)
-                .disabled(viewModel.isCheckingCloudflareHealth)
+                .disabled(viewModel.isCheckingCloudflareHealth || !canCheckConnection)
             }
         } header: {
             Text("Cloudflare Gateway")

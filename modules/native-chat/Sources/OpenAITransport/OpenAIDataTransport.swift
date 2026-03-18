@@ -7,29 +7,11 @@ public protocol OpenAIDataTransport: Sendable {
 public actor OpenAIURLSessionTransport: OpenAIDataTransport {
     private let session: URLSession
 
-    public init(session: URLSession = .shared) {
+    public init(session: URLSession) {
         self.session = session
     }
 
     public func data(for request: URLRequest) async throws -> (Data, URLResponse) {
-        try await withCheckedThrowingContinuation { continuation in
-            let task = session.dataTask(with: request) { data, response, error in
-                if let error {
-                    continuation.resume(throwing: error)
-                    return
-                }
-
-                guard let data, let response else {
-                    continuation.resume(
-                        throwing: URLError(.badServerResponse)
-                    )
-                    return
-                }
-
-                continuation.resume(returning: (data, response))
-            }
-
-            task.resume()
-        }
+        try await session.data(for: request)
     }
 }

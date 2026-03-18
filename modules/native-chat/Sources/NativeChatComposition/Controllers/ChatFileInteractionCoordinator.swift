@@ -8,9 +8,11 @@ import GeneratedFilesInfra
 @MainActor
 final class ChatFileInteractionCoordinator {
     unowned let controller: ChatController
+    let prefetchCoordinator: ChatGeneratedFilePrefetchCoordinator
 
     init(controller: ChatController) {
         self.controller = controller
+        self.prefetchCoordinator = ChatGeneratedFilePrefetchCoordinator(controller: controller)
     }
 
     func handlePickedDocuments(_ urls: [URL]) {
@@ -154,61 +156,6 @@ final class ChatFileInteractionCoordinator {
     }
 
     func prefetchGeneratedFilesIfNeeded(for message: Message) {
-        let key = controller.apiKey.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !key.isEmpty else { return }
-
-        let initialAnnotations = message.filePathAnnotations.filter { !$0.fileId.isEmpty }
-        guard !initialAnnotations.isEmpty else { return }
-
-        let messageID = message.id
-        let responseId = message.responseId
-
-        let controller = controller
-        Task { @MainActor in
-            var annotationsToPrefetch = initialAnnotations
-
-            if annotationsToPrefetch.contains(where: { !controller.generatedFileCoordinator.annotationCanDownloadDirectly($0) }),
-               let responseId,
-               !responseId.isEmpty {
-                do {
-                    let result = try await controller.openAIService.fetchResponse(responseId: responseId, apiKey: key)
-                    let refreshedAnnotations = result.filePathAnnotations.filter { !$0.fileId.isEmpty }
-
-                    if !refreshedAnnotations.isEmpty {
-                        annotationsToPrefetch = refreshedAnnotations
-
-                        if let persistedMessage = controller.conversationCoordinator.findMessage(byId: messageID) {
-                            controller.messagePersistence.refreshFileAnnotations(refreshedAnnotations, on: persistedMessage)
-                            controller.conversationCoordinator.saveContextIfPossible("prefetchGeneratedFilesIfNeeded.refreshAnnotations")
-
-                            if persistedMessage.conversation?.id == controller.currentConversation?.id {
-                                controller.conversationCoordinator.upsertMessage(persistedMessage)
-                            }
-                        }
-                    }
-                } catch {
-                    #if DEBUG
-                    Loggers.files.debug("[GeneratedFileCache] Refresh failed for \(messageID): \(error.localizedDescription)")
-                    #endif
-                }
-            }
-
-            Task.detached(priority: .utility) {
-                for annotation in annotationsToPrefetch {
-                    do {
-                        _ = try await self.controller.fileDownloadService.prefetchGeneratedFile(
-                            fileId: annotation.fileId,
-                            containerId: annotation.containerId,
-                            suggestedFilename: annotation.filename,
-                            apiKey: key
-                        )
-                    } catch {
-                        #if DEBUG
-                        Loggers.files.debug("[GeneratedFileCache] Prefetch failed for \(annotation.fileId): \(error.localizedDescription)")
-                        #endif
-                    }
-                }
-            }
-        }
+        prefetchCoordinator.prefetchGeneratedFilesIfNeeded(for: message)
     }
 }
