@@ -4,7 +4,6 @@ import ChatPersistenceSwiftData
 import ChatPresentation
 import ChatRuntimeModel
 import GeneratedFilesCore
-import NativeChatComposition
 import NativeChatUI
 import XCTest
 import SwiftData
