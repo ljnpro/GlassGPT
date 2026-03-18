@@ -262,6 +262,7 @@ func makeTestChatScreenStore(
     apiKey: String = "sk-test",
     configurationProvider: RuntimeTestOpenAIConfigurationProvider = RuntimeTestOpenAIConfigurationProvider(),
     transport: OpenAIDataTransport = StubOpenAITransport(),
+    fileDownloadService: FileDownloadService? = nil,
     streamClient: OpenAIStreamClient,
     bootstrapPolicy: FeatureBootstrapPolicy = .testing
 ) throws -> ChatController {
@@ -277,7 +278,6 @@ func makeTestChatScreenStore(
 
     let settingsStore = SettingsStore(valueStore: settingsValueStore)
     let apiKeyStore = PersistedAPIKeyStore(backend: apiBackend)
-    let hapticService = HapticService()
     let requestBuilder = OpenAIRequestBuilder(configuration: configurationProvider)
     let responseParser = OpenAIResponseParser()
     let sharedService = OpenAIService(
@@ -293,7 +293,7 @@ func makeTestChatScreenStore(
         apiKeyStore: apiKeyStore,
         configurationProvider: configurationProvider,
         transport: transport,
-        hapticService: hapticService,
+        fileDownloadService: fileDownloadService,
         serviceFactory: { sharedService },
         bootstrapPolicy: bootstrapPolicy
     )
@@ -456,5 +456,24 @@ func waitUntil(
     }
 
     XCTFail("Timed out waiting for condition", file: file, line: line)
+    throw NativeChatTestError.timeout
+}
+
+func waitUntilAsync(
+    timeout: TimeInterval = 2.0,
+    pollInterval: UInt64 = 20_000_000,
+    file: StaticString = #filePath,
+    line: UInt = #line,
+    _ predicate: @escaping @Sendable () async -> Bool
+) async throws {
+    let deadline = Date().addingTimeInterval(timeout)
+    while Date() < deadline {
+        if await predicate() {
+            return
+        }
+        try await Task.sleep(nanoseconds: pollInterval)
+    }
+
+    XCTFail("Timed out waiting for async condition", file: file, line: line)
     throw NativeChatTestError.timeout
 }

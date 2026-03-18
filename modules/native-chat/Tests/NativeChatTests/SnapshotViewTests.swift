@@ -1,11 +1,11 @@
 import ChatDomain
 import ChatPersistenceSwiftData
-import NativeChatUI
 import SnapshotTesting
 import SwiftUI
 import GeneratedFilesCore
 import XCTest
 @testable import NativeChatComposition
+@testable import NativeChatUI
 
 @MainActor
 final class SnapshotViewTests: XCTestCase {
@@ -117,6 +117,25 @@ final class SnapshotViewTests: XCTestCase {
         assertViewSnapshots(named: "settings") {
             SettingsView(viewModel: viewModel)
         }
+
+        let gatewayViewModel = makeSettingsSnapshotViewModel()
+        gatewayViewModel.apiKey = "sk-gateway"
+        gatewayViewModel.cloudflareEnabled = true
+        gatewayViewModel.cloudflareHealthStatus = .connected
+        gatewayViewModel.generatedImageCacheSizeBytes = 12_800
+        gatewayViewModel.generatedDocumentCacheSizeBytes = 65_536
+        assertViewSnapshots(named: "settings-gateway") {
+            SettingsView(viewModel: gatewayViewModel)
+        }
+
+        let unavailableGatewayViewModel = makeSettingsSnapshotViewModel()
+        unavailableGatewayViewModel.cloudflareEnabled = true
+        unavailableGatewayViewModel.cloudflareHealthStatus = .gatewayUnavailable
+        unavailableGatewayViewModel.generatedImageCacheSizeBytes = 1_024
+        unavailableGatewayViewModel.generatedDocumentCacheSizeBytes = 0
+        assertViewSnapshots(named: "settings-gateway-unavailable") {
+            SettingsView(viewModel: unavailableGatewayViewModel)
+        }
     }
 
     func testModelSelectorPhoneLightSnapshot() {
@@ -158,6 +177,98 @@ final class SnapshotViewTests: XCTestCase {
                     viewerFilename: "report.pdf"
                 )
             )
+        }
+    }
+
+    func testPresentationComponentSnapshots() {
+        assertViewSnapshots(named: "thinking-view", variants: [.phoneLight, .phoneDark]) {
+            ThinkingView(
+                text: "First **reason** step.\n\nThen evaluate `x^2` and finish.",
+                isLive: false,
+                externalIsExpanded: .constant(true)
+            )
+        }
+
+        assertViewSnapshots(named: "thinking-indicator", variants: [.phoneLight, .phoneDark]) {
+            ThinkingIndicator()
+                .padding()
+        }
+
+        assertViewSnapshots(named: "code-block", variants: [.phoneLight, .phoneDark]) {
+            CodeBlockView(
+                language: "swift",
+                code: """
+                struct BuildReport {
+                    let version: String
+                    let passed: Bool
+                }
+                """,
+                surfaceStyle: .standalone
+            )
+        }
+
+        assertViewSnapshots(named: "code-interpreter-indicator", variants: [.phoneLight, .phoneDark]) {
+            CodeInterpreterIndicator()
+                .padding()
+        }
+
+        assertViewSnapshots(named: "code-interpreter-result", variants: [.phoneLight, .phoneDark]) {
+            CodeInterpreterResultView(
+                toolCall: ToolCallInfo(
+                    id: "ci_result",
+                    type: .codeInterpreter,
+                    status: .completed,
+                    code: "print('release ok')",
+                    results: ["release ok", "archive complete"]
+                )
+            )
+            .padding()
+        }
+
+        assertViewSnapshots(named: "file-attachments-row", variants: [.phoneLight, .phoneDark]) {
+            FileAttachmentsRow(
+                attachments: [
+                    FileAttachment(
+                        filename: "report.pdf",
+                        fileSize: 12_800,
+                        fileType: "pdf",
+                        uploadStatus: .uploaded
+                    ),
+                    FileAttachment(
+                        filename: "chart.png",
+                        fileSize: 8_192,
+                        fileType: "png",
+                        uploadStatus: .uploading
+                    ),
+                    FileAttachment(
+                        filename: "trace.txt",
+                        fileSize: 256,
+                        fileType: "txt",
+                        uploadStatus: .failed
+                    )
+                ]
+            )
+            .padding()
+        }
+
+        assertViewSnapshots(named: "citation-links", variants: [.phoneLight, .phoneDark]) {
+            CitationLinksView(
+                citations: [
+                    URLCitation(
+                        url: "https://example.com/one",
+                        title: "Release Notes",
+                        startIndex: 0,
+                        endIndex: 10
+                    ),
+                    URLCitation(
+                        url: "https://example.com/two",
+                        title: "Architecture Review",
+                        startIndex: 11,
+                        endIndex: 20
+                    )
+                ]
+            )
+            .padding()
         }
     }
 }

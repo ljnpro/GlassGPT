@@ -3,8 +3,8 @@
 ## Source Of Truth
 
 - default branch: `main`
-- active stable branch: `codex/stable-4.6`
-- frozen backup branch: `codex/stable-4.5`
+- active stable branch: `codex/stable-4.7`
+- frozen backup branch: `codex/stable-4.6`
 - version/build source of truth: `ios/GlassGPT/Config/Versions.xcconfig`
 - local publishing credentials: `.local/publish.env`
 - local release helper: `.local/one_click_release.sh`
@@ -12,7 +12,7 @@
 ## Tracked Release Command
 
 ```bash
-./scripts/release_testflight.sh 4.6.1 <build-number> --branch codex/stable-4.6
+./scripts/release_testflight.sh 4.7.0 <build-number> --branch codex/stable-4.7
 ```
 
 The wrapper runs release-readiness, full CI gates, archive/export, IPA verification, TestFlight upload, and release commit/tag creation.
@@ -24,8 +24,8 @@ The wrapper runs release-readiness, full CI gates, archive/export, IPA verificat
 3. `./scripts/ci.sh release-readiness`
 4. manual parity checklist from `docs/parity-baseline.md`
 5. clean worktree
-6. branch is `codex/stable-4.6`
-7. version/build match the intended 4.6.1 candidate
+6. branch is `codex/stable-4.7`
+7. version/build match the intended 4.7.0 candidate
 
 ## Output Artifacts
 
@@ -38,7 +38,7 @@ The wrapper runs release-readiness, full CI gates, archive/export, IPA verificat
 ## Post-Release Checklist
 
 1. capture the TestFlight Delivery UUID
-2. verify `codex/stable-4.6` points to the release commit
-3. verify `v4.6.1` points to the same commit
-4. verify `git ls-remote` shows `codex/stable-4.6`, `main`, and `v<marketing-version>` aligned
+2. verify `codex/stable-4.7` points to the release commit
+3. verify `v4.7.0` points to the same commit
+4. verify `git ls-remote` shows `codex/stable-4.7`, `main`, and `v<marketing-version>` aligned
 5. preserve the backup tag and source bundle

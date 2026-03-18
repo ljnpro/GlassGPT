@@ -12,8 +12,8 @@ APP_BUNDLE_IDENTIFIER="space.manus.liquid.glass.chat.t20260308214621"
 UI_TEST_RUNNER_BUNDLE_IDENTIFIER="${APP_BUNDLE_IDENTIFIER}UITests.xctrunner"
 SIMULATOR_DEVICE_NAME="${SIMULATOR_DEVICE_NAME:-iPhone 17}"
 SIMULATOR_DEVICE_DESTINATION="platform=iOS Simulator,name=${SIMULATOR_DEVICE_NAME}"
-DEFAULT_RELEASE_VERSION="4.6.1"
-DEFAULT_RELEASE_BUILD="20178"
+DEFAULT_RELEASE_VERSION="4.7.0"
+DEFAULT_RELEASE_BUILD="20179"
 XCODEBUILD_RETRY_ATTEMPTS="${XCODEBUILD_RETRY_ATTEMPTS:-5}"
 XCODE_TEST_TIMEOUT_ALLOWANCE="${XCODE_TEST_TIMEOUT_ALLOWANCE:-180}"
 SIMULATOR_BOOT_TIMEOUT_SECONDS="${SIMULATOR_BOOT_TIMEOUT_SECONDS:-60}"
@@ -374,7 +374,7 @@ function gate_package_tests() {
   log "Running package logic coverage tests"
   run_checked_xcodebuild_in_dir nativechat-coverage-tests "$ROOT_DIR/modules/native-chat" \
     xcodebuild \
-    -scheme NativeChat \
+    -scheme NativeChat-Package \
     -destination "$SIMULATOR_DEVICE_DESTINATION" \
     -enableCodeCoverage YES \
     -resultBundlePath "$CI_OUTPUT_DIR/NativeChatCoverageTests.xcresult" \
@@ -386,7 +386,7 @@ function gate_architecture_tests() {
   log "Running architecture tests"
   run_checked_xcodebuild_in_dir nativechat-architecture-tests "$ROOT_DIR/modules/native-chat" \
     xcodebuild \
-    -scheme NativeChat \
+    -scheme NativeChat-Package \
     -destination "$SIMULATOR_DEVICE_DESTINATION" \
     -parallel-testing-enabled NO \
     -resultBundlePath "$CI_OUTPUT_DIR/NativeChatArchitectureTests.xcresult" \
@@ -595,7 +595,7 @@ function assert_release_readiness() {
   current_branch="${GITHUB_REF_NAME:-$(git rev-parse --abbrev-ref HEAD)}"
 
   case "$current_branch" in
-    main|codex/stable-4.1|codex/stable-4.2|codex/stable-4.3|codex/stable-4.4|codex/stable-4.5|codex/stable-4.6|codex/feature/4.6*|HEAD)
+    main|codex/stable-4.1|codex/stable-4.2|codex/stable-4.3|codex/stable-4.4|codex/stable-4.5|codex/stable-4.6|codex/stable-4.7|codex/feature/4.7*|HEAD)
       ;;
     *)
       echo "Release-readiness gate does not permit branch '$current_branch'." >&2
@@ -603,13 +603,13 @@ function assert_release_readiness() {
       ;;
   esac
 
-  if ! rg -q "codex/stable-4.6" "$ROOT_DIR/docs/branch-strategy.md"; then
-    echo "branch-strategy.md does not include codex/stable-4.6." >&2
+  if ! rg -q "codex/stable-4.7" "$ROOT_DIR/docs/branch-strategy.md"; then
+    echo "branch-strategy.md does not include codex/stable-4.7." >&2
     exit 1
   fi
 
-  if ! rg -q "4.4.2|4.6.1" "$ROOT_DIR/docs/parity-baseline.md"; then
-    echo "parity-baseline.md must include the active 4.4.2 or 4.6.1 baseline marker." >&2
+  if ! rg -q "4.6.1|4.7.0" "$ROOT_DIR/docs/parity-baseline.md"; then
+    echo "parity-baseline.md must include the active 4.6.1 or 4.7.0 baseline marker." >&2
     exit 1
   fi
 
@@ -651,6 +651,11 @@ function gate_source_share() {
     python3 ./scripts/check_source_share.py | tee "$CI_OUTPUT_DIR/source-share-report.txt"
 }
 
+function gate_infra_safety() {
+  log "Running infra-safety gate"
+  python3 ./scripts/check_infra_safety.py | tee "$CI_OUTPUT_DIR/infra-safety-report.txt"
+}
+
 function gate_module_boundary() {
   log "Running module-boundary gate"
   python3 ./scripts/check_module_boundaries.py | tee "$CI_OUTPUT_DIR/module-boundary-report.txt"
@@ -671,11 +676,12 @@ function run_gate() {
     ui-tests) gate_ui_tests ;;
     maintainability) gate_maintainability ;;
     source-share) gate_source_share ;;
+    infra-safety) gate_infra_safety ;;
     module-boundary) gate_module_boundary ;;
     release-readiness) assert_release_readiness ;;
     *)
       echo "Unknown gate: $gate" >&2
-      echo "Valid gates: lint, build, architecture-tests, app-tests, snapshot-tests, package-tests, coverage-report, core-tests, ui-tests, maintainability, source-share, module-boundary, release-readiness" >&2
+      echo "Valid gates: lint, build, architecture-tests, app-tests, snapshot-tests, package-tests, coverage-report, core-tests, ui-tests, maintainability, source-share, infra-safety, module-boundary, release-readiness" >&2
       exit 1
       ;;
   esac
@@ -684,13 +690,13 @@ function run_gate() {
 function usage() {
   cat <<'EOF'
 Usage:
-  ./scripts/ci.sh [all|lint|build|architecture-tests|app-tests|snapshot-tests|package-tests|coverage-report|core-tests|ui-tests|maintainability|source-share|module-boundary|release-readiness|comma-separated list]
+  ./scripts/ci.sh [all|lint|build|architecture-tests|app-tests|snapshot-tests|package-tests|coverage-report|core-tests|ui-tests|maintainability|source-share|infra-safety|module-boundary|release-readiness|comma-separated list]
 
 Examples:
   ./scripts/ci.sh
   ./scripts/ci.sh lint
   ./scripts/ci.sh app-tests,snapshot-tests,package-tests,coverage-report
-  ./scripts/ci.sh build,architecture-tests,core-tests,ui-tests,maintainability,source-share,module-boundary
+  ./scripts/ci.sh build,architecture-tests,core-tests,ui-tests,maintainability,source-share,infra-safety,module-boundary
 EOF
 }
 
@@ -709,6 +715,7 @@ function clean_outputs() {
     "$CI_OUTPUT_DIR/maintainability-report.txt" \
     "$CI_OUTPUT_DIR/source-share-report.txt" \
     "$CI_OUTPUT_DIR/source-share.json" \
+    "$CI_OUTPUT_DIR/infra-safety-report.txt" \
     "$CI_OUTPUT_DIR/module-boundary-report.txt"
   find "$CI_OUTPUT_DIR" -maxdepth 1 -name 'glassgpt-snapshot-*.log' -delete
   rm -f "$CI_OUTPUT_DIR/glassgpt-snapshot-suite.log"
@@ -730,7 +737,7 @@ if [[ $# -gt 1 ]]; then
 fi
 
 if [[ $# -eq 0 || "$1" == "all" ]]; then
-  requested_gates=(lint build architecture-tests core-tests ui-tests coverage-report maintainability source-share module-boundary release-readiness)
+  requested_gates=(lint build architecture-tests core-tests ui-tests coverage-report maintainability source-share infra-safety module-boundary release-readiness)
 elif [[ "$1" == "help" || "$1" == "-h" || "$1" == "--help" ]]; then
   usage
   exit 0

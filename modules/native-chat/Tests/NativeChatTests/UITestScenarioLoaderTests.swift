@@ -3,6 +3,7 @@ import ChatPersistenceSwiftData
 import SwiftData
 import XCTest
 @testable import NativeChatComposition
+@testable import NativeChatUITestSupport
 
 @MainActor
 final class UITestScenarioLoaderTests: XCTestCase {

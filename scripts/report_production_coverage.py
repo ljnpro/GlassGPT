@@ -173,6 +173,10 @@ def normalize(path: str) -> str:
 
 
 def build_groups() -> list[CoverageGroup]:
+    app_shell_paths = sorted(
+        normalize(str(path.relative_to(ROOT)))
+        for path in (ROOT / "ios" / "GlassGPT").rglob("*.swift")
+    )
     return [
         CoverageGroup(
             name="nativechat-non-ui-total",
@@ -227,7 +231,7 @@ def build_groups() -> list[CoverageGroup]:
         ),
         CoverageGroup(
             name="views-and-presentation",
-            threshold=0.08,
+            threshold=0.15,
             prefixes=[
                 normalize("modules/native-chat/Sources/NativeChatUI/"),
                 normalize("modules/native-chat/Sources/ChatUIComponents/"),
@@ -236,10 +240,9 @@ def build_groups() -> list[CoverageGroup]:
         ),
         CoverageGroup(
             name="app-shell",
-            threshold=0.50,
-            prefixes=[
-                normalize("ios/GlassGPT/"),
-            ],
+            threshold=0.75,
+            prefixes=[],
+            exact_paths=app_shell_paths,
         ),
     ]
 
@@ -262,6 +265,20 @@ def apply_coverage(groups: list[CoverageGroup], file_entries: list[dict]) -> Non
                 group.covered += covered
                 group.executable += executable
                 group.files.append(path)
+
+
+def validate_group_file_membership(groups: list[CoverageGroup]) -> list[str]:
+    failures: list[str] = []
+    forbidden_segments = ("/Tests/", "/UITests/", "/__Snapshots__/")
+
+    for group in groups:
+        if not group.required:
+            continue
+        for path in sorted(set(group.files or [])):
+            if any(segment in path for segment in forbidden_segments):
+                failures.append(f"Coverage group {group.name} matched non-production path: {path}")
+
+    return failures
 
 
 def write_report(groups: list[CoverageGroup], output: Path) -> None:
@@ -311,13 +328,14 @@ def main() -> int:
     payload = load_xccov_json(args.coverage_source)
     groups = build_groups()
     apply_coverage(groups, iter_files(payload))
+    membership_failures = validate_group_file_membership(groups)
     write_report(groups, args.report)
     write_summary(groups, args.summary_json)
     if args.raw_report_output is not None:
         write_raw_report(args.coverage_source, args.raw_report_output)
 
     failing = [group for group in groups if group.required and not group.ok]
-    if failing:
+    if failing or membership_failures:
         for group in failing:
             if group.executable == 0:
                 print(
@@ -329,6 +347,8 @@ def main() -> int:
                     f"Coverage gate failed: {group.name} is {group.coverage * 100:.2f}% and requires {group.threshold * 100:.0f}%.",
                     file=sys.stderr,
                 )
+        for failure in membership_failures:
+            print(f"Coverage gate failed: {failure}", file=sys.stderr)
         return 1
 
     return 0

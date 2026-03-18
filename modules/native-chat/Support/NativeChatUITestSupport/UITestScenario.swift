@@ -1,6 +1,6 @@
 import GeneratedFilesCore
 import ChatPresentation
-import ChatUIComponents
+import NativeChatComposition
 
 package enum UITestScenario: String {
     case empty
@@ -39,7 +39,6 @@ package enum UITestScenario: String {
 package struct UITestBootstrap {
     package let chatController: ChatController
     package let settingsPresenter: SettingsPresenter
-    package let hapticService: HapticService
     package let initialTab: Int
     package let scenario: UITestScenario
     package let initialPreviewItem: FilePreviewItem?

@@ -22,6 +22,6 @@ extension ChatController {
     var backgroundTaskCoordinator: BackgroundTaskCoordinator { services.backgroundTaskCoordinator }
     var fileDownloadService: FileDownloadService { services.fileDownloadService }
     var hapticsEnabled: Bool { settingsStore.hapticEnabled }
-    var hapticService: HapticService { services.hapticService }
+    var hapticService: HapticService { HapticService() }
     var serviceFactory: @MainActor () -> OpenAIService { services.serviceFactory }
 }

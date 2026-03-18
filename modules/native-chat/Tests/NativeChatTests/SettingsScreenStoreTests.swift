@@ -79,7 +79,7 @@ final class SettingsScreenStoreTests: XCTestCase {
 
         XCTAssertEqual(store.apiKey, "")
         XCTAssertNil(store.isAPIKeyValid)
-        XCTAssertEqual(store.cloudflareHealthStatus, .unknown)
+        XCTAssertEqual(store.cloudflareHealthStatus, .missingAPIKey)
     }
 
     func testCloudflareToggleTracksConfigurationProviderAndResetsHealthWhenDisabled() {
@@ -144,7 +144,7 @@ final class SettingsScreenStoreTests: XCTestCase {
 
         await store.checkCloudflareHealth()
 
-        XCTAssertEqual(store.cloudflareHealthStatus, .error("No API key configured"))
+        XCTAssertEqual(store.cloudflareHealthStatus, .missingAPIKey)
         XCTAssertFalse(store.isCheckingCloudflareHealth)
     }
 
@@ -221,7 +221,7 @@ final class SettingsScreenStoreTests: XCTestCase {
 
         await store.checkCloudflareHealth()
 
-        XCTAssertEqual(store.cloudflareHealthStatus, .error(timeoutError.localizedDescription))
+        XCTAssertEqual(store.cloudflareHealthStatus, .remoteError(timeoutError.localizedDescription))
         XCTAssertFalse(store.isCheckingCloudflareHealth)
     }
 
@@ -293,8 +293,42 @@ final class SettingsScreenStoreTests: XCTestCase {
 
         await store.checkCloudflareHealth()
 
-        XCTAssertEqual(store.cloudflareHealthStatus, .error("Gateway unavailable"))
+        XCTAssertEqual(store.cloudflareHealthStatus, .remoteError("Gateway unavailable"))
         XCTAssertFalse(store.isCheckingCloudflareHealth)
+    }
+
+    func testEnablingCloudflareShowsGatewayUnavailableWhenBuildLacksGatewayCapability() {
+        let configurationProvider = RuntimeTestOpenAIConfigurationProvider(
+            cloudflareAIGToken: "",
+            useCloudflareGateway: false
+        )
+        let store = makeTestSettingsScreenStore(configurationProvider: configurationProvider)
+
+        store.cloudflareEnabled = true
+
+        XCTAssertEqual(store.cloudflareHealthStatus, .gatewayUnavailable)
+    }
+
+    func testCheckCloudflareHealthSurfacesInvalidGatewayURLWithoutNetworkRequest() async {
+        let configurationProvider = RuntimeTestOpenAIConfigurationProvider(
+            cloudflareGatewayBaseURL: "not a url",
+            cloudflareAIGToken: "cf-test-token",
+            useCloudflareGateway: false
+        )
+        let transport = StubOpenAITransport()
+        let store = makeTestSettingsScreenStore(
+            apiKey: "sk-runtime",
+            configurationProvider: configurationProvider,
+            transport: transport
+        )
+        store.cloudflareEnabled = true
+
+        await store.checkCloudflareHealth()
+
+        XCTAssertEqual(store.cloudflareHealthStatus, .invalidGatewayURL)
+        XCTAssertFalse(store.isCheckingCloudflareHealth)
+        let requests = await transport.requests()
+        XCTAssertTrue(requests.isEmpty)
     }
 
     func testRefreshAndClearGeneratedCachesTrackFilesystemState() async throws {

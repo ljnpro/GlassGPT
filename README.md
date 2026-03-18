@@ -34,18 +34,18 @@ GlassGPT/
 └── scripts/
 ```
 
-## 4.6.1 Architecture
+## 4.7.0 Architecture
 
 - `ReplySessionActor` is the single mutable runtime owner.
 - `ChatController` is an observable projection facade backed by coordinators.
 - `NativeChatCompositionRoot` is the only production composition root.
 - Persistence ships no mid-cutover status marker or legacy-compat residue.
-- CI enforces build, architecture, maintainability, source-share, module-boundary, and release-readiness gates.
+- CI enforces build, architecture, maintainability, source-share, infra-safety, module-boundary, and release-readiness gates.
 
 ## Common Commands
 
 ```bash
 ./scripts/ci.sh
 ./scripts/ci.sh maintainability
-./scripts/release_testflight.sh 4.6.1 <build-number> --branch codex/stable-4.6
+./scripts/release_testflight.sh 4.7.0 <build-number> --branch codex/stable-4.7
 ```

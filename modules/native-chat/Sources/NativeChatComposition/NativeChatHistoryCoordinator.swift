@@ -7,12 +7,12 @@ import Foundation
 import SwiftData
 
 @MainActor
-final class NativeChatHistoryCoordinator {
+package final class NativeChatHistoryCoordinator {
     private let modelContext: ModelContext
     private let chatController: ChatController
     private let showChatTab: @MainActor () -> Void
 
-    init(
+    package init(
         modelContext: ModelContext,
         chatController: ChatController,
         showChatTab: @escaping @MainActor () -> Void
@@ -22,7 +22,7 @@ final class NativeChatHistoryCoordinator {
         self.showChatTab = showChatTab
     }
 
-    func makePresenter() -> HistoryPresenter {
+    package func makePresenter() -> HistoryPresenter {
         let modelContext = self.modelContext
         let chatController = self.chatController
         let showChatTab = self.showChatTab

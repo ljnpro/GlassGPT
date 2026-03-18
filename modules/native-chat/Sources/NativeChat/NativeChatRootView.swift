@@ -5,23 +5,13 @@ import Foundation
 import SwiftData
 
 public typealias NativeChatRootView = NativeChatComposition.NativeChatRootView
+public typealias NativeChatPersistenceBootstrap = ChatPersistenceSwiftData.NativeChatPersistenceBootstrap
+public typealias NativeChatRootOverrideFactory = NativeChatComposition.NativeChatRootOverrideFactory
 
-@MainActor
 public enum NativeChatPersistence {
-    public static let bootstrap: ChatPersistenceSwiftData.NativeChatPersistenceBootstrap =
+    public static func makeBootstrap(bundleIdentifier: String?) -> NativeChatPersistenceBootstrap {
         ChatPersistenceSwiftData.NativeChatPersistence.makeSharedBootstrap(
-            bundleIdentifier: Bundle.main.bundleIdentifier
+            bundleIdentifier: bundleIdentifier
         )
-
-    public static var shared: ModelContainer? {
-        bootstrap.container
-    }
-
-    public static var startupErrorDescription: String? {
-        bootstrap.startupErrorDescription
-    }
-
-    public static var didRecoverPersistentStore: Bool {
-        bootstrap.didRecoverPersistentStore
     }
 }

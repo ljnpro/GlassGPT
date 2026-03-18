@@ -1,6 +1,5 @@
 import ChatPersistenceCore
 import ChatPersistenceSwiftData
-import ChatUIComponents
 import Foundation
 import GeneratedFilesInfra
 import OpenAITransport
@@ -22,7 +21,6 @@ final class ChatControllerServices {
     let messagePersistence: MessagePersistenceAdapter
     let backgroundTaskCoordinator: BackgroundTaskCoordinator
     let fileDownloadService: FileDownloadService
-    let hapticService: HapticService
     let serviceFactory: @MainActor () -> OpenAIService
 
     init(
@@ -34,7 +32,7 @@ final class ChatControllerServices {
         responseParser: OpenAIResponseParser,
         transport: OpenAIDataTransport,
         openAIService: OpenAIService,
-        hapticService: HapticService,
+        fileDownloadService: FileDownloadService? = nil,
         serviceFactory: @escaping @MainActor () -> OpenAIService
     ) {
         self.modelContext = modelContext
@@ -50,8 +48,7 @@ final class ChatControllerServices {
         self.generatedFileCoordinator = GeneratedFileCoordinator()
         self.messagePersistence = MessagePersistenceAdapter()
         self.backgroundTaskCoordinator = BackgroundTaskCoordinator()
-        self.fileDownloadService = FileDownloadService(configurationProvider: configurationProvider)
-        self.hapticService = hapticService
+        self.fileDownloadService = fileDownloadService ?? FileDownloadService(configurationProvider: configurationProvider)
         self.serviceFactory = serviceFactory
     }
 }
