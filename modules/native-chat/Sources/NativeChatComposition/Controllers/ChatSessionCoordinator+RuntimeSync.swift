@@ -5,7 +5,7 @@ import ChatRuntimeWorkflows
 import Foundation
 
 @MainActor
-extension ChatController {
+extension ChatSessionCoordinator {
     func ensureRuntimeSessionRegistered(for session: ReplySession) {
         Task { @MainActor in
             await ensureRuntimeSessionRegisteredNow(for: session)
@@ -13,36 +13,36 @@ extension ChatController {
     }
 
     func ensureRuntimeSessionRegisteredNow(for session: ReplySession) async {
-        let alreadyRegistered = await runtimeRegistry.contains(session.assistantReplyID)
+        let alreadyRegistered = await controller.runtimeRegistry.contains(session.assistantReplyID)
         if !alreadyRegistered {
-            await runtimeRegistry.startSession(
+            await controller.runtimeRegistry.startSession(
                 replyID: session.assistantReplyID,
                 messageID: session.messageID,
                 conversationID: session.conversationID
             )
         }
-        guard let replySession = await runtimeRegistry.session(for: session.assistantReplyID) else {
+        guard let replySession = await controller.runtimeRegistry.session(for: session.assistantReplyID) else {
             return
         }
         let state = await replySession.snapshot()
-        sessionRegistry.updateRuntimeState(state, for: session.messageID)
+        controller.sessionRegistry.updateRuntimeState(state, for: session.messageID)
     }
 
     func runtimeState(for session: ReplySession) async -> ReplyRuntimeState? {
-        guard let replySession = await runtimeRegistry.session(for: session.assistantReplyID) else {
+        guard let replySession = await controller.runtimeRegistry.session(for: session.assistantReplyID) else {
             return nil
         }
         let state = await replySession.snapshot()
-        sessionRegistry.updateRuntimeState(state, for: session.messageID)
+        controller.sessionRegistry.updateRuntimeState(state, for: session.messageID)
         return state
     }
 
     func cachedRuntimeState(for session: ReplySession) -> ReplyRuntimeState? {
-        sessionRegistry.runtimeState(for: session.messageID)
+        controller.sessionRegistry.runtimeState(for: session.messageID)
     }
 
     func runtimeSession(for session: ReplySession) async -> ReplySessionActor? {
-        await runtimeRegistry.session(for: session.assistantReplyID)
+        await controller.runtimeRegistry.session(for: session.assistantReplyID)
     }
 
     func applyRuntimeTransition(
@@ -54,27 +54,27 @@ extension ChatController {
             return nil
         }
         let state = await runtimeActor.apply(transition)
-        sessionRegistry.updateRuntimeState(state, for: session.messageID)
+        controller.sessionRegistry.updateRuntimeState(state, for: session.messageID)
         return state
     }
 
     func runtimeRoute(for session: ReplySession) -> OpenAITransportRoute {
-        let usesGateway = sessionRegistry.execution(for: session.messageID)?
+        let usesGateway = controller.sessionRegistry.execution(for: session.messageID)?
             .service
             .configurationProvider
-            .useCloudflareGateway ?? configurationProvider.useCloudflareGateway
+            .useCloudflareGateway ?? controller.configurationProvider.useCloudflareGateway
         return usesGateway ? .gateway : .direct
     }
 
     func removeRuntimeSession(for session: ReplySession) {
         let assistantReplyID = session.assistantReplyID
         Task {
-            await runtimeRegistry.remove(assistantReplyID)
+            await controller.runtimeRegistry.remove(assistantReplyID)
         }
     }
 
     func suspendActiveSessionsForAppBackground() {
-        let sessions = sessionRegistry.allSessions
+        let sessions = controller.sessionRegistry.allSessions
         guard !sessions.isEmpty else { return }
 
         Task { @MainActor in
@@ -84,29 +84,29 @@ extension ChatController {
                     .detachForBackground(usedBackgroundMode: session.request.usesBackgroundMode),
                     to: session
                 )
-                let execution = sessionRegistry.execution(for: session.messageID)
+                let execution = controller.sessionRegistry.execution(for: session.messageID)
                 execution?.service.cancelStream()
                 execution?.task?.cancel()
 
-                guard let message = findMessage(byId: session.messageID),
+                guard let message = controller.conversationCoordinator.findMessage(byId: session.messageID),
                       let runtimeState = await runtimeState(for: session) else { continue }
 
                 if runtimeState.responseID != nil {
                     message.isComplete = false
                     message.conversation?.updatedAt = .now
-                    upsertMessage(message)
+                    controller.conversationCoordinator.upsertMessage(message)
                 } else {
-                    message.content = interruptedResponseFallbackText(for: message, session: session)
+                    message.content = controller.interruptedResponseFallbackText(for: message, session: session)
                     message.thinking = runtimeState.buffer.thinking.isEmpty ? nil : runtimeState.buffer.thinking
                     message.isComplete = true
                     message.lastSequenceNumber = nil
                     message.conversation?.updatedAt = .now
-                    upsertMessage(message)
+                    controller.conversationCoordinator.upsertMessage(message)
                 }
             }
 
-            saveContextIfPossible("suspendActiveSessionsForAppBackground")
-            sessionRegistry.removeAll { execution in
+            controller.conversationCoordinator.saveContextIfPossible("suspendActiveSessionsForAppBackground")
+            controller.sessionRegistry.removeAll { execution in
                 execution.task?.cancel()
                 execution.service.cancelStream()
             }

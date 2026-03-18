@@ -2,6 +2,7 @@ import ChatApplication
 import XCTest
 import ChatPersistenceCore
 import ChatPersistenceSwiftData
+import ChatUIComponents
 import OpenAITransport
 import SwiftData
 import ChatDomain
@@ -561,6 +562,7 @@ final class ChatScreenStoreRuntimeTests: XCTestCase {
         let context = ModelContext(container)
         let settingsStore = SettingsStore(valueStore: settingsValueStore)
         let apiKeyStore = PersistedAPIKeyStore(backend: apiBackend)
+        let hapticService = HapticService()
         let requestBuilder = OpenAIRequestBuilder(configuration: configurationProvider)
         let responseParser = OpenAIResponseParser()
         let service = OpenAIService(
@@ -576,6 +578,7 @@ final class ChatScreenStoreRuntimeTests: XCTestCase {
             apiKeyStore: apiKeyStore,
             configurationProvider: configurationProvider,
             transport: transport,
+            hapticService: hapticService,
             serviceFactory: { service },
             bootstrapPolicy: bootstrapPolicy
         )

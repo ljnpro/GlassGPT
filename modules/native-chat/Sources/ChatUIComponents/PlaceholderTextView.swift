@@ -15,19 +15,19 @@ public final class PlaceholderTextView: UITextView {
         }
     }
 
-    public override var font: UIFont? {
+    override public var font: UIFont? {
         didSet {
             placeholderLabel.font = font
         }
     }
 
-    public override var text: String! {
+    override public var text: String! {
         didSet {
             updatePlaceholderVisibility()
         }
     }
 
-    public override init(frame: CGRect, textContainer: NSTextContainer?) {
+    override public init(frame: CGRect, textContainer: NSTextContainer?) {
         super.init(frame: frame, textContainer: textContainer)
         configurePlaceholder()
     }
@@ -37,7 +37,7 @@ public final class PlaceholderTextView: UITextView {
         fatalError("init(coder:) has not been implemented")
     }
 
-    public override func layoutSubviews() {
+    override public func layoutSubviews() {
         super.layoutSubviews()
         applyTransparentCanvasStyleIfNeeded()
         let inset = textContainerInset

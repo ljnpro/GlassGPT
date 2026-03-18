@@ -47,7 +47,7 @@ extension ChatRecoveryCoordinator {
 
     func recoveryFallbackText(for message: Message, session: ReplySession? = nil) -> String {
         if let session,
-           let runtimeState = controller.cachedRuntimeState(for: session),
+           let runtimeState = controller.sessionCoordinator.cachedRuntimeState(for: session),
            !runtimeState.buffer.text.isEmpty {
             return runtimeState.buffer.text
         }
@@ -59,7 +59,7 @@ extension ChatRecoveryCoordinator {
 
     func recoveryFallbackThinking(for message: Message, session: ReplySession? = nil) -> String? {
         if let session,
-           let runtimeState = controller.cachedRuntimeState(for: session),
+           let runtimeState = controller.sessionCoordinator.cachedRuntimeState(for: session),
            !runtimeState.buffer.thinking.isEmpty {
             return runtimeState.buffer.thinking
         }
@@ -118,13 +118,13 @@ extension ChatRecoveryCoordinator {
             fallbackThinking: fallbackThinking
         )
 
-        controller.saveContextIfPossible("finishRecovery")
-        controller.upsertMessage(message)
+        controller.conversationCoordinator.saveContextIfPossible("finishRecovery")
+        controller.conversationCoordinator.upsertMessage(message)
         controller.prefetchGeneratedFilesIfNeeded(for: message)
 
         let conversation = message.conversation
         let wasVisible = controller.visibleSessionMessageID == session.messageID
-        controller.removeSession(session)
+        controller.sessionCoordinator.removeSession(session)
 
         if let conversation {
             let viewModel = controller
@@ -134,7 +134,7 @@ extension ChatRecoveryCoordinator {
         }
 
         if wasVisible {
-            HapticService.shared.notify(.success)
+            controller.hapticService.notify(.success, isEnabled: controller.hapticsEnabled)
         }
     }
 }

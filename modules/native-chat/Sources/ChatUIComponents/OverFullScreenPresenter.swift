@@ -68,7 +68,7 @@ public final class AnchorViewController<PresentedContent: View>: UIViewControlle
     public var onDismiss: (() -> Void)?
     private var hostingController: DismissAwareHostingController<PresentedContent>?
 
-    public override func loadView() {
+    override public func loadView() {
         view = UIView(frame: .zero)
         view.isHidden = true
         view.isUserInteractionEnabled = false
@@ -115,7 +115,7 @@ public final class AnchorViewController<PresentedContent: View>: UIViewControlle
 public final class DismissAwareHostingController<Content: View>: UIHostingController<Content> {
     public var dismissHandler: (() -> Void)?
 
-    public override func viewDidDisappear(_ animated: Bool) {
+    override public func viewDidDisappear(_ animated: Bool) {
         super.viewDidDisappear(animated)
         guard isBeingDismissed || presentingViewController == nil else { return }
         dismissHandler?()

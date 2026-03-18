@@ -26,9 +26,9 @@ public struct OpenAIStandardRequestAuthorizer: OpenAIRequestAuthorizer {
             return
         }
 
-        request.setValue(
-            "Bearer \(configuration.cloudflareAIGToken)",
-            forHTTPHeaderField: "cf-aig-authorization"
-        )
+        let aigToken = configuration.cloudflareAIGToken.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !aigToken.isEmpty else { return }
+
+        request.setValue("Bearer \(aigToken)", forHTTPHeaderField: "cf-aig-authorization")
     }
 }

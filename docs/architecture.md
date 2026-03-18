@@ -1,8 +1,8 @@
-# 4.6.0 Architecture
+# 4.6.1 Architecture
 
 ## Goal
 
-`4.6.0` is the terminal ownership cutover release. The final system removes split runtime mutation, composition-root drift, and controller-centric orchestration.
+`4.6.1` is the hardened cutover release. The final system removes split runtime mutation, composition-root drift, and controller-centric orchestration while tightening credential and governance hygiene.
 
 ## Production Topology
 

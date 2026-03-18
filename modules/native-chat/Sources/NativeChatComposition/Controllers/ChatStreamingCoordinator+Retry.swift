@@ -25,13 +25,13 @@ extension ChatStreamingCoordinator {
             return true
         }
 
-        guard controller.isSessionActive(session),
-              let runtimeActor = await controller.runtimeSession(for: session),
+        guard controller.sessionCoordinator.isSessionActive(session),
+              let runtimeActor = await controller.sessionCoordinator.runtimeSession(for: session),
               await runtimeActor.isActiveStream(streamID) else {
             return true
         }
 
-        HapticService.shared.impact(.light)
+        controller.hapticService.impact(.light, isEnabled: controller.hapticsEnabled)
         startStreamingRequest(for: session, reconnectAttempt: nextAttempt)
         return true
     }

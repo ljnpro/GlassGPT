@@ -46,12 +46,12 @@ public final class ChatScrollContainerController: UIViewController, UIScrollView
         contentSizeObservation?.invalidate()
     }
 
-    public override func viewDidLoad() {
+    override public func viewDidLoad() {
         super.viewDidLoad()
         configureViewHierarchy()
     }
 
-    public override func viewDidLayoutSubviews() {
+    override public func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
         reconcileLayout()
     }

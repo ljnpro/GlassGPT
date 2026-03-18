@@ -1,4 +1,5 @@
 import ChatPersistenceSwiftData
+import ChatUIComponents
 import SwiftUI
 import ChatDomain
 
@@ -19,6 +20,11 @@ struct MessageBubble: View {
     // File preview handler
     var onSandboxLinkTap: ((String, FilePathAnnotation?) -> Void)?
     let renderKey: RenderKey
+    @Environment(\.hapticsEnabled) var hapticsEnabled
+
+    var hapticService: HapticService {
+        HapticService()
+    }
 
     init(
         message: Message,

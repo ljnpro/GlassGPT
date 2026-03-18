@@ -1,6 +1,5 @@
 included:
   - ios
-  - modules/native-chat/ios
   - modules/native-chat/Sources
   - modules/native-chat/Tests
 
@@ -12,13 +11,29 @@ excluded:
 
 only_rules:
   - blanket_disable_command
+  - colon
+  - comma
+  - control_statement
   - duplicate_conditions
   - duplicate_enum_cases
   - duplicate_imports
   - empty_count
+  - empty_enum_arguments
+  - empty_parameters
   - explicit_init
   - first_where
+  - force_cast
+  - implicit_getter
+  - modifier_order
+  - operator_usage_whitespace
+  - private_over_fileprivate
   - redundant_nil_coalescing
+  - redundant_string_enum_value
+  - return_arrow_whitespace
+  - statement_position
   - toggle_bool
+  - trailing_whitespace
+  - unused_optional_binding
+  - vertical_whitespace
 
 reporter: "xcode"

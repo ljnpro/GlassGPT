@@ -2,9 +2,8 @@ import Foundation
 
 private struct StaticOpenAIConfigurationProvider: OpenAIConfigurationProvider {
     let directOpenAIBaseURL: String = "https://api.openai.com/v1"
-    let cloudflareGatewayBaseURL: String =
-        "https://gateway.ai.cloudflare.com/v1/887b39f387990e7ef89e400eb228e193/glass-gpt/openai"
-    let cloudflareAIGToken: String = "W3AAxNEfdJNnhh-tT-w9TX4mPTLtU2_e_ox0Pwd7"
+    let cloudflareGatewayBaseURL: String = DefaultOpenAIConfigurationProvider.defaultCloudflareGatewayBaseURL
+    let cloudflareAIGToken: String = ""
     var useCloudflareGateway: Bool = false
 }
 

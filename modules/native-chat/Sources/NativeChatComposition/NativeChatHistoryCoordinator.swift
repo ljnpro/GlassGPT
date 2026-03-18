@@ -75,7 +75,7 @@ final class NativeChatHistoryCoordinator {
             },
             selectConversation: { conversationID in
                 if let conversation = fetchConversation(id: conversationID) {
-                    chatController.loadConversation(conversation)
+                    chatController.conversationCoordinator.loadConversation(conversation)
                     showChatTab()
                 }
             },
@@ -85,7 +85,7 @@ final class NativeChatHistoryCoordinator {
                     self.saveHistoryChanges(context: "deleteConversation")
                 }
                 if chatController.currentConversation?.id == deletedConversationID {
-                    chatController.startNewChat()
+                    chatController.conversationCoordinator.startNewChat()
                 }
             },
             deleteAllConversations: {
@@ -93,7 +93,7 @@ final class NativeChatHistoryCoordinator {
                     modelContext.delete(conversation)
                 }
                 self.saveHistoryChanges(context: "deleteAllConversations")
-                chatController.startNewChat()
+                chatController.conversationCoordinator.startNewChat()
             }
         )
     }

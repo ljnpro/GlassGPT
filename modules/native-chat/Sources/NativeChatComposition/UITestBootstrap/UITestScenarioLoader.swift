@@ -3,6 +3,7 @@ import ChatDomain
 import Foundation
 import ChatPersistenceCore
 import ChatPresentation
+import ChatUIComponents
 import GeneratedFilesCore
 import GeneratedFilesInfra
 import OpenAITransport
@@ -28,6 +29,7 @@ package enum UITestScenarioLoader {
     ) -> UITestBootstrap {
         let settingsValueStore = ScenarioSettingsValueStore()
         let settingsStore = SettingsStore(valueStore: settingsValueStore)
+        let hapticService = HapticService()
         let apiKeyBackend: APIKeyPersisting = scenario.usesLiveKeychain
             ? KeychainAPIKeyBackend(
                 service: KeychainAPIKeyBackend.defaultServiceIdentifier(bundleIdentifier: Bundle.main.bundleIdentifier)
@@ -36,20 +38,28 @@ package enum UITestScenarioLoader {
         let apiKeyStore = PersistedAPIKeyStore(backend: apiKeyBackend)
 
         seedDefaultSettings(into: settingsStore)
-        DefaultOpenAIConfigurationProvider.shared.useCloudflareGateway = false
+        let configurationProvider = DefaultOpenAIConfigurationProvider(
+            directOpenAIBaseURL: DefaultOpenAIConfigurationProvider.defaultOpenAIBaseURL,
+            cloudflareGatewayBaseURL: "https://gateway.test.openai.local/v1",
+            cloudflareAIGToken: "",
+            useCloudflareGateway: false
+        )
 
         clearAllConversations(in: modelContext)
         resetAPIKeyIfNeeded(for: scenario, store: apiKeyStore)
         let seededConversations = seedConversationsIfNeeded(in: modelContext, scenario: scenario)
 
+        let transport = OpenAIURLSessionTransport()
         let chatController = ChatController(
             modelContext: modelContext,
             settingsStore: settingsStore,
             apiKeyStore: apiKeyStore,
+            configurationProvider: configurationProvider,
+            transport: transport,
+            hapticService: hapticService,
             bootstrapPolicy: .testing
         )
-        let requestBuilder = OpenAIRequestBuilder(configuration: DefaultOpenAIConfigurationProvider.shared)
-        let transport = OpenAIURLSessionTransport()
+        let requestBuilder = OpenAIRequestBuilder(configuration: configurationProvider)
         let openAIService = OpenAIService(
             requestBuilder: requestBuilder,
             streamClient: SSEEventStream(),
@@ -61,8 +71,8 @@ package enum UITestScenarioLoader {
             openAIService: openAIService,
             requestBuilder: requestBuilder,
             transport: transport,
-            configurationProvider: DefaultOpenAIConfigurationProvider.shared,
-            fileDownloadService: GeneratedFilesInfra.FileDownloadService(configurationProvider: DefaultOpenAIConfigurationProvider.shared)
+            configurationProvider: configurationProvider,
+            fileDownloadService: GeneratedFilesInfra.FileDownloadService(configurationProvider: configurationProvider)
         )
 
         if scenario == .settingsGateway {
@@ -78,6 +88,7 @@ package enum UITestScenarioLoader {
         return UITestBootstrap(
             chatController: chatController,
             settingsPresenter: settingsPresenter,
+            hapticService: hapticService,
             initialTab: scenario.initialTab,
             scenario: scenario,
             initialPreviewItem: scenario == .preview ? chatController.filePreviewItem : nil
@@ -120,12 +131,12 @@ package enum UITestScenarioLoader {
 
         case .seeded, .replySplit:
             if let conversation = conversations.first {
-                viewModel.loadConversation(conversation)
+                viewModel.conversationCoordinator.loadConversation(conversation)
             }
 
         case .streaming:
             if let conversation = conversations.first {
-                viewModel.loadConversation(conversation)
+                viewModel.conversationCoordinator.loadConversation(conversation)
             }
 
             viewModel.isStreaming = true
@@ -144,7 +155,7 @@ package enum UITestScenarioLoader {
 
         case .preview:
             if let conversation = conversations.first {
-                viewModel.loadConversation(conversation)
+                viewModel.conversationCoordinator.loadConversation(conversation)
             }
 
             if let previewURL = makePreviewImageURL() {

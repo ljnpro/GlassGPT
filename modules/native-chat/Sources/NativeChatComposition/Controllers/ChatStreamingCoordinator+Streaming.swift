@@ -14,11 +14,14 @@ extension ChatStreamingCoordinator {
         execution.task?.cancel()
         execution.task = Task { @MainActor in
             let streamID = UUID()
-            _ = await controller.applyRuntimeTransition(
-                .beginStreaming(streamID: streamID, route: controller.runtimeRoute(for: session)),
+            _ = await controller.sessionCoordinator.applyRuntimeTransition(
+                .beginStreaming(
+                    streamID: streamID,
+                    route: controller.sessionCoordinator.runtimeRoute(for: session)
+                ),
                 to: session
             )
-            controller.syncVisibleState(from: session)
+            controller.sessionCoordinator.syncVisibleState(from: session)
 
             let stream = execution.service.streamChat(
                 apiKey: session.request.apiKey,
@@ -35,8 +38,8 @@ extension ChatStreamingCoordinator {
             var pendingRecoveryError: String?
 
             for await event in stream {
-                guard controller.isSessionActive(session),
-                      let runtimeActor = await controller.runtimeSession(for: session),
+                guard controller.sessionCoordinator.isSessionActive(session),
+                      let runtimeActor = await controller.sessionCoordinator.runtimeSession(for: session),
                       await runtimeActor.isActiveStream(streamID) else {
                     break
                 }
@@ -47,53 +50,53 @@ extension ChatStreamingCoordinator {
 
                 case .terminalCompleted:
                     didReceiveCompletedEvent = true
-                    controller.finalizeSession(session)
+                    controller.sessionCoordinator.finalizeSession(session)
 
                 case .terminalIncomplete(let message):
                     pendingRecoveryError = message ?? "Response was incomplete."
-                    controller.saveSessionNow(session)
-                    if let responseId = controller.cachedRuntimeState(for: session)?.responseID {
+                    controller.sessionCoordinator.saveSessionNow(session)
+                    if let responseId = controller.sessionCoordinator.cachedRuntimeState(for: session)?.responseID {
                         pendingRecoveryResponseId = responseId
-                    } else if !(controller.cachedRuntimeState(for: session)?.buffer.text.isEmpty ?? true) {
-                        controller.finalizeSessionAsPartial(session)
-                    } else if let message = controller.findMessage(byId: session.messageID) {
-                        controller.removeEmptyMessage(message, for: session)
+                    } else if !(controller.sessionCoordinator.cachedRuntimeState(for: session)?.buffer.text.isEmpty ?? true) {
+                        controller.sessionCoordinator.finalizeSessionAsPartial(session)
+                    } else if let message = controller.conversationCoordinator.findMessage(byId: session.messageID) {
+                        controller.sessionCoordinator.removeEmptyMessage(message, for: session)
                     }
 
                 case .connectionLost:
                     receivedConnectionLost = true
-                    controller.saveSessionNow(session)
+                    controller.sessionCoordinator.saveSessionNow(session)
                     #if DEBUG
                     Loggers.chat.debug("[VM] Connection lost for session \(session.messageID)")
                     #endif
 
                 case .error(let error):
-                    controller.saveSessionNow(session)
-                    if let responseId = controller.cachedRuntimeState(for: session)?.responseID {
+                    controller.sessionCoordinator.saveSessionNow(session)
+                    if let responseId = controller.sessionCoordinator.cachedRuntimeState(for: session)?.responseID {
                         pendingRecoveryResponseId = responseId
                         pendingRecoveryError = error.localizedDescription
                         #if DEBUG
                         Loggers.chat.debug("[VM] Stream error, attempting recovery: \(error.localizedDescription)")
                         #endif
-                    } else if !(controller.cachedRuntimeState(for: session)?.buffer.text.isEmpty ?? true) {
-                        controller.finalizeSessionAsPartial(session)
+                    } else if !(controller.sessionCoordinator.cachedRuntimeState(for: session)?.buffer.text.isEmpty ?? true) {
+                        controller.sessionCoordinator.finalizeSessionAsPartial(session)
                         if controller.visibleSessionMessageID == session.messageID {
                             controller.errorMessage = error.localizedDescription
-                            HapticService.shared.notify(.error)
+                            controller.hapticService.notify(.error, isEnabled: controller.hapticsEnabled)
                         }
-                    } else if let message = controller.findMessage(byId: session.messageID) {
-                        controller.removeEmptyMessage(message, for: session)
+                    } else if let message = controller.conversationCoordinator.findMessage(byId: session.messageID) {
+                        controller.sessionCoordinator.removeEmptyMessage(message, for: session)
                         if controller.visibleSessionMessageID == session.messageID {
                             controller.errorMessage = error.localizedDescription
-                            controller.clearLiveGenerationState(clearDraft: true)
-                            HapticService.shared.notify(.error)
+                            controller.sessionCoordinator.clearLiveGenerationState(clearDraft: true)
+                            controller.hapticService.notify(.error, isEnabled: controller.hapticsEnabled)
                         }
                     }
                 }
             }
 
-            guard controller.isSessionActive(session),
-                  let runtimeActor = await controller.runtimeSession(for: session),
+            guard controller.sessionCoordinator.isSessionActive(session),
+                  let runtimeActor = await controller.sessionCoordinator.runtimeSession(for: session),
                   await runtimeActor.isActiveStream(streamID) else {
                 controller.endBackgroundTask()
                 return
@@ -105,12 +108,12 @@ extension ChatStreamingCoordinator {
             }
 
             if let responseId = pendingRecoveryResponseId {
-                _ = await controller.applyRuntimeTransition(
+                _ = await controller.sessionCoordinator.applyRuntimeTransition(
                     .beginRecoveryStatus(
                         responseID: responseId,
-                        lastSequenceNumber: controller.cachedRuntimeState(for: session)?.lastSequenceNumber,
+                        lastSequenceNumber: controller.sessionCoordinator.cachedRuntimeState(for: session)?.lastSequenceNumber,
                         usedBackgroundMode: session.request.usesBackgroundMode,
-                        route: controller.runtimeRoute(for: session)
+                        route: controller.sessionCoordinator.runtimeRoute(for: session)
                     ),
                     to: session
                 )
@@ -119,7 +122,7 @@ extension ChatStreamingCoordinator {
                    !pendingRecoveryError.isEmpty {
                     controller.errorMessage = pendingRecoveryError
                 }
-                controller.syncVisibleState(from: session)
+                controller.sessionCoordinator.syncVisibleState(from: session)
                 controller.recoverResponse(
                     messageId: session.messageID,
                     responseId: responseId,
@@ -130,17 +133,17 @@ extension ChatStreamingCoordinator {
             }
 
             if receivedConnectionLost {
-                if let responseId = controller.cachedRuntimeState(for: session)?.responseID {
-                    _ = await controller.applyRuntimeTransition(
+                if let responseId = controller.sessionCoordinator.cachedRuntimeState(for: session)?.responseID {
+                    _ = await controller.sessionCoordinator.applyRuntimeTransition(
                         .beginRecoveryStatus(
                             responseID: responseId,
-                            lastSequenceNumber: controller.cachedRuntimeState(for: session)?.lastSequenceNumber,
+                            lastSequenceNumber: controller.sessionCoordinator.cachedRuntimeState(for: session)?.lastSequenceNumber,
                             usedBackgroundMode: session.request.usesBackgroundMode,
-                            route: controller.runtimeRoute(for: session)
+                            route: controller.sessionCoordinator.runtimeRoute(for: session)
                         ),
                         to: session
                     )
-                    controller.syncVisibleState(from: session)
+                    controller.sessionCoordinator.syncVisibleState(from: session)
                     controller.recoverResponse(
                         messageId: session.messageID,
                         responseId: responseId,
@@ -159,14 +162,14 @@ extension ChatStreamingCoordinator {
                     return
                 }
 
-                if !(controller.cachedRuntimeState(for: session)?.buffer.text.isEmpty ?? true) {
-                    controller.finalizeSessionAsPartial(session)
-                } else if let message = controller.findMessage(byId: session.messageID) {
-                    controller.removeEmptyMessage(message, for: session)
+                if !(controller.sessionCoordinator.cachedRuntimeState(for: session)?.buffer.text.isEmpty ?? true) {
+                    controller.sessionCoordinator.finalizeSessionAsPartial(session)
+                } else if let message = controller.conversationCoordinator.findMessage(byId: session.messageID) {
+                    controller.sessionCoordinator.removeEmptyMessage(message, for: session)
                     if controller.visibleSessionMessageID == session.messageID {
                         controller.errorMessage = "Connection lost. Please check your network and try again."
-                        controller.clearLiveGenerationState(clearDraft: true)
-                        HapticService.shared.notify(.error)
+                        controller.sessionCoordinator.clearLiveGenerationState(clearDraft: true)
+                        controller.hapticService.notify(.error, isEnabled: controller.hapticsEnabled)
                     }
                 }
 
@@ -174,30 +177,30 @@ extension ChatStreamingCoordinator {
                 return
             }
 
-            if controller.cachedRuntimeState(for: session)?.isStreaming == true {
-                if let responseId = controller.cachedRuntimeState(for: session)?.responseID {
-                    controller.saveSessionNow(session)
-                    _ = await controller.applyRuntimeTransition(
+            if controller.sessionCoordinator.cachedRuntimeState(for: session)?.isStreaming == true {
+                if let responseId = controller.sessionCoordinator.cachedRuntimeState(for: session)?.responseID {
+                    controller.sessionCoordinator.saveSessionNow(session)
+                    _ = await controller.sessionCoordinator.applyRuntimeTransition(
                         .beginRecoveryStatus(
                             responseID: responseId,
-                            lastSequenceNumber: controller.cachedRuntimeState(for: session)?.lastSequenceNumber,
+                            lastSequenceNumber: controller.sessionCoordinator.cachedRuntimeState(for: session)?.lastSequenceNumber,
                             usedBackgroundMode: session.request.usesBackgroundMode,
-                            route: controller.runtimeRoute(for: session)
+                            route: controller.sessionCoordinator.runtimeRoute(for: session)
                         ),
                         to: session
                     )
-                    controller.syncVisibleState(from: session)
+                    controller.sessionCoordinator.syncVisibleState(from: session)
                     controller.recoverResponse(
                         messageId: session.messageID,
                         responseId: responseId,
                         preferStreamingResume: session.request.usesBackgroundMode
                     )
-                } else if !(controller.cachedRuntimeState(for: session)?.buffer.text.isEmpty ?? true) {
-                    controller.finalizeSessionAsPartial(session)
-                } else if let message = controller.findMessage(byId: session.messageID) {
-                    controller.removeEmptyMessage(message, for: session)
+                } else if !(controller.sessionCoordinator.cachedRuntimeState(for: session)?.buffer.text.isEmpty ?? true) {
+                    controller.sessionCoordinator.finalizeSessionAsPartial(session)
+                } else if let message = controller.conversationCoordinator.findMessage(byId: session.messageID) {
+                    controller.sessionCoordinator.removeEmptyMessage(message, for: session)
                     if controller.visibleSessionMessageID == session.messageID {
-                        controller.clearLiveGenerationState(clearDraft: true)
+                        controller.sessionCoordinator.clearLiveGenerationState(clearDraft: true)
                     }
                 }
             }

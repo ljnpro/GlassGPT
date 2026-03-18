@@ -34,7 +34,7 @@ GlassGPT/
 └── scripts/
 ```
 
-## 4.6.0 Architecture
+## 4.6.1 Architecture
 
 - `ReplySessionActor` is the single mutable runtime owner.
 - `ChatController` is an observable projection facade backed by coordinators.
@@ -47,5 +47,5 @@ GlassGPT/
 ```bash
 ./scripts/ci.sh
 ./scripts/ci.sh maintainability
-./scripts/release_testflight.sh 4.6.0 <build-number> --branch codex/stable-4.6
+./scripts/release_testflight.sh 4.6.1 <build-number> --branch codex/stable-4.6
 ```

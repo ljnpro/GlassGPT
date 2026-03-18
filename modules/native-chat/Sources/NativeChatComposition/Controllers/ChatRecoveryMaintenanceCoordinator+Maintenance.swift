@@ -19,7 +19,7 @@ extension ChatRecoveryMaintenanceCoordinator {
             return
         }
 
-        let activeDraftID = controller.activeIncompleteAssistantDraft()?.id
+        let activeDraftID = controller.conversationCoordinator.activeIncompleteAssistantDraft()?.id
         let currentConversationID = controller.currentConversation?.id
         let incompleteMessages = fetchedMessages.filter {
             $0.id != activeDraftID && $0.conversation?.id != currentConversationID
@@ -65,7 +65,7 @@ extension ChatRecoveryMaintenanceCoordinator {
         }
 
         if cleanedCount > 0 {
-            controller.saveContextIfPossible("cleanupStaleDrafts")
+            controller.conversationCoordinator.saveContextIfPossible("cleanupStaleDrafts")
             #if DEBUG
             Loggers.recovery.debug("[Recovery] Cleaned up \(cleanedCount) stale draft(s)")
             #endif
@@ -96,7 +96,7 @@ extension ChatRecoveryMaintenanceCoordinator {
         for draft in draftsToResend {
             guard let conversation = draft.conversation else {
                 controller.conversationRepository.delete(draft)
-                controller.saveContextIfPossible("resendOrphanedDrafts.deleteDetachedDraft")
+                controller.conversationCoordinator.saveContextIfPossible("resendOrphanedDrafts.deleteDetachedDraft")
                 continue
             }
 
@@ -110,7 +110,7 @@ extension ChatRecoveryMaintenanceCoordinator {
 
             guard userMessages.last != nil else {
                 controller.conversationRepository.delete(draft)
-                controller.saveContextIfPossible("resendOrphanedDrafts.deleteDraftWithoutUserMessage")
+                controller.conversationCoordinator.saveContextIfPossible("resendOrphanedDrafts.deleteDraftWithoutUserMessage")
                 continue
             }
 
@@ -119,17 +119,17 @@ extension ChatRecoveryMaintenanceCoordinator {
             #endif
 
             controller.currentConversation = conversation
-            controller.messages = controller.visibleMessages(for: conversation)
+            controller.messages = controller.conversationCoordinator.visibleMessages(for: conversation)
                 .filter { $0.id != draft.id }
 
-            controller.applyConversationConfiguration(from: conversation)
+            controller.conversationCoordinator.applyConversationConfiguration(from: conversation)
 
             if let idx = conversation.messages.firstIndex(where: { $0.id == draft.id }) {
                 conversation.messages.remove(at: idx)
             }
 
             controller.conversationRepository.delete(draft)
-            controller.saveContextIfPossible("resendOrphanedDrafts.deleteBeforeRestart")
+            controller.conversationCoordinator.saveContextIfPossible("resendOrphanedDrafts.deleteBeforeRestart")
 
             let newDraft = Message(
                 role: .assistant,
@@ -141,7 +141,7 @@ extension ChatRecoveryMaintenanceCoordinator {
             )
             newDraft.conversation = controller.currentConversation
             controller.currentConversation?.messages.append(newDraft)
-            controller.saveContextIfPossible("resendOrphanedDrafts.insertReplacementDraft")
+            controller.conversationCoordinator.saveContextIfPossible("resendOrphanedDrafts.insertReplacementDraft")
 
             let preparedReply: PreparedAssistantReply
             do {
@@ -156,12 +156,16 @@ extension ChatRecoveryMaintenanceCoordinator {
 
             let session = ReplySession(preparedReply: preparedReply)
 
-            controller.registerSession(session, execution: SessionExecutionState(service: controller.serviceFactory()), visible: true)
+            controller.sessionCoordinator.registerSession(
+                session,
+                execution: SessionExecutionState(service: controller.serviceFactory()),
+                visible: true
+            )
             let controller = controller
             Task { @MainActor in
-                _ = await controller.applyRuntimeTransition(.beginSubmitting, to: session)
-                _ = await controller.applyRuntimeTransition(.setThinking(true), to: session)
-                controller.syncVisibleState(from: session)
+                _ = await controller.sessionCoordinator.applyRuntimeTransition(.beginSubmitting, to: session)
+                _ = await controller.sessionCoordinator.applyRuntimeTransition(.setThinking(true), to: session)
+                controller.sessionCoordinator.syncVisibleState(from: session)
             }
             controller.errorMessage = nil
 

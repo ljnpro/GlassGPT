@@ -44,7 +44,7 @@ public final class ComposerHostingView: UIView {
         fatalError("init(coder:) has not been implemented")
     }
 
-    public override func layoutSubviews() {
+    override public func layoutSubviews() {
         super.layoutSubviews()
         glassBackgroundView.frame = bounds
         textView.frame = bounds

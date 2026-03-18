@@ -15,6 +15,7 @@ public struct FilePreviewSheet: View {
 
     @AppStorage("appTheme") private var appThemeRawValue: String = AppTheme.system.rawValue
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.hapticsEnabled) var hapticsEnabled
 
     @State var saveState: SaveState = .idle
     @State var saveError: String?
@@ -26,6 +27,10 @@ public struct FilePreviewSheet: View {
 
     var fileURL: URL {
         previewItem.url
+    }
+
+    var hapticService: HapticService {
+        HapticService()
     }
 
     var canSaveToPhotos: Bool {

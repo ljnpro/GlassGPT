@@ -9,8 +9,8 @@ extension ChatRecoveryCoordinator {
     func pollResponseUntilTerminal(session: ReplySession, responseId: String) async {
         let key = activeAPIKey(for: session)
         guard !key.isEmpty else { return }
-        _ = await controller.applyRuntimeTransition(.beginRecoveryPoll, to: session)
-        controller.syncVisibleState(from: session)
+        _ = await controller.sessionCoordinator.applyRuntimeTransition(.beginRecoveryPoll, to: session)
+        controller.sessionCoordinator.syncVisibleState(from: session)
         var attempts = 0
         let maxAttempts = 180
         var lastResult: OpenAIResponseFetchResult?
@@ -38,7 +38,7 @@ extension ChatRecoveryCoordinator {
                     }
 
                 case .completed, .incomplete, .failed, .unknown:
-                    if let message = controller.findMessage(byId: session.messageID) {
+                    if let message = controller.conversationCoordinator.findMessage(byId: session.messageID) {
                         if result.status == .failed || result.status == .incomplete,
                            controller.visibleSessionMessageID == session.messageID {
                             controller.errorMessage = result.errorMessage ?? "Response did not complete."
@@ -54,7 +54,7 @@ extension ChatRecoveryCoordinator {
                     return
                 }
             } catch {
-                if let message = controller.findMessage(byId: session.messageID),
+                if let message = controller.conversationCoordinator.findMessage(byId: session.messageID),
                    handleUnrecoverableRecoveryError(
                     error,
                     for: message,
@@ -78,7 +78,7 @@ extension ChatRecoveryCoordinator {
             }
         }
 
-        guard !Task.isCancelled, let message = controller.findMessage(byId: session.messageID) else { return }
+        guard !Task.isCancelled, let message = controller.conversationCoordinator.findMessage(byId: session.messageID) else { return }
 
         if controller.visibleSessionMessageID == session.messageID,
            let lastError,
@@ -114,9 +114,9 @@ extension ChatRecoveryCoordinator {
 
             switch result.status {
             case .queued, .inProgress:
-                if let message = controller.findMessage(byId: messageId),
-                   let session = controller.makeRecoverySession(for: message) {
-                    controller.registerSession(
+                if let message = controller.conversationCoordinator.findMessage(byId: messageId),
+                   let session = controller.sessionCoordinator.makeRecoverySession(for: message) {
+                    controller.sessionCoordinator.registerSession(
                         session,
                         execution: SessionExecutionState(service: controller.serviceFactory()),
                         visible: false
@@ -125,15 +125,15 @@ extension ChatRecoveryCoordinator {
                 }
 
             case .completed, .incomplete, .failed, .unknown:
-                guard let message = controller.findMessage(byId: messageId) else { return }
+                guard let message = controller.conversationCoordinator.findMessage(byId: messageId) else { return }
                 controller.applyRecoveredResult(
                     result,
                     to: message,
                     fallbackText: message.content,
                     fallbackThinking: message.thinking
                 )
-                controller.saveContextIfPossible("cancelBackgroundResponseAndSync")
-                controller.upsertMessage(message)
+                controller.conversationCoordinator.saveContextIfPossible("cancelBackgroundResponseAndSync")
+                controller.conversationCoordinator.upsertMessage(message)
                 controller.prefetchGeneratedFilesIfNeeded(for: message)
             }
         } catch {

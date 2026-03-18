@@ -1,10 +1,9 @@
 import ChatPersistenceSwiftData
 import ChatRuntimeModel
-import ChatUIComponents
 import Foundation
 
 @MainActor
-extension ChatController {
+extension ChatSessionCoordinator {
     func saveSessionIfNeeded(_ session: ReplySession) {
         guard cachedRuntimeState(for: session) != nil else { return }
         let now = Date()
@@ -14,22 +13,22 @@ extension ChatController {
     }
 
     func saveSessionNow(_ session: ReplySession) {
-        guard let message = findMessage(byId: session.messageID),
+        guard let message = controller.conversationCoordinator.findMessage(byId: session.messageID),
               let runtimeState = cachedRuntimeState(for: session) else { return }
 
-        messagePersistence.saveDraftState(from: .init(session: session, runtimeState: runtimeState), to: message)
+        controller.messagePersistence.saveDraftState(from: .init(session: session, runtimeState: runtimeState), to: message)
         session.lastDraftSaveTime = Date()
-        saveContextIfPossible("saveSessionNow")
+        controller.conversationCoordinator.saveContextIfPossible("saveSessionNow")
 
-        if message.conversation?.id == currentConversation?.id {
-            upsertMessage(message)
+        if message.conversation?.id == controller.currentConversation?.id {
+            controller.conversationCoordinator.upsertMessage(message)
         }
 
         syncVisibleState(from: session)
     }
 
     func finalizeSession(_ session: ReplySession) {
-        guard let message = findMessage(byId: session.messageID),
+        guard let message = controller.conversationCoordinator.findMessage(byId: session.messageID),
               let runtimeState = cachedRuntimeState(for: session) else {
             removeSession(session)
             return
@@ -58,48 +57,48 @@ extension ChatController {
             ),
             isThinking: false
         )
-        sessionRegistry.updateRuntimeState(normalizedRuntimeState, for: session.messageID)
-        messagePersistence.finalizeCompletedSession(
+        controller.sessionRegistry.updateRuntimeState(normalizedRuntimeState, for: session.messageID)
+        controller.messagePersistence.finalizeCompletedSession(
             from: .init(session: session, runtimeState: normalizedRuntimeState),
             to: message
         )
-        upsertMessage(message)
-        saveContextIfPossible("finalizeSession")
-        prefetchGeneratedFilesIfNeeded(for: message)
+        controller.conversationCoordinator.upsertMessage(message)
+        controller.conversationCoordinator.saveContextIfPossible("finalizeSession")
+        controller.fileInteractionCoordinator.prefetchGeneratedFilesIfNeeded(for: message)
 
         let finishedConversation = message.conversation
-        let wasVisible = visibleSessionMessageID == session.messageID
+        let wasVisible = controller.visibleSessionMessageID == session.messageID
 
         removeSession(session)
 
         if let finishedConversation,
            finishedConversation.title == "New Chat",
            finishedConversation.messages.count >= 2 {
-            let viewModel = self
+            let viewModel = controller
             Task { @MainActor in
                 await viewModel.generateTitleIfNeeded(for: finishedConversation)
             }
         }
 
         if wasVisible {
-            HapticService.shared.notify(.success)
+            controller.hapticService.notify(.success, isEnabled: controller.hapticsEnabled)
         }
     }
 
     func finalizeSessionAsPartial(_ session: ReplySession) {
-        guard let message = findMessage(byId: session.messageID),
+        guard let message = controller.conversationCoordinator.findMessage(byId: session.messageID),
               let runtimeState = cachedRuntimeState(for: session) else {
             removeSession(session)
             return
         }
 
-        messagePersistence.finalizePartialSession(
+        controller.messagePersistence.finalizePartialSession(
             from: .init(session: session, runtimeState: runtimeState),
             to: message
         )
-        upsertMessage(message)
-        saveContextIfPossible("finalizeSessionAsPartial")
-        prefetchGeneratedFilesIfNeeded(for: message)
+        controller.conversationCoordinator.upsertMessage(message)
+        controller.conversationCoordinator.saveContextIfPossible("finalizeSessionAsPartial")
+        controller.fileInteractionCoordinator.prefetchGeneratedFilesIfNeeded(for: message)
         removeSession(session)
     }
 
@@ -109,18 +108,18 @@ extension ChatController {
             conversation.messages.remove(at: idx)
         }
 
-        if let idx = messages.firstIndex(where: { $0.id == message.id }) {
-            messages.remove(at: idx)
+        if let idx = controller.messages.firstIndex(where: { $0.id == message.id }) {
+            controller.messages.remove(at: idx)
         }
 
-        conversationRepository.delete(message)
-        saveContextIfPossible("removeEmptyMessage")
+        controller.conversationRepository.delete(message)
+        controller.conversationCoordinator.saveContextIfPossible("removeEmptyMessage")
         removeSession(session)
     }
 
     func removeSession(_ session: ReplySession) {
-        let wasVisible = visibleSessionMessageID == session.messageID
-        sessionRegistry.remove(session) { target in
+        let wasVisible = controller.visibleSessionMessageID == session.messageID
+        controller.sessionRegistry.remove(session) { target in
             target.task?.cancel()
             target.service.cancelStream()
         }
