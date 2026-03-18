@@ -1,6 +1,4 @@
 import ChatPersistenceSwiftData
-import ChatPersistenceCore
-import ChatUIComponents
 import Foundation
 import OpenAITransport
 
@@ -14,76 +12,29 @@ extension ChatController {
         session: ReplySession,
         visible: Bool
     ) -> Bool {
-        guard case let OpenAIServiceError.httpError(statusCode, responseBody) = error, statusCode == 404 else {
-            return false
-        }
-
-        let fallbackText: String
-        if message.usedBackgroundMode {
-            if visible {
-                errorMessage = "This response is no longer resumable."
-            }
-            fallbackText = recoveryFallbackText(for: message, session: session)
-        } else {
-            if visible {
-                errorMessage = nil
-            }
-            fallbackText = interruptedResponseFallbackText(for: message, session: session)
-        }
-
-        #if DEBUG
-        Loggers.recovery.debug("[Recovery] Response \(responseId) is no longer available: \(responseBody)")
-        #endif
-
-        finishRecovery(
+        recoveryCoordinator.handleUnrecoverableRecoveryError(
+            error,
             for: message,
+            responseId: responseId,
             session: session,
-            result: nil,
-            fallbackText: fallbackText,
-            fallbackThinking: recoveryFallbackThinking(for: message, session: session)
+            visible: visible
         )
-        return true
     }
 
     func recoveryFallbackText(for message: Message, session: ReplySession? = nil) -> String {
-        if let session, !session.currentText.isEmpty {
-            return session.currentText
-        }
-        if message.id == visibleSessionMessageID, !currentStreamingText.isEmpty {
-            return currentStreamingText
-        }
-        return message.content
+        recoveryCoordinator.recoveryFallbackText(for: message, session: session)
     }
 
     func recoveryFallbackThinking(for message: Message, session: ReplySession? = nil) -> String? {
-        if let session, !session.currentThinking.isEmpty {
-            return session.currentThinking
-        }
-        if message.id == visibleSessionMessageID, !currentThinkingText.isEmpty {
-            return currentThinkingText
-        }
-        return message.thinking
+        recoveryCoordinator.recoveryFallbackThinking(for: message, session: session)
     }
 
     func interruptedResponseFallbackText(for message: Message, session: ReplySession? = nil) -> String {
-        let interruptionNotice = "Response interrupted because the app was closed before completion."
-        let baseText = recoveryFallbackText(for: message, session: session)
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-
-        guard !baseText.isEmpty else {
-            return interruptionNotice
-        }
-
-        if baseText.contains(interruptionNotice) {
-            return baseText
-        }
-
-        return "\(baseText)\n\n\(interruptionNotice)"
+        recoveryCoordinator.interruptedResponseFallbackText(for: message, session: session)
     }
 
     func activeAPIKey(for session: ReplySession) -> String {
-        let key = session.request.apiKey.trimmingCharacters(in: .whitespacesAndNewlines)
-        return key.isEmpty ? apiKey : key
+        recoveryCoordinator.activeAPIKey(for: session)
     }
 
     func applyRecoveredResult(
@@ -92,7 +43,7 @@ extension ChatController {
         fallbackText: String,
         fallbackThinking: String?
     ) {
-        messagePersistence.applyRecoveredResult(
+        recoveryCoordinator.applyRecoveredResult(
             result,
             to: message,
             fallbackText: fallbackText,
@@ -107,30 +58,12 @@ extension ChatController {
         fallbackText: String,
         fallbackThinking: String?
     ) {
-        applyRecoveredResult(
-            result,
-            to: message,
+        recoveryCoordinator.finishRecovery(
+            for: message,
+            session: session,
+            result: result,
             fallbackText: fallbackText,
             fallbackThinking: fallbackThinking
         )
-
-        saveContextIfPossible("finishRecovery")
-        upsertMessage(message)
-        prefetchGeneratedFilesIfNeeded(for: message)
-
-        let conversation = message.conversation
-        let wasVisible = visibleSessionMessageID == session.messageID
-        removeSession(session)
-
-        if let conversation {
-            let viewModel = self
-            Task { @MainActor in
-                await viewModel.generateTitleIfNeeded(for: conversation)
-            }
-        }
-
-        if wasVisible {
-            HapticService.shared.notify(.success)
-        }
     }
 }

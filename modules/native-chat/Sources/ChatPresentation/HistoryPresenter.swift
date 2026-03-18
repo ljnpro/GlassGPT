@@ -29,14 +29,23 @@ public struct HistoryConversationRow: Equatable, Identifiable, Sendable {
 public final class HistoryPresenter {
     public var searchText = ""
     public private(set) var conversations: [HistoryConversationRow]
-    private let controller: HistorySceneController
+    private let loadConversationsHandler: () -> [HistoryConversationSummary]
+    private let selectConversationHandler: (UUID) -> Void
+    private let deleteConversationHandler: (UUID) -> Void
+    private let deleteAllConversationsHandler: () -> Void
 
     public init(
         conversations: [HistoryConversationSummary] = [],
-        controller: HistorySceneController
+        loadConversations: @escaping () -> [HistoryConversationSummary],
+        selectConversation: @escaping (UUID) -> Void,
+        deleteConversation: @escaping (UUID) -> Void,
+        deleteAllConversations: @escaping () -> Void
     ) {
         self.conversations = conversations.map(Self.makeRow)
-        self.controller = controller
+        self.loadConversationsHandler = loadConversations
+        self.selectConversationHandler = selectConversation
+        self.deleteConversationHandler = deleteConversation
+        self.deleteAllConversationsHandler = deleteAllConversations
     }
 
     public var filteredConversations: [HistoryConversationRow] {
@@ -50,20 +59,20 @@ public final class HistoryPresenter {
     }
 
     public func refresh() {
-        conversations = controller.loadConversations().map(Self.makeRow)
+        conversations = loadConversationsHandler().map(Self.makeRow)
     }
 
     public func selectConversation(id: UUID) {
-        controller.selectConversation(id: id)
+        selectConversationHandler(id)
     }
 
     public func deleteConversation(id: UUID) {
-        controller.deleteConversation(id: id)
+        deleteConversationHandler(id)
         refresh()
     }
 
     public func deleteAllConversations() {
-        controller.deleteAllConversations()
+        deleteAllConversationsHandler()
         refresh()
     }
 

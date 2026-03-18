@@ -13,6 +13,7 @@ import NativeChat
 import NativeChatUI
 import NativeChatComposition
 import ChatDomain
+import SwiftData
 
 final class NativeChatArchitectureTests: XCTestCase {
     private var packageRoot: URL {
@@ -153,7 +154,6 @@ final class NativeChatArchitectureTests: XCTestCase {
         let settings = SettingsStore(valueStore: valueStore)
         settings.defaultModel = .gpt5_4_pro
         XCTAssertEqual(settings.defaultModel, .gpt5_4_pro)
-        XCTAssertTrue(SwiftDataPersistenceModuleReadiness().usesLegacyAdapters)
 
         let descriptor = GeneratedFileDescriptor(
             fileID: "file_chart",
@@ -165,49 +165,45 @@ final class NativeChatArchitectureTests: XCTestCase {
         XCTAssertEqual(GeneratedFilePolicy.openBehavior(for: descriptor), .imagePreview)
 
         let replyID = AssistantReplyID()
-        let controller = await MainActor.run {
-            ChatSceneController(
-                registry: RuntimeRegistryActor(),
-                preparationPort: ArchitectureTestPreparationPort()
-            )
-        }
-        let startedReplyID = await controller.startReply(messageID: UUID(), conversationID: UUID())
-        XCTAssertNotEqual(replyID, startedReplyID)
-
         let session = ReplySessionActor(
             initialState: ReplyRuntimeState(
-                assistantReplyID: startedReplyID,
+                assistantReplyID: replyID,
                 messageID: UUID(),
                 conversationID: UUID()
             )
         )
         let registry = RuntimeRegistryActor()
-        await registry.register(session, for: startedReplyID)
-        let registryContainsReply = await registry.contains(startedReplyID)
+        await registry.register(session, for: replyID)
+        let registryContainsReply = await registry.contains(replyID)
         XCTAssertTrue(registryContainsReply)
+
+        let runtimeState = await session.apply(
+            .beginRecoveryStatus(
+                responseID: "resp_architecture",
+                lastSequenceNumber: 4,
+                usedBackgroundMode: true,
+                route: .gateway
+            )
+        )
+        XCTAssertEqual(runtimeState.responseID, "resp_architecture")
+        XCTAssertTrue(runtimeState.isRecovering)
 
         let streamingText = RichTextAttributedStringBuilder.parseStreamingText("**Ship** 4.5.0")
         XCTAssertEqual(String(streamingText.characters), "Ship 4.5.0")
 
-        let presenter = await MainActor.run {
-            ChatPresenter(bootstrapPolicy: .live)
-        }
         await MainActor.run {
-            presenter.render(
-                VisibleProjection(
-                    conversationID: UUID(),
-                    text: "Hello",
-                    thinking: "Plan",
-                    citations: [],
-                    generatedFiles: []
-                )
+            let container = try! ModelContainer(
+                for: Schema([Conversation.self, Message.self]),
+                configurations: [ModelConfiguration(isStoredInMemoryOnly: true)]
             )
-            XCTAssertEqual(presenter.projection.text, "Hello")
-            XCTAssertTrue(presenter.bootstrapPolicy.runLaunchTasks)
-
-            let factory = NativeChatContainerFactory()
-            _ = factory.makePresenter()
-            _ = factory.makeRootView()
+            let root = NativeChatCompositionRoot(
+                modelContext: ModelContext(container),
+                bootstrapPolicy: .testing
+            )
+            let store = root.makeAppStore()
+            XCTAssertNotNil(store.chatController)
+            XCTAssertNotNil(store.settingsPresenter)
+            XCTAssertNotNil(store.historyPresenter)
             _ = NativeChatRootTabsView(title: "Architecture")
         }
 
@@ -238,28 +234,4 @@ private final class InMemorySettingsValueStore: SettingsValueStore {
     func set(_ value: Any?, forKey defaultName: String) {
         storage[defaultName] = value
     }
-}
-
-@MainActor
-private final class ArchitectureTestPreparationPort: SendMessagePreparationPort {
-    func prepareSendMessage(text rawText: String) throws -> PreparedAssistantReply {
-        PreparedAssistantReply(
-            apiKey: "sk-test",
-            userMessageID: UUID(),
-            draftMessageID: UUID(),
-            conversationID: UUID(),
-            requestMessages: [],
-            requestModel: .gpt5_4_pro,
-            requestEffort: .xhigh,
-            requestUsesBackgroundMode: false,
-            requestServiceTier: .standard,
-            attachmentsToUpload: []
-        )
-    }
-
-    func uploadAttachments(_ attachments: [FileAttachment]) async -> [FileAttachment] {
-        attachments
-    }
-
-    func persistUploadedAttachments(_ attachments: [FileAttachment], onUserMessageID messageID: UUID) {}
 }

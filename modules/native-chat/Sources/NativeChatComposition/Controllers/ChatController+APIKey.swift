@@ -3,10 +3,10 @@ import Foundation
 @MainActor
 extension ChatController {
     var apiKey: String {
-        apiKeyStore.loadAPIKey() ?? ""
+        sendCoordinator.apiKey
     }
 
     var hasAPIKey: Bool {
-        !apiKey.isEmpty
+        sendCoordinator.hasAPIKey
     }
 }

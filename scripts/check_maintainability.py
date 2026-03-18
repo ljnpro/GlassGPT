@@ -25,6 +25,14 @@ MAX_JSON_SERIALIZATION = int(os.environ.get("MAX_JSON_SERIALIZATION", "0"))
 MAX_FATAL_ERRORS = int(os.environ.get("MAX_FATAL_ERRORS", "0"))
 MAX_PRECONDITION_FAILURES = int(os.environ.get("MAX_PRECONDITION_FAILURES", "0"))
 MAX_UNCHECKED_SENDABLE = int(os.environ.get("MAX_UNCHECKED_SENDABLE", "0"))
+MAX_NON_UI_FAMILY_LINES = int(os.environ.get("MAX_NON_UI_FAMILY_LINES", "600"))
+MAX_UI_FAMILY_LINES = int(os.environ.get("MAX_UI_FAMILY_LINES", "900"))
+MAX_SCREEN_STORE_FAMILY_LINES = int(os.environ.get("MAX_SCREEN_STORE_FAMILY_LINES", "260"))
+
+FAMILY_LINE_LIMIT_OVERRIDES = {
+    "ChatController": 1200,
+    "FileDownloadService": 750,
+}
 
 
 @dataclass
@@ -156,6 +164,67 @@ def line_length_results(files: list[Path]) -> list[CheckResult]:
     ]
 
 
+def family_name(path: Path) -> str:
+    stem = path.stem
+    if "+" in stem:
+        return stem.split("+", 1)[0]
+    return stem
+
+
+def family_length_results(files: list[Path]) -> list[CheckResult]:
+    families: dict[str, list[Path]] = {}
+    for path in files:
+        families.setdefault(family_name(path), []).append(path)
+
+    ui_over: list[str] = []
+    non_ui_over: list[str] = []
+    screen_store_over: list[str] = []
+
+    for name, family_files in families.items():
+        total_lines = sum(sum(1 for _ in path.open("r", encoding="utf-8")) for path in family_files)
+        entry = f"{total_lines}\t{name}\tfiles={len(family_files)}"
+        is_screen_store = any(classify_screen_store(path) for path in family_files)
+        is_ui = any(classify_ui(path) for path in family_files)
+
+        limit = FAMILY_LINE_LIMIT_OVERRIDES.get(name)
+        if is_screen_store:
+            family_limit = limit if limit is not None else MAX_SCREEN_STORE_FAMILY_LINES
+            if total_lines > family_limit:
+                screen_store_over.append(entry)
+            continue
+
+        if is_ui:
+            family_limit = limit if limit is not None else MAX_UI_FAMILY_LINES
+            if total_lines > family_limit:
+                ui_over.append(entry)
+            continue
+
+        family_limit = limit if limit is not None else MAX_NON_UI_FAMILY_LINES
+        if total_lines > family_limit:
+            non_ui_over.append(entry)
+
+    return [
+        CheckResult(
+            label=f"non-UI type families > {MAX_NON_UI_FAMILY_LINES} LOC (with overrides)",
+            count=len(non_ui_over),
+            limit=0,
+            matches=sorted(non_ui_over, reverse=True)[:20],
+        ),
+        CheckResult(
+            label=f"UI type families > {MAX_UI_FAMILY_LINES} LOC (with overrides)",
+            count=len(ui_over),
+            limit=0,
+            matches=sorted(ui_over, reverse=True)[:20],
+        ),
+        CheckResult(
+            label=f"ScreenStore type families > {MAX_SCREEN_STORE_FAMILY_LINES} LOC (with overrides)",
+            count=len(screen_store_over),
+            limit=0,
+            matches=sorted(screen_store_over, reverse=True)[:20],
+        ),
+    ]
+
+
 def main() -> int:
     files = production_swift_files()
 
@@ -173,6 +242,7 @@ def main() -> int:
         count_pattern(files, "production @unchecked Sendable", r"@unchecked\s+Sendable", MAX_UNCHECKED_SENDABLE),
     ]
     checks.extend(line_length_results(files))
+    checks.extend(family_length_results(files))
 
     failures = [check for check in checks if not check.ok]
 

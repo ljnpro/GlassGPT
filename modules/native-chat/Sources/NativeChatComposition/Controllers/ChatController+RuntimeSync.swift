@@ -1,107 +1,69 @@
 import ChatDomain
 import ChatPersistenceSwiftData
 import ChatRuntimeModel
+import ChatRuntimeWorkflows
 import Foundation
 
 @MainActor
 extension ChatController {
     func ensureRuntimeSessionRegistered(for session: ReplySession) {
-        let replyID = session.assistantReplyID
-        Task {
-            let alreadyRegistered = await runtimeRegistry.contains(replyID)
-            guard !alreadyRegistered else { return }
+        Task { @MainActor in
+            await ensureRuntimeSessionRegisteredNow(for: session)
+        }
+    }
+
+    func ensureRuntimeSessionRegisteredNow(for session: ReplySession) async {
+        let alreadyRegistered = await runtimeRegistry.contains(session.assistantReplyID)
+        if !alreadyRegistered {
             await runtimeRegistry.startSession(
-                replyID: replyID,
+                replyID: session.assistantReplyID,
                 messageID: session.messageID,
                 conversationID: session.conversationID
             )
         }
+        guard let replySession = await runtimeRegistry.session(for: session.assistantReplyID) else {
+            return
+        }
+        let state = await replySession.snapshot()
+        sessionRegistry.updateRuntimeState(state, for: session.messageID)
     }
 
-    func syncRuntimeSession(from session: ReplySession) {
-        let attachments = findMessage(byId: session.messageID)?.fileAttachments ?? []
-        let assistantReplyID = session.assistantReplyID
+    func runtimeState(for session: ReplySession) async -> ReplyRuntimeState? {
+        guard let replySession = await runtimeRegistry.session(for: session.assistantReplyID) else {
+            return nil
+        }
+        let state = await replySession.snapshot()
+        sessionRegistry.updateRuntimeState(state, for: session.messageID)
+        return state
+    }
+
+    func cachedRuntimeState(for session: ReplySession) -> ReplyRuntimeState? {
+        sessionRegistry.runtimeState(for: session.messageID)
+    }
+
+    func runtimeSession(for session: ReplySession) async -> ReplySessionActor? {
+        await runtimeRegistry.session(for: session.assistantReplyID)
+    }
+
+    func applyRuntimeTransition(
+        _ transition: ReplyRuntimeTransition,
+        to session: ReplySession
+    ) async -> ReplyRuntimeState? {
+        await ensureRuntimeSessionRegisteredNow(for: session)
+        guard let runtimeActor = await runtimeSession(for: session) else {
+            return nil
+        }
+        let state = await runtimeActor.apply(transition)
+        sessionRegistry.updateRuntimeState(state, for: session.messageID)
+        return state
+    }
+
+    func runtimeRoute(for session: ReplySession) -> OpenAITransportRoute {
         let usesGateway = sessionRegistry.execution(for: session.messageID)?
             .service
             .configurationProvider
             .useCloudflareGateway ?? configurationProvider.useCloudflareGateway
-        let route: OpenAITransportRoute = usesGateway ? .gateway : .direct
-        let cursor = session.responseId.map {
-            StreamCursor(
-                responseID: $0,
-                lastSequenceNumber: session.lastSequenceNumber,
-                route: route
-            )
-        }
-
-        let lifecycle: ReplyLifecycle
-        switch session.phase {
-        case .idle:
-            lifecycle = .idle
-        case .submitting:
-            lifecycle = .preparingInput
-        case .streaming:
-            lifecycle = cursor.map(ReplyLifecycle.streaming) ?? .preparingInput
-        case .recoveringStatus:
-            if let cursor {
-                let ticket = DetachedRecoveryTicket(
-                    assistantReplyID: assistantReplyID,
-                    messageID: session.messageID,
-                    conversationID: session.conversationID,
-                    responseID: cursor.responseID,
-                    lastSequenceNumber: cursor.lastSequenceNumber,
-                    usedBackgroundMode: session.request.usesBackgroundMode,
-                    route: cursor.route
-                )
-                lifecycle = .recoveringStatus(ticket)
-            } else {
-                lifecycle = .preparingInput
-            }
-        case .recoveringStream:
-            lifecycle = cursor.map(ReplyLifecycle.recoveringStream) ?? .preparingInput
-        case .recoveringPoll:
-            if let cursor {
-                let ticket = DetachedRecoveryTicket(
-                    assistantReplyID: assistantReplyID,
-                    messageID: session.messageID,
-                    conversationID: session.conversationID,
-                    responseID: cursor.responseID,
-                    lastSequenceNumber: cursor.lastSequenceNumber,
-                    usedBackgroundMode: session.request.usesBackgroundMode,
-                    route: cursor.route
-                )
-                lifecycle = .recoveringPoll(ticket)
-            } else {
-                lifecycle = .preparingInput
-            }
-        case .finalizing:
-            lifecycle = .finalizing
-        case .completed:
-            lifecycle = .completed
-        case .failed:
-            lifecycle = .failed(nil)
-        }
-
-        let state = ReplyRuntimeState(
-            assistantReplyID: assistantReplyID,
-            messageID: session.messageID,
-            conversationID: session.conversationID,
-            lifecycle: lifecycle,
-            buffer: ReplyBuffer(
-                text: session.currentText,
-                thinking: session.currentThinking,
-                toolCalls: session.toolCalls,
-                citations: session.citations,
-                filePathAnnotations: session.filePathAnnotations,
-                attachments: attachments
-            ),
-            cursor: cursor
-        )
-
-        Task {
-            guard let replySession = await runtimeRegistry.session(for: assistantReplyID) else { return }
-            await replySession.replaceState(with: state)
-        }
+        return usesGateway ? .gateway : .direct
     }
 
     func removeRuntimeSession(for session: ReplySession) {
@@ -115,34 +77,40 @@ extension ChatController {
         let sessions = sessionRegistry.allSessions
         guard !sessions.isEmpty else { return }
 
-        for session in sessions {
-            saveSessionNow(session)
-            session.cancelStreaming()
-            let execution = sessionRegistry.execution(for: session.messageID)
-            execution?.service.cancelStream()
-            execution?.task?.cancel()
+        Task { @MainActor in
+            for session in sessions {
+                saveSessionNow(session)
+                _ = await applyRuntimeTransition(
+                    .detachForBackground(usedBackgroundMode: session.request.usesBackgroundMode),
+                    to: session
+                )
+                let execution = sessionRegistry.execution(for: session.messageID)
+                execution?.service.cancelStream()
+                execution?.task?.cancel()
 
-            guard let message = findMessage(byId: session.messageID) else { continue }
+                guard let message = findMessage(byId: session.messageID),
+                      let runtimeState = await runtimeState(for: session) else { continue }
 
-            if session.responseId != nil {
-                message.isComplete = false
-                message.conversation?.updatedAt = .now
-                upsertMessage(message)
-            } else {
-                message.content = interruptedResponseFallbackText(for: message, session: session)
-                message.thinking = session.currentThinking.isEmpty ? nil : session.currentThinking
-                message.isComplete = true
-                message.lastSequenceNumber = nil
-                message.conversation?.updatedAt = .now
-                upsertMessage(message)
+                if runtimeState.responseID != nil {
+                    message.isComplete = false
+                    message.conversation?.updatedAt = .now
+                    upsertMessage(message)
+                } else {
+                    message.content = interruptedResponseFallbackText(for: message, session: session)
+                    message.thinking = runtimeState.buffer.thinking.isEmpty ? nil : runtimeState.buffer.thinking
+                    message.isComplete = true
+                    message.lastSequenceNumber = nil
+                    message.conversation?.updatedAt = .now
+                    upsertMessage(message)
+                }
             }
-        }
 
-        saveContextIfPossible("suspendActiveSessionsForAppBackground")
-        sessionRegistry.removeAll { execution in
-            execution.task?.cancel()
-            execution.service.cancelStream()
+            saveContextIfPossible("suspendActiveSessionsForAppBackground")
+            sessionRegistry.removeAll { execution in
+                execution.task?.cancel()
+                execution.service.cancelStream()
+            }
+            detachVisibleSessionBinding()
         }
-        detachVisibleSessionBinding()
     }
 }

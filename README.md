@@ -1,44 +1,51 @@
-<h1 align="center">GlassGPT</h1>
+# GlassGPT
 
-<p align="center">
-  A native AI chat client for iOS &amp; iPadOS, built in SwiftUI with Apple's Liquid Glass design language.
-</p>
+GlassGPT is a native iOS and iPadOS OpenAI chat client built and released entirely from Swift, SwiftUI, SwiftData, and Xcode.
 
----
-
-## Overview
-
-GlassGPT is a pure native iOS app that connects to the OpenAI API using your own API key. The full product UI, data layer, and release pipeline live in Swift and Xcode with no Expo, React Native, Metro, CocoaPods, or Node runtime in the shipping app.
-
-## Architecture
+## Repository Shape
 
 ```text
 GlassGPT/
 ├── ios/
-│   ├── GlassGPT.xcodeproj        # Native Xcode project and release settings
-│   └── GlassGPT/                 # App entry point, plist, entitlements, asset catalogs
+│   ├── GlassGPT.xcodeproj
+│   ├── GlassGPT.xcworkspace
+│   └── GlassGPT/
 ├── modules/native-chat/
-│   ├── Package.swift             # Local Swift package consumed by the app target
-│   └── ios/
-│       ├── Models/
-│       ├── Services/
-│       ├── ViewModels/
-│       ├── Views/
-│       ├── Resources/
-│       └── NativeChatPersistence.swift
-└── .local/                       # Local release instructions and publishing credentials
+│   ├── Package.swift
+│   ├── Sources/
+│   │   ├── ChatDomain/
+│   │   ├── ChatPersistenceContracts/
+│   │   ├── ChatPersistenceCore/
+│   │   ├── ChatPersistenceSwiftData/
+│   │   ├── OpenAITransport/
+│   │   ├── GeneratedFilesCore/
+│   │   ├── GeneratedFilesInfra/
+│   │   ├── ChatRuntimeModel/
+│   │   ├── ChatRuntimePorts/
+│   │   ├── ChatRuntimeWorkflows/
+│   │   ├── ChatApplication/
+│   │   ├── ChatPresentation/
+│   │   ├── ChatUIComponents/
+│   │   ├── NativeChatUI/
+│   │   ├── NativeChatComposition/
+│   │   └── NativeChat/
+│   └── Tests/
+├── docs/
+└── scripts/
 ```
 
-## Getting Started
+## 4.6.0 Architecture
 
-1. Open the native project:
-   ```bash
-   open ios/GlassGPT.xcodeproj
-   ```
+- `ReplySessionActor` is the single mutable runtime owner.
+- `ChatController` is an observable projection facade backed by coordinators.
+- `NativeChatCompositionRoot` is the only production composition root.
+- Persistence ships no mid-cutover status marker or legacy-compat residue.
+- CI enforces build, architecture, maintainability, source-share, module-boundary, and release-readiness gates.
 
-2. Build from the command line:
-   ```bash
-   xcodebuild -project ios/GlassGPT.xcodeproj -scheme GlassGPT -destination 'generic/platform=iOS Simulator' build
-   ```
+## Common Commands
 
-3. Publish builds using the local instructions in `.local/README.md`.
+```bash
+./scripts/ci.sh
+./scripts/ci.sh maintainability
+./scripts/release_testflight.sh 4.6.0 <build-number> --branch codex/stable-4.6
+```

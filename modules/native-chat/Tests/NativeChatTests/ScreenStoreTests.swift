@@ -97,7 +97,7 @@ final class ScreenStoreTests: XCTestCase {
             )
         ]
         store.isThinking = true
-        store.visibleRecoveryPhase = .pollingTerminal
+        store.isRecovering = true
         store.draftMessage = draft
         store.activeToolCalls = [ToolCallInfo(id: "tool_1", type: .webSearch, status: .searching)]
         store.liveCitations = [URLCitation(url: "https://example.com", title: "Example", startIndex: 0, endIndex: 7)]
@@ -139,7 +139,7 @@ final class ScreenStoreTests: XCTestCase {
         XCTAssertNil(store.selectedImageData)
         XCTAssertTrue(store.pendingAttachments.isEmpty)
         XCTAssertFalse(store.isThinking)
-        XCTAssertEqual(store.visibleRecoveryPhase, .idle)
+        XCTAssertFalse(store.isRecovering)
         XCTAssertNil(store.draftMessage)
         XCTAssertTrue(store.activeToolCalls.isEmpty)
         XCTAssertTrue(store.liveCitations.isEmpty)
@@ -610,12 +610,10 @@ final class ScreenStoreTests: XCTestCase {
         var deleteAllCount = 0
 
         let store = HistoryPresenter(
-            controller: HistorySceneController(
-                loadConversations: { [] },
-                selectConversation: { selectedConversationID = $0 },
-                deleteConversation: { deletedConversationID = $0 },
-                deleteAllConversations: { deleteAllCount += 1 }
-            )
+            loadConversations: { [] },
+            selectConversation: { selectedConversationID = $0 },
+            deleteConversation: { deletedConversationID = $0 },
+            deleteAllConversations: { deleteAllCount += 1 }
         )
 
         store.searchText = "Release"
@@ -632,12 +630,10 @@ final class ScreenStoreTests: XCTestCase {
     func testHistoryPresenterDeleteAllDoesNotDisturbSearchState() {
         var deleteAllCount = 0
         let store = HistoryPresenter(
-            controller: HistorySceneController(
-                loadConversations: { [] },
-                selectConversation: { _ in XCTFail("selection should not be called") },
-                deleteConversation: { _ in XCTFail("single delete should not be called") },
-                deleteAllConversations: { deleteAllCount += 1 }
-            )
+            loadConversations: { [] },
+            selectConversation: { _ in XCTFail("selection should not be called") },
+            deleteConversation: { _ in XCTFail("single delete should not be called") },
+            deleteAllConversations: { deleteAllCount += 1 }
         )
 
         store.searchText = "Archive"
@@ -650,7 +646,10 @@ final class ScreenStoreTests: XCTestCase {
     func testNativeChatAppStoreHistoryCallbacksLoadSelectionAndResetCurrentConversation() throws {
         let container = try makeInMemoryModelContainer()
         let modelContext = ModelContext(container)
-        let appStore = NativeChatAppStore(modelContext: modelContext)
+        let appStore = NativeChatCompositionRoot(
+            modelContext: modelContext,
+            bootstrapPolicy: .testing
+        ).makeAppStore()
         let conversation = Conversation(title: "Selected Conversation")
         let message = Message(role: .assistant, content: "Loaded reply", conversation: conversation)
         conversation.messages.append(message)
@@ -684,7 +683,10 @@ final class ScreenStoreTests: XCTestCase {
 
     func testNativeChatAppStoreDismissesUITestPreviewStateAcrossStoreAndAppProjection() throws {
         let container = try makeInMemoryModelContainer()
-        let appStore = NativeChatAppStore(modelContext: ModelContext(container))
+        let appStore = NativeChatCompositionRoot(
+            modelContext: ModelContext(container),
+            bootstrapPolicy: .testing
+        ).makeAppStore()
         let preview = FilePreviewItem(
             url: URL(fileURLWithPath: "/tmp/chart.png"),
             kind: .generatedImage,

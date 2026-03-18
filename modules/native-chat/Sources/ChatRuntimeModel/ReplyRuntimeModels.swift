@@ -90,7 +90,7 @@ public struct ReplyRuntimeState: Equatable, Sendable {
     public let conversationID: UUID
     public var lifecycle: ReplyLifecycle
     public var buffer: ReplyBuffer
-    public var cursor: StreamCursor?
+    public var isThinking: Bool
 
     public init(
         assistantReplyID: AssistantReplyID,
@@ -98,13 +98,54 @@ public struct ReplyRuntimeState: Equatable, Sendable {
         conversationID: UUID,
         lifecycle: ReplyLifecycle = .idle,
         buffer: ReplyBuffer = .init(),
-        cursor: StreamCursor? = nil
+        isThinking: Bool = false
     ) {
         self.assistantReplyID = assistantReplyID
         self.messageID = messageID
         self.conversationID = conversationID
         self.lifecycle = lifecycle
         self.buffer = buffer
-        self.cursor = cursor
+        self.isThinking = isThinking
+    }
+
+    public var cursor: StreamCursor? {
+        switch lifecycle {
+        case .streaming(let cursor), .recoveringStream(let cursor):
+            return cursor
+        case .recoveringStatus(let ticket), .recoveringPoll(let ticket), .detached(let ticket):
+            return StreamCursor(
+                responseID: ticket.responseID,
+                lastSequenceNumber: ticket.lastSequenceNumber,
+                route: ticket.route
+            )
+        case .idle, .preparingInput, .uploadingAttachments, .finalizing, .completed, .failed:
+            return nil
+        }
+    }
+
+    public var responseID: String? {
+        cursor?.responseID
+    }
+
+    public var lastSequenceNumber: Int? {
+        cursor?.lastSequenceNumber
+    }
+
+    public var isStreaming: Bool {
+        switch lifecycle {
+        case .streaming, .recoveringStream:
+            return true
+        case .idle, .preparingInput, .uploadingAttachments, .detached, .recoveringStatus, .recoveringPoll, .finalizing, .completed, .failed:
+            return false
+        }
+    }
+
+    public var isRecovering: Bool {
+        switch lifecycle {
+        case .recoveringStatus, .recoveringStream, .recoveringPoll:
+            return true
+        case .idle, .preparingInput, .uploadingAttachments, .streaming, .detached, .finalizing, .completed, .failed:
+            return false
+        }
     }
 }
