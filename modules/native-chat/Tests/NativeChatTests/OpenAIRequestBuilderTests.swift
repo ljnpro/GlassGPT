@@ -1,5 +1,9 @@
+import ChatPersistenceCore
+import ChatDomain
+import ChatPersistenceSwiftData
+import OpenAITransport
 import XCTest
-@testable import NativeChat
+@testable import NativeChatComposition
 
 final class OpenAIRequestBuilderTests: XCTestCase {
     private var originalGatewayEnabled = false
@@ -148,9 +152,14 @@ final class OpenAIRequestBuilderTests: XCTestCase {
     }
 
     func testRecoveryRequestUsesGatewayRouteAndAuthorizationWhenEnabled() throws {
-        SettingsStore.shared.cloudflareGatewayEnabled = true
-
-        let builder = OpenAIRequestBuilder()
+        let provider = DefaultOpenAIConfigurationProvider(
+            directOpenAIBaseURL: { "https://api.openai.com/v1" },
+            cloudflareGatewayBaseURL: { DefaultOpenAIConfigurationProvider.bundledCloudflareGatewayBaseURL },
+            cloudflareAIGToken: { DefaultOpenAIConfigurationProvider.bundledCloudflareAIGToken },
+            useCloudflareGateway: { true },
+            setUseCloudflareGateway: { _ in }
+        )
+        let builder = OpenAIRequestBuilder(configuration: provider)
         let request = try builder.recoveryRequest(
             responseId: "resp_123",
             startingAfter: 9,
@@ -161,7 +170,7 @@ final class OpenAIRequestBuilderTests: XCTestCase {
         let url = try XCTUnwrap(request.url)
         let components = try XCTUnwrap(URLComponents(url: url, resolvingAgainstBaseURL: false))
 
-        XCTAssertTrue(url.absoluteString.hasPrefix(FeatureFlags.cloudflareGatewayBaseURL))
+        XCTAssertTrue(url.absoluteString.hasPrefix(provider.cloudflareGatewayBaseURL))
         XCTAssertEqual(components.path, "/v1/887b39f387990e7ef89e400eb228e193/glass-gpt/openai/responses/resp_123")
         XCTAssertEqual(components.queryItems?.first(where: { $0.name == "stream" })?.value, "true")
         XCTAssertEqual(components.queryItems?.first(where: { $0.name == "starting_after" })?.value, "9")

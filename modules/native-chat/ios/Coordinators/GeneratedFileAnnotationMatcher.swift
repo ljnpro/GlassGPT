@@ -1,3 +1,0 @@
-import GeneratedFilesCore
-
-typealias GeneratedFileAnnotationMatcher = GeneratedFilesCore.GeneratedFileAnnotationMatcher

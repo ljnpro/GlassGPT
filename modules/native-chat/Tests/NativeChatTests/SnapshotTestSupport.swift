@@ -1,9 +1,17 @@
+import ChatApplication
+import ChatDomain
+import ChatPersistenceSwiftData
+import ChatPersistenceCore
+import ChatPresentation
+import GeneratedFilesInfra
+import NativeChatUI
+import OpenAITransport
 import SnapshotTesting
 import SwiftData
 import SwiftUI
 import UIKit
 import XCTest
-@testable import NativeChat
+@testable import NativeChatComposition
 
 enum SnapshotTestThemeVariant: CaseIterable {
     case phoneLight
@@ -130,7 +138,7 @@ func assertViewSnapshots<V: View>(
 }
 
 @MainActor
-func makeSnapshotChatScreenStore(hasAPIKey: Bool = false) throws -> ChatScreenStore {
+func makeSnapshotChatScreenStore(hasAPIKey: Bool = false) throws -> ChatController {
     let container = try makeInMemoryModelContainer()
     let context = ModelContext(container)
     let settingsValueStore = InMemorySettingsValueStore()
@@ -141,16 +149,16 @@ func makeSnapshotChatScreenStore(hasAPIKey: Bool = false) throws -> ChatScreenSt
     let apiBackend = InMemoryAPIKeyBackend()
     apiBackend.storedKey = hasAPIKey ? "sk-snapshot" : nil
 
-    return ChatScreenStore(
+    return ChatController(
         modelContext: context,
         settingsStore: SettingsStore(valueStore: settingsValueStore),
-        apiKeyStore: APIKeyStore(backend: apiBackend),
+        apiKeyStore: PersistedAPIKeyStore(backend: apiBackend),
         bootstrapPolicy: .testing
     )
 }
 
 @MainActor
-func makeConversationSamples(in viewModel: ChatScreenStore) -> Conversation {
+func makeConversationSamples(in viewModel: ChatController) -> Conversation {
     let conversation = Conversation(
         title: "Release Planning",
         model: ModelType.gpt5_4.rawValue,
@@ -195,7 +203,7 @@ func makeConversationSamples(in viewModel: ChatScreenStore) -> Conversation {
 }
 
 @MainActor
-func makeRichMarkdownConversationSamples(in viewModel: ChatScreenStore) -> Conversation {
+func makeRichMarkdownConversationSamples(in viewModel: ChatController) -> Conversation {
     let conversation = RichAssistantReplyFixture.makeConversation()
     viewModel.currentConversation = conversation
     viewModel.messages = conversation.messages.sorted { $0.createdAt < $1.createdAt }
@@ -203,7 +211,7 @@ func makeRichMarkdownConversationSamples(in viewModel: ChatScreenStore) -> Conve
 }
 
 @MainActor
-func makeRichMarkdownCodeBlockConversationSamples(in viewModel: ChatScreenStore) -> Conversation {
+func makeRichMarkdownCodeBlockConversationSamples(in viewModel: ChatController) -> Conversation {
     let conversation = RichAssistantReplyFixture.makeConversation(
         title: RichAssistantReplyFixture.codeConversationTitle,
         assistantReply: RichAssistantReplyFixture.assistantReplyWithCodeBlock
@@ -214,7 +222,7 @@ func makeRichMarkdownCodeBlockConversationSamples(in viewModel: ChatScreenStore)
 }
 
 @MainActor
-func makeSettingsSnapshotViewModel() -> SettingsScreenStore {
+func makeSettingsSnapshotViewModel() -> SettingsPresenter {
     let settingsValueStore = InMemorySettingsValueStore()
     settingsValueStore.set(ModelType.gpt5_4_pro.rawValue, forKey: SettingsStore.Keys.defaultModel)
     settingsValueStore.set(ReasoningEffort.xhigh.rawValue, forKey: SettingsStore.Keys.defaultEffort)
@@ -225,10 +233,28 @@ func makeSettingsSnapshotViewModel() -> SettingsScreenStore {
     settingsValueStore.set(false, forKey: SettingsStore.Keys.cloudflareGatewayEnabled)
 
     let apiBackend = InMemoryAPIKeyBackend()
+    let settingsStore = SettingsStore(valueStore: settingsValueStore)
+    let apiKeyStore = PersistedAPIKeyStore(backend: apiBackend)
+    let configurationProvider = RuntimeTestOpenAIConfigurationProvider()
+    let requestBuilder = OpenAIRequestBuilder(configuration: configurationProvider)
+    let transport = StubOpenAITransport()
+    let openAIService = OpenAIService(
+        requestBuilder: requestBuilder,
+        responseParser: OpenAIResponseParser(),
+        streamClient: QueuedOpenAIStreamClient(scriptedStreams: []),
+        transport: transport
+    )
 
-    return SettingsScreenStore(
-        settingsStore: SettingsStore(valueStore: settingsValueStore),
-        apiKeyStore: APIKeyStore(backend: apiBackend)
+    return makeSettingsPresenter(
+        settingsStore: settingsStore,
+        apiKeyStore: apiKeyStore,
+        openAIService: openAIService,
+        requestBuilder: requestBuilder,
+        transport: transport,
+        configurationProvider: configurationProvider,
+        fileDownloadService: GeneratedFilesInfra.FileDownloadService(configurationProvider: configurationProvider),
+        appVersionString: "4.5.0 (20176)",
+        platformString: "iOS 26.0 · Liquid Glass"
     )
 }
 
@@ -262,11 +288,30 @@ func makeHistorySnapshotContainer() throws -> ModelContainer {
 }
 
 @MainActor
-func makeHistoryScreenStore() -> HistoryScreenStore {
-    HistoryScreenStore(
-        onSelectConversation: { _ in },
-        onDeleteConversation: { _ in },
-        onDeleteAllConversations: {}
+func makeHistoryScreenStore() -> HistoryPresenter {
+    HistoryPresenter(
+        conversations: [
+            HistoryConversationSummary(
+                id: UUID(),
+                title: "Conversation 1",
+                preview: "Snapshot sample 1",
+                updatedAt: Date(timeIntervalSince1970: 10),
+                modelDisplayName: "GPT-5.4"
+            ),
+            HistoryConversationSummary(
+                id: UUID(),
+                title: "Conversation 2",
+                preview: "Snapshot sample 2",
+                updatedAt: Date(timeIntervalSince1970: 9),
+                modelDisplayName: "GPT-5.4"
+            )
+        ],
+        controller: HistorySceneController(
+            loadConversations: { [] },
+            selectConversation: { _ in },
+            deleteConversation: { _ in },
+            deleteAllConversations: {}
+        )
     )
 }
 

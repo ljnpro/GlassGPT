@@ -27,6 +27,7 @@ ACTIVE_SOURCE_TARGETS = (
     "ChatUIComponents",
     "NativeChatUI",
     "NativeChatComposition",
+    "NativeChat",
 )
 
 
@@ -56,7 +57,7 @@ TARGET_RULES: dict[str, TargetRule] = {
         ),
     ),
     "ChatPersistenceCore": TargetRule(
-        allowed_imports=frozenset({"Foundation", "ChatDomain", "Security"}),
+        allowed_imports=frozenset({"Foundation", "ChatDomain", "Security", "OSLog"}),
         forbidden_patterns=(
             ("Bundle.main", "ChatPersistenceCore must not reach app bundle state"),
             ("ProcessInfo.processInfo", "ChatPersistenceCore must not read process environment"),
@@ -64,7 +65,7 @@ TARGET_RULES: dict[str, TargetRule] = {
         ),
     ),
     "ChatPersistenceSwiftData": TargetRule(
-        allowed_imports=frozenset({"Foundation", "SwiftData", "ChatDomain", "ChatPersistenceContracts", "ChatPersistenceCore"}),
+        allowed_imports=frozenset({"Foundation", "SwiftData", "CryptoKit", "ChatDomain", "ChatPersistenceContracts", "ChatPersistenceCore", "OpenAITransport"}),
         forbidden_patterns=(
             ("Bundle.main", "ChatPersistenceSwiftData must not reach app bundle state"),
             ("ProcessInfo.processInfo", "ChatPersistenceSwiftData must not read process environment"),
@@ -72,7 +73,7 @@ TARGET_RULES: dict[str, TargetRule] = {
         ),
     ),
     "OpenAITransport": TargetRule(
-        allowed_imports=frozenset({"Foundation", "ChatDomain"}),
+        allowed_imports=frozenset({"Foundation", "ChatDomain", "Synchronization"}),
         forbidden_patterns=(
             ("Bundle.main", "OpenAITransport must not reach app bundle state directly"),
             ("ProcessInfo.processInfo", "OpenAITransport configuration must flow through providers"),
@@ -88,7 +89,7 @@ TARGET_RULES: dict[str, TargetRule] = {
         ),
     ),
     "GeneratedFilesInfra": TargetRule(
-        allowed_imports=frozenset({"Foundation", "OSLog", "ChatDomain", "GeneratedFilesCore", "OpenAITransport"}),
+        allowed_imports=frozenset({"Foundation", "OSLog", "ImageIO", "PDFKit", "ChatDomain", "GeneratedFilesCore", "OpenAITransport"}),
         forbidden_patterns=(
             ("Bundle.main", "GeneratedFilesInfra must not reach app bundle state"),
             ("ProcessInfo.processInfo", "GeneratedFilesInfra must not read process environment"),
@@ -130,7 +131,7 @@ TARGET_RULES: dict[str, TargetRule] = {
         ),
     ),
     "ChatPresentation": TargetRule(
-        allowed_imports=frozenset({"Foundation", "ChatDomain", "GeneratedFilesCore", "ChatApplication"}),
+        allowed_imports=frozenset({"Foundation", "Observation", "ChatDomain", "GeneratedFilesCore", "ChatApplication"}),
         forbidden_patterns=(
             ("Bundle.main", "ChatPresentation must not reach app bundle state"),
             ("ProcessInfo.processInfo", "ChatPresentation must not read process environment"),
@@ -139,7 +140,7 @@ TARGET_RULES: dict[str, TargetRule] = {
         ),
     ),
     "ChatUIComponents": TargetRule(
-        allowed_imports=frozenset({"Foundation", "SwiftUI", "UIKit"}),
+        allowed_imports=frozenset({"Foundation", "SwiftUI", "UIKit", "PDFKit", "Photos", "QuickLook", "UniformTypeIdentifiers"}),
         forbidden_patterns=(
             ("Bundle.main", "ChatUIComponents should not reach app bundle state"),
             ("ProcessInfo.processInfo", "ChatUIComponents should not read process environment"),
@@ -147,7 +148,7 @@ TARGET_RULES: dict[str, TargetRule] = {
         ),
     ),
     "NativeChatUI": TargetRule(
-        allowed_imports=frozenset({"Foundation", "SwiftUI", "ChatDomain", "ChatPresentation", "ChatUIComponents"}),
+        allowed_imports=frozenset({"Foundation", "SwiftUI", "UIKit", "WebKit", "PDFKit", "Photos", "ImageIO", "ChatDomain", "ChatPresentation", "ChatUIComponents", "GeneratedFilesCore"}),
         forbidden_patterns=(
             ("Bundle.main", "NativeChatUI should consume resolved configuration rather than Bundle.main"),
             ("ProcessInfo.processInfo", "NativeChatUI should not read process environment"),
@@ -158,6 +159,7 @@ TARGET_RULES: dict[str, TargetRule] = {
     "NativeChatComposition": TargetRule(
         allowed_imports=frozenset({
             "Foundation",
+            "SwiftData",
             "SwiftUI",
             "ChatDomain",
             "ChatPersistenceContracts",
@@ -173,6 +175,18 @@ TARGET_RULES: dict[str, TargetRule] = {
             "ChatPresentation",
             "ChatUIComponents",
             "NativeChatUI",
+            "UIKit",
+            "PhotosUI",
+            "OSLog",
+        }),
+    ),
+    "NativeChat": TargetRule(
+        allowed_imports=frozenset({
+            "Foundation",
+            "SwiftData",
+            "SwiftUI",
+            "ChatPersistenceSwiftData",
+            "NativeChatComposition",
         }),
     ),
 }

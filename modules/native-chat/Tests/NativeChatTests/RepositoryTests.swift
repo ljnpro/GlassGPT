@@ -1,6 +1,8 @@
+import ChatDomain
+import ChatPersistenceSwiftData
 import XCTest
 import SwiftData
-@testable import NativeChat
+@testable import NativeChatComposition
 
 final class RepositoryTests: XCTestCase {
     @MainActor

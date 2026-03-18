@@ -1,12 +1,12 @@
-# 4.4.2 Parity Baseline
+# 4.5.0 Parity Baseline
 
-This document records the `4.4.1` production baseline that `4.4.2` must preserve.
+This document records the `4.4.2` production baseline that `4.5.0` must preserve.
 
 ## Stable Baseline
 
-- Source branch: `codex/stable-4.4`
-- Development branch: `codex/feature/4.4.2-*`
-- Baseline app version: `4.4.1 (20174)`
+- Source branch: `codex/stable-4.5`
+- Development branch: `codex/feature/4.5.0-*`
+- Baseline app version: `4.4.2 (20175)`
 - App target: `GlassGPT`
 - Package target: `NativeChat`
 - Current package size: ~14k Swift LOC across 101 Swift files
@@ -19,7 +19,7 @@ Last verified baseline command:
 xcodebuild -project ios/GlassGPT.xcodeproj -scheme GlassGPT -destination 'generic/platform=iOS Simulator' build
 ```
 
-Baseline result before 4.4.2 work:
+Baseline result before 4.5.0 work:
 
 - Build status: succeeded
 - Existing warnings:
@@ -41,14 +41,13 @@ The following must remain unchanged unless a release blocker forces a deviation:
 - One logical assistant reply remains one visible assistant bubble even across paragraph breaks and recovery
 - Generated image/document cache behavior
 - Cloudflare gateway behavior and defaults
-- Keychain API key storage behavior
-- Uninstall/reinstall behavior:
-  - if a key exists in Keychain, first launch after reinstall is immediately usable
-  - if no key exists, the app cold-starts into a stable empty shell with no recovery blocker
+- Reset-on-upgrade behavior:
+  - the first `4.5.0` launch performs a hard reset of local store, cache, and Keychain API key
+  - the app cold-starts into a stable empty shell and requires reconfiguration
 
 ## Manual Acceptance Checklist
 
-Run this checklist against both `v4.4.1` and the current `4.4.2` candidate before release:
+Run this checklist against both `v4.4.2` and the current `4.5.0` candidate before release:
 
 1. Launch the app and confirm the initial empty state matches.
 2. Open Settings and confirm sections, ordering, labels, and controls match.
@@ -64,8 +63,8 @@ Run this checklist against both `v4.4.1` and the current `4.4.2` candidate befor
 12. Open History, search conversations, select a conversation, delete one conversation, and delete all conversations.
 13. Open a generated file and confirm preview/share behavior matches.
 14. Clear image/document caches and confirm settings UI and results match.
-15. Delete the app, reinstall it, and confirm a previously saved API key is still available without manual recovery.
-16. Delete the app with no saved key, reinstall it, and confirm the empty shell is usable and routes the user to Settings only when they attempt a send.
+15. Launch `4.5.0` for the first time and confirm no prior history or API key is restored.
+16. Re-enter an API key after reset and confirm the empty shell becomes usable for new sends.
 
 ## Release Gates
 

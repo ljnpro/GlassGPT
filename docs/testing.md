@@ -2,13 +2,13 @@
 
 ## Principle
 
-4.4.2 prioritizes parity, maintainability, release reliability, and real module boundaries. Tests exist to prevent behavioral drift while proving that more of the production code now lives in directly testable source targets rather than only inside the app target.
+4.5.0 prioritizes terminal cutover, maintainability, release reliability, and real module boundaries. Tests exist to prevent behavioral drift while proving that production logic no longer lives in the legacy app-facing layer.
 
 ## Coverage
 
 - Unit tests
   - settings/defaults persistence
-  - API key store behavior via test doubles, including reinstall/keychain compatibility semantics
+  - API key store behavior via test doubles, including reset-first-launch semantics
   - request builder output
   - response parser behavior
   - repository CRUD and draft queries
@@ -24,7 +24,7 @@
 - UI tests
   - app launch reachability
   - scenario-driven smoke coverage for history open/search/delete flows
-  - settings theme persistence, API key save/clear, relaunch persistence, and gateway feedback
+  - settings theme persistence, API key save/clear, reset-first-launch, and gateway feedback
   - seeded conversation rendering, streaming indicators, model selection, file preview, and reply-split single-surface behavior
   - empty-install shell behavior with no seeded API key
 - Maintainability gates
@@ -88,7 +88,7 @@ xcodebuild -project ios/GlassGPT.xcodeproj -scheme GlassGPT -destination 'platfo
   - `views-and-presentation`
   - `app-shell`
 - Warnings are gated by `scripts/check_warnings.sh`. The only currently allowed warning is the external `appintentsmetadataprocessor` metadata extraction notice if Xcode emits it.
-- Snapshot comparisons anchor to the `4.4.1` production baseline set, and the release baseline is refreshed only when `docs/parity-baseline.md` is updated for `4.4.2`.
+- Snapshot comparisons anchor to the `4.4.2` production baseline set, and the release baseline is refreshed only when `docs/parity-baseline.md` is updated for `4.5.0`.
 - Before treating simulator launch failures as product regressions, check local machine load first.
   - If CPU is saturated, `SBMainWorkspace` launch denials, `BUILD INTERRUPTED`, or transient simulator install/launch failures can be host-pressure artifacts rather than app bugs.
   - When load is high, temporarily stop extra Codex subagents, shut down unused simulators, and rerun the failing gate serially before debugging production code.
@@ -96,9 +96,9 @@ xcodebuild -project ios/GlassGPT.xcodeproj -scheme GlassGPT -destination 'platfo
   - one assistant reply -> one visible bubble
   - stale stream tasks cannot write after reconnect/recovery/cancel
   - background-mode resume vs polling remains branch-equivalent to the 4.4.0 maintained baseline
-  - uninstall/reinstall must preserve the API key via Keychain without requiring a recovery flow
+  - first `4.5.0` launch must clear stale local state and land in a stable empty shell
 
-## 4.4.2 Gates
+## 4.5.0 Gates
 
 `./scripts/ci.sh app-tests` validates:
 
@@ -131,7 +131,7 @@ xcodebuild -project ios/GlassGPT.xcodeproj -scheme GlassGPT -destination 'platfo
 
 `./scripts/ci.sh source-share` validates:
 
-- non-boundary code under `modules/native-chat/Sources` stays at or above the configured share threshold of the product package (`17.0%` for 4.4.2)
+- non-boundary code under `modules/native-chat/Sources` is the only allowed production package code path in `4.5.0`
 - `TargetBoundary.swift` placeholders do not count toward the score
 
 `./scripts/ci.sh module-boundary` validates:
@@ -141,7 +141,7 @@ xcodebuild -project ios/GlassGPT.xcodeproj -scheme GlassGPT -destination 'platfo
 
 `./scripts/ci.sh release-readiness` validates:
 
-- release branch/class is routable (`main`, `codex/stable-4.1`, `codex/stable-4.2`, `codex/stable-4.3`, `codex/stable-4.4`)
+- release branch/class is routable (`main`, `codex/stable-4.1`, `codex/stable-4.2`, `codex/stable-4.3`, `codex/stable-4.4`, `codex/stable-4.5`)
 - MARKETING_VERSION and CURRENT_PROJECT_VERSION are single-valued in `ios/GlassGPT/Config/Versions.xcconfig`
 - expected release values through `RELEASE_EXPECT_MARKETING_VERSION` and `RELEASE_EXPECT_BUILD_NUMBER` (or CI defaults)
 - release docs and wrappers exist and are executable

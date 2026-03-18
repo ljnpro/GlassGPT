@@ -1,6 +1,9 @@
+import ChatDomain
+import ChatPersistenceSwiftData
+import NativeChatComposition
 import SwiftData
 import XCTest
-@testable import NativeChat
+@testable import NativeChatComposition
 
 @MainActor
 final class UITestScenarioLoaderTests: XCTestCase {
@@ -48,18 +51,18 @@ final class UITestScenarioLoaderTests: XCTestCase {
         XCTAssertEqual(bootstrap.initialTab, 0)
         XCTAssertEqual(bootstrap.scenario, .streaming)
         XCTAssertEqual(seededConversations.count, 1)
-        XCTAssertEqual(bootstrap.chatScreenStore.currentConversation?.title, "Release Planning")
-        XCTAssertTrue(bootstrap.chatScreenStore.isStreaming)
-        XCTAssertTrue(bootstrap.chatScreenStore.isThinking)
+        XCTAssertEqual(bootstrap.chatController.currentConversation?.title, "Release Planning")
+        XCTAssertTrue(bootstrap.chatController.isStreaming)
+        XCTAssertTrue(bootstrap.chatController.isThinking)
         XCTAssertEqual(
-            bootstrap.chatScreenStore.currentThinkingText,
+            bootstrap.chatController.currentThinkingText,
             "Gathering the recovery plan before finalizing the response."
         )
         XCTAssertEqual(
-            bootstrap.chatScreenStore.currentStreamingText,
+            bootstrap.chatController.currentStreamingText,
             "The streaming session is active and will resume cleanly after a reconnect."
         )
-        XCTAssertEqual(bootstrap.chatScreenStore.activeToolCalls.first?.type, .codeInterpreter)
+        XCTAssertEqual(bootstrap.chatController.activeToolCalls.first?.type, .codeInterpreter)
     }
 
     func testMakeBootstrapForPreviewSeedsGeneratedPreviewItem() throws {
@@ -70,8 +73,8 @@ final class UITestScenarioLoaderTests: XCTestCase {
 
         XCTAssertEqual(bootstrap.scenario, .preview)
         XCTAssertEqual(bootstrap.initialPreviewItem?.displayName, "Generated Chart")
-        XCTAssertEqual(bootstrap.chatScreenStore.filePreviewItem?.viewerFilename, "chart.png")
-        XCTAssertEqual(bootstrap.chatScreenStore.currentConversation?.title, "Release Planning")
+        XCTAssertEqual(bootstrap.chatController.filePreviewItem?.viewerFilename, "chart.png")
+        XCTAssertEqual(bootstrap.chatController.currentConversation?.title, "Release Planning")
     }
 
     func testMakeBootstrapForHistorySeedsThreeConversationsAndHistoryTab() throws {
@@ -97,9 +100,9 @@ final class UITestScenarioLoaderTests: XCTestCase {
         let seededConversations = try context.fetch(FetchDescriptor<Conversation>())
 
         XCTAssertEqual(bootstrap.initialTab, 2)
-        XCTAssertTrue(bootstrap.settingsScreenStore.cloudflareEnabled)
-        XCTAssertTrue(bootstrap.settingsScreenStore.apiKey.isEmpty)
+        XCTAssertTrue(bootstrap.settingsPresenter.cloudflareEnabled)
+        XCTAssertTrue(bootstrap.settingsPresenter.apiKey.isEmpty)
         XCTAssertTrue(seededConversations.isEmpty)
-        XCTAssertNil(bootstrap.chatScreenStore.currentConversation)
+        XCTAssertNil(bootstrap.chatController.currentConversation)
     }
 }
