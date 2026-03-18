@@ -4,10 +4,6 @@ import Foundation
 extension ChatScreenStore {
     // MARK: - Session Management
 
-    func makeStreamingSession(for draft: Message) -> ResponseSession? {
-        conversationRuntime.sessionStateStore.makeStreamingSession(for: draft)
-    }
-
     func makeRecoverySession(for message: Message) -> ResponseSession? {
         conversationRuntime.sessionStateStore.makeRecoverySession(for: message)
     }
@@ -123,6 +119,19 @@ extension ChatScreenStore {
             messages.append(message)
             messages.sort { $0.createdAt < $1.createdAt }
         }
+    }
+
+    func ensureRuntimeSessionRegistered(for session: ResponseSession) {
+        conversationRuntime.ensureRuntimeSessionRegistered(for: session)
+    }
+
+    func syncRuntimeSession(from session: ResponseSession) {
+        let attachments = findMessage(byId: session.messageID)?.fileAttachments ?? []
+        conversationRuntime.syncRuntimeSession(from: session, attachments: attachments)
+    }
+
+    func removeRuntimeSession(for session: ResponseSession) {
+        conversationRuntime.removeRuntimeSession(for: session)
     }
 
     func clearLiveGenerationState(clearDraft: Bool) {

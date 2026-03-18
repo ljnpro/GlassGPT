@@ -1,3 +1,3 @@
-import GeneratedFiles
+import GeneratedFilesCore
 
-typealias GeneratedFileAnnotationMatcher = GeneratedFiles.GeneratedFileAnnotationMatcher
+typealias GeneratedFileAnnotationMatcher = GeneratedFilesCore.GeneratedFileAnnotationMatcher

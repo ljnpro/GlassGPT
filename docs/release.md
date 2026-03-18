@@ -7,7 +7,7 @@
 - 4.2 release branch: `codex/stable-4.2` (maintenance only)
 - 4.3 release branch: `codex/stable-4.3` (maintenance only)
 - 4.4 release branch: `codex/stable-4.4`
-- 4.4.1 development work happens on `codex/feature/<topic>`
+- 4.4.2 development work happens on `codex/feature/<topic>`
 - version/build source of truth is `ios/GlassGPT/Config/Versions.xcconfig`
 - Local credentials remain in `.local/publish.env`
 - Local machine-specific release helper remains `.local/one_click_release.sh`
@@ -17,7 +17,7 @@
 Use the tracked wrapper:
 
 ```bash
-./scripts/release_testflight.sh 4.4.1 <build-number> --branch codex/stable-4.4
+./scripts/release_testflight.sh 4.4.2 <build-number> --branch codex/stable-4.4
 ```
 
 The wrapper validates release-readiness, then runs:
@@ -39,7 +39,7 @@ The wrapper validates release-readiness, then runs:
 4. manual parity checklist from `docs/parity-baseline.md`
 5. verify clean worktree
 6. verify branch is `codex/stable-4.4` (or `main` for backfilled maintenance)
-7. verify release version/build number (4.4.1 / 20174 baseline)
+7. verify release version/build number (4.4.2 / 20175 baseline)
 8. verify `.local/build` artifacts and logs exist from the release attempt
 9. verify local machine load is reasonable before trusting simulator launch failures as release blockers
 10. if the machine is saturated, temporarily stop extra subagents and unused simulators, then rerun the failing gate serially before escalating as a product regression
@@ -56,6 +56,6 @@ The wrapper validates release-readiness, then runs:
 
 1. Save TestFlight Delivery UUID
 2. Verify branch `codex/stable-4.4` moved to release commit
-3. Verify release tag `v4.4.1` exists and points to release commit
+3. Verify release tag `v4.4.2` exists and points to release commit
 4. Verify `git ls-remote` shows `codex/stable-4.4`, `main`, and `v<marketing-version>` on the expected commit
 5. Preserve the pre-release backup tag and bundle for rollback/reference

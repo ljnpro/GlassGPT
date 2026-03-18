@@ -12,8 +12,8 @@ APP_BUNDLE_IDENTIFIER="space.manus.liquid.glass.chat.t20260308214621"
 UI_TEST_RUNNER_BUNDLE_IDENTIFIER="${APP_BUNDLE_IDENTIFIER}UITests.xctrunner"
 SIMULATOR_DEVICE_NAME="${SIMULATOR_DEVICE_NAME:-iPhone 17}"
 SIMULATOR_DEVICE_DESTINATION="platform=iOS Simulator,name=${SIMULATOR_DEVICE_NAME}"
-DEFAULT_RELEASE_VERSION="4.4.1"
-DEFAULT_RELEASE_BUILD="20174"
+DEFAULT_RELEASE_VERSION="4.4.2"
+DEFAULT_RELEASE_BUILD="20175"
 XCODEBUILD_RETRY_ATTEMPTS="${XCODEBUILD_RETRY_ATTEMPTS:-5}"
 XCODE_TEST_TIMEOUT_ALLOWANCE="${XCODE_TEST_TIMEOUT_ALLOWANCE:-180}"
 SIMULATOR_BOOT_TIMEOUT_SECONDS="${SIMULATOR_BOOT_TIMEOUT_SECONDS:-60}"
@@ -353,21 +353,21 @@ function gate_app_tests() {
 }
 
 function gate_snapshot_tests() {
+  ensure_ui_test_xctestrun_path
+
   for snapshot_case in "${SNAPSHOT_CASES[@]}"; do
     log "Running snapshot test ${snapshot_case}"
     run_checked_xcodebuild "glassgpt-snapshot-${snapshot_case}" \
       xcodebuild \
-      -project "$XCODE_PROJECT" \
-      -scheme "$SCHEME" \
-      -clonedSourcePackagesDirPath "$CI_SOURCE_PACKAGES_DIR" \
-      -enableCodeCoverage YES \
+      -quiet \
+      test-without-building \
+      -xctestrun "$UI_TEST_XCTESTRUN_RESOLVED_PATH" \
       -parallel-testing-enabled NO \
       -test-timeouts-enabled YES \
       -maximum-test-execution-time-allowance "$XCODE_TEST_TIMEOUT_ALLOWANCE" \
       -destination "$SIMULATOR_DEVICE_DESTINATION" \
       -resultBundlePath "$CI_OUTPUT_DIR/${snapshot_case}.xcresult" \
-      -only-testing:"GlassGPTTests/SnapshotViewTests/${snapshot_case}" \
-      test
+      -only-testing:"GlassGPTTests/SnapshotViewTests/${snapshot_case}"
   done
 }
 
@@ -380,6 +380,18 @@ function gate_package_tests() {
     -enableCodeCoverage YES \
     -resultBundlePath "$CI_OUTPUT_DIR/NativeChatCoverageTests.xcresult" \
     -skip-testing:NativeChatTests/SnapshotViewTests \
+    test
+}
+
+function gate_architecture_tests() {
+  log "Running architecture tests"
+  run_checked_xcodebuild_in_dir nativechat-architecture-tests "$ROOT_DIR/modules/native-chat" \
+    xcodebuild \
+    -scheme NativeChat \
+    -destination "$SIMULATOR_DEVICE_DESTINATION" \
+    -parallel-testing-enabled NO \
+    -resultBundlePath "$CI_OUTPUT_DIR/NativeChatArchitectureTests.xcresult" \
+    -only-testing:NativeChatArchitectureTests \
     test
 }
 
@@ -436,6 +448,7 @@ function ensure_ui_test_xctestrun_path() {
       -project "$XCODE_PROJECT" \
       -scheme "$SCHEME" \
       -clonedSourcePackagesDirPath "$CI_SOURCE_PACKAGES_DIR" \
+      -enableCodeCoverage YES \
       -parallel-testing-enabled NO \
       -destination "$SIMULATOR_DEVICE_DESTINATION" \
       -derivedDataPath "$CI_DERIVED_DATA_DIR" \
@@ -594,8 +607,8 @@ function assert_release_readiness() {
     exit 1
   fi
 
-  if ! rg -q "4.3.1|4.4.0|4.4.1" "$ROOT_DIR/docs/parity-baseline.md"; then
-    echo "parity-baseline.md must include the active 4.3.1, 4.4.0, or 4.4.1 baseline marker." >&2
+  if ! rg -q "4.3.1|4.4.0|4.4.1|4.4.2" "$ROOT_DIR/docs/parity-baseline.md"; then
+    echo "parity-baseline.md must include the active 4.3.1, 4.4.0, 4.4.1, or 4.4.2 baseline marker." >&2
     exit 1
   fi
 
@@ -648,6 +661,7 @@ function run_gate() {
   case "$gate" in
     lint) gate_lint ;;
     build) gate_build ;;
+    architecture-tests) gate_architecture_tests ;;
     app-tests) gate_app_tests ;;
     snapshot-tests) gate_snapshot_tests ;;
     package-tests) gate_package_tests ;;
@@ -660,7 +674,7 @@ function run_gate() {
     release-readiness) assert_release_readiness ;;
     *)
       echo "Unknown gate: $gate" >&2
-      echo "Valid gates: lint, build, app-tests, snapshot-tests, package-tests, coverage-report, core-tests, ui-tests, maintainability, source-share, module-boundary, release-readiness" >&2
+      echo "Valid gates: lint, build, architecture-tests, app-tests, snapshot-tests, package-tests, coverage-report, core-tests, ui-tests, maintainability, source-share, module-boundary, release-readiness" >&2
       exit 1
       ;;
   esac
@@ -669,13 +683,13 @@ function run_gate() {
 function usage() {
   cat <<'EOF'
 Usage:
-  ./scripts/ci.sh [all|lint|build|app-tests|snapshot-tests|package-tests|coverage-report|core-tests|ui-tests|maintainability|source-share|module-boundary|release-readiness|comma-separated list]
+  ./scripts/ci.sh [all|lint|build|architecture-tests|app-tests|snapshot-tests|package-tests|coverage-report|core-tests|ui-tests|maintainability|source-share|module-boundary|release-readiness|comma-separated list]
 
 Examples:
   ./scripts/ci.sh
   ./scripts/ci.sh lint
   ./scripts/ci.sh app-tests,snapshot-tests,package-tests,coverage-report
-  ./scripts/ci.sh build,core-tests,ui-tests,maintainability,source-share,module-boundary
+  ./scripts/ci.sh build,architecture-tests,core-tests,ui-tests,maintainability,source-share,module-boundary
 EOF
 }
 
@@ -686,6 +700,7 @@ function clean_outputs() {
     "$CI_OUTPUT_DIR/glassgpt-unit-tests.log" \
     "$CI_OUTPUT_DIR/glassgpt-ui-tests.log" \
     "$CI_OUTPUT_DIR/glassgpt-ui-build-for-testing.log" \
+    "$CI_OUTPUT_DIR/nativechat-architecture-tests.log" \
     "$CI_OUTPUT_DIR/nativechat-coverage-tests.log" \
     "$CI_OUTPUT_DIR/coverage-report.txt" \
     "$CI_OUTPUT_DIR/coverage-production.txt" \
@@ -708,7 +723,7 @@ if [[ $# -gt 1 ]]; then
 fi
 
 if [[ $# -eq 0 || "$1" == "all" ]]; then
-  requested_gates=(lint build core-tests ui-tests maintainability source-share module-boundary release-readiness)
+  requested_gates=(lint build architecture-tests core-tests ui-tests maintainability source-share module-boundary release-readiness)
 elif [[ "$1" == "help" || "$1" == "-h" || "$1" == "--help" ]]; then
   usage
   exit 0

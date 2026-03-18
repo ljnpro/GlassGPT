@@ -1,6 +1,9 @@
 import SwiftUI
 import SwiftData
 import UIKit
+import ChatApplication
+import ChatRuntimePorts
+import ChatRuntimeWorkflows
 
 @Observable
 @MainActor
@@ -77,7 +80,21 @@ final class ChatScreenStore: ChatRuntimeScreenStore {
     var didCompleteLaunchBootstrap = false
     var visibleRecoveryPhase: RecoveryPhase = .idle
     @ObservationIgnored
-    lazy var conversationRuntime = ChatRuntimeEngine(viewModel: self)
+    lazy var runtimeRegistry = RuntimeRegistryActor()
+    @ObservationIgnored
+    lazy var sendPreparationPort = LegacySendMessagePreparationAdapter(store: self)
+    @ObservationIgnored
+    lazy var chatSceneController = ChatSceneController(
+        registry: runtimeRegistry,
+        preparationPort: sendPreparationPort
+    )
+    @ObservationIgnored
+    lazy var conversationRuntime = ChatRuntimeEngine(
+        viewModel: self,
+        runtimeRegistry: runtimeRegistry,
+        chatSceneController: chatSceneController,
+        sendPreparationPort: sendPreparationPort
+    )
 
     // MARK: - Init
 

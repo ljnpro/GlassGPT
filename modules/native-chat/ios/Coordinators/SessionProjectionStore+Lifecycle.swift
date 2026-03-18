@@ -75,6 +75,7 @@ extension SessionProjectionStore {
             target.task?.cancel()
             target.service.cancelStream()
         }
+        viewModel.removeRuntimeSession(for: session)
 
         if wasVisible {
             refreshVisibleBindingForCurrentConversation()

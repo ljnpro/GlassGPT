@@ -2,7 +2,7 @@
 
 ## Principle
 
-4.4.1 prioritizes parity, maintainability, release reliability, and real module boundaries. Tests exist to prevent behavioral drift while proving that more of the production code now lives in directly testable source targets rather than only inside the app target.
+4.4.2 prioritizes parity, maintainability, release reliability, and real module boundaries. Tests exist to prevent behavioral drift while proving that more of the production code now lives in directly testable source targets rather than only inside the app target.
 
 ## Coverage
 
@@ -88,7 +88,7 @@ xcodebuild -project ios/GlassGPT.xcodeproj -scheme GlassGPT -destination 'platfo
   - `views-and-presentation`
   - `app-shell`
 - Warnings are gated by `scripts/check_warnings.sh`. The only currently allowed warning is the external `appintentsmetadataprocessor` metadata extraction notice if Xcode emits it.
-- Snapshot comparisons anchor to the `4.4.0` production baseline set, and the release baseline is refreshed only when `docs/parity-baseline.md` is updated for `4.4.1`.
+- Snapshot comparisons anchor to the `4.4.1` production baseline set, and the release baseline is refreshed only when `docs/parity-baseline.md` is updated for `4.4.2`.
 - Before treating simulator launch failures as product regressions, check local machine load first.
   - If CPU is saturated, `SBMainWorkspace` launch denials, `BUILD INTERRUPTED`, or transient simulator install/launch failures can be host-pressure artifacts rather than app bugs.
   - When load is high, temporarily stop extra Codex subagents, shut down unused simulators, and rerun the failing gate serially before debugging production code.
@@ -98,7 +98,7 @@ xcodebuild -project ios/GlassGPT.xcodeproj -scheme GlassGPT -destination 'platfo
   - background-mode resume vs polling remains branch-equivalent to the 4.4.0 maintained baseline
   - uninstall/reinstall must preserve the API key via Keychain without requiring a recovery flow
 
-## 4.4.1 Gates
+## 4.4.2 Gates
 
 `./scripts/ci.sh app-tests` validates:
 
@@ -131,7 +131,7 @@ xcodebuild -project ios/GlassGPT.xcodeproj -scheme GlassGPT -destination 'platfo
 
 `./scripts/ci.sh source-share` validates:
 
-- non-boundary code under `modules/native-chat/Sources` stays at or above the configured share threshold of the product package (`17.0%` for 4.4.1)
+- non-boundary code under `modules/native-chat/Sources` stays at or above the configured share threshold of the product package (`17.0%` for 4.4.2)
 - `TargetBoundary.swift` placeholders do not count toward the score
 
 `./scripts/ci.sh module-boundary` validates:

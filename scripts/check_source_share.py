@@ -13,6 +13,23 @@ ROOT = Path(__file__).resolve().parent.parent
 SOURCES_ROOT = ROOT / "modules" / "native-chat" / "Sources"
 IOS_ROOT = ROOT / "modules" / "native-chat" / "ios"
 MIN_SOURCE_SHARE_PERCENT = float(os.environ.get("MIN_SOURCE_SHARE_PERCENT", "17.0"))
+ACTIVE_SOURCE_TARGETS = (
+    "ChatDomain",
+    "ChatPersistenceContracts",
+    "ChatPersistenceCore",
+    "ChatPersistenceSwiftData",
+    "OpenAITransport",
+    "GeneratedFilesCore",
+    "GeneratedFilesInfra",
+    "ChatRuntimeModel",
+    "ChatRuntimePorts",
+    "ChatRuntimeWorkflows",
+    "ChatApplication",
+    "ChatPresentation",
+    "ChatUIComponents",
+    "NativeChatUI",
+    "NativeChatComposition",
+)
 
 
 @dataclass
@@ -46,7 +63,13 @@ def main() -> int:
         print("Missing source-share roots.", file=sys.stderr)
         return 1
 
-    target_summaries = [summarize_target(path) for path in sorted(SOURCES_ROOT.iterdir()) if path.is_dir()]
+    target_summaries: list[TargetSummary] = []
+    for target_name in ACTIVE_SOURCE_TARGETS:
+        target_path = SOURCES_ROOT / target_name
+        if not target_path.is_dir():
+            print(f"Missing source target directory: {target_path}", file=sys.stderr)
+            return 1
+        target_summaries.append(summarize_target(target_path))
     ios_files = sorted(IOS_ROOT.rglob("*.swift"))
     ios_loc = sum(swift_loc(candidate) for candidate in ios_files)
     sources_total_loc = sum(summary.loc for summary in target_summaries)

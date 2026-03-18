@@ -11,7 +11,6 @@ extension StreamingEffectHandler {
         guard let requestMessages = session.requestMessages else { return }
 
         let viewModel = self.viewModel
-        let requestAPIKey = viewModel.apiKey
         let streamID = UUID()
         session.beginStreaming(streamID: streamID)
         viewModel.setRecoveryPhase(.idle, for: session)
@@ -20,7 +19,7 @@ extension StreamingEffectHandler {
         session.task?.cancel()
         session.task = Task { @MainActor in
             let stream = session.service.streamChat(
-                apiKey: requestAPIKey,
+                apiKey: session.requestAPIKey,
                 messages: requestMessages,
                 model: session.requestModel,
                 reasoningEffort: session.requestEffort,

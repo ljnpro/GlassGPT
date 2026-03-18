@@ -1,17 +1,6 @@
 import Foundation
 
-package enum GeneratedFileStoreError: Error, LocalizedError, Sendable {
-    case invalidCacheRoot
-
-    package var errorDescription: String? {
-        switch self {
-        case .invalidCacheRoot:
-            return "Unable to create the generated file cache."
-        }
-    }
-}
-
-public struct GeneratedFileLocalResource: Sendable {
+public struct GeneratedFileLocalResource: Sendable, Equatable {
     public let localURL: URL
     public let filename: String
     public let cacheBucket: GeneratedFileCacheBucket
@@ -30,12 +19,12 @@ public struct GeneratedFileLocalResource: Sendable {
     }
 }
 
-public enum FilePreviewKind: String, Sendable {
+public enum FilePreviewKind: String, Sendable, Equatable {
     case generatedImage
     case generatedPDF
 }
 
-public struct FilePreviewItem: Identifiable, Sendable {
+public struct FilePreviewItem: Identifiable, Sendable, Equatable {
     public let url: URL
     public let kind: FilePreviewKind
     public let displayName: String
@@ -56,7 +45,7 @@ public struct FilePreviewItem: Identifiable, Sendable {
     public var id: String { "\(kind.rawValue):\(url.path)" }
 }
 
-public struct SharedGeneratedFileItem: Identifiable, Sendable {
+public struct SharedGeneratedFileItem: Identifiable, Sendable, Equatable {
     public let url: URL
     public let filename: String
 

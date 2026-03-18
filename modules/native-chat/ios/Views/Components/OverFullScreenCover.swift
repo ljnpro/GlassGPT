@@ -1,6 +1,6 @@
 import SwiftUI
 import UIKit
-import ChatUI
+import ChatUIComponents
 
 extension View {
     func overFullScreenCover<PresentedContent: View>(
@@ -10,7 +10,7 @@ extension View {
         @ViewBuilder content: @escaping () -> PresentedContent
     ) -> some View {
         background(
-            ChatUI.OverFullScreenPresenter(
+            ChatUIComponents.OverFullScreenPresenter(
                 isPresented: isPresented,
                 onDismiss: onDismiss,
                 interfaceStyle: interfaceStyle,

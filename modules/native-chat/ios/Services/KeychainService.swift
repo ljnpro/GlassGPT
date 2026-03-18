@@ -1,4 +1,4 @@
-import ChatPersistence
+import ChatPersistenceCore
 import Foundation
 
 struct KeychainService: Sendable {

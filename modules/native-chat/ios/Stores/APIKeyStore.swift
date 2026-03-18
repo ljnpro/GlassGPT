@@ -1,6 +1,6 @@
-import ChatPersistence
+import ChatPersistenceCore
 
-typealias APIKeyPersisting = ChatPersistence.APIKeyPersisting
+typealias APIKeyPersisting = ChatPersistenceCore.APIKeyPersisting
 
 extension KeychainService: APIKeyPersisting {}
 

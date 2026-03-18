@@ -1,4 +1,6 @@
 import Foundation
+import ChatDomain
+import ChatRuntimeModel
 
 enum RecoveryPhase: Equatable {
     case idle
@@ -9,9 +11,11 @@ enum RecoveryPhase: Equatable {
 
 @MainActor
 final class ResponseSession {
+    let assistantReplyID: AssistantReplyID
     let messageID: UUID
     let conversationID: UUID
     let service: OpenAIService
+    let requestAPIKey: String
     let requestMessages: [APIMessage]?
     let requestModel: ModelType
     let requestEffort: ReasoningEffort
@@ -28,17 +32,21 @@ final class ResponseSession {
     var task: Task<Void, Never>?
 
     init(
+        assistantReplyID: AssistantReplyID? = nil,
         message: Message,
         conversationID: UUID,
         service: OpenAIService,
+        requestAPIKey: String = "",
         requestMessages: [APIMessage]? = nil,
         requestModel: ModelType,
         requestEffort: ReasoningEffort,
         requestUsesBackgroundMode: Bool,
         requestServiceTier: ServiceTier
     ) {
+        self.assistantReplyID = assistantReplyID ?? AssistantReplyID(rawValue: message.id)
         self.messageID = message.id
         self.conversationID = conversationID
+        self.requestAPIKey = requestAPIKey
         self.requestMessages = requestMessages
         self.requestModel = requestModel
         self.requestEffort = requestEffort
@@ -54,6 +62,33 @@ final class ResponseSession {
             responseId: message.responseId,
             lastSequenceNumber: message.lastSequenceNumber,
             backgroundResumable: message.usedBackgroundMode
+        )
+    }
+
+    convenience init(
+        preparedReply: PreparedAssistantReply,
+        service: OpenAIService
+    ) {
+        let message = Message(
+            id: preparedReply.draftMessageID,
+            role: .assistant,
+            content: "",
+            thinking: nil,
+            lastSequenceNumber: nil,
+            usedBackgroundMode: preparedReply.requestUsesBackgroundMode,
+            isComplete: false
+        )
+        self.init(
+            assistantReplyID: preparedReply.assistantReplyID,
+            message: message,
+            conversationID: preparedReply.conversationID,
+            service: service,
+            requestAPIKey: preparedReply.apiKey,
+            requestMessages: preparedReply.requestMessages,
+            requestModel: preparedReply.requestModel,
+            requestEffort: preparedReply.requestEffort,
+            requestUsesBackgroundMode: preparedReply.requestUsesBackgroundMode,
+            requestServiceTier: preparedReply.requestServiceTier
         )
     }
 

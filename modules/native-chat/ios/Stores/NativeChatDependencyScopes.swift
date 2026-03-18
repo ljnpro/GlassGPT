@@ -1,35 +1,32 @@
 import SwiftData
-import ChatFeatures
-import ChatPersistence
-import GeneratedFiles
 
-typealias NativeChatServiceScope = ChatFeaturesBoundary.Services<
-    OpenAIConfigurationProvider,
-    OpenAIRequestBuilder,
-    OpenAIResponseParser,
-    OpenAIDataTransport,
-    OpenAIService
->
+struct NativeChatServiceDependencies {
+    let configurationProvider: OpenAIConfigurationProvider
+    let requestBuilder: OpenAIRequestBuilder
+    let responseParser: OpenAIResponseParser
+    let transport: OpenAIDataTransport
+    let service: OpenAIService
+}
 
-typealias NativeChatPersistenceScope = ChatPersistenceBoundary.Scope<
-    ModelContext,
-    ConversationRepository,
-    DraftRepository,
-    MessagePersistenceAdapter
->
+struct NativeChatPersistenceDependencies {
+    let modelContext: ModelContext
+    let conversationRepository: ConversationRepository
+    let draftRepository: DraftRepository
+    let messagePersistence: MessagePersistenceAdapter
+}
 
-typealias NativeChatGeneratedFilesScope = GeneratedFilesBoundary.Scope<GeneratedFileCoordinator>
+struct NativeChatGeneratedFilesDependencies {
+    let coordinator: GeneratedFileCoordinator
+}
 
 @MainActor
 struct NativeChatFeatureDependencies {
-    let scope: ChatFeaturesBoundary.Scope<
-        NativeChatServiceScope,
-        NativeChatPersistenceScope,
-        NativeChatGeneratedFilesScope,
-        SettingsStore,
-        APIKeyStore,
-        BackgroundTaskCoordinator
-    >
+    let services: NativeChatServiceDependencies
+    let persistence: NativeChatPersistenceDependencies
+    let generatedFiles: NativeChatGeneratedFilesDependencies
+    let settingsStore: SettingsStore
+    let apiKeyStore: APIKeyStore
+    let backgroundTasks: BackgroundTaskCoordinator
     let serviceFactory: @MainActor () -> OpenAIService
 
     init(
@@ -46,39 +43,30 @@ struct NativeChatFeatureDependencies {
         generatedFileCoordinator: GeneratedFileCoordinator = GeneratedFileCoordinator(),
         messagePersistence: MessagePersistenceAdapter = MessagePersistenceAdapter()
     ) {
-        self.scope = .init(
-            services: .init(
-                configurationProvider: configurationProvider,
-                requestBuilder: requestBuilder,
-                responseParser: responseParser,
-                transport: transport,
-                service: openAIService
-            ),
-            persistence: .init(
-                modelContext: modelContext,
-                conversationRepository: ConversationRepository(modelContext: modelContext),
-                draftRepository: DraftRepository(modelContext: modelContext),
-                messagePersistence: messagePersistence
-            ),
-            generatedFiles: .init(coordinator: generatedFileCoordinator),
-            settingsStore: settingsStore,
-            apiKeyStore: apiKeyStore,
-            backgroundTasks: backgroundTasks
+        self.services = .init(
+            configurationProvider: configurationProvider,
+            requestBuilder: requestBuilder,
+            responseParser: responseParser,
+            transport: transport,
+            service: openAIService
         )
+        self.persistence = .init(
+            modelContext: modelContext,
+            conversationRepository: ConversationRepository(modelContext: modelContext),
+            draftRepository: DraftRepository(modelContext: modelContext),
+            messagePersistence: messagePersistence
+        )
+        self.generatedFiles = .init(coordinator: generatedFileCoordinator)
+        self.settingsStore = settingsStore
+        self.apiKeyStore = apiKeyStore
+        self.backgroundTasks = backgroundTasks
         self.serviceFactory = serviceFactory
     }
-
-    var services: NativeChatServiceScope { scope.services }
-    var persistence: NativeChatPersistenceScope { scope.persistence }
-    var generatedFiles: NativeChatGeneratedFilesScope { scope.generatedFiles }
-    var settingsStore: SettingsStore { scope.settingsStore }
-    var apiKeyStore: APIKeyStore { scope.apiKeyStore }
-    var backgroundTasks: BackgroundTaskCoordinator { scope.backgroundTasks }
 }
 
 @MainActor
 struct NativeChatSettingsDependencies {
-    let services: NativeChatServiceScope
+    let services: NativeChatServiceDependencies
     let settingsStore: SettingsStore
     let apiKeyStore: APIKeyStore
     private let setCloudflareGatewayEnabledHandler: @MainActor (Bool) -> Void
