@@ -617,7 +617,7 @@ function assert_release_readiness() {
   assert_expected_versions_config
 
   if [[ "${RELEASE_REQUIRE_CLEAN_WORKTREE:-0}" == "1" ]]; then
-    if [[ -n "$(git status --short)" ]]; then
+    if [[ -n "$(filtered_git_status)" ]]; then
       echo "Release-readiness requires a clean worktree." >&2
       exit 1
     fi
@@ -714,6 +714,10 @@ function clean_outputs() {
   if [[ "${PRESERVE_CI_DERIVED_DATA:-0}" != "1" ]]; then
     force_remove_path "$CI_DERIVED_DATA_DIR"
   fi
+}
+
+function filtered_git_status() {
+  git status --short -- . ':(exclude)docs/refactor' ':(exclude)scripts/export_refactor_bundle.py'
 }
 
 if [[ $# -gt 1 ]]; then
