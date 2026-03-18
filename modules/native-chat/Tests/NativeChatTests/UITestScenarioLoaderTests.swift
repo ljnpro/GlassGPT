@@ -1,6 +1,5 @@
 import ChatDomain
 import ChatPersistenceSwiftData
-import NativeChatComposition
 import SwiftData
 import XCTest
 @testable import NativeChatComposition
