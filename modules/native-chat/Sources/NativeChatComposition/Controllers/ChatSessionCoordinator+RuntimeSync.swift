@@ -75,6 +75,7 @@ extension ChatSessionCoordinator {
 
     func suspendActiveSessionsForAppBackground() {
         let sessions = controller.sessionRegistry.allSessions
+        controller.cancelGeneratedFilePrefetches(controller.generatedFilePrefetchRegistry.cancelAll())
         guard !sessions.isEmpty else { return }
 
         Task { @MainActor in
@@ -96,7 +97,7 @@ extension ChatSessionCoordinator {
                     message.conversation?.updatedAt = .now
                     controller.conversationCoordinator.upsertMessage(message)
                 } else {
-                    message.content = controller.interruptedResponseFallbackText(for: message, session: session)
+                    message.content = controller.recoveryResultApplier.interruptedResponseFallbackText(for: message, session: session)
                     message.thinking = runtimeState.buffer.thinking.isEmpty ? nil : runtimeState.buffer.thinking
                     message.isComplete = true
                     message.lastSequenceNumber = nil

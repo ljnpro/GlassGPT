@@ -7,18 +7,19 @@ import Foundation
 import OpenAITransport
 
 @MainActor
-final class ChatConversationCoordinator {
+package final class ChatConversationCoordinator {
     unowned let controller: ChatController
 
-    init(controller: ChatController) {
+    package init(controller: ChatController) {
         self.controller = controller
     }
 
-    func startNewChat() {
+    package func startNewChat() {
         if let session = controller.currentVisibleSession {
             controller.sessionCoordinator.saveSessionNow(session)
         }
 
+        controller.cancelGeneratedFilePrefetches(controller.generatedFilePrefetchRegistry.cancelAll())
         controller.sessionCoordinator.detachVisibleSessionBinding()
         controller.currentConversation = nil
         controller.messages = []
@@ -42,7 +43,7 @@ final class ChatConversationCoordinator {
         controller.hapticService.selection(isEnabled: controller.hapticsEnabled)
     }
 
-    func regenerateMessage(_ message: Message) {
+    package func regenerateMessage(_ message: Message) {
         guard !controller.isStreaming else { return }
         guard message.role == .assistant else { return }
         guard !controller.apiKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
@@ -103,11 +104,12 @@ final class ChatConversationCoordinator {
         controller.startStreamingRequest(for: session)
     }
 
-    func loadConversation(_ conversation: Conversation) {
+    package func loadConversation(_ conversation: Conversation) {
         if let session = controller.currentVisibleSession {
             controller.sessionCoordinator.saveSessionNow(session)
         }
 
+        controller.cancelGeneratedFilePrefetches(controller.generatedFilePrefetchRegistry.cancelAll())
         controller.sessionCoordinator.detachVisibleSessionBinding()
         controller.currentConversation = conversation
         controller.messages = visibleMessages(for: conversation)
@@ -138,7 +140,7 @@ final class ChatConversationCoordinator {
         }
     }
 
-    func restoreLastConversationIfAvailable() {
+    package func restoreLastConversationIfAvailable() {
         do {
             if let lastConversation = try controller.conversationRepository.fetchMostRecentConversationWithMessages() {
                 controller.currentConversation = lastConversation
@@ -155,7 +157,7 @@ final class ChatConversationCoordinator {
         }
     }
 
-    func activeIncompleteAssistantDraft() -> Message? {
+    package func activeIncompleteAssistantDraft() -> Message? {
         if let draft = controller.draftMessage, !draft.isComplete, draft.role == .assistant {
             return draft
         }

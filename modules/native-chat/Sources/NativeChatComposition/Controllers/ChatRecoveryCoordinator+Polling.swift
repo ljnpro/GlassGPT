@@ -7,7 +7,7 @@ import OpenAITransport
 @MainActor
 extension ChatRecoveryCoordinator {
     func pollResponseUntilTerminal(session: ReplySession, responseId: String) async {
-        let key = activeAPIKey(for: session)
+        let key = resultApplier.activeAPIKey(for: session)
         guard !key.isEmpty else { return }
         _ = await controller.sessionCoordinator.applyRuntimeTransition(.beginRecoveryPoll, to: session)
         controller.sessionCoordinator.syncVisibleState(from: session)
@@ -43,19 +43,19 @@ extension ChatRecoveryCoordinator {
                            controller.visibleSessionMessageID == session.messageID {
                             controller.errorMessage = result.errorMessage ?? "Response did not complete."
                         }
-                        controller.finishRecovery(
+                        resultApplier.finishRecovery(
                             for: message,
                             session: session,
                             result: result,
-                            fallbackText: recoveryFallbackText(for: message, session: session),
-                            fallbackThinking: recoveryFallbackThinking(for: message, session: session)
+                            fallbackText: resultApplier.recoveryFallbackText(for: message, session: session),
+                            fallbackThinking: resultApplier.recoveryFallbackThinking(for: message, session: session)
                         )
                     }
                     return
                 }
             } catch {
                 if let message = controller.conversationCoordinator.findMessage(byId: session.messageID),
-                   handleUnrecoverableRecoveryError(
+                   resultApplier.handleUnrecoverableRecoveryError(
                     error,
                     for: message,
                     responseId: responseId,
@@ -85,12 +85,12 @@ extension ChatRecoveryCoordinator {
            !lastError.isEmpty {
             controller.errorMessage = lastError
         }
-        controller.finishRecovery(
+        resultApplier.finishRecovery(
             for: message,
             session: session,
             result: lastResult,
-            fallbackText: recoveryFallbackText(for: message, session: session),
-            fallbackThinking: recoveryFallbackThinking(for: message, session: session)
+            fallbackText: resultApplier.recoveryFallbackText(for: message, session: session),
+            fallbackThinking: resultApplier.recoveryFallbackThinking(for: message, session: session)
         )
 
         #if DEBUG
@@ -126,7 +126,7 @@ extension ChatRecoveryCoordinator {
 
             case .completed, .incomplete, .failed, .unknown:
                 guard let message = controller.conversationCoordinator.findMessage(byId: messageId) else { return }
-                controller.applyRecoveredResult(
+                resultApplier.applyRecoveredResult(
                     result,
                     to: message,
                     fallbackText: message.content,
@@ -134,7 +134,7 @@ extension ChatRecoveryCoordinator {
                 )
                 controller.conversationCoordinator.saveContextIfPossible("cancelBackgroundResponseAndSync")
                 controller.conversationCoordinator.upsertMessage(message)
-                controller.prefetchGeneratedFilesIfNeeded(for: message)
+                controller.fileInteractionCoordinator.prefetchGeneratedFilesIfNeeded(for: message)
             }
         } catch {
             #if DEBUG

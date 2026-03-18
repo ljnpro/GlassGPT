@@ -83,7 +83,11 @@ extension ChatView {
             liveFilePathAnnotations: isLiveDraft ? viewModel.liveFilePathAnnotations : [],
             showsRecoveryIndicator: isLiveDraft && viewModel.isRecovering,
             onSandboxLinkTap: message.role == .assistant ? { sandboxURL, annotation in
-                viewModel.handleSandboxLinkTap(message: message, sandboxURL: sandboxURL, annotation: annotation)
+                viewModel.fileInteractionCoordinator.handleSandboxLinkTap(
+                    message: message,
+                    sandboxURL: sandboxURL,
+                    annotation: annotation
+                )
             } : nil
         )
         .equatable()

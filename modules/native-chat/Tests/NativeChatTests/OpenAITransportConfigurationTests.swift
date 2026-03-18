@@ -1,6 +1,7 @@
 import ChatPersistenceCore
 import ChatDomain
 import ChatPersistenceSwiftData
+import Foundation
 import OpenAITransport
 import XCTest
 @testable import NativeChatComposition
@@ -78,6 +79,50 @@ final class OpenAITransportConfigurationTests: XCTestCase {
             request.value(forHTTPHeaderField: "cf-aig-authorization"),
             "Bearer gateway-token"
         )
+    }
+
+    func testTransportSessionFactoryBuildsExplicitRequestAndDownloadSessions() {
+        let requestSession = OpenAITransportSessionFactory.makeRequestSession()
+        let downloadSession = OpenAITransportSessionFactory.makeDownloadSession()
+
+        XCTAssertEqual(requestSession.configuration.timeoutIntervalForRequest, 60)
+        XCTAssertEqual(requestSession.configuration.timeoutIntervalForResource, 120)
+        XCTAssertEqual(requestSession.configuration.requestCachePolicy, .reloadIgnoringLocalCacheData)
+        XCTAssertNil(requestSession.configuration.urlCache)
+        XCTAssertFalse(requestSession.configuration.waitsForConnectivity)
+
+        XCTAssertEqual(downloadSession.configuration.timeoutIntervalForRequest, 120)
+        XCTAssertEqual(downloadSession.configuration.timeoutIntervalForResource, 300)
+        XCTAssertEqual(downloadSession.configuration.requestCachePolicy, .reloadIgnoringLocalCacheData)
+        XCTAssertNil(downloadSession.configuration.urlCache)
+        XCTAssertFalse(downloadSession.configuration.waitsForConnectivity)
+    }
+
+    func testOpenAIURLSessionTransportCancelsUnderlyingRequest() async {
+        CancellationAwareURLProtocol.state.reset()
+
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [CancellationAwareURLProtocol.self]
+        let session = URLSession(configuration: configuration)
+        let transport = OpenAIURLSessionTransport(session: session)
+        let request = URLRequest(url: URL(string: "https://example.com/cancel")!)
+
+        let task = Task {
+            try await transport.data(for: request)
+        }
+
+        try? await Task.sleep(nanoseconds: 50_000_000)
+        task.cancel()
+
+        do {
+            _ = try await task.value
+            XCTFail("Expected cancellation")
+        } catch {
+            XCTAssertTrue(error is CancellationError || (error as? URLError)?.code == .cancelled)
+        }
+
+        XCTAssertTrue(CancellationAwareURLProtocol.state.waitForCancellation(timeout: 1))
+        session.invalidateAndCancel()
     }
 
     @MainActor
@@ -401,5 +446,63 @@ private struct TransportConfigurationFixture: OpenAIConfigurationProvider {
 
     var openAIBaseURL: String {
         useCloudflareGateway ? cloudflareGatewayBaseURL : directOpenAIBaseURL
+    }
+}
+
+private final class CancellationAwareURLProtocol: URLProtocol {
+    static let state = CancellationAwareURLProtocolState()
+
+    override class func canInit(with request: URLRequest) -> Bool {
+        true
+    }
+
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest {
+        request
+    }
+
+    override func startLoading() {
+        Self.state.recordStart()
+    }
+
+    override func stopLoading() {
+        Self.state.recordCancellation()
+    }
+}
+
+private final class CancellationAwareURLProtocolState: @unchecked Sendable {
+    private let lock = NSLock()
+    private var didCancel = false
+    private var semaphore = DispatchSemaphore(value: 0)
+
+    func reset() {
+        lock.lock()
+        didCancel = false
+        semaphore = DispatchSemaphore(value: 0)
+        lock.unlock()
+    }
+
+    func recordStart() {}
+
+    func recordCancellation() {
+        lock.lock()
+        guard !didCancel else {
+            lock.unlock()
+            return
+        }
+        didCancel = true
+        let semaphore = self.semaphore
+        lock.unlock()
+        semaphore.signal()
+    }
+
+    func waitForCancellation(timeout: TimeInterval) -> Bool {
+        lock.lock()
+        if didCancel {
+            lock.unlock()
+            return true
+        }
+        let semaphore = self.semaphore
+        lock.unlock()
+        return semaphore.wait(timeout: .now() + timeout) == .success
     }
 }

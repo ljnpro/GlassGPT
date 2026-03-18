@@ -9,7 +9,6 @@ import ChatPresentation
 import ChatRuntimeModel
 import ChatRuntimePorts
 import ChatRuntimeWorkflows
-import ChatUIComponents
 import GeneratedFilesInfra
 import OpenAITransport
 
@@ -94,7 +93,7 @@ package final class ChatController {
     @ObservationIgnored
     lazy var sendCoordinator = ChatSendCoordinator(controller: self)
     @ObservationIgnored
-    lazy var conversationCoordinator = ChatConversationCoordinator(controller: self)
+    package lazy var conversationCoordinator = ChatConversationCoordinator(controller: self)
     @ObservationIgnored
     lazy var sessionCoordinator = ChatSessionCoordinator(controller: self)
     @ObservationIgnored
@@ -106,7 +105,11 @@ package final class ChatController {
     @ObservationIgnored
     lazy var recoveryCoordinator = ChatRecoveryCoordinator(controller: self)
     @ObservationIgnored
+    lazy var recoveryResultApplier = ChatRecoveryResultApplier(controller: self)
+    @ObservationIgnored
     lazy var recoveryMaintenanceCoordinator = ChatRecoveryMaintenanceCoordinator(controller: self)
+    @ObservationIgnored
+    let generatedFilePrefetchRegistry = GeneratedFilePrefetchRegistry()
     // MARK: - Init
 
     package init(
@@ -115,7 +118,7 @@ package final class ChatController {
         apiKeyStore: PersistedAPIKeyStore,
         configurationProvider: OpenAIConfigurationProvider,
         transport: OpenAIDataTransport,
-        hapticService: HapticService,
+        fileDownloadService: FileDownloadService? = nil,
         serviceFactory: (@MainActor () -> OpenAIService)? = nil,
         bootstrapPolicy: FeatureBootstrapPolicy = .live
     ) {
@@ -140,7 +143,7 @@ package final class ChatController {
             responseParser: resolvedResponseParser,
             transport: transport,
             openAIService: resolvedOpenAIService,
-            hapticService: hapticService,
+            fileDownloadService: fileDownloadService,
             serviceFactory: resolvedServiceFactory
         )
         self.didCompleteLaunchBootstrap = !bootstrapPolicy.runLaunchTasks
@@ -165,9 +168,7 @@ package final class ChatController {
         }
     }
 
-    func syncConversationProjection() {
-        // Visible state lives directly on the controller.
-    }
+    func syncConversationProjection() {}
 
     func stopGeneration(savePartial: Bool = true) {
         sessionCoordinator.stopGeneration(savePartial: savePartial)
@@ -175,5 +176,16 @@ package final class ChatController {
 
     func suspendActiveSessionsForAppBackground() {
         sessionCoordinator.suspendActiveSessionsForAppBackground()
+    }
+
+    func cancelGeneratedFilePrefetches(_ requests: some Sequence<GeneratedFilePrefetchRequest>) {
+        Task {
+            for request in requests {
+                await fileDownloadService.cancelGeneratedFilePrefetch(
+                    fileId: request.fileID,
+                    containerId: request.containerID
+                )
+            }
+        }
     }
 }

@@ -48,6 +48,7 @@ final class NativeChatArchitectureTests: XCTestCase {
             "ChatUIComponents",
             "NativeChatUI",
             "NativeChatComposition",
+            "NativeChatUITestSupport",
             "NativeChat",
             "NativeChatArchitectureTests",
         ]
@@ -104,6 +105,7 @@ final class NativeChatArchitectureTests: XCTestCase {
         )
         XCTAssertTrue(workflow.contains("./scripts/ci.sh architecture-tests"))
         XCTAssertTrue(workflow.contains("./scripts/ci.sh source-share"))
+        XCTAssertTrue(workflow.contains("./scripts/ci.sh infra-safety"))
         XCTAssertTrue(workflow.contains("./scripts/ci.sh module-boundary"))
 
         let swiftlint = try String(
@@ -126,6 +128,29 @@ final class NativeChatArchitectureTests: XCTestCase {
         XCTAssertTrue(
             umbrella.contains("import NativeChatComposition"),
             "NativeChat umbrella should route through NativeChatComposition"
+        )
+    }
+
+    func testUITestBootstrapSupportLivesOutsideProductionSources() throws {
+        let productionSupport = packageRoot.appendingPathComponent("Sources/NativeChatComposition/UITestBootstrap", isDirectory: true)
+        XCTAssertFalse(
+            FileManager.default.fileExists(atPath: productionSupport.path),
+            "NativeChatComposition must not keep UITest bootstrap sources in production paths"
+        )
+
+        let supportRoot = packageRoot.appendingPathComponent("Support/NativeChatUITestSupport", isDirectory: true)
+        XCTAssertTrue(
+            FileManager.default.fileExists(atPath: supportRoot.path),
+            "UITest support should live under Support/NativeChatUITestSupport"
+        )
+
+        let compositionRoot = try String(
+            contentsOf: packageRoot.appendingPathComponent("Sources/NativeChatComposition/NativeChatCompositionRoot.swift"),
+            encoding: .utf8
+        )
+        XCTAssertFalse(
+            compositionRoot.contains("UITestScenarioLoader"),
+            "Production composition root must not reach UITest bootstrap support directly"
         )
     }
 

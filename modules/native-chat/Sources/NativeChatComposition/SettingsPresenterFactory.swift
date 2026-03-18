@@ -8,7 +8,7 @@ import Foundation
 import UIKit
 
 @MainActor
-func makeSettingsPresenter(
+package func makeSettingsPresenter(
     settingsStore: SettingsStore,
     apiKeyStore: PersistedAPIKeyStore,
     openAIService: OpenAIService,
@@ -20,6 +20,44 @@ func makeSettingsPresenter(
     platformString: String? = nil
 ) -> SettingsPresenter {
     var mutableConfigurationProvider = configurationProvider
+    let isValidGatewayModelsURL: (String) -> Bool = { baseURL in
+        guard let url = URL(string: "\(baseURL)/models"),
+              let scheme = url.scheme?.lowercased(),
+              ["http", "https"].contains(scheme),
+              url.host != nil else {
+            return false
+        }
+        return true
+    }
+    let resolvedCloudflareHealth: (_ typedAPIKey: String, _ gatewayEnabled: Bool) -> CloudflareHealthStatus = { typedAPIKey, gatewayEnabled in
+        guard gatewayEnabled else {
+            return .unknown
+        }
+
+        let gatewayBaseURL = mutableConfigurationProvider.cloudflareGatewayBaseURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !gatewayBaseURL.isEmpty else {
+            return .gatewayUnavailable
+        }
+
+        let gatewayToken = mutableConfigurationProvider.cloudflareAIGToken.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !gatewayToken.isEmpty else {
+            return .gatewayUnavailable
+        }
+
+        guard isValidGatewayModelsURL(gatewayBaseURL) else {
+            return .invalidGatewayURL
+        }
+
+        let typedKey = typedAPIKey.trimmingCharacters(in: .whitespacesAndNewlines)
+        let storedKey = apiKeyStore.loadAPIKey()?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let resolvedAPIKey = typedKey.isEmpty ? storedKey : typedKey
+
+        guard !resolvedAPIKey.isEmpty else {
+            return .missingAPIKey
+        }
+
+        return .unknown
+    }
 
     let controller = SettingsSceneController(
         loadAPIKey: {
@@ -34,38 +72,34 @@ func makeSettingsPresenter(
         validateAPIKey: { trimmedKey in
             await openAIService.validateAPIKey(trimmedKey)
         },
+        resolveCloudflareHealth: { typedAPIKey, gatewayEnabled in
+            resolvedCloudflareHealth(typedAPIKey, gatewayEnabled)
+        },
         checkCloudflareHealth: { typedAPIKey, gatewayEnabled in
-            guard gatewayEnabled else {
-                return .unknown
+            let localStatus = resolvedCloudflareHealth(typedAPIKey, gatewayEnabled)
+            guard localStatus == .unknown else {
+                return localStatus
             }
 
-            let trimmedKey: String
-            let typedKey = typedAPIKey.trimmingCharacters(in: .whitespacesAndNewlines)
-            if !typedKey.isEmpty {
-                trimmedKey = typedKey
-            } else {
-                trimmedKey = apiKeyStore.loadAPIKey()?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-            }
-
-            guard !trimmedKey.isEmpty else {
-                return .error("No API key configured")
-            }
+            let trimmedKey = typedAPIKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                ? (apiKeyStore.loadAPIKey()?.trimmingCharacters(in: .whitespacesAndNewlines) ?? "")
+                : typedAPIKey.trimmingCharacters(in: .whitespacesAndNewlines)
 
             let gatewayRequest: URLRequest
             do {
                 gatewayRequest = try requestBuilder.modelsRequest(apiKey: trimmedKey)
             } catch {
-                return .error("Invalid gateway URL")
+                return .invalidGatewayURL
             }
 
             var request = gatewayRequest
-            request.url = URL(string: "\(mutableConfigurationProvider.cloudflareGatewayBaseURL)/models")
+            request.url = URL(string: "\(mutableConfigurationProvider.cloudflareGatewayBaseURL.trimmingCharacters(in: .whitespacesAndNewlines))/models")
 
             do {
                 let (data, response) = try await transport.data(for: request)
 
                 guard let httpResponse = response as? HTTPURLResponse else {
-                    return .error("Invalid gateway response")
+                    return .remoteError("Invalid gateway response")
                 }
 
                 if (200...299).contains(httpResponse.statusCode) {
@@ -76,14 +110,14 @@ func makeSettingsPresenter(
                     let payload = try JSONCoding.decode(SettingsErrorResponseDTO.self, from: data)
                     if let message = payload.message ?? payload.error?.message,
                        !message.isEmpty {
-                        return .error(message)
+                        return .remoteError(message)
                     }
                 } catch {
                 }
 
-                return .error(String(data: data, encoding: .utf8) ?? "Status \(httpResponse.statusCode)")
+                return .remoteError(String(data: data, encoding: .utf8) ?? "Status \(httpResponse.statusCode)")
             } catch {
-                return .error(error.localizedDescription)
+                return .remoteError(error.localizedDescription)
             }
         },
         refreshGeneratedImageCacheSize: {

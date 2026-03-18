@@ -152,7 +152,6 @@ func makeSnapshotChatScreenStore(hasAPIKey: Bool = false) throws -> ChatControll
     let settingsStore = SettingsStore(valueStore: settingsValueStore)
     let apiKeyStore = PersistedAPIKeyStore(backend: apiBackend)
     let configurationProvider = RuntimeTestOpenAIConfigurationProvider()
-    let hapticService = HapticService()
     let transport = StubOpenAITransport()
 
     return ChatController(
@@ -161,7 +160,6 @@ func makeSnapshotChatScreenStore(hasAPIKey: Bool = false) throws -> ChatControll
         apiKeyStore: apiKeyStore,
         configurationProvider: configurationProvider,
         transport: transport,
-        hapticService: hapticService,
         bootstrapPolicy: .testing
     )
 }

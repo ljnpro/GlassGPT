@@ -21,6 +21,8 @@ public actor FileDownloadService {
     nonisolated let transport: OpenAIDataTransport
     let fileManager: FileManager
     let cacheStore: GeneratedFileCacheStore
+    let namingResolver: GeneratedFileNamingResolver
+    let downloadClient: GeneratedFileDownloadClient
 
     public init(
         configurationProvider: OpenAIConfigurationProvider,
@@ -29,19 +31,22 @@ public actor FileDownloadService {
         fileManager: FileManager = .default
     ) {
         let authorizer = requestAuthorizer ?? OpenAIStandardRequestAuthorizer(configuration: configurationProvider)
-        let resolvedTransport = transport ?? OpenAIURLSessionTransport(session: Self.makeDownloadSession())
+        let resolvedTransport = transport ?? OpenAIURLSessionTransport(
+            session: OpenAITransportSessionFactory.makeDownloadSession()
+        )
+        let resolvedNamingResolver = GeneratedFileNamingResolver()
         self.configurationProvider = configurationProvider
         self.requestAuthorizer = authorizer
         self.transport = resolvedTransport
         self.fileManager = fileManager
         self.cacheStore = GeneratedFileCacheStore(fileManager: fileManager)
-    }
-
-    private static func makeDownloadSession() -> URLSession {
-        let configuration = URLSessionConfiguration.default
-        configuration.timeoutIntervalForRequest = 120
-        configuration.timeoutIntervalForResource = 300
-        return URLSession(configuration: configuration)
+        self.namingResolver = resolvedNamingResolver
+        self.downloadClient = GeneratedFileDownloadClient(
+            configurationProvider: configurationProvider,
+            requestAuthorizer: authorizer,
+            transport: resolvedTransport,
+            namingResolver: resolvedNamingResolver
+        )
     }
 
     public func downloadFile(
@@ -50,7 +55,7 @@ public actor FileDownloadService {
         suggestedFilename: String?,
         apiKey: String
     ) async throws -> URL {
-        let key = downloadKey(fileId: fileId, containerId: containerId)
+        let key = namingResolver.downloadKey(fileId: fileId, containerId: containerId)
 
         if let existingTask = inFlightDownloads[key] {
             return try await existingTask.value
@@ -76,7 +81,7 @@ public actor FileDownloadService {
         suggestedFilename: String?,
         apiKey: String
     ) async throws -> GeneratedFileLocalResource {
-        let key = downloadKey(fileId: fileId, containerId: containerId)
+        let key = namingResolver.downloadKey(fileId: fileId, containerId: containerId)
 
         if let cached = cachedGeneratedFile(
             fileId: fileId,
@@ -109,8 +114,8 @@ public actor FileDownloadService {
         containerId: String?,
         suggestedFilename: String?
     ) -> GeneratedFileLocalResource? {
-        let key = downloadKey(fileId: fileId, containerId: containerId)
-        let preferredBucket = Self.cacheBucket(for: suggestedFilename)
+        let key = namingResolver.downloadKey(fileId: fileId, containerId: containerId)
+        let preferredBucket = GeneratedFileCachePolicy.cacheBucket(for: suggestedFilename)
         let bucketsToSearch: [GeneratedFileCacheBucket] = preferredBucket == .image
             ? [.image, .document]
             : [.document, .image]
@@ -130,7 +135,7 @@ public actor FileDownloadService {
                 localURL: entry.fileURL,
                 filename: filename,
                 cacheBucket: bucket,
-                openBehavior: Self.openBehavior(for: filename)
+                openBehavior: GeneratedFileCachePolicy.openBehavior(for: filename)
             )
         }
 
@@ -151,5 +156,21 @@ public actor FileDownloadService {
 
     public func clearGeneratedDocumentCache() {
         clearGeneratedFileCache(for: .document)
+    }
+
+    public static func openBehavior(for filename: String?) -> GeneratedFileOpenBehavior {
+        GeneratedFileCachePolicy.openBehavior(for: filename)
+    }
+
+    public func cancelGeneratedFilePrefetch(fileId: String, containerId: String?) {
+        let key = namingResolver.downloadKey(fileId: fileId, containerId: containerId)
+        inFlightGeneratedFileDownloads.removeValue(forKey: key)?.cancel()
+    }
+
+    public func cancelAllGeneratedFilePrefetches() {
+        for task in inFlightGeneratedFileDownloads.values {
+            task.cancel()
+        }
+        inFlightGeneratedFileDownloads.removeAll()
     }
 }

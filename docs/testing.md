@@ -2,7 +2,7 @@
 
 ## Principle
 
-`4.6.1` proves the real ownership boundaries:
+`4.7.0` proves the real ownership boundaries:
 
 - actor-owned runtime behavior
 - composition-root assembly
@@ -40,6 +40,7 @@
 ./scripts/ci.sh coverage-report
 ./scripts/ci.sh maintainability
 ./scripts/ci.sh source-share
+./scripts/ci.sh infra-safety
 ./scripts/ci.sh module-boundary
 ./scripts/ci.sh release-readiness
 ```
@@ -50,3 +51,5 @@
 - UI files: `<= 280 LOC`
 - ScreenStore files: `<= 180 LOC`
 - type families are checked in aggregate so extension-split monoliths still fail
+- non-UI type families: `<= 500 LOC`
+- UI type families: `<= 700 LOC`

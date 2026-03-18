@@ -7,8 +7,12 @@ public struct NativeChatRootView: View {
     @Environment(\.modelContext) private var modelContext
     @AppStorage("appTheme") private var appThemeRawValue: String = AppTheme.system.rawValue
     @State private var appStore: NativeChatAppStore?
+    @State private var overrideContent: AnyView?
+    private let rootOverrideFactory: (any NativeChatRootOverrideFactory)?
 
-    public init() {}
+    public init(rootOverrideFactory: (any NativeChatRootOverrideFactory)? = nil) {
+        self.rootOverrideFactory = rootOverrideFactory
+    }
 
     private var selectedTheme: AppTheme {
         AppTheme(rawValue: appThemeRawValue) ?? .system
@@ -16,14 +20,21 @@ public struct NativeChatRootView: View {
 
     public var body: some View {
         Group {
-            if let appStore {
+            if let overrideContent {
+                overrideContent
+            } else if let appStore {
                 ContentView(appStore: appStore)
             } else {
                 ProgressView()
             }
         }
         .task {
-            if appStore == nil {
+            if overrideContent == nil, appStore == nil {
+                if let rootOverrideFactory,
+                   let content = rootOverrideFactory.makeRootContent(modelContext: modelContext) {
+                    overrideContent = content
+                    return
+                }
                 appStore = NativeChatCompositionRoot(modelContext: modelContext).makeAppStore()
             }
         }

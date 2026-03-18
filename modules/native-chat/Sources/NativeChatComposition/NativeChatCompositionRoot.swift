@@ -2,7 +2,6 @@ import ChatApplication
 import ChatDomain
 import ChatPersistenceCore
 import ChatPresentation
-import ChatUIComponents
 import Foundation
 import GeneratedFilesInfra
 import OpenAITransport
@@ -22,32 +21,7 @@ package struct NativeChatCompositionRoot {
     }
 
     package func makeAppStore() -> NativeChatAppStore {
-        if let bootstrap = UITestScenarioLoader.makeBootstrap(modelContext: modelContext) {
-            let store = NativeChatAppStore(
-                chatController: bootstrap.chatController,
-                settingsPresenter: bootstrap.settingsPresenter,
-                historyPresenter: HistoryPresenter(
-                    loadConversations: { [] },
-                    selectConversation: { _ in },
-                    deleteConversation: { _ in },
-                    deleteAllConversations: {}
-                ),
-                hapticService: bootstrap.hapticService,
-                selectedTab: bootstrap.initialTab,
-                uiTestScenario: bootstrap.scenario,
-                uiTestPreviewItem: bootstrap.initialPreviewItem
-            )
-            let historyCoordinator = NativeChatHistoryCoordinator(
-                modelContext: modelContext,
-                chatController: bootstrap.chatController,
-                showChatTab: { store.selectedTab = 0 }
-            )
-            store.historyPresenter = historyCoordinator.makePresenter()
-            return store
-        }
-
         let settingsStore = SettingsStore()
-        let hapticService = HapticService()
 
         let apiKeyStore = PersistedAPIKeyStore(
             backend: KeychainAPIKeyBackend(
@@ -57,7 +31,9 @@ package struct NativeChatCompositionRoot {
         let configurationProvider = makeConfigurationProvider(settingsStore: settingsStore)
         let requestBuilder = OpenAIRequestBuilder(configuration: configurationProvider)
         let responseParser = OpenAIResponseParser()
-        let transport = OpenAIURLSessionTransport()
+        let transport = OpenAIURLSessionTransport(
+            session: OpenAITransportSessionFactory.makeRequestSession()
+        )
         let serviceFactory: @MainActor () -> OpenAIService = {
             OpenAIService(
                 requestBuilder: requestBuilder,
@@ -75,7 +51,6 @@ package struct NativeChatCompositionRoot {
             apiKeyStore: apiKeyStore,
             configurationProvider: configurationProvider,
             transport: transport,
-            hapticService: hapticService,
             serviceFactory: serviceFactory,
             bootstrapPolicy: bootstrapPolicy
         )
@@ -96,8 +71,7 @@ package struct NativeChatCompositionRoot {
                 selectConversation: { _ in },
                 deleteConversation: { _ in },
                 deleteAllConversations: {}
-            ),
-            hapticService: hapticService
+            )
         )
         let historyCoordinator = NativeChatHistoryCoordinator(
             modelContext: modelContext,

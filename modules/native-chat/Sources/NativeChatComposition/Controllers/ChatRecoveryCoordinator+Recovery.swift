@@ -64,31 +64,31 @@ extension ChatRecoveryCoordinator {
         execution.task?.cancel()
         execution.task = Task { @MainActor in
             guard controller.sessionCoordinator.isSessionActive(session) else { return }
-            let apiKey = self.activeAPIKey(for: session)
+            let apiKey = self.resultApplier.activeAPIKey(for: session)
 
             do {
                 let result = try await execution.service.fetchResponse(responseId: responseId, apiKey: apiKey)
 
                 switch result.status {
                 case .completed:
-                    self.controller.finishRecovery(
+                    self.resultApplier.finishRecovery(
                         for: message,
                         session: session,
                         result: result,
-                        fallbackText: self.recoveryFallbackText(for: message, session: session),
-                        fallbackThinking: self.recoveryFallbackThinking(for: message, session: session)
+                        fallbackText: self.resultApplier.recoveryFallbackText(for: message, session: session),
+                        fallbackThinking: self.resultApplier.recoveryFallbackThinking(for: message, session: session)
                     )
 
                 case .failed, .incomplete, .unknown:
                     if visible {
                         controller.errorMessage = result.errorMessage ?? "Response did not complete."
                     }
-                    self.controller.finishRecovery(
+                    self.resultApplier.finishRecovery(
                         for: message,
                         session: session,
                         result: result,
-                        fallbackText: self.recoveryFallbackText(for: message, session: session),
-                        fallbackThinking: self.recoveryFallbackThinking(for: message, session: session)
+                        fallbackText: self.resultApplier.recoveryFallbackText(for: message, session: session),
+                        fallbackThinking: self.resultApplier.recoveryFallbackThinking(for: message, session: session)
                     )
 
                 case .queued, .inProgress:
@@ -109,7 +109,7 @@ extension ChatRecoveryCoordinator {
                     }
                 }
             } catch {
-                if self.controller.handleUnrecoverableRecoveryError(
+                if self.resultApplier.handleUnrecoverableRecoveryError(
                     error,
                     for: message,
                     responseId: responseId,

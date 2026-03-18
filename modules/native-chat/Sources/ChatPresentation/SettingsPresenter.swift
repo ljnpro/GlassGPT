@@ -74,6 +74,11 @@ public final class SettingsPresenter {
             if !cloudflareEnabled {
                 cloudflareHealthStatus = .unknown
                 isCheckingCloudflareHealth = false
+            } else {
+                cloudflareHealthStatus = controller.resolveCloudflareHealth(
+                    typedAPIKey: apiKey,
+                    gatewayEnabled: cloudflareEnabled
+                )
             }
         }
     }
@@ -126,6 +131,10 @@ public final class SettingsPresenter {
         self.generatedImageCacheLimitString = generatedImageCacheLimitString
         self.generatedDocumentCacheLimitString = generatedDocumentCacheLimitString
         self.controller = controller
+        self.cloudflareHealthStatus = controller.resolveCloudflareHealth(
+            typedAPIKey: apiKey,
+            gatewayEnabled: cloudflareEnabled
+        )
     }
 
     public func saveAPIKey() {
@@ -136,6 +145,12 @@ public final class SettingsPresenter {
             try controller.saveAPIKey(trimmedKey)
             apiKey = trimmedKey
             saveConfirmation = true
+            if cloudflareEnabled {
+                cloudflareHealthStatus = controller.resolveCloudflareHealth(
+                    typedAPIKey: apiKey,
+                    gatewayEnabled: cloudflareEnabled
+                )
+            }
         } catch {
         }
     }
@@ -145,7 +160,10 @@ public final class SettingsPresenter {
         controller.clearAPIKey()
         isAPIKeyValid = nil
         if cloudflareEnabled {
-            cloudflareHealthStatus = .unknown
+            cloudflareHealthStatus = controller.resolveCloudflareHealth(
+                typedAPIKey: apiKey,
+                gatewayEnabled: cloudflareEnabled
+            )
         }
     }
 
@@ -165,6 +183,16 @@ public final class SettingsPresenter {
     public func checkCloudflareHealth() async {
         guard cloudflareEnabled else {
             cloudflareHealthStatus = .unknown
+            isCheckingCloudflareHealth = false
+            return
+        }
+
+        let localStatus = controller.resolveCloudflareHealth(
+            typedAPIKey: apiKey,
+            gatewayEnabled: cloudflareEnabled
+        )
+        guard localStatus == .unknown else {
+            cloudflareHealthStatus = localStatus
             isCheckingCloudflareHealth = false
             return
         }

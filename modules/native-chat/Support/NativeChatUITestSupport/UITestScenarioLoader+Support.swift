@@ -1,5 +1,6 @@
 import ChatPersistenceCore
 import Foundation
+import NativeChatComposition
 import OSLog
 
 enum ScenarioSettingsValue: Sendable {

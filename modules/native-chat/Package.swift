@@ -134,6 +134,20 @@ let boundaryTargets: [Target] = [
         ],
         path: "Sources/NativeChat"
     ),
+    .target(
+        name: "NativeChatUITestSupport",
+        dependencies: [
+            "ChatDomain",
+            "ChatPersistenceCore",
+            "ChatPersistenceSwiftData",
+            "ChatPresentation",
+            "GeneratedFilesCore",
+            "GeneratedFilesInfra",
+            "OpenAITransport",
+            "NativeChatComposition"
+        ],
+        path: "Support/NativeChatUITestSupport"
+    ),
 ]
 
 let package = Package(
@@ -145,6 +159,10 @@ let package = Package(
         .library(
             name: "NativeChat",
             targets: ["NativeChat"]
+        ),
+        .library(
+            name: "NativeChatUITestSupport",
+            targets: ["NativeChatUITestSupport"]
         )
     ],
     dependencies: [
@@ -172,7 +190,8 @@ let package = Package(
                 "ChatUIComponents",
                 "NativeChatUI",
                 "NativeChatComposition",
-                "NativeChat"
+                "NativeChat",
+                "NativeChatUITestSupport"
             ],
             path: "Tests/NativeChatArchitectureTests"
         ),
@@ -191,6 +210,7 @@ let package = Package(
                 "ChatUIComponents",
                 "NativeChatUI",
                 "NativeChatComposition",
+                "NativeChatUITestSupport",
                 "OpenAITransport",
                 "GeneratedFilesCore",
                 "GeneratedFilesInfra",

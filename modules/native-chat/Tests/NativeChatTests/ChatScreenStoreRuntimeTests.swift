@@ -3,6 +3,7 @@ import XCTest
 import ChatPersistenceCore
 import ChatPersistenceSwiftData
 import ChatUIComponents
+import GeneratedFilesInfra
 import OpenAITransport
 import SwiftData
 import ChatDomain
@@ -241,6 +242,55 @@ final class ChatScreenStoreRuntimeTests: XCTestCase {
         XCTAssertFalse(store.isRecovering)
         let requestedPaths = await transport.requestedPaths()
         XCTAssertEqual(requestedPaths, ["/v1/responses/resp_missing"])
+    }
+
+    func testStartNewChatCancelsTrackedGeneratedFilePrefetch() async throws {
+        let fileDownloadTransport = SlowGeneratedFileDownloadTransport()
+        let configurationProvider = RuntimeTestOpenAIConfigurationProvider()
+        let fileDownloadService = FileDownloadService(
+            configurationProvider: configurationProvider,
+            transport: fileDownloadTransport
+        )
+        let store = try makeTestChatScreenStore(
+            configurationProvider: configurationProvider,
+            fileDownloadService: fileDownloadService,
+            streamClient: QueuedOpenAIStreamClient(scriptedStreams: [])
+        )
+        let conversation = try seedConversation(in: store, title: "Generated Prefetch")
+        let message = Message(
+            role: .assistant,
+            content: "Finished",
+            conversation: conversation,
+            responseId: "resp_prefetch",
+            filePathAnnotations: [
+                FilePathAnnotation(
+                    fileId: "file_prefetch",
+                    containerId: "ctr_prefetch",
+                    sandboxPath: "sandbox:/mnt/data/report.pdf",
+                    filename: "report.pdf",
+                    startIndex: 0,
+                    endIndex: 10
+                )
+            ]
+        )
+        conversation.messages.append(message)
+        store.modelContext.insert(message)
+        try store.modelContext.save()
+
+        store.currentConversation = conversation
+        store.messages = [message]
+
+        store.fileInteractionCoordinator.prefetchGeneratedFilesIfNeeded(for: message)
+
+        try await waitUntilAsync {
+            await fileDownloadTransport.requestCount() == 1
+        }
+
+        store.conversationCoordinator.startNewChat()
+
+        try await waitUntilAsync {
+            await fileDownloadTransport.cancellationCount() == 1
+        }
     }
 
     func testRecoverResponseInvisiblePollingFinalizesMessageWithoutBindingVisibleSession() async throws {
@@ -562,7 +612,6 @@ final class ChatScreenStoreRuntimeTests: XCTestCase {
         let context = ModelContext(container)
         let settingsStore = SettingsStore(valueStore: settingsValueStore)
         let apiKeyStore = PersistedAPIKeyStore(backend: apiBackend)
-        let hapticService = HapticService()
         let requestBuilder = OpenAIRequestBuilder(configuration: configurationProvider)
         let responseParser = OpenAIResponseParser()
         let service = OpenAIService(
@@ -578,7 +627,6 @@ final class ChatScreenStoreRuntimeTests: XCTestCase {
             apiKeyStore: apiKeyStore,
             configurationProvider: configurationProvider,
             transport: transport,
-            hapticService: hapticService,
             serviceFactory: { service },
             bootstrapPolicy: bootstrapPolicy
         )
@@ -593,5 +641,37 @@ final class ChatScreenStoreRuntimeTests: XCTestCase {
         }
         XCTFail("Expected an active visible session")
         return UUID()
+    }
+}
+
+private actor SlowGeneratedFileDownloadTransport: OpenAIDataTransport {
+    private var requestsSeen = 0
+    private var cancellationsSeen = 0
+
+    func data(for request: URLRequest) async throws -> (Data, URLResponse) {
+        requestsSeen += 1
+        do {
+            try await Task.sleep(nanoseconds: 60_000_000_000)
+            let response = HTTPURLResponse(
+                url: request.url ?? URL(string: "https://api.test.openai.local/v1/files/file_prefetch/content")!,
+                statusCode: 200,
+                httpVersion: nil,
+                headerFields: nil
+            )!
+            return (Data("%PDF".utf8), response)
+        } catch {
+            if Task.isCancelled {
+                cancellationsSeen += 1
+            }
+            throw error
+        }
+    }
+
+    func requestCount() -> Int {
+        requestsSeen
+    }
+
+    func cancellationCount() -> Int {
+        cancellationsSeen
     }
 }

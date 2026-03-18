@@ -1,9 +1,12 @@
 import SwiftUI
 import ChatDomain
 import ChatPersistenceSwiftData
-import NativeChatUI
+import GeneratedFilesCore
+import PDFKit
+import UIKit
 import XCTest
 @testable import NativeChatComposition
+@testable import NativeChatUI
 
 @MainActor
 final class PresentationHelperTests: XCTestCase {
@@ -109,5 +112,90 @@ final class PresentationHelperTests: XCTestCase {
         XCTAssertNil(AppTheme.system.colorScheme)
         XCTAssertEqual(AppTheme.light.colorScheme, .light)
         XCTAssertEqual(AppTheme.dark.colorScheme, .dark)
+    }
+
+    func testFilePreviewSheetComputesStableViewerMetrics() throws {
+        let sheet = FilePreviewSheet(
+            previewItem: FilePreviewItem(
+                url: try makeSnapshotImageFile(),
+                kind: .generatedImage,
+                displayName: "Generated Chart",
+                viewerFilename: "chart.png"
+            )
+        )
+
+        XCTAssertEqual(sheet.fileURL.lastPathComponent, "snapshot-preview-image.png")
+        XCTAssertFalse(sheet.isPad)
+        XCTAssertGreaterThan(sheet.circularButtonDiameter, 0)
+        XCTAssertGreaterThan(sheet.closeIconSize, 0)
+        XCTAssertGreaterThan(sheet.actionIconSize, 0)
+    }
+
+    func testLoadGeneratedImagePreviewReturnsUnavailableForMissingFile() {
+        let missingURL = URL(fileURLWithPath: "/tmp/missing-generated-image.png")
+        switch FilePreviewLoadingModel.loadGeneratedImagePreview(from: missingURL) {
+        case .unavailable:
+            XCTAssertTrue(true)
+        default:
+            XCTFail("Expected unavailable image preview")
+        }
+    }
+
+    func testLoadGeneratedImagePreviewRejectsNonImageFilename() throws {
+        let url = try makeSnapshotPDFFile()
+        let renamed = url.deletingPathExtension().appendingPathExtension("txt")
+        try? FileManager.default.removeItem(at: renamed)
+        try FileManager.default.copyItem(at: url, to: renamed)
+
+        switch FilePreviewLoadingModel.loadGeneratedImagePreview(from: renamed) {
+        case .error(let message):
+            XCTAssertEqual(message, "This file is no longer recognized as an image.")
+        default:
+            XCTFail("Expected image filename validation failure")
+        }
+    }
+
+    func testLoadGeneratedImagePreviewLoadsValidImage() throws {
+        let url = try makeSnapshotImageFile()
+
+        switch FilePreviewLoadingModel.loadGeneratedImagePreview(from: url) {
+        case .image(let payload):
+            XCTAssertFalse(payload.data.isEmpty)
+        default:
+            XCTFail("Expected valid generated image preview")
+        }
+    }
+
+    func testLoadGeneratedPDFPreviewReturnsUnavailableForMissingFile() {
+        let missingURL = URL(fileURLWithPath: "/tmp/missing-generated-document.pdf")
+        switch FilePreviewLoadingModel.loadGeneratedPDFPreview(from: missingURL) {
+        case .unavailable:
+            XCTAssertTrue(true)
+        default:
+            XCTFail("Expected unavailable PDF preview")
+        }
+    }
+
+    func testLoadGeneratedPDFPreviewRejectsNonPDFFilename() throws {
+        let url = try makeSnapshotImageFile()
+        let renamed = url.deletingPathExtension().appendingPathExtension("png")
+
+        switch FilePreviewLoadingModel.loadGeneratedPDFPreview(from: renamed) {
+        case .error(let message):
+            XCTAssertEqual(message, "This file is no longer recognized as a PDF.")
+        default:
+            XCTFail("Expected PDF filename validation failure")
+        }
+    }
+
+    func testLoadGeneratedPDFPreviewLoadsValidPDF() throws {
+        let url = try makeSnapshotPDFFile()
+
+        switch FilePreviewLoadingModel.loadGeneratedPDFPreview(from: url) {
+        case .document(let document):
+            XCTAssertGreaterThan(document.pageCount, 0)
+        default:
+            XCTFail("Expected valid generated PDF preview")
+        }
     }
 }
