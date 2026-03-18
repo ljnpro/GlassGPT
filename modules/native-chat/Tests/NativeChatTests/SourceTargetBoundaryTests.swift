@@ -2,6 +2,7 @@ import XCTest
 import ChatDomain
 import ChatPersistenceContracts
 import ChatPersistenceCore
+import ChatPersistenceSwiftData
 import GeneratedFilesCore
 import ChatRuntimeModel
 import ChatApplication

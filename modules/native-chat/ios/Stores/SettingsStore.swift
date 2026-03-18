@@ -1,5 +1,0 @@
-import ChatPersistenceCore
-
-typealias SettingsValueStore = ChatPersistenceCore.SettingsValueStore
-typealias UserDefaultsSettingsValueStore = ChatPersistenceCore.UserDefaultsSettingsValueStore
-typealias SettingsStore = ChatPersistenceCore.SettingsStore

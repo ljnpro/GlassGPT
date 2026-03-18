@@ -104,7 +104,13 @@ def count_fatal_errors(files: list[Path], limit: int) -> CheckResult:
 
 def classify_ui(path: Path) -> bool:
     relative_path = f"/{relative(path)}/"
-    return "/Views/" in relative_path or "/ScreenStores/" in relative_path
+    return (
+        "/Views/" in relative_path
+        or "/ScreenStores/" in relative_path
+        or "/Sources/NativeChatUI/" in relative_path
+        or "/Sources/ChatUIComponents/" in relative_path
+        or "/Sources/NativeChatComposition/Views/" in relative_path
+    )
 
 
 def classify_screen_store(path: Path) -> bool:

@@ -1,9 +1,16 @@
+import ChatApplication
+import ChatDomain
+import ChatPersistenceCore
+import ChatPresentation
+import ChatPersistenceSwiftData
+import GeneratedFilesInfra
 import Foundation
+import OpenAITransport
 import SwiftData
 import XCTest
-@testable import NativeChat
+@testable import NativeChatComposition
 
-final class RuntimeTestOpenAIConfigurationProvider: OpenAIConfigurationProvider {
+final class RuntimeTestOpenAIConfigurationProvider: OpenAIConfigurationProvider, @unchecked Sendable {
     var directOpenAIBaseURL: String
     var cloudflareGatewayBaseURL: String
     var cloudflareAIGToken: String
@@ -202,7 +209,7 @@ actor StubOpenAITransport: OpenAIDataTransport {
 
 @MainActor
 struct SettingsScreenStoreHarness {
-    let store: SettingsScreenStore
+    let store: SettingsPresenter
     let settingsValueStore: InMemorySettingsValueStore
     let apiKeyBackend: InMemoryAPIKeyBackend
     let configurationProvider: RuntimeTestOpenAIConfigurationProvider
@@ -215,8 +222,8 @@ func makeTestChatScreenStore(
     configurationProvider: RuntimeTestOpenAIConfigurationProvider = RuntimeTestOpenAIConfigurationProvider(),
     transport: OpenAIDataTransport = StubOpenAITransport(),
     streamClient: OpenAIStreamClient,
-    bootstrapPolicy: ChatScreenStoreBootstrapPolicy = .testing
-) throws -> ChatScreenStore {
+    bootstrapPolicy: FeatureBootstrapPolicy = .testing
+) throws -> ChatController {
     let container = try makeInMemoryModelContainer()
     let context = ModelContext(container)
     let settingsValueStore = InMemorySettingsValueStore()
@@ -228,7 +235,7 @@ func makeTestChatScreenStore(
     apiBackend.storedKey = apiKey
 
     let settingsStore = SettingsStore(valueStore: settingsValueStore)
-    let apiKeyStore = APIKeyStore(backend: apiBackend)
+    let apiKeyStore = PersistedAPIKeyStore(backend: apiBackend)
     let requestBuilder = OpenAIRequestBuilder(configuration: configurationProvider)
     let responseParser = OpenAIResponseParser()
     let sharedService = OpenAIService(
@@ -238,7 +245,7 @@ func makeTestChatScreenStore(
         transport: transport
     )
 
-    return ChatScreenStore(
+    return ChatController(
         modelContext: context,
         settingsStore: settingsStore,
         apiKeyStore: apiKeyStore,
@@ -254,7 +261,20 @@ func makeTestSettingsScreenStore(
     apiKey: String? = nil,
     configurationProvider: RuntimeTestOpenAIConfigurationProvider = RuntimeTestOpenAIConfigurationProvider(),
     transport: OpenAIDataTransport = StubOpenAITransport()
-) -> SettingsScreenStore {
+) -> SettingsPresenter {
+    makeTestSettingsScreenStoreHarness(
+        apiKey: apiKey,
+        configurationProvider: configurationProvider,
+        transport: transport
+    ).store
+}
+
+@MainActor
+func makeTestSettingsPresenter(
+    apiKey: String? = nil,
+    configurationProvider: RuntimeTestOpenAIConfigurationProvider = RuntimeTestOpenAIConfigurationProvider(),
+    transport: OpenAIDataTransport = StubOpenAITransport()
+) -> SettingsPresenter {
     makeTestSettingsScreenStoreHarness(
         apiKey: apiKey,
         configurationProvider: configurationProvider,
@@ -281,7 +301,7 @@ func makeTestSettingsScreenStoreHarness(
     apiBackend.storedKey = apiKey
 
     let settingsStore = SettingsStore(valueStore: settingsValueStore)
-    let apiKeyStore = APIKeyStore(backend: apiBackend)
+    let apiKeyStore = PersistedAPIKeyStore(backend: apiBackend)
     let requestBuilder = OpenAIRequestBuilder(configuration: configurationProvider)
     let openAIService = OpenAIService(
         requestBuilder: requestBuilder,
@@ -289,15 +309,19 @@ func makeTestSettingsScreenStoreHarness(
         streamClient: QueuedOpenAIStreamClient(scriptedStreams: []),
         transport: transport
     )
+    let fileDownloadService = GeneratedFilesInfra.FileDownloadService(configurationProvider: configurationProvider)
 
     return SettingsScreenStoreHarness(
-        store: SettingsScreenStore(
+        store: makeSettingsPresenter(
             settingsStore: settingsStore,
             apiKeyStore: apiKeyStore,
             openAIService: openAIService,
             requestBuilder: requestBuilder,
             transport: transport,
-            configurationProvider: configurationProvider
+            configurationProvider: configurationProvider,
+            fileDownloadService: fileDownloadService,
+            appVersionString: "4.5.0 (20176)",
+            platformString: "iOS 26.0 · Liquid Glass"
         ),
         settingsValueStore: settingsValueStore,
         apiKeyBackend: apiBackend,

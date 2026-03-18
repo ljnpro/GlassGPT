@@ -1,7 +1,0 @@
-import OpenAITransport
-
-typealias ResponsesInputMessageDTO = OpenAITransport.ResponsesInputMessageDTO
-typealias ResponsesToolDTO = OpenAITransport.ResponsesToolDTO
-typealias ResponsesReasoningRequestDTO = OpenAITransport.ResponsesReasoningRequestDTO
-typealias ResponsesStreamRequestDTO = OpenAITransport.ResponsesStreamRequestDTO
-typealias ResponsesTitleRequestDTO = OpenAITransport.ResponsesTitleRequestDTO

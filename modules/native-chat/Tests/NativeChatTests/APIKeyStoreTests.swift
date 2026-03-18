@@ -1,19 +1,20 @@
+import ChatPersistenceCore
 import Security
 import XCTest
-@testable import NativeChat
+@testable import NativeChatComposition
 
 final class APIKeyStoreTests: XCTestCase {
     func testLoadReturnsPreexistingBackendValueForReinstallCompatibility() {
         let backend = InMemoryAPIKeyBackend()
         backend.storedKey = "sk-existing-keychain"
-        let store = APIKeyStore(backend: backend)
+        let store = PersistedAPIKeyStore(backend: backend)
 
         XCTAssertEqual(store.loadAPIKey(), "sk-existing-keychain")
     }
 
     func testSaveLoadAndDeleteDelegateToBackend() throws {
         let backend = InMemoryAPIKeyBackend()
-        let store = APIKeyStore(backend: backend)
+        let store = PersistedAPIKeyStore(backend: backend)
 
         try store.saveAPIKey("sk-test")
 
@@ -29,7 +30,7 @@ final class APIKeyStoreTests: XCTestCase {
     func testSavePropagatesBackendError() {
         let backend = InMemoryAPIKeyBackend()
         backend.saveError = NativeChatTestError.saveFailed
-        let store = APIKeyStore(backend: backend)
+        let store = PersistedAPIKeyStore(backend: backend)
 
         XCTAssertThrowsError(try store.saveAPIKey("sk-test")) { error in
             XCTAssertTrue(error is NativeChatTestError)
@@ -39,7 +40,7 @@ final class APIKeyStoreTests: XCTestCase {
     func testDeleteClearsPreexistingBackendValue() {
         let backend = InMemoryAPIKeyBackend()
         backend.storedKey = "sk-existing-keychain"
-        let store = APIKeyStore(backend: backend)
+        let store = PersistedAPIKeyStore(backend: backend)
 
         store.deleteAPIKey()
 
@@ -48,25 +49,25 @@ final class APIKeyStoreTests: XCTestCase {
     }
 
     func testKeychainServiceRetainsStableReinstallContract() {
-        XCTAssertEqual(KeychainService.apiKeyAccount, "openai_api_key")
+        XCTAssertEqual(KeychainAPIKeyBackend.apiKeyAccount, "openai_api_key")
         XCTAssertEqual(
-            KeychainService.apiKeyAccessibility,
+            KeychainAPIKeyBackend.apiKeyAccessibility,
             kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly as String
         )
         XCTAssertEqual(
-            KeychainService.defaultServiceIdentifier(bundleIdentifier: "space.manus.liquid.glass.chat.t20260308214621"),
+            KeychainAPIKeyBackend.defaultServiceIdentifier(bundleIdentifier: "space.manus.liquid.glass.chat.t20260308214621"),
             "space.manus.liquid.glass.chat.t20260308214621"
         )
     }
 
     func testKeychainServiceFallsBackWhenBundleIdentifierIsMissing() {
         XCTAssertEqual(
-            KeychainService.defaultServiceIdentifier(bundleIdentifier: nil),
-            KeychainService.fallbackServiceIdentifier
+            KeychainAPIKeyBackend.defaultServiceIdentifier(bundleIdentifier: nil),
+            KeychainAPIKeyBackend.fallbackServiceIdentifier
         )
         XCTAssertEqual(
-            KeychainService.defaultServiceIdentifier(bundleIdentifier: "   "),
-            KeychainService.fallbackServiceIdentifier
+            KeychainAPIKeyBackend.defaultServiceIdentifier(bundleIdentifier: "   "),
+            KeychainAPIKeyBackend.fallbackServiceIdentifier
         )
     }
 }

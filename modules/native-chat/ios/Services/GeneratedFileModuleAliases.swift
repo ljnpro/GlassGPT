@@ -1,7 +1,0 @@
-import GeneratedFilesCore
-import GeneratedFilesInfra
-
-typealias GeneratedFileCacheBucket = GeneratedFilesCore.GeneratedFileCacheBucket
-typealias GeneratedFileOpenBehavior = GeneratedFilesCore.GeneratedFileOpenBehavior
-typealias GeneratedFileLocalResource = GeneratedFilesCore.GeneratedFileLocalResource
-typealias GeneratedFileCacheStore = GeneratedFilesInfra.GeneratedFileCacheStore

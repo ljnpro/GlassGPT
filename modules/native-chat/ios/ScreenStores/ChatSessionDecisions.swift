@@ -1,5 +1,0 @@
-import ChatRuntimeModel
-
-typealias ChatRecoveryResumeMode = RuntimeRecoveryResumeMode
-typealias PendingBackgroundCancellation = RuntimePendingBackgroundCancellation
-typealias ChatSessionDecisions = RuntimeSessionDecisionPolicy

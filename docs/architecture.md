@@ -1,8 +1,8 @@
-# 4.4.2 Architecture
+# 4.5.0 Architecture
 
 ## Goal
 
-Refactor the app for maintainability while preserving the exact `4.4.0` user experience.
+Refactor the app for terminal maintainability while removing the legacy app-facing business layer.
 
 ## Layering
 
@@ -12,37 +12,53 @@ Refactor the app for maintainability while preserving the exact `4.4.0` user exp
   - still ships a single `NativeChat` product to the app target
   - internally split into real source targets with direct tests and explicit dependency boundaries
 
-## 4.4.2 Internal Boundaries
+## 4.5.0 Internal Boundaries
 
 - `ChatDomain`
   - stable value types and payload models such as themes, model selection, attachments, annotations, tool calls, and generated-file descriptors
-- `ChatPersistence`
-  - store snapshots, migration planning, and persistence-facing contracts
+- `ChatPersistenceContracts`
+  - store snapshots, draft checkpoints, and persistence-facing contracts
+- `ChatPersistenceCore`
+  - settings, keychain, reset, and release bootstrap concerns
+- `ChatPersistenceSwiftData`
+  - concrete SwiftData entities, repositories, payload codecs, and container wiring
 - `OpenAITransport`
   - request DTOs, response DTOs, request factories, transport configuration, stream envelopes, and service errors
-- `GeneratedFiles`
-  - generated-file cache storage, cache policy, metadata normalization, and logging
-- `ChatRuntime`
-  - runtime decision policies and state-transition helpers that do not require UI ownership
-- `ChatFeatures`
-  - feature-level bootstrap policies and orchestration glue that remain testable without the full UI shell
-- `ChatUI`
-  - UIKit/SwiftUI hosts and reusable presentation primitives that do not own chat business logic
-- `NativeChat` (`modules/native-chat/ios`)
-  - composition root, SwiftData entities, repositories, screen stores, views, and release-stable shims that preserve the app-facing contract
+- `GeneratedFilesCore`
+  - generated-file descriptors, cache policy, and open-behavior models
+- `GeneratedFilesInfra`
+  - generated-file cache storage, downloads, and concrete presentation mapping
+- `ChatRuntimeModel`
+  - runtime state, reply identity, lifecycle, cursor, and pure policies
+- `ChatRuntimePorts`
+  - narrow effect boundaries consumed by workflows
+- `ChatRuntimeWorkflows`
+  - actor-owned runtime kernel and side-effect orchestration
+- `ChatApplication`
+  - scene controllers and feature orchestration
+- `ChatPresentation`
+  - MainActor presenters and visible projection mapping
+- `ChatUIComponents`
+  - UIKit/SwiftUI hosts and reusable presentation primitives
+- `NativeChatUI`
+  - feature views only
+- `NativeChatComposition`
+  -唯一 concrete wiring 层
+- `NativeChat`
+  - pure umbrella export
 
 ## Design Rules
 
-- Preserve view output and interaction behavior. Extract logic out of views and screen stores; do not redesign UI.
-- Keep `ChatScreenStore`, `SettingsScreenStore`, `HistoryScreenStore`, and `FilePreviewStore` as UI adapters rather than transport or persistence owners.
-- Keep `OpenAIService` as a thin façade over typed transport collaborators.
+- Preserve view output and interaction behavior where practical, but prioritize full ownership cutover over legacy structure retention.
+- Delete `ChatScreenStore`, `SettingsScreenStore`, `HistoryScreenStore`, and `FilePreviewStore` as production abstractions.
+- Use typed transport and workflow boundaries directly instead of screen-store orchestration.
 - Keep one logical assistant reply mapped to one visible assistant surface. Paragraph breaks, reconnects, and recovery must not create duplicate bubbles.
-- Persist API keys only through `APIKeyStore -> KeychainService`; uninstall/reinstall must preserve a previously saved key.
+- Persist API keys only through `ChatPersistenceCore`; `4.5.0` first launch clears any pre-existing key.
 - Prefer typed request/response helpers over ad hoc parsing in feature code.
-- Prefer moving pure types and policies into `Sources/*` rather than keeping them inside the app-facing `ios` target.
+- No production logic remains in `modules/native-chat/ios`.
 
 ## Notes
 
-- `NativeChat` remains the only product imported by `ios/GlassGPT`, but newly extracted pure types should land in `Sources/*` instead of `ios`.
+- `NativeChat` remains the only product imported by `ios/GlassGPT`, and all production logic must live in `Sources/*`.
 - `TargetBoundary.swift` files are no longer treated as sufficient evidence of modularity. CI tracks source-share and module-boundary health directly.
-- `4.4.2` only promises migration compatibility from `4.4.0+`. Reinstall parity focuses on immediate usability through preserved Keychain credentials, not on retaining the local conversation database after uninstall.
+- `4.5.0` is a terminal cutover release. It does not preserve local conversation state or Keychain credentials from prior versions.

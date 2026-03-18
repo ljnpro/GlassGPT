@@ -22,7 +22,8 @@ let boundaryTargets: [Target] = [
         dependencies: [
             "ChatDomain",
             "ChatPersistenceContracts",
-            "ChatPersistenceCore"
+            "ChatPersistenceCore",
+            "OpenAITransport"
         ],
         path: "Sources/ChatPersistenceSwiftData"
     ),
@@ -91,7 +92,10 @@ let boundaryTargets: [Target] = [
     ),
     .target(
         name: "ChatUIComponents",
-        path: "Sources/ChatUIComponents"
+        path: "Sources/ChatUIComponents",
+        resources: [
+            .process("Resources")
+        ]
     ),
     .target(
         name: "NativeChatUI",
@@ -122,6 +126,14 @@ let boundaryTargets: [Target] = [
         ],
         path: "Sources/NativeChatComposition"
     ),
+    .target(
+        name: "NativeChat",
+        dependencies: [
+            "ChatPersistenceSwiftData",
+            "NativeChatComposition",
+        ],
+        path: "Sources/NativeChat"
+    ),
 ]
 
 let package = Package(
@@ -142,30 +154,6 @@ let package = Package(
         )
     ],
     targets: boundaryTargets + [
-        .target(
-            name: "NativeChat",
-            dependencies: [
-                "ChatDomain",
-                "ChatPersistenceContracts",
-                "ChatPersistenceCore",
-                "ChatPersistenceSwiftData",
-                "OpenAITransport",
-                "GeneratedFilesCore",
-                "GeneratedFilesInfra",
-                "ChatRuntimeModel",
-                "ChatRuntimePorts",
-                "ChatRuntimeWorkflows",
-                "ChatApplication",
-                "ChatPresentation",
-                "ChatUIComponents",
-                "NativeChatUI",
-                "NativeChatComposition",
-            ],
-            path: "ios",
-            resources: [
-                .process("Resources")
-            ]
-        ),
         .testTarget(
             name: "NativeChatArchitectureTests",
             dependencies: [
@@ -183,14 +171,14 @@ let package = Package(
                 "ChatPresentation",
                 "ChatUIComponents",
                 "NativeChatUI",
-                "NativeChatComposition"
+                "NativeChatComposition",
+                "NativeChat"
             ],
             path: "Tests/NativeChatArchitectureTests"
         ),
         .testTarget(
             name: "NativeChatTests",
             dependencies: [
-                "NativeChat",
                 "ChatDomain",
                 "ChatPersistenceContracts",
                 "ChatPersistenceCore",
@@ -201,6 +189,8 @@ let package = Package(
                 "ChatApplication",
                 "ChatPresentation",
                 "ChatUIComponents",
+                "NativeChatUI",
+                "NativeChatComposition",
                 "OpenAITransport",
                 "GeneratedFilesCore",
                 "GeneratedFilesInfra",

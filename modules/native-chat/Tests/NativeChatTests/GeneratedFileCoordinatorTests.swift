@@ -1,5 +1,9 @@
+import ChatDomain
+import ChatPersistenceSwiftData
+import GeneratedFilesCore
+import GeneratedFilesInfra
 import XCTest
-@testable import NativeChat
+@testable import NativeChatComposition
 
 final class GeneratedFileCoordinatorTests: XCTestCase {
     func testRequestedFilenamePrefersAnnotationThenSandboxPath() {

@@ -1,5 +1,8 @@
+import ChatDomain
+import ChatPersistenceSwiftData
+import ChatPersistenceCore
 import XCTest
-@testable import NativeChat
+@testable import NativeChatComposition
 
 final class SettingsStoreTests: XCTestCase {
     func testDefaultsMatchCurrentAppBehavior() {

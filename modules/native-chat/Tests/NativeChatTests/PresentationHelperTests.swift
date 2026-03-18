@@ -1,6 +1,9 @@
 import SwiftUI
+import ChatDomain
+import ChatPersistenceSwiftData
+import NativeChatUI
 import XCTest
-@testable import NativeChat
+@testable import NativeChatComposition
 
 @MainActor
 final class PresentationHelperTests: XCTestCase {

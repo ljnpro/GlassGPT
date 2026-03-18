@@ -1,9 +1,13 @@
+import ChatRuntimeModel
+import ChatDomain
+import ChatPersistenceSwiftData
+import OpenAITransport
 import XCTest
-@testable import NativeChat
+@testable import NativeChatComposition
 
 final class ChatSessionDecisionsTests: XCTestCase {
     func testRecoveryResumeModeUsesStreamingWhenBackgroundModeAndSequenceExist() {
-        let mode = ChatSessionDecisions.recoveryResumeMode(
+        let mode = RuntimeSessionDecisionPolicy.recoveryResumeMode(
             preferStreamingResume: true,
             usedBackgroundMode: true,
             lastSequenceNumber: 42
@@ -13,7 +17,7 @@ final class ChatSessionDecisionsTests: XCTestCase {
     }
 
     func testRecoveryResumeModeFallsBackToPollingWhenBackgroundModeIsDisabled() {
-        let mode = ChatSessionDecisions.recoveryResumeMode(
+        let mode = RuntimeSessionDecisionPolicy.recoveryResumeMode(
             preferStreamingResume: true,
             usedBackgroundMode: false,
             lastSequenceNumber: 42
@@ -23,7 +27,7 @@ final class ChatSessionDecisionsTests: XCTestCase {
     }
 
     func testRecoveryResumeModeFallsBackToPollingWhenStreamingResumeIsNotPreferred() {
-        let mode = ChatSessionDecisions.recoveryResumeMode(
+        let mode = RuntimeSessionDecisionPolicy.recoveryResumeMode(
             preferStreamingResume: false,
             usedBackgroundMode: true,
             lastSequenceNumber: 42
@@ -34,7 +38,7 @@ final class ChatSessionDecisionsTests: XCTestCase {
 
     func testGatewayFallbackTriggersDirectResumeWhenNoRecoveryEventsArrive() {
         XCTAssertTrue(
-            ChatSessionDecisions.shouldFallbackToDirectRecoveryStream(
+            RuntimeSessionDecisionPolicy.shouldFallbackToDirectRecoveryStream(
                 cloudflareGatewayEnabled: true,
                 useDirectEndpoint: false,
                 gatewayResumeTimedOut: false,
@@ -45,7 +49,7 @@ final class ChatSessionDecisionsTests: XCTestCase {
 
     func testGatewayFallbackDoesNotTriggerAfterRecoveryEventsOnDirectRoute() {
         XCTAssertFalse(
-            ChatSessionDecisions.shouldFallbackToDirectRecoveryStream(
+            RuntimeSessionDecisionPolicy.shouldFallbackToDirectRecoveryStream(
                 cloudflareGatewayEnabled: true,
                 useDirectEndpoint: true,
                 gatewayResumeTimedOut: true,
@@ -56,7 +60,7 @@ final class ChatSessionDecisionsTests: XCTestCase {
 
     func testGatewayFallbackTriggersWhenGatewayResumeTimesOut() {
         XCTAssertTrue(
-            ChatSessionDecisions.shouldFallbackToDirectRecoveryStream(
+            RuntimeSessionDecisionPolicy.shouldFallbackToDirectRecoveryStream(
                 cloudflareGatewayEnabled: true,
                 useDirectEndpoint: false,
                 gatewayResumeTimedOut: true,
@@ -67,19 +71,19 @@ final class ChatSessionDecisionsTests: XCTestCase {
 
     func testPollAfterRecoveryStreamWhenRecoverableFailureOccursOrResponseStillTracked() {
         XCTAssertTrue(
-            ChatSessionDecisions.shouldPollAfterRecoveryStream(
+            RuntimeSessionDecisionPolicy.shouldPollAfterRecoveryStream(
                 encounteredRecoverableFailure: true,
                 responseId: nil
             )
         )
         XCTAssertTrue(
-            ChatSessionDecisions.shouldPollAfterRecoveryStream(
+            RuntimeSessionDecisionPolicy.shouldPollAfterRecoveryStream(
                 encounteredRecoverableFailure: false,
                 responseId: "resp_123"
             )
         )
         XCTAssertFalse(
-            ChatSessionDecisions.shouldPollAfterRecoveryStream(
+            RuntimeSessionDecisionPolicy.shouldPollAfterRecoveryStream(
                 encounteredRecoverableFailure: false,
                 responseId: nil
             )
@@ -90,15 +94,15 @@ final class ChatSessionDecisionsTests: XCTestCase {
         let messageId = UUID()
 
         XCTAssertEqual(
-            ChatSessionDecisions.pendingBackgroundCancellation(
+            RuntimeSessionDecisionPolicy.pendingBackgroundCancellation(
                 requestUsesBackgroundMode: true,
                 responseId: "resp_123",
                 messageId: messageId
             ),
-            PendingBackgroundCancellation(responseId: "resp_123", messageId: messageId)
+            RuntimePendingBackgroundCancellation(responseId: "resp_123", messageId: messageId)
         )
         XCTAssertNil(
-            ChatSessionDecisions.pendingBackgroundCancellation(
+            RuntimeSessionDecisionPolicy.pendingBackgroundCancellation(
                 requestUsesBackgroundMode: false,
                 responseId: "resp_123",
                 messageId: messageId
@@ -106,14 +110,14 @@ final class ChatSessionDecisionsTests: XCTestCase {
         )
 
         XCTAssertTrue(
-            ChatSessionDecisions.canDetachBackgroundResponse(
+            RuntimeSessionDecisionPolicy.canDetachBackgroundResponse(
                 hasVisibleSession: true,
                 usedBackgroundMode: true,
                 responseId: "resp_123"
             )
         )
         XCTAssertFalse(
-            ChatSessionDecisions.canDetachBackgroundResponse(
+            RuntimeSessionDecisionPolicy.canDetachBackgroundResponse(
                 hasVisibleSession: true,
                 usedBackgroundMode: false,
                 responseId: "resp_123"
@@ -173,7 +177,7 @@ final class ChatSessionDecisionsTests: XCTestCase {
         let replacement = Message(id: message.id, role: .assistant, content: "")
         replacement.conversation = conversation
 
-        let originalSession = ResponseSession(
+        let originalSession = ReplySession(
             message: message,
             conversationID: conversation.id,
             service: OpenAIService(),
@@ -182,7 +186,7 @@ final class ChatSessionDecisionsTests: XCTestCase {
             requestUsesBackgroundMode: true,
             requestServiceTier: .standard
         )
-        let replacementSession = ResponseSession(
+        let replacementSession = ReplySession(
             message: replacement,
             conversationID: conversation.id,
             service: OpenAIService(),
@@ -213,7 +217,7 @@ final class ChatSessionDecisionsTests: XCTestCase {
         let conversation = Conversation()
         let message = Message(role: .assistant, content: "")
         message.conversation = conversation
-        let session = ResponseSession(
+        let session = ReplySession(
             message: message,
             conversationID: conversation.id,
             service: OpenAIService(),
@@ -382,7 +386,7 @@ final class ChatSessionDecisionsTests: XCTestCase {
     func testSessionVisibilityCoordinatorVisibleAndClearedStateMirrorSessionRuntime() {
         let conversation = Conversation()
         let draft = Message(role: .assistant, content: "draft", conversation: conversation)
-        let session = ResponseSession(
+        let session = ReplySession(
             message: draft,
             conversationID: conversation.id,
             service: OpenAIService(),
@@ -468,7 +472,7 @@ final class ChatSessionDecisionsTests: XCTestCase {
         let completed = Message(role: .assistant, content: "done", conversation: conversation, isComplete: true)
         conversation.messages = [olderDraft, newerDraft, completed]
 
-        let olderSession = ResponseSession(
+        let olderSession = ReplySession(
             message: olderDraft,
             conversationID: conversation.id,
             service: OpenAIService(),
@@ -477,7 +481,7 @@ final class ChatSessionDecisionsTests: XCTestCase {
             requestUsesBackgroundMode: false,
             requestServiceTier: .standard
         )
-        let newerSession = ResponseSession(
+        let newerSession = ReplySession(
             message: newerDraft,
             conversationID: conversation.id,
             service: OpenAIService(),
@@ -500,11 +504,11 @@ final class ChatSessionDecisionsTests: XCTestCase {
         )
 
         var cancelled: [UUID] = []
-        registry.remove(olderSession) { cancelled.append($0.messageID) }
+        registry.remove(olderSession) { _ in cancelled.append(olderSession.messageID) }
         XCTAssertEqual(cancelled, [olderSession.messageID])
         XCTAssertNil(registry.session(for: olderDraft.id))
 
-        registry.removeAll { cancelled.append($0.messageID) }
+        registry.removeAll { _ in cancelled.append(newerSession.messageID) }
         XCTAssertNil(registry.visibleMessageID)
         XCTAssertFalse(registry.hasVisibleSession(in: conversation.id))
         XCTAssertNil(
@@ -526,7 +530,7 @@ final class ChatSessionDecisionsTests: XCTestCase {
             lastSequenceNumber: 17,
             usedBackgroundMode: true
         )
-        let session = ResponseSession(
+        let session = ReplySession(
             message: source,
             conversationID: conversation.id,
             service: OpenAIService(),
@@ -549,7 +553,7 @@ final class ChatSessionDecisionsTests: XCTestCase {
     func testResponseSessionLifecycleMethodsUpdateRuntimeStateAsExpected() {
         let conversation = Conversation()
         let source = Message(role: .assistant, content: "seed", conversation: conversation)
-        let session = ResponseSession(
+        let session = ReplySession(
             message: source,
             conversationID: conversation.id,
             service: OpenAIService(),
@@ -605,7 +609,7 @@ final class ChatSessionDecisionsTests: XCTestCase {
     func testCancelAndRecoveryPhaseTransitionsPreserveInvariantMapping() {
         let conversation = Conversation()
         let source = Message(role: .assistant, content: "seed", conversation: conversation)
-        let session = ResponseSession(
+        let session = ReplySession(
             message: source,
             conversationID: conversation.id,
             service: OpenAIService(),
@@ -654,7 +658,7 @@ final class ChatSessionDecisionsTests: XCTestCase {
             isComplete: true
         )
 
-        let session = ResponseSession(
+        let session = ReplySession(
             message: source,
             conversationID: conversation.id,
             service: OpenAIService(),
@@ -696,7 +700,7 @@ final class ChatSessionDecisionsTests: XCTestCase {
         session.lastSequenceNumber = 11
         session.responseId = "resp_save"
 
-        MessagePersistenceAdapter().saveDraftState(from: session, to: source)
+        ChatPersistenceSwiftData.MessagePersistenceAdapter().saveDraftState(from: session, to: source)
 
         XCTAssertEqual(source.content, "streaming text")
         XCTAssertEqual(source.thinking, "streaming reasoning")
@@ -722,7 +726,7 @@ final class ChatSessionDecisionsTests: XCTestCase {
             isComplete: false
         )
 
-        let session = ResponseSession(
+        let session = ReplySession(
             message: source,
             conversationID: conversation.id,
             service: OpenAIService(),
@@ -746,7 +750,7 @@ final class ChatSessionDecisionsTests: XCTestCase {
         session.responseId = "resp_complete"
         session.lastSequenceNumber = 12
 
-        MessagePersistenceAdapter().finalizeCompletedSession(from: session, to: source)
+        ChatPersistenceSwiftData.MessagePersistenceAdapter().finalizeCompletedSession(from: session, to: source)
 
         XCTAssertEqual(source.content, "final text")
         XCTAssertNil(source.thinking)
@@ -767,7 +771,7 @@ final class ChatSessionDecisionsTests: XCTestCase {
             isComplete: false
         )
 
-        let session = ResponseSession(
+        let session = ReplySession(
             message: source,
             conversationID: conversation.id,
             service: OpenAIService(),
@@ -789,7 +793,7 @@ final class ChatSessionDecisionsTests: XCTestCase {
         session.responseId = "resp_partial"
         session.lastSequenceNumber = 3
 
-        MessagePersistenceAdapter().finalizePartialSession(from: session, to: source)
+        ChatPersistenceSwiftData.MessagePersistenceAdapter().finalizePartialSession(from: session, to: source)
 
         XCTAssertEqual(
             source.content,
@@ -832,7 +836,7 @@ final class ChatSessionDecisionsTests: XCTestCase {
             )
         ]
 
-        MessagePersistenceAdapter().refreshFileAnnotations(replacement, on: source)
+        ChatPersistenceSwiftData.MessagePersistenceAdapter().refreshFileAnnotations(replacement, on: source)
 
         XCTAssertEqual(source.filePathAnnotations, replacement)
     }
@@ -883,7 +887,7 @@ final class ChatSessionDecisionsTests: XCTestCase {
             errorMessage: nil
         )
 
-        MessagePersistenceAdapter().applyRecoveredResult(
+        ChatPersistenceSwiftData.MessagePersistenceAdapter().applyRecoveredResult(
             result,
             to: message,
             fallbackText: "fallback text",
@@ -913,7 +917,7 @@ final class ChatSessionDecisionsTests: XCTestCase {
             )
         ]
 
-        MessagePersistenceAdapter().setFileAttachments(attachments, on: message)
+        ChatPersistenceSwiftData.MessagePersistenceAdapter().setFileAttachments(attachments, on: message)
 
         XCTAssertEqual(message.fileAttachments.count, 1)
         XCTAssertEqual(message.fileAttachments.first?.filename, "report.pdf")
@@ -927,10 +931,10 @@ final class ChatSessionDecisionsTests: XCTestCase {
         effort: ReasoningEffort = .high,
         usesBackgroundMode: Bool = true,
         serviceTier: ServiceTier = .standard
-    ) -> ResponseSession {
+    ) -> ReplySession {
         let conversation = Conversation()
         let message = Message(role: .assistant, content: "", conversation: conversation)
-        return ResponseSession(
+        return ReplySession(
             message: message,
             conversationID: conversation.id,
             service: OpenAIService(),
@@ -938,6 +942,80 @@ final class ChatSessionDecisionsTests: XCTestCase {
             requestEffort: effort,
             requestUsesBackgroundMode: usesBackgroundMode,
             requestServiceTier: serviceTier
+        )
+    }
+}
+
+@MainActor
+private extension ReplySession {
+    convenience init(
+        message: Message,
+        conversationID: UUID,
+        service _: OpenAIService,
+        requestModel: ModelType,
+        requestEffort: ReasoningEffort,
+        requestUsesBackgroundMode: Bool,
+        requestServiceTier: ServiceTier
+    ) {
+        self.init(
+            message: message,
+            conversationID: conversationID,
+            request: ResponseRequestContext(
+                apiKey: "sk-test",
+                messages: nil,
+                model: requestModel,
+                effort: requestEffort,
+                usesBackgroundMode: requestUsesBackgroundMode,
+                serviceTier: requestServiceTier
+            )
+        )
+    }
+}
+
+@MainActor
+private extension ChatSessionRegistry {
+    func register(
+        _ session: ReplySession,
+        visible: Bool,
+        cancelExisting: (ReplySession) -> Void
+    ) {
+        let existingSession = self.session(for: session.messageID)
+        register(
+            session,
+            execution: SessionExecutionState(service: OpenAIService()),
+            visible: visible
+        ) { _ in
+            if let existingSession, existingSession !== session {
+                cancelExisting(existingSession)
+            }
+        }
+    }
+}
+
+@MainActor
+private extension ChatPersistenceSwiftData.MessagePersistenceAdapter {
+    func saveDraftState(from session: ReplySession, to message: Message) {
+        saveDraftState(from: snapshot(of: session), to: message)
+    }
+
+    func finalizeCompletedSession(from session: ReplySession, to message: Message) {
+        finalizeCompletedSession(from: snapshot(of: session), to: message)
+    }
+
+    func finalizePartialSession(from session: ReplySession, to message: Message) {
+        finalizePartialSession(from: snapshot(of: session), to: message)
+    }
+
+    private func snapshot(of session: ReplySession) -> ReplySessionSnapshot {
+        ReplySessionSnapshot(
+            currentText: session.currentText,
+            currentThinking: session.currentThinking,
+            toolCalls: session.toolCalls,
+            citations: session.citations,
+            filePathAnnotations: session.filePathAnnotations,
+            lastSequenceNumber: session.lastSequenceNumber,
+            responseId: session.responseId,
+            requestUsesBackgroundMode: session.request.usesBackgroundMode
         )
     }
 }

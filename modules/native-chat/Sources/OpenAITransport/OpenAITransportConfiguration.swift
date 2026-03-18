@@ -1,7 +1,7 @@
 import ChatDomain
 import Foundation
 
-public protocol OpenAIConfigurationProvider {
+public protocol OpenAIConfigurationProvider: Sendable {
     var directOpenAIBaseURL: String { get }
     var cloudflareGatewayBaseURL: String { get }
     var cloudflareAIGToken: String { get }

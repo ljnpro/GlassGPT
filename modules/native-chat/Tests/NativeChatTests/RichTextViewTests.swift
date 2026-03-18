@@ -1,5 +1,7 @@
+import ChatDomain
+import NativeChatUI
 import XCTest
-@testable import NativeChat
+@testable import NativeChatComposition
 
 @MainActor
 final class RichTextViewTests: XCTestCase {

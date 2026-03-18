@@ -269,14 +269,11 @@ final class GlassGPTUITests: XCTestCase {
         XCTAssertTrue(apiKeyField.waitForExistence(timeout: 10))
         XCTAssertTrue(saveButton.waitForExistence(timeout: 5))
         XCTAssertTrue(clearButton.waitForExistence(timeout: 5))
-        XCTAssertTrue(saveButton.isEnabled)
+        XCTAssertFalse(saveButton.isEnabled)
 
         app.tabBars.buttons["Chat"].tap()
         XCTAssertTrue(app.buttons["chat.newChat"].waitForExistence(timeout: 5))
-
-        app.tabBars.buttons["Settings"].tap()
-        clearButton.tap()
-        XCTAssertFalse(saveButton.isEnabled)
+        XCTAssertTrue(app.staticTexts["Add your API key in Settings"].waitForExistence(timeout: 5))
     }
 
     @MainActor
