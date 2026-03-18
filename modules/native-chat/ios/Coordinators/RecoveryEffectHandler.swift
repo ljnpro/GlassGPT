@@ -8,6 +8,11 @@ final class RecoveryEffectHandler {
         self.viewModel = viewModel
     }
 
+    func activeAPIKey(for session: ResponseSession) -> String {
+        let key = session.requestAPIKey.trimmingCharacters(in: .whitespacesAndNewlines)
+        return key.isEmpty ? viewModel.apiKey : key
+    }
+
     func recoverResponse(
         messageId: UUID,
         responseId: String,
@@ -48,9 +53,10 @@ final class RecoveryEffectHandler {
         session.task?.cancel()
         session.task = Task { @MainActor in
             guard viewModel.isSessionActive(session) else { return }
+            let apiKey = self.activeAPIKey(for: session)
 
             do {
-                let result = try await session.service.fetchResponse(responseId: responseId, apiKey: viewModel.apiKey)
+                let result = try await session.service.fetchResponse(responseId: responseId, apiKey: apiKey)
 
                 switch result.status {
                 case .completed:
@@ -85,7 +91,7 @@ final class RecoveryEffectHandler {
                             session: session,
                             responseId: responseId,
                             lastSeq: lastSequenceNumber,
-                            apiKey: viewModel.apiKey
+                            apiKey: apiKey
                         )
                     case .poll:
                         await self.pollResponseUntilTerminal(session: session, responseId: responseId)

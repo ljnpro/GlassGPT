@@ -1,6 +1,7 @@
 included:
   - ios
   - modules/native-chat/ios
+  - modules/native-chat/Sources
   - modules/native-chat/Tests
 
 excluded:

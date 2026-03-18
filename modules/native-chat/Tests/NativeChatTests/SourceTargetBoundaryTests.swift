@@ -1,10 +1,11 @@
 import XCTest
 import ChatDomain
-import ChatPersistence
-import ChatFeatures
-import GeneratedFiles
-import ChatRuntime
-import ChatUI
+import ChatPersistenceContracts
+import ChatPersistenceCore
+import GeneratedFilesCore
+import ChatRuntimeModel
+import ChatApplication
+import ChatUIComponents
 import OpenAITransport
 
 final class SourceTargetBoundaryTests: XCTestCase {

@@ -1,4 +1,7 @@
 import Foundation
+import ChatApplication
+import ChatRuntimeModel
+import ChatRuntimePorts
 
 @MainActor
 final class StreamingEffectHandler {
@@ -7,73 +10,42 @@ final class StreamingEffectHandler {
 
     unowned let viewModel: any ChatRuntimeScreenStore
     let recoveryCoordinator: RecoveryEffectHandler
+    let chatSceneController: ChatSceneController
+    let sendPreparationPort: any SendMessagePreparationPort
 
     init(
         viewModel: any ChatRuntimeScreenStore,
-        recoveryCoordinator: RecoveryEffectHandler
+        recoveryCoordinator: RecoveryEffectHandler,
+        chatSceneController: ChatSceneController,
+        sendPreparationPort: any SendMessagePreparationPort
     ) {
         self.viewModel = viewModel
         self.recoveryCoordinator = recoveryCoordinator
+        self.chatSceneController = chatSceneController
+        self.sendPreparationPort = sendPreparationPort
     }
 
     @discardableResult
     func sendMessage(text rawText: String) -> Bool {
-        guard !viewModel.isStreaming else { return false }
-
-        let text = rawText.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !text.isEmpty || viewModel.selectedImageData != nil || !viewModel.pendingAttachments.isEmpty else { return false }
-        guard !viewModel.apiKey.isEmpty else {
+        let preparedReply: PreparedAssistantReply
+        do {
+            preparedReply = try chatSceneController.prepareSendMessage(text: rawText)
+        } catch SendMessagePreparationError.alreadyStreaming {
+            return false
+        } catch SendMessagePreparationError.emptyInput {
+            return false
+        } catch SendMessagePreparationError.missingAPIKey {
             viewModel.errorMessage = "Please add your OpenAI API key in Settings."
             return false
-        }
-
-        let imageDataToSend = viewModel.selectedImageData
-        let attachmentsToSend = viewModel.pendingAttachments
-
-        let userMessage = Message(role: .user, content: text, imageData: imageDataToSend)
-        if !attachmentsToSend.isEmpty {
-            viewModel.messagePersistence.setFileAttachments(attachmentsToSend, on: userMessage)
-        }
-
-        if viewModel.currentConversation == nil {
-            viewModel.currentConversation = viewModel.conversationRepository.createConversation(
-                configuration: viewModel.conversationConfiguration
-            )
-        }
-
-        userMessage.conversation = viewModel.currentConversation
-        viewModel.currentConversation?.messages.append(userMessage)
-        viewModel.currentConversation?.model = viewModel.selectedModel.rawValue
-        viewModel.currentConversation?.reasoningEffort = viewModel.reasoningEffort.rawValue
-        viewModel.currentConversation?.backgroundModeEnabled = viewModel.backgroundModeEnabled
-        viewModel.currentConversation?.serviceTierRawValue = viewModel.serviceTier.rawValue
-        viewModel.currentConversation?.updatedAt = .now
-        viewModel.messages.append(userMessage)
-
-        guard viewModel.saveContext(reportingUserError: "Failed to save your message.", logContext: "sendMessage.userMessage") else {
-            return false
-        }
-
-        viewModel.selectedImageData = nil
-        viewModel.pendingAttachments = []
-        viewModel.errorMessage = nil
-
-        let draft = Message(
-            role: .assistant,
-            content: "",
-            thinking: nil,
-            lastSequenceNumber: nil,
-            usedBackgroundMode: viewModel.backgroundModeEnabled,
-            isComplete: false
-        )
-        draft.conversation = viewModel.currentConversation
-        viewModel.currentConversation?.messages.append(draft)
-        viewModel.saveContextIfPossible("sendMessage.draft")
-
-        guard let session = viewModel.makeStreamingSession(for: draft) else {
+        } catch {
             viewModel.errorMessage = "Failed to start response session."
             return false
         }
+
+        let session = ResponseSession(
+            preparedReply: preparedReply,
+            service: viewModel.serviceFactory()
+        )
 
         viewModel.registerSession(session, visible: true)
         session.beginSubmitting()
@@ -81,12 +53,15 @@ final class StreamingEffectHandler {
 
         HapticService.shared.impact(.light)
 
-        if !attachmentsToSend.isEmpty {
-            let viewModel = self.viewModel
+        if !preparedReply.attachmentsToUpload.isEmpty {
+            let chatSceneController = self.chatSceneController
+            let preparedReply = preparedReply
             Task { @MainActor in
-                let uploadedAttachments = await viewModel.uploadAttachments(attachmentsToSend)
-                viewModel.messagePersistence.setFileAttachments(uploadedAttachments, on: userMessage)
-                viewModel.saveContextIfPossible("sendMessage.uploadedAttachments")
+                let uploadedAttachments = await chatSceneController.uploadAttachments(preparedReply.attachmentsToUpload)
+                chatSceneController.persistUploadedAttachments(
+                    uploadedAttachments,
+                    onUserMessageID: preparedReply.userMessageID
+                )
                 self.startStreamingRequest(for: session)
             }
         } else {

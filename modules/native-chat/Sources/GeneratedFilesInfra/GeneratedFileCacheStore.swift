@@ -1,6 +1,17 @@
 import Foundation
+import GeneratedFilesCore
 
-/// Lightweight helper that owns all generated-file cache filesystem operations.
+package enum GeneratedFileStoreError: Error, LocalizedError, Sendable {
+    case invalidCacheRoot
+
+    package var errorDescription: String? {
+        switch self {
+        case .invalidCacheRoot:
+            return "Unable to create the generated file cache."
+        }
+    }
+}
+
 package struct GeneratedFileCacheStore {
     package struct CachedEntry {
         package let directoryURL: URL

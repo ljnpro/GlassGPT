@@ -4,11 +4,10 @@ import Foundation
 extension RecoveryEffectHandler {
     func pollResponseUntilTerminal(session: ResponseSession, responseId: String) async {
         let viewModel = self.viewModel
-        guard !viewModel.apiKey.isEmpty else { return }
+        let key = activeAPIKey(for: session)
+        guard !key.isEmpty else { return }
         session.beginRecoveryPoll()
         viewModel.setRecoveryPhase(.pollingTerminal, for: session)
-
-        let key = viewModel.apiKey
         var attempts = 0
         let maxAttempts = 180
         var lastResult: OpenAIResponseFetchResult?

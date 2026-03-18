@@ -1,5 +1,7 @@
 import XCTest
 import SwiftData
+import ChatDomain
+import ChatRuntimeModel
 @testable import NativeChat
 
 @MainActor
@@ -95,6 +97,16 @@ final class ChatScreenStoreRuntimeTests: XCTestCase {
             store.currentStreamingText == "Partial answer"
         }
 
+        let activeReplyID = AssistantReplyID(rawValue: sessionMessageID(for: store))
+        let runtimeSession = await store.runtimeRegistry.session(for: activeReplyID)
+        let runtimeSnapshotValue = await runtimeSession?.snapshot()
+        let runtimeSnapshot = try XCTUnwrap(runtimeSnapshotValue)
+        XCTAssertEqual(runtimeSnapshot.buffer.text, "Partial answer")
+        guard case .streaming(let cursor) = runtimeSnapshot.lifecycle else {
+            return XCTFail("Expected runtime registry to track an active streaming reply")
+        }
+        XCTAssertEqual(cursor.responseID, "resp_stop_1")
+
         store.stopGeneration(savePartial: true)
 
         try await waitUntil {
@@ -108,6 +120,14 @@ final class ChatScreenStoreRuntimeTests: XCTestCase {
         XCTAssertNil(store.currentVisibleSession)
         XCTAssertFalse(store.isStreaming)
         XCTAssertGreaterThanOrEqual(streamClient.cancelCallCount, 1)
+        var runtimeSessionStillRegistered = await store.runtimeRegistry.contains(activeReplyID)
+        if runtimeSessionStillRegistered {
+            for _ in 0..<10 where runtimeSessionStillRegistered {
+                try await Task.sleep(nanoseconds: 20_000_000)
+                runtimeSessionStillRegistered = await store.runtimeRegistry.contains(activeReplyID)
+            }
+        }
+        XCTAssertFalse(runtimeSessionStillRegistered)
     }
 
     func testRecoverResponseVisibleSessionResumesStreamingAndFinalizesThroughStoreAPI() async throws {
@@ -555,5 +575,16 @@ final class ChatScreenStoreRuntimeTests: XCTestCase {
             serviceFactory: { service },
             bootstrapPolicy: bootstrapPolicy
         )
+    }
+
+    private func sessionMessageID(for store: ChatScreenStore) -> UUID {
+        if let session = store.currentVisibleSession {
+            return session.messageID
+        }
+        if let draft = store.draftMessage {
+            return draft.id
+        }
+        XCTFail("Expected an active visible session")
+        return UUID()
     }
 }

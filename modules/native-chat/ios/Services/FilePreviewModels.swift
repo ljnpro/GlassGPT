@@ -1,5 +1,5 @@
-import GeneratedFiles
+import GeneratedFilesCore
 
-typealias FilePreviewKind = GeneratedFiles.FilePreviewKind
-typealias FilePreviewItem = GeneratedFiles.FilePreviewItem
-typealias SharedGeneratedFileItem = GeneratedFiles.SharedGeneratedFileItem
+typealias FilePreviewKind = GeneratedFilesCore.FilePreviewKind
+typealias FilePreviewItem = GeneratedFilesCore.FilePreviewItem
+typealias SharedGeneratedFileItem = GeneratedFilesCore.SharedGeneratedFileItem

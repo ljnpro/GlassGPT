@@ -8,9 +8,23 @@ let boundaryTargets: [Target] = [
         path: "Sources/ChatDomain"
     ),
     .target(
-        name: "ChatPersistence",
+        name: "ChatPersistenceContracts",
         dependencies: ["ChatDomain"],
-        path: "Sources/ChatPersistence"
+        path: "Sources/ChatPersistenceContracts"
+    ),
+    .target(
+        name: "ChatPersistenceCore",
+        dependencies: ["ChatDomain"],
+        path: "Sources/ChatPersistenceCore"
+    ),
+    .target(
+        name: "ChatPersistenceSwiftData",
+        dependencies: [
+            "ChatDomain",
+            "ChatPersistenceContracts",
+            "ChatPersistenceCore"
+        ],
+        path: "Sources/ChatPersistenceSwiftData"
     ),
     .target(
         name: "OpenAITransport",
@@ -18,29 +32,95 @@ let boundaryTargets: [Target] = [
         path: "Sources/OpenAITransport"
     ),
     .target(
-        name: "GeneratedFiles",
+        name: "GeneratedFilesCore",
         dependencies: ["ChatDomain"],
-        path: "Sources/GeneratedFiles"
+        path: "Sources/GeneratedFilesCore"
     ),
     .target(
-        name: "ChatRuntime",
+        name: "GeneratedFilesInfra",
         dependencies: [
             "ChatDomain",
-            "ChatPersistence",
-            "OpenAITransport",
-            "GeneratedFiles"
+            "GeneratedFilesCore",
+            "OpenAITransport"
         ],
-        path: "Sources/ChatRuntime"
+        path: "Sources/GeneratedFilesInfra"
     ),
     .target(
-        name: "ChatFeatures",
-        dependencies: ["ChatRuntime"],
-        path: "Sources/ChatFeatures"
+        name: "ChatRuntimeModel",
+        dependencies: ["ChatDomain"],
+        path: "Sources/ChatRuntimeModel"
     ),
     .target(
-        name: "ChatUI",
-        dependencies: ["ChatFeatures"],
-        path: "Sources/ChatUI"
+        name: "ChatRuntimePorts",
+        dependencies: [
+            "ChatDomain",
+            "ChatPersistenceContracts",
+            "GeneratedFilesCore",
+            "ChatRuntimeModel"
+        ],
+        path: "Sources/ChatRuntimePorts"
+    ),
+    .target(
+        name: "ChatRuntimeWorkflows",
+        dependencies: [
+            "ChatDomain",
+            "ChatRuntimeModel",
+            "ChatRuntimePorts"
+        ],
+        path: "Sources/ChatRuntimeWorkflows"
+    ),
+    .target(
+        name: "ChatApplication",
+        dependencies: [
+            "ChatDomain",
+            "ChatPersistenceContracts",
+            "ChatRuntimeModel",
+            "ChatRuntimePorts",
+            "ChatRuntimeWorkflows"
+        ],
+        path: "Sources/ChatApplication"
+    ),
+    .target(
+        name: "ChatPresentation",
+        dependencies: [
+            "ChatDomain",
+            "GeneratedFilesCore",
+            "ChatApplication"
+        ],
+        path: "Sources/ChatPresentation"
+    ),
+    .target(
+        name: "ChatUIComponents",
+        path: "Sources/ChatUIComponents"
+    ),
+    .target(
+        name: "NativeChatUI",
+        dependencies: [
+            "ChatDomain",
+            "ChatPresentation",
+            "ChatUIComponents"
+        ],
+        path: "Sources/NativeChatUI"
+    ),
+    .target(
+        name: "NativeChatComposition",
+        dependencies: [
+            "ChatDomain",
+            "ChatPersistenceContracts",
+            "ChatPersistenceCore",
+            "ChatPersistenceSwiftData",
+            "OpenAITransport",
+            "GeneratedFilesCore",
+            "GeneratedFilesInfra",
+            "ChatRuntimeModel",
+            "ChatRuntimePorts",
+            "ChatRuntimeWorkflows",
+            "ChatApplication",
+            "ChatPresentation",
+            "ChatUIComponents",
+            "NativeChatUI"
+        ],
+        path: "Sources/NativeChatComposition"
     ),
 ]
 
@@ -66,12 +146,20 @@ let package = Package(
             name: "NativeChat",
             dependencies: [
                 "ChatDomain",
-                "ChatPersistence",
+                "ChatPersistenceContracts",
+                "ChatPersistenceCore",
+                "ChatPersistenceSwiftData",
                 "OpenAITransport",
-                "GeneratedFiles",
-                "ChatRuntime",
-                "ChatFeatures",
-                "ChatUI",
+                "GeneratedFilesCore",
+                "GeneratedFilesInfra",
+                "ChatRuntimeModel",
+                "ChatRuntimePorts",
+                "ChatRuntimeWorkflows",
+                "ChatApplication",
+                "ChatPresentation",
+                "ChatUIComponents",
+                "NativeChatUI",
+                "NativeChatComposition",
             ],
             path: "ios",
             resources: [
@@ -79,16 +167,43 @@ let package = Package(
             ]
         ),
         .testTarget(
+            name: "NativeChatArchitectureTests",
+            dependencies: [
+                "ChatDomain",
+                "ChatPersistenceContracts",
+                "ChatPersistenceCore",
+                "ChatPersistenceSwiftData",
+                "OpenAITransport",
+                "GeneratedFilesCore",
+                "GeneratedFilesInfra",
+                "ChatRuntimeModel",
+                "ChatRuntimePorts",
+                "ChatRuntimeWorkflows",
+                "ChatApplication",
+                "ChatPresentation",
+                "ChatUIComponents",
+                "NativeChatUI",
+                "NativeChatComposition"
+            ],
+            path: "Tests/NativeChatArchitectureTests"
+        ),
+        .testTarget(
             name: "NativeChatTests",
             dependencies: [
                 "NativeChat",
                 "ChatDomain",
-                "ChatPersistence",
-                "ChatRuntime",
-                "ChatFeatures",
-                "ChatUI",
+                "ChatPersistenceContracts",
+                "ChatPersistenceCore",
+                "ChatPersistenceSwiftData",
+                "ChatRuntimeModel",
+                "ChatRuntimePorts",
+                "ChatRuntimeWorkflows",
+                "ChatApplication",
+                "ChatPresentation",
+                "ChatUIComponents",
                 "OpenAITransport",
-                "GeneratedFiles",
+                "GeneratedFilesCore",
+                "GeneratedFilesInfra",
                 .product(name: "SnapshotTesting", package: "swift-snapshot-testing")
             ],
             path: "Tests/NativeChatTests",

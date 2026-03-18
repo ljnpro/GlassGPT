@@ -1,24 +1,7 @@
 import ChatDomain
 import Foundation
 
-public struct APIMessage: Sendable {
-    public let role: MessageRole
-    public let content: String
-    public let imageData: Data?
-    public let fileAttachments: [FileAttachment]
-
-    public init(
-        role: MessageRole,
-        content: String,
-        imageData: Data? = nil,
-        fileAttachments: [FileAttachment] = []
-    ) {
-        self.role = role
-        self.content = content
-        self.imageData = imageData
-        self.fileAttachments = fileAttachments
-    }
-}
+public typealias APIMessage = ChatRequestMessage
 
 public enum StreamEvent: Sendable {
     case textDelta(String)

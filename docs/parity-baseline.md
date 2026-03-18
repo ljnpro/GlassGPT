@@ -1,12 +1,12 @@
-# 4.4.1 Parity Baseline
+# 4.4.2 Parity Baseline
 
-This document records the `4.4.0` production baseline that `4.4.1` must preserve.
+This document records the `4.4.1` production baseline that `4.4.2` must preserve.
 
 ## Stable Baseline
 
 - Source branch: `codex/stable-4.4`
-- Development branch: `codex/feature/4.4.1-*`
-- Baseline app version: `4.4.0 (20173)`
+- Development branch: `codex/feature/4.4.2-*`
+- Baseline app version: `4.4.1 (20174)`
 - App target: `GlassGPT`
 - Package target: `NativeChat`
 - Current package size: ~14k Swift LOC across 101 Swift files
@@ -19,7 +19,7 @@ Last verified baseline command:
 xcodebuild -project ios/GlassGPT.xcodeproj -scheme GlassGPT -destination 'generic/platform=iOS Simulator' build
 ```
 
-Baseline result before 4.4.1 work:
+Baseline result before 4.4.2 work:
 
 - Build status: succeeded
 - Existing warnings:
@@ -48,7 +48,7 @@ The following must remain unchanged unless a release blocker forces a deviation:
 
 ## Manual Acceptance Checklist
 
-Run this checklist against both `v4.4.0` and the current `4.4.1` candidate before release:
+Run this checklist against both `v4.4.1` and the current `4.4.2` candidate before release:
 
 1. Launch the app and confirm the initial empty state matches.
 2. Open Settings and confirm sections, ordering, labels, and controls match.

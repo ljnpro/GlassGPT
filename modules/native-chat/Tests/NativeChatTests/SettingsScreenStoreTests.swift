@@ -1,5 +1,5 @@
 import XCTest
-import GeneratedFiles
+import GeneratedFilesCore
 @testable import NativeChat
 
 @MainActor

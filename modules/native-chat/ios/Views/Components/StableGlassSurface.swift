@@ -1,5 +1,5 @@
 import SwiftUI
-import ChatUI
+import ChatUIComponents
 
 extension View {
     @ViewBuilder
@@ -20,7 +20,7 @@ extension View {
         innerInset: CGFloat = 0.75,
         stableFillOpacity: Double = 0.04
     ) -> some View {
-        modifier(ChatUI.StableRoundedGlassModifier(
+        modifier(ChatUIComponents.StableRoundedGlassModifier(
             cornerRadius: cornerRadius,
             interactive: interactive,
             innerInset: innerInset,
@@ -32,7 +32,7 @@ extension View {
         cornerRadius: CGFloat,
         innerInset: CGFloat = 1
     ) -> some View {
-        modifier(ChatUI.StaticRoundedGlassShellModifier(
+        modifier(ChatUIComponents.StaticRoundedGlassShellModifier(
             cornerRadius: cornerRadius,
             innerInset: innerInset
         ))

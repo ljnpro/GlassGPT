@@ -1,4 +1,5 @@
 import Foundation
+import ChatDomain
 
 @MainActor
 final class SessionProjectionStore {
@@ -9,31 +10,16 @@ final class SessionProjectionStore {
         self.viewModel = viewModel
     }
 
-    func makeStreamingSession(for draft: Message) -> ResponseSession? {
-        guard let conversation = draft.conversation else { return nil }
-        let requestMessages = viewModel.buildRequestMessages(for: conversation, excludingDraft: draft.id)
-        let configuration = viewModel.sessionRequestConfiguration(for: conversation)
-
-        return ResponseSession(
-            message: draft,
-            conversationID: conversation.id,
-            service: viewModel.serviceFactory(),
-            requestMessages: requestMessages,
-            requestModel: configuration.0,
-            requestEffort: configuration.1,
-            requestUsesBackgroundMode: conversation.backgroundModeEnabled,
-            requestServiceTier: configuration.2
-        )
-    }
-
     func makeRecoverySession(for message: Message) -> ResponseSession? {
         guard let conversation = message.conversation else { return nil }
         let configuration = viewModel.sessionRequestConfiguration(for: conversation)
 
         return ResponseSession(
+            assistantReplyID: AssistantReplyID(rawValue: message.id),
             message: message,
             conversationID: conversation.id,
             service: viewModel.serviceFactory(),
+            requestAPIKey: viewModel.apiKey,
             requestMessages: nil,
             requestModel: configuration.0,
             requestEffort: configuration.1,
@@ -47,6 +33,7 @@ final class SessionProjectionStore {
             existing.task?.cancel()
             existing.service.cancelStream()
         }
+        viewModel.ensureRuntimeSessionRegistered(for: session)
 
         if visible {
             bindVisibleSession(messageID: session.messageID)
@@ -87,12 +74,14 @@ final class SessionProjectionStore {
 
     func setRecoveryPhase(_ phase: RecoveryPhase, for session: ResponseSession) {
         session.setRecoveryPhase(phase)
+        viewModel.syncRuntimeSession(from: session)
         if viewModel.visibleSessionMessageID == session.messageID {
             viewModel.setVisibleRecoveryPhase(phase)
         }
     }
 
     func syncVisibleState(from session: ResponseSession) {
+        viewModel.syncRuntimeSession(from: session)
         guard viewModel.visibleSessionMessageID == session.messageID else { return }
 
         let state = SessionVisibilityCoordinator.visibleState(
@@ -115,6 +104,7 @@ final class SessionProjectionStore {
         viewModel.messagePersistence.saveDraftState(from: session, to: message)
         session.lastDraftSaveTime = Date()
         viewModel.saveContextIfPossible("saveSessionNow")
+        viewModel.syncRuntimeSession(from: session)
 
         if message.conversation?.id == viewModel.currentConversation?.id {
             viewModel.upsertMessage(message)

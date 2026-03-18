@@ -1,4 +1,5 @@
 import Foundation
+import ChatRuntimeModel
 
 @MainActor
 extension ChatScreenStore {
@@ -139,10 +140,21 @@ extension ChatScreenStore {
             currentConversation?.messages.append(newDraft)
             saveContextIfPossible("resendOrphanedDrafts.insertReplacementDraft")
 
-            guard let session = makeStreamingSession(for: newDraft) else {
+            let preparedReply: PreparedAssistantReply
+            do {
+                preparedReply = try sendPreparationPort.prepareExistingDraft(newDraft)
+            } catch SendMessagePreparationError.missingAPIKey {
+                errorMessage = "Please add your OpenAI API key in Settings."
+                return
+            } catch {
                 errorMessage = "Failed to restart orphaned draft."
                 return
             }
+
+            let session = ResponseSession(
+                preparedReply: preparedReply,
+                service: serviceFactory()
+            )
 
             registerSession(session, visible: true)
             session.beginSubmitting()

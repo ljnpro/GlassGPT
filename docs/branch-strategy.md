@@ -16,7 +16,7 @@
   - no feature development
 - `codex/stable-4.4`
   - active 4.4.x release line
-  - every 4.4.x release lands here first, including the 4.4.1 perfect-score refactor line
+  - every 4.4.x release lands here first, including the 4.4.2 perfect-score refactor line
 
 ## Short-Lived Branches
 
