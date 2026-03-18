@@ -65,7 +65,7 @@ final class ChatFileInteractionCoordinator {
                     applyGeneratedFilePresentation(
                         controller.generatedFileCoordinator.presentation(for: cachedResource, suggestedFilename: requestedFilename)
                     )
-                    HapticService.shared.impact(.light)
+                    controller.hapticService.impact(.light, isEnabled: controller.hapticsEnabled)
                     return
                 }
 
@@ -93,14 +93,14 @@ final class ChatFileInteractionCoordinator {
                 applyGeneratedFilePresentation(
                     controller.generatedFileCoordinator.presentation(for: resource, suggestedFilename: resolvedFilename)
                 )
-                HapticService.shared.impact(.light)
+                controller.hapticService.impact(.light, isEnabled: controller.hapticsEnabled)
             } catch {
                 controller.isDownloadingFile = false
                 controller.fileDownloadError = controller.generatedFileCoordinator.userFacingDownloadError(
                     error,
                     openBehavior: requestedOpenBehavior
                 )
-                HapticService.shared.notify(.error)
+                controller.hapticService.notify(.error, isEnabled: controller.hapticsEnabled)
                 #if DEBUG
                 Loggers.files.debug("[FileDownload] Failed: \(error.localizedDescription)")
                 #endif
@@ -140,7 +140,7 @@ final class ChatFileInteractionCoordinator {
         }
 
         controller.messagePersistence.refreshFileAnnotations(persistedAnnotations, on: message)
-        controller.saveContextIfPossible("resolveDownloadAnnotation")
+        controller.conversationCoordinator.saveContextIfPossible("resolveDownloadAnnotation")
         return refreshedAnnotation
     }
 
@@ -177,12 +177,12 @@ final class ChatFileInteractionCoordinator {
                     if !refreshedAnnotations.isEmpty {
                         annotationsToPrefetch = refreshedAnnotations
 
-                        if let persistedMessage = controller.findMessage(byId: messageID) {
+                        if let persistedMessage = controller.conversationCoordinator.findMessage(byId: messageID) {
                             controller.messagePersistence.refreshFileAnnotations(refreshedAnnotations, on: persistedMessage)
-                            controller.saveContextIfPossible("prefetchGeneratedFilesIfNeeded.refreshAnnotations")
+                            controller.conversationCoordinator.saveContextIfPossible("prefetchGeneratedFilesIfNeeded.refreshAnnotations")
 
                             if persistedMessage.conversation?.id == controller.currentConversation?.id {
-                                controller.upsertMessage(persistedMessage)
+                                controller.conversationCoordinator.upsertMessage(persistedMessage)
                             }
                         }
                     }

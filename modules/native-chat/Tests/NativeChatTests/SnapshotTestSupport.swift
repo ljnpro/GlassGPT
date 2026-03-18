@@ -3,6 +3,7 @@ import ChatDomain
 import ChatPersistenceSwiftData
 import ChatPersistenceCore
 import ChatPresentation
+import ChatUIComponents
 import GeneratedFilesInfra
 import NativeChatUI
 import OpenAITransport
@@ -148,11 +149,19 @@ func makeSnapshotChatScreenStore(hasAPIKey: Bool = false) throws -> ChatControll
 
     let apiBackend = InMemoryAPIKeyBackend()
     apiBackend.storedKey = hasAPIKey ? "sk-snapshot" : nil
+    let settingsStore = SettingsStore(valueStore: settingsValueStore)
+    let apiKeyStore = PersistedAPIKeyStore(backend: apiBackend)
+    let configurationProvider = RuntimeTestOpenAIConfigurationProvider()
+    let hapticService = HapticService()
+    let transport = StubOpenAITransport()
 
     return ChatController(
         modelContext: context,
-        settingsStore: SettingsStore(valueStore: settingsValueStore),
-        apiKeyStore: PersistedAPIKeyStore(backend: apiBackend),
+        settingsStore: settingsStore,
+        apiKeyStore: apiKeyStore,
+        configurationProvider: configurationProvider,
+        transport: transport,
+        hapticService: hapticService,
         bootstrapPolicy: .testing
     )
 }
@@ -253,7 +262,7 @@ func makeSettingsSnapshotViewModel() -> SettingsPresenter {
         transport: transport,
         configurationProvider: configurationProvider,
         fileDownloadService: GeneratedFilesInfra.FileDownloadService(configurationProvider: configurationProvider),
-        appVersionString: "4.5.0 (20176)",
+        appVersionString: currentReleaseVersionString(),
         platformString: "iOS 26.0 · Liquid Glass"
     )
 }

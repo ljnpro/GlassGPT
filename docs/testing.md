@@ -2,7 +2,7 @@
 
 ## Principle
 
-`4.6.0` proves the real ownership boundaries:
+`4.6.1` proves the real ownership boundaries:
 
 - actor-owned runtime behavior
 - composition-root assembly
@@ -37,6 +37,7 @@
 ./scripts/ci.sh architecture-tests
 ./scripts/ci.sh core-tests
 ./scripts/ci.sh ui-tests
+./scripts/ci.sh coverage-report
 ./scripts/ci.sh maintainability
 ./scripts/ci.sh source-share
 ./scripts/ci.sh module-boundary

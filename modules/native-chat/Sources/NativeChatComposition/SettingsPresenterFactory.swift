@@ -119,6 +119,7 @@ func makeSettingsPresenter(
             settingsStore.hapticEnabled = enabled
         },
         persistCloudflareEnabled: { enabled in
+            settingsStore.cloudflareGatewayEnabled = enabled
             mutableConfigurationProvider.useCloudflareGateway = enabled
         }
     )

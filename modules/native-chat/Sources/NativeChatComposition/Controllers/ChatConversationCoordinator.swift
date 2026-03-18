@@ -16,10 +16,10 @@ final class ChatConversationCoordinator {
 
     func startNewChat() {
         if let session = controller.currentVisibleSession {
-            controller.saveSessionNow(session)
+            controller.sessionCoordinator.saveSessionNow(session)
         }
 
-        controller.detachVisibleSessionBinding()
+        controller.sessionCoordinator.detachVisibleSessionBinding()
         controller.currentConversation = nil
         controller.messages = []
         controller.currentStreamingText = ""
@@ -39,7 +39,7 @@ final class ChatConversationCoordinator {
         controller.fileDownloadError = nil
         loadDefaultsFromSettings()
         controller.syncConversationProjection()
-        HapticService.shared.selection()
+        controller.hapticService.selection(isEnabled: controller.hapticsEnabled)
     }
 
     func regenerateMessage(_ message: Message) {
@@ -88,23 +88,27 @@ final class ChatConversationCoordinator {
         }
 
         let session = ReplySession(preparedReply: preparedReply)
-        controller.registerSession(session, execution: SessionExecutionState(service: controller.serviceFactory()), visible: true)
+        controller.sessionCoordinator.registerSession(
+            session,
+            execution: SessionExecutionState(service: controller.serviceFactory()),
+            visible: true
+        )
         let controller = controller
         Task { @MainActor in
-            _ = await controller.applyRuntimeTransition(.beginSubmitting, to: session)
-            controller.syncVisibleState(from: session)
+            _ = await controller.sessionCoordinator.applyRuntimeTransition(.beginSubmitting, to: session)
+            controller.sessionCoordinator.syncVisibleState(from: session)
         }
 
-        HapticService.shared.impact(.medium)
+        controller.hapticService.impact(.medium, isEnabled: controller.hapticsEnabled)
         controller.startStreamingRequest(for: session)
     }
 
     func loadConversation(_ conversation: Conversation) {
         if let session = controller.currentVisibleSession {
-            controller.saveSessionNow(session)
+            controller.sessionCoordinator.saveSessionNow(session)
         }
 
-        controller.detachVisibleSessionBinding()
+        controller.sessionCoordinator.detachVisibleSessionBinding()
         controller.currentConversation = conversation
         controller.messages = visibleMessages(for: conversation)
         controller.syncConversationProjection()
@@ -126,7 +130,7 @@ final class ChatConversationCoordinator {
         controller.sharedGeneratedFileItem = nil
         controller.fileDownloadError = nil
 
-        controller.refreshVisibleBindingForCurrentConversation()
+        controller.sessionCoordinator.refreshVisibleBindingForCurrentConversation()
 
         let controller = controller
         Task { @MainActor in

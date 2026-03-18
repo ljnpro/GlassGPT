@@ -1,4 +1,3 @@
-import ChatPersistenceCore
 import ChatDomain
 import ChatPersistenceSwiftData
 import OpenAITransport
@@ -6,21 +5,8 @@ import XCTest
 @testable import NativeChatComposition
 
 final class OpenAIRequestBuilderTests: XCTestCase {
-    private var originalGatewayEnabled = false
-
-    override func setUp() {
-        super.setUp()
-        originalGatewayEnabled = SettingsStore.shared.cloudflareGatewayEnabled
-        SettingsStore.shared.cloudflareGatewayEnabled = false
-    }
-
-    override func tearDown() {
-        SettingsStore.shared.cloudflareGatewayEnabled = originalGatewayEnabled
-        super.tearDown()
-    }
-
     func testStreamingRequestPreservesWireDefaults() throws {
-        let builder = OpenAIRequestBuilder()
+        let builder = makeDirectRequestBuilder()
         let request = try builder.streamingRequest(
             apiKey: "sk-test",
             messages: [
@@ -61,18 +47,16 @@ final class OpenAIRequestBuilderTests: XCTestCase {
         XCTAssertEqual(payload.serviceTier, ServiceTier.flex.rawValue)
         XCTAssertEqual(payload.reasoning?.effort, ReasoningEffort.high.rawValue)
         XCTAssertEqual(payload.reasoning?.summary, "auto")
-        let tools = payload.tools
-        XCTAssertEqual(tools.count, 3)
-        XCTAssertEqual(tools.map(\.type), [
+        XCTAssertEqual(payload.tools.count, 3)
+        XCTAssertEqual(payload.tools.map(\.type), [
             "web_search_preview",
             "code_interpreter",
             "file_search"
         ])
-        XCTAssertEqual(tools.last?.vectorStoreIDs ?? [], ["vs_123"])
-        let input = payload.input
-        XCTAssertEqual(input.count, 2)
-        XCTAssertEqual(input[0].role, "user")
-        switch input[0].content {
+        XCTAssertEqual(payload.tools.last?.vectorStoreIDs ?? [], ["vs_123"])
+        XCTAssertEqual(payload.input.count, 2)
+        XCTAssertEqual(payload.input[0].role, "user")
+        switch payload.input[0].content {
         case .items(let items):
             XCTAssertEqual(items, [
                 .inputText("Describe this file"),
@@ -82,7 +66,7 @@ final class OpenAIRequestBuilderTests: XCTestCase {
         default:
             XCTFail("Expected multi-part content")
         }
-        switch input[1].content {
+        switch payload.input[1].content {
         case .text(let content):
             XCTAssertEqual(content, "Sure")
         default:
@@ -112,7 +96,7 @@ final class OpenAIRequestBuilderTests: XCTestCase {
     }
 
     func testStreamingRequestOmitsBackgroundFieldWhenDisabled() throws {
-        let builder = OpenAIRequestBuilder()
+        let builder = makeDirectRequestBuilder()
         let request = try builder.streamingRequest(
             apiKey: "sk-test",
             messages: [APIMessage(role: .user, content: "Hello")],
@@ -130,7 +114,7 @@ final class OpenAIRequestBuilderTests: XCTestCase {
     }
 
     func testFetchRequestIncludesRecoveryQueryParameters() throws {
-        let builder = OpenAIRequestBuilder()
+        let builder = makeDirectRequestBuilder()
         let request = try builder.fetchRequest(
             responseId: "resp_123",
             apiKey: "sk-test",
@@ -153,11 +137,10 @@ final class OpenAIRequestBuilderTests: XCTestCase {
 
     func testRecoveryRequestUsesGatewayRouteAndAuthorizationWhenEnabled() throws {
         let provider = DefaultOpenAIConfigurationProvider(
-            directOpenAIBaseURL: { "https://api.openai.com/v1" },
-            cloudflareGatewayBaseURL: { DefaultOpenAIConfigurationProvider.bundledCloudflareGatewayBaseURL },
-            cloudflareAIGToken: { DefaultOpenAIConfigurationProvider.bundledCloudflareAIGToken },
-            useCloudflareGateway: { true },
-            setUseCloudflareGateway: { _ in }
+            directOpenAIBaseURL: "https://api.openai.com/v1",
+            cloudflareGatewayBaseURL: DefaultOpenAIConfigurationProvider.defaultCloudflareGatewayBaseURL,
+            cloudflareAIGToken: "cf-test-token",
+            useCloudflareGateway: true
         )
         let builder = OpenAIRequestBuilder(configuration: provider)
         let request = try builder.recoveryRequest(
@@ -176,13 +159,17 @@ final class OpenAIRequestBuilderTests: XCTestCase {
         XCTAssertEqual(components.queryItems?.first(where: { $0.name == "starting_after" })?.value, "9")
         XCTAssertEqual(request.value(forHTTPHeaderField: "Accept"), "text/event-stream")
         XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer sk-test")
-        XCTAssertNotNil(request.value(forHTTPHeaderField: "cf-aig-authorization"))
+        XCTAssertEqual(request.value(forHTTPHeaderField: "cf-aig-authorization"), "Bearer cf-test-token")
     }
 
     func testRecoveryRequestUsesDirectRouteWithoutGatewayAuthorization() throws {
-        SettingsStore.shared.cloudflareGatewayEnabled = true
-
-        let builder = OpenAIRequestBuilder()
+        let provider = DefaultOpenAIConfigurationProvider(
+            directOpenAIBaseURL: "https://api.openai.com/v1",
+            cloudflareGatewayBaseURL: DefaultOpenAIConfigurationProvider.defaultCloudflareGatewayBaseURL,
+            cloudflareAIGToken: "cf-test-token",
+            useCloudflareGateway: true
+        )
+        let builder = OpenAIRequestBuilder(configuration: provider)
         let request = try builder.recoveryRequest(
             responseId: "resp_123",
             startingAfter: 12,
@@ -199,5 +186,16 @@ final class OpenAIRequestBuilderTests: XCTestCase {
         XCTAssertEqual(components.queryItems?.first(where: { $0.name == "starting_after" })?.value, "12")
         XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer sk-test")
         XCTAssertNil(request.value(forHTTPHeaderField: "cf-aig-authorization"))
+    }
+
+    private func makeDirectRequestBuilder() -> OpenAIRequestBuilder {
+        OpenAIRequestBuilder(
+            configuration: DefaultOpenAIConfigurationProvider(
+                directOpenAIBaseURL: "https://api.openai.com/v1",
+                cloudflareGatewayBaseURL: DefaultOpenAIConfigurationProvider.defaultCloudflareGatewayBaseURL,
+                cloudflareAIGToken: "",
+                useCloudflareGateway: false
+            )
+        )
     }
 }

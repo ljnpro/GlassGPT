@@ -6,14 +6,12 @@ import XCTest
 @testable import NativeChatComposition
 
 final class OpenAITransportConfigurationTests: XCTestCase {
-    func testDefaultConfigurationProviderTracksGatewayToggleThroughSettingsStore() {
-        let gatewayState = GatewayState()
+    func testDefaultConfigurationProviderTracksGatewayToggleState() {
         let provider = DefaultOpenAIConfigurationProvider(
-            directOpenAIBaseURL: { "https://api.openai.com/v1" },
-            cloudflareGatewayBaseURL: { "https://gateway.example/v1" },
-            cloudflareAIGToken: { "gateway-token" },
-            useCloudflareGateway: { gatewayState.enabled },
-            setUseCloudflareGateway: { gatewayState.enabled = $0 }
+            directOpenAIBaseURL: "https://api.openai.com/v1",
+            cloudflareGatewayBaseURL: "https://gateway.example/v1",
+            cloudflareAIGToken: "gateway-token",
+            useCloudflareGateway: false
         )
 
         XCTAssertEqual(provider.directOpenAIBaseURL, "https://api.openai.com/v1")
@@ -21,7 +19,7 @@ final class OpenAITransportConfigurationTests: XCTestCase {
 
         provider.useCloudflareGateway = true
 
-        XCTAssertTrue(gatewayState.enabled)
+        XCTAssertTrue(provider.useCloudflareGateway)
         XCTAssertEqual(provider.openAIBaseURL, provider.cloudflareGatewayBaseURL)
     }
 
@@ -341,10 +339,6 @@ final class OpenAITransportConfigurationTests: XCTestCase {
         XCTAssertEqual(transport.requests.count, 1)
         XCTAssertEqual(transport.requests.first?.httpMethod, "POST")
     }
-}
-
-private final class GatewayState: @unchecked Sendable {
-    var enabled = false
 }
 
 private final class MockOpenAIDataTransport: OpenAIDataTransport, @unchecked Sendable {

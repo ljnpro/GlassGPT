@@ -4,17 +4,17 @@ import ChatRuntimeModel
 import Foundation
 
 @MainActor
-extension ChatController {
+extension ChatSessionCoordinator {
     func makeRecoverySession(for message: Message) -> ReplySession? {
         guard let conversation = message.conversation else { return nil }
-        let configuration = sessionRequestConfiguration(for: conversation)
+        let configuration = controller.conversationCoordinator.sessionRequestConfiguration(for: conversation)
 
         return ReplySession(
             assistantReplyID: AssistantReplyID(rawValue: message.id),
             message: message,
             conversationID: conversation.id,
             request: ResponseRequestContext(
-                apiKey: apiKey,
+                apiKey: controller.apiKey,
                 messages: nil,
                 model: configuration.0,
                 effort: configuration.1,
@@ -25,7 +25,7 @@ extension ChatController {
     }
 
     func registerSession(_ session: ReplySession, execution: SessionExecutionState, visible: Bool) {
-        sessionRegistry.register(session, execution: execution, visible: visible) { existing in
+        controller.sessionRegistry.register(session, execution: execution, visible: visible) { existing in
             existing.task?.cancel()
             existing.service.cancelStream()
         }
@@ -39,33 +39,33 @@ extension ChatController {
     }
 
     func isSessionActive(_ session: ReplySession) -> Bool {
-        sessionRegistry.contains(session)
+        controller.sessionRegistry.contains(session)
     }
 
     func bindVisibleSession(messageID: UUID?) {
-        sessionRegistry.bindVisibleSession(messageID: messageID)
+        controller.sessionRegistry.bindVisibleSession(messageID: messageID)
 
         guard
             let messageID,
-            let session = sessionRegistry.session(for: messageID),
-            let message = findMessage(byId: messageID),
-            currentConversation?.id == session.conversationID
+            let session = controller.sessionRegistry.session(for: messageID),
+            let message = controller.conversationCoordinator.findMessage(byId: messageID),
+            controller.currentConversation?.id == session.conversationID
         else {
-            draftMessage = nil
+            controller.draftMessage = nil
             clearVisibleState(clearDraft: false)
             return
         }
 
-        draftMessage = message
+        controller.draftMessage = message
         syncVisibleState(from: session)
-        upsertMessage(message)
+        controller.conversationCoordinator.upsertMessage(message)
     }
 
     func detachVisibleSessionBinding() {
-        sessionRegistry.bindVisibleSession(messageID: nil)
-        draftMessage = nil
+        controller.sessionRegistry.bindVisibleSession(messageID: nil)
+        controller.draftMessage = nil
         clearVisibleState(clearDraft: false)
-        errorMessage = nil
+        controller.errorMessage = nil
     }
 
     func syncVisibleState(from session: ReplySession) {
@@ -76,14 +76,14 @@ extension ChatController {
             let state = SessionVisibilityCoordinator.visibleState(
                 from: session,
                 runtimeState: runtimeState,
-                draftMessage: findMessage(byId: session.messageID)
+                draftMessage: controller.conversationCoordinator.findMessage(byId: session.messageID)
             )
             applyVisibleState(state)
         }
     }
 
     func refreshVisibleBindingForCurrentConversation() {
-        guard let conversation = currentConversation else {
+        guard let conversation = controller.currentConversation else {
             detachVisibleSessionBinding()
             return
         }
@@ -92,49 +92,49 @@ extension ChatController {
             .filter { $0.role == .assistant && !$0.isComplete }
             .sorted(by: { $0.createdAt < $1.createdAt })
 
-        if let message = activeMessages.last(where: { sessionRegistry.session(for: $0.id) != nil }) {
+        if let message = activeMessages.last(where: { controller.sessionRegistry.session(for: $0.id) != nil }) {
             bindVisibleSession(messageID: message.id)
             return
         }
 
         if let message = activeMessages.last {
-            sessionRegistry.bindVisibleSession(messageID: nil)
+            controller.sessionRegistry.bindVisibleSession(messageID: nil)
             clearVisibleState(clearDraft: false)
-            draftMessage = message
+            controller.draftMessage = message
         } else {
             detachVisibleSessionBinding()
         }
     }
 
     func applyVisibleState(_ state: ChatVisibleSessionState) {
-        draftMessage = state.draftMessage
-        currentStreamingText = state.currentStreamingText
-        currentThinkingText = state.currentThinkingText
-        activeToolCalls = state.activeToolCalls
-        liveCitations = state.liveCitations
-        liveFilePathAnnotations = state.liveFilePathAnnotations
-        lastSequenceNumber = state.lastSequenceNumber
-        activeRequestModel = state.activeRequestModel
-        activeRequestEffort = state.activeRequestEffort
-        activeRequestUsesBackgroundMode = state.activeRequestUsesBackgroundMode
-        activeRequestServiceTier = state.activeRequestServiceTier
-        isStreaming = state.isStreaming
-        isThinking = state.isThinking
-        isRecovering = state.isRecovering
+        controller.draftMessage = state.draftMessage
+        controller.currentStreamingText = state.currentStreamingText
+        controller.currentThinkingText = state.currentThinkingText
+        controller.activeToolCalls = state.activeToolCalls
+        controller.liveCitations = state.liveCitations
+        controller.liveFilePathAnnotations = state.liveFilePathAnnotations
+        controller.lastSequenceNumber = state.lastSequenceNumber
+        controller.activeRequestModel = state.activeRequestModel
+        controller.activeRequestEffort = state.activeRequestEffort
+        controller.activeRequestUsesBackgroundMode = state.activeRequestUsesBackgroundMode
+        controller.activeRequestServiceTier = state.activeRequestServiceTier
+        controller.isStreaming = state.isStreaming
+        controller.isThinking = state.isThinking
+        controller.isRecovering = state.isRecovering
     }
 
     func clearLiveGenerationState(clearDraft: Bool) {
         clearVisibleState(clearDraft: clearDraft)
     }
 
-    func syncConversationProjection() {
-        // Visible state now lives directly on the controller.
+    private var visibleSessionMessageID: UUID? {
+        controller.sessionRegistry.visibleMessageID
     }
 
     private func clearVisibleState(clearDraft: Bool) {
         applyVisibleState(
             SessionVisibilityCoordinator.clearedState(
-                retaining: draftMessage,
+                retaining: controller.draftMessage,
                 clearDraft: clearDraft
             )
         )

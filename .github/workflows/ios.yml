@@ -39,6 +39,9 @@ jobs:
       - name: UI Tests Gate
         run: ./scripts/ci.sh ui-tests
 
+      - name: Coverage Report Gate
+        run: ./scripts/ci.sh coverage-report
+
       - name: Maintainability Gate
         run: ./scripts/ci.sh maintainability
 

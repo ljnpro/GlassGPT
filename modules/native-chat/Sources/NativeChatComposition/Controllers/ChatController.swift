@@ -9,6 +9,7 @@ import ChatPresentation
 import ChatRuntimeModel
 import ChatRuntimePorts
 import ChatRuntimeWorkflows
+import ChatUIComponents
 import GeneratedFilesInfra
 import OpenAITransport
 
@@ -31,7 +32,7 @@ package final class ChatController {
                 reasoningEffort = selectedModel.defaultEffort
             }
             guard !isApplyingStoredConversationConfiguration && !isApplyingConversationConfigurationBatch else { return }
-            syncConversationConfiguration()
+            conversationCoordinator.syncConversationConfiguration()
         }
     }
     var reasoningEffort: ReasoningEffort = .high {
@@ -41,19 +42,19 @@ package final class ChatController {
                 return
             }
             guard !isApplyingStoredConversationConfiguration && !isApplyingConversationConfigurationBatch else { return }
-            syncConversationConfiguration()
+            conversationCoordinator.syncConversationConfiguration()
         }
     }
     var backgroundModeEnabled: Bool = false {
         didSet {
             guard !isApplyingStoredConversationConfiguration && !isApplyingConversationConfigurationBatch else { return }
-            syncConversationConfiguration()
+            conversationCoordinator.syncConversationConfiguration()
         }
     }
     var serviceTier: ServiceTier = .standard {
         didSet {
             guard !isApplyingStoredConversationConfiguration && !isApplyingConversationConfigurationBatch else { return }
-            syncConversationConfiguration()
+            conversationCoordinator.syncConversationConfiguration()
         }
     }
     package var currentConversation: ChatPersistenceSwiftData.Conversation?
@@ -95,6 +96,8 @@ package final class ChatController {
     @ObservationIgnored
     lazy var conversationCoordinator = ChatConversationCoordinator(controller: self)
     @ObservationIgnored
+    lazy var sessionCoordinator = ChatSessionCoordinator(controller: self)
+    @ObservationIgnored
     lazy var fileInteractionCoordinator = ChatFileInteractionCoordinator(controller: self)
     @ObservationIgnored
     lazy var lifecycleCoordinator = ChatLifecycleCoordinator(controller: self)
@@ -108,14 +111,11 @@ package final class ChatController {
 
     package init(
         modelContext: ModelContext,
-        settingsStore: SettingsStore = .shared,
-        apiKeyStore: PersistedAPIKeyStore = PersistedAPIKeyStore(
-            backend: KeychainAPIKeyBackend(
-                service: KeychainAPIKeyBackend.defaultServiceIdentifier(bundleIdentifier: Bundle.main.bundleIdentifier)
-            )
-        ),
-        configurationProvider: OpenAIConfigurationProvider = DefaultOpenAIConfigurationProvider.shared,
-        transport: OpenAIDataTransport = OpenAIURLSessionTransport(),
+        settingsStore: SettingsStore,
+        apiKeyStore: PersistedAPIKeyStore,
+        configurationProvider: OpenAIConfigurationProvider,
+        transport: OpenAIDataTransport,
+        hapticService: HapticService,
         serviceFactory: (@MainActor () -> OpenAIService)? = nil,
         bootstrapPolicy: FeatureBootstrapPolicy = .live
     ) {
@@ -140,12 +140,13 @@ package final class ChatController {
             responseParser: resolvedResponseParser,
             transport: transport,
             openAIService: resolvedOpenAIService,
+            hapticService: hapticService,
             serviceFactory: resolvedServiceFactory
         )
         self.didCompleteLaunchBootstrap = !bootstrapPolicy.runLaunchTasks
-        loadDefaultsFromSettings()
+        conversationCoordinator.loadDefaultsFromSettings()
         if bootstrapPolicy.restoreLastConversation {
-            restoreLastConversationIfAvailable()
+            conversationCoordinator.restoreLastConversationIfAvailable()
         }
         syncConversationProjection()
 
@@ -164,16 +165,15 @@ package final class ChatController {
         }
     }
 
-    package convenience init(modelContext: ModelContext) {
-        self.init(
-            modelContext: modelContext,
-            settingsStore: .shared,
-            apiKeyStore: PersistedAPIKeyStore(
-                backend: KeychainAPIKeyBackend(
-                    service: KeychainAPIKeyBackend.defaultServiceIdentifier(bundleIdentifier: Bundle.main.bundleIdentifier)
-                )
-            ),
-            bootstrapPolicy: .live
-        )
+    func syncConversationProjection() {
+        // Visible state lives directly on the controller.
+    }
+
+    func stopGeneration(savePartial: Bool = true) {
+        sessionCoordinator.stopGeneration(savePartial: savePartial)
+    }
+
+    func suspendActiveSessionsForAppBackground() {
+        sessionCoordinator.suspendActiveSessionsForAppBackground()
     }
 }

@@ -43,7 +43,7 @@ package struct ThinkingView: View {
 
     /// Use external binding if provided, otherwise fall back to internal state
     private var isExpanded: Bool {
-        get { externalIsExpanded ?? internalIsExpanded }
+        externalIsExpanded ?? internalIsExpanded
     }
 
     private func setExpanded(_ value: Bool) {

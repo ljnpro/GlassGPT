@@ -13,13 +13,12 @@ public struct ModelSelectorSheet: View {
     private var selectedModel: ModelType {
         proModeEnabled ? .gpt5_4_pro : .gpt5_4
     }
-
     private var metrics: Metrics {
         Metrics(idiom: UIDevice.current.userInterfaceIdiom)
     }
-
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.verticalSizeClass) private var verticalSizeClass
+    @Environment(\.hapticsEnabled) private var hapticsEnabled
 
     public init(
         proModeEnabled: Binding<Bool>,
@@ -66,10 +65,14 @@ public struct ModelSelectorSheet: View {
                 let newEffort = efforts[clampedIndex]
                 if newEffort != reasoningEffort {
                     reasoningEffort = newEffort
-                    HapticService.shared.selection()
+                    hapticService.selection(isEnabled: hapticsEnabled)
                 }
             }
         )
+    }
+
+    private var hapticService: HapticService {
+        HapticService()
     }
 
     public var body: some View {
@@ -267,7 +270,7 @@ public struct ModelSelectorSheet: View {
                 .toggleStyle(.switch)
                 .accessibilityIdentifier(accessibilityIdentifier)
                 .onChange(of: isOn.wrappedValue) { _, _ in
-                    HapticService.shared.selection()
+                    hapticService.selection(isEnabled: hapticsEnabled)
                 }
         }
         .padding(.horizontal, metrics.rowHorizontalPadding)

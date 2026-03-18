@@ -56,7 +56,7 @@ extension ChatView {
 
     func startNewChat() {
         composerResetToken = UUID()
-        viewModel.startNewChat()
+        viewModel.conversationCoordinator.startNewChat()
     }
 
     func dismissModelSelector() {
@@ -64,7 +64,7 @@ extension ChatView {
     }
 
     func commitModelSelectorAndDismiss() {
-        viewModel.applyConversationConfiguration(modelSelectorDraft)
+        viewModel.conversationCoordinator.applyConversationConfiguration(modelSelectorDraft)
         dismissModelSelector()
     }
 }

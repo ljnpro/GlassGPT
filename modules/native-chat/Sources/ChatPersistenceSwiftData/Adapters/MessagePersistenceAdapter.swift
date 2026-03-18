@@ -65,7 +65,7 @@ public struct MessagePersistenceAdapter {
             message.content = fallbackText.isEmpty ? "[Response interrupted. Please try again.]" : fallbackText
         }
 
-        if (message.thinking?.isEmpty ?? true),
+        if message.thinking?.isEmpty ?? true,
            let fallbackThinking,
            !fallbackThinking.isEmpty {
             message.thinking = fallbackThinking

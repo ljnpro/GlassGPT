@@ -24,7 +24,7 @@ extension ChatLifecycleCoordinator {
                     apiKey: controller.apiKey
                 )
                 conversation.title = title
-                controller.saveContextIfPossible("generateTitlesForUntitledConversations")
+                controller.conversationCoordinator.saveContextIfPossible("generateTitlesForUntitledConversations")
 
                 if conversation.id == controller.currentConversation?.id {
                     controller.currentConversation?.title = title
@@ -51,7 +51,7 @@ extension ChatLifecycleCoordinator {
                 apiKey: controller.apiKey
             )
             conversation.title = title
-            controller.saveContextIfPossible("generateTitleIfNeeded")
+            controller.conversationCoordinator.saveContextIfPossible("generateTitleIfNeeded")
         } catch {
             #if DEBUG
             Loggers.chat.debug("[Title] Failed to generate title: \(error.localizedDescription)")
@@ -68,7 +68,7 @@ extension ChatLifecycleCoordinator {
                 apiKey: controller.apiKey
             )
             conversation.title = title
-            controller.saveContextIfPossible("generateTitle")
+            controller.conversationCoordinator.saveContextIfPossible("generateTitle")
         } catch {
             #if DEBUG
             Loggers.chat.debug("[Title] Failed to generate title: \(error.localizedDescription)")

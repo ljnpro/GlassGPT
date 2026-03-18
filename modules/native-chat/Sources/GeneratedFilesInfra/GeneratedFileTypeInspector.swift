@@ -1,6 +1,6 @@
 import Foundation
 
-extension FileDownloadService {
+enum GeneratedFileTypeInspector {
     static func extensionForMimeType(_ mimeType: String) -> String? {
         let lower = mimeType.lowercased()
         switch lower {
