@@ -29,7 +29,7 @@ public final class SettingsSceneController {
     private let persistenceHandler: any SettingsPersistenceHandler
 
     /// Creates a controller with the given handler implementations.
-    public init(
+    package init(
         credentialHandler: any SettingsCredentialHandler,
         cacheHandler: any SettingsCacheHandler,
         persistenceHandler: any SettingsPersistenceHandler
