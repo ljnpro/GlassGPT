@@ -4,8 +4,16 @@ set -euo pipefail
 export PYTHONDONTWRITEBYTECODE="${PYTHONDONTWRITEBYTECODE:-1}"
 
 EXPECTED_SWIFT_DRIVER_VERSION="${EXPECTED_SWIFT_DRIVER_VERSION:-1.127.15}"
+EXPECTED_PYTHON_VERSION="${EXPECTED_PYTHON_VERSION:-3.14.3}"
 
-python3 -c "import sys; assert sys.version_info >= (3, 14), f'Python 3.14+ required, got {sys.version}'"
+python3 - "$EXPECTED_PYTHON_VERSION" <<'PY'
+import sys
+
+expected = tuple(int(part) for part in sys.argv[1].split("."))
+actual = tuple(int(part) for part in sys.version.split()[0].split("."))
+if actual[: len(expected)] != expected:
+    raise SystemExit(f"Python {sys.argv[1]} required, got {sys.version.split()[0]}")
+PY
 SWIFT_VERSION_OUTPUT="$(swift --version 2>&1)"
 printf '%s\n' "$SWIFT_VERSION_OUTPUT" | grep -q "6.2" || { echo "Swift 6.2+ required"; exit 1; }
 printf '%s\n' "$SWIFT_VERSION_OUTPUT" | grep -q "swift-driver version: ${EXPECTED_SWIFT_DRIVER_VERSION}" || {

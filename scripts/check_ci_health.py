@@ -16,6 +16,7 @@ SIMULATOR_DEVICE_NAME = os.environ.get("SIMULATOR_DEVICE_NAME", "iPhone 17")
 REQUIRED_RUNTIME_MARKER = "iOS 26"
 EXPECTED_SWIFT_DRIVER_VERSION = os.environ.get("EXPECTED_SWIFT_DRIVER_VERSION", "1.127.15")
 EXPECTED_XCODE_VERSION = os.environ.get("EXPECTED_XCODE_VERSION", "26.3")
+EXPECTED_PYTHON_VERSION = os.environ.get("EXPECTED_PYTHON_VERSION", "3.14.3")
 
 
 def command_output(*args: str) -> str:
@@ -31,15 +32,15 @@ def command_output(*args: str) -> str:
 
 def main() -> int:
     failures: list[str] = []
-    python_version = tuple(int(part) for part in sys.version.split()[0].split(".")[:2])
+    python_version = sys.version.split()[0]
 
     print("CI health report")
     print(f"Workspace root: {ROOT}")
 
-    if python_version < (3, 14):
-        failures.append(f"Python 3.14+ required, found {sys.version.split()[0]}")
+    if python_version != EXPECTED_PYTHON_VERSION:
+        failures.append(f"Python {EXPECTED_PYTHON_VERSION} required, found {python_version}")
     else:
-        print(f"[PASS] Python: {sys.version.split()[0]}")
+        print(f"[PASS] Python: {python_version}")
 
     for executable in ("swift", "xcodebuild", "xcrun", "swiftformat", "swiftlint"):
         resolved = shutil.which(executable)
