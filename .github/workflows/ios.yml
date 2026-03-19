@@ -230,13 +230,14 @@ jobs:
         uses: actions/download-artifact@v6
         with:
           name: ui-test-products
-          path: .local/build/ci/ui-test-products
+          path: .local/build/ci/DerivedData/Build/Products
 
       - name: Run UI tests
         run: ./scripts/ci.sh ui-tests
         env:
+          PRESERVE_CI_DERIVED_DATA: "1"
           UI_TEST_FILTER: ${{ matrix.ui_filter }}
-          UI_TEST_XCTESTRUN_ROOT: .local/build/ci/ui-test-products
+          UI_TEST_XCTESTRUN_ROOT: .local/build/ci/DerivedData/Build/Products
 
       - name: Upload test results
         if: always()
@@ -374,9 +375,10 @@ jobs:
         uses: actions/download-artifact@v6
         with:
           name: ui-test-products
-          path: .local/build/ci/ui-test-products
+          path: .local/build/ci/DerivedData/Build/Products
 
       - name: Release Readiness Gate
         run: ./scripts/ci.sh release-readiness
         env:
-          UI_TEST_XCTESTRUN_ROOT: .local/build/ci/ui-test-products
+          PRESERVE_CI_DERIVED_DATA: "1"
+          UI_TEST_XCTESTRUN_ROOT: .local/build/ci/DerivedData/Build/Products
