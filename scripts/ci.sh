@@ -15,8 +15,8 @@ APP_BUNDLE_IDENTIFIER="space.manus.liquid.glass.chat.t20260308214621"
 UI_TEST_RUNNER_BUNDLE_IDENTIFIER="${APP_BUNDLE_IDENTIFIER}UITests.xctrunner"
 SIMULATOR_DEVICE_NAME="${SIMULATOR_DEVICE_NAME:-iPhone 17}"
 SIMULATOR_DEVICE_DESTINATION="platform=iOS Simulator,name=${SIMULATOR_DEVICE_NAME}"
-DEFAULT_RELEASE_VERSION="4.8.1"
-DEFAULT_RELEASE_BUILD="20181"
+DEFAULT_RELEASE_VERSION="4.8.2"
+DEFAULT_RELEASE_BUILD="20182"
 XCODEBUILD_RETRY_ATTEMPTS="${XCODEBUILD_RETRY_ATTEMPTS:-5}"
 XCODE_TEST_TIMEOUT_ALLOWANCE="${XCODE_TEST_TIMEOUT_ALLOWANCE:-180}"
 SIMULATOR_BOOT_TIMEOUT_SECONDS="${SIMULATOR_BOOT_TIMEOUT_SECONDS:-60}"
@@ -68,6 +68,68 @@ mkdir -p "$CI_OUTPUT_DIR"
 
 function log() {
   echo "==> $1"
+}
+
+function clean_stale_xctestrun() {
+  local derived_data="${DERIVED_DATA_PATH:-$HOME/Library/Developer/Xcode/DerivedData}"
+  local stale_count
+  stale_count=$(find "$derived_data" -name '*.xctestrun' -mtime +1 2>/dev/null | wc -l | tr -d ' ')
+  if [ "$stale_count" -gt 0 ]; then
+    log "Removing $stale_count stale .xctestrun bundles from derived data"
+    find "$derived_data" -name '*.xctestrun' -mtime +1 -delete 2>/dev/null || true
+  fi
+}
+
+function recover_simulator() {
+  local max_retries=2
+  local attempt=0
+  while [ $attempt -lt $max_retries ]; do
+    if xcrun simctl boot "$SIM_UDID" 2>/dev/null; then
+      return 0
+    fi
+    (( attempt += 1 ))
+    log "Simulator boot failed (attempt $attempt/$max_retries), recovering CoreSimulator..."
+    killall -9 com.apple.CoreSimulator.CoreSimulatorService 2>/dev/null || true
+    sleep 3
+  done
+  log "ERROR: Simulator recovery failed after $max_retries retries"
+  return 1
+}
+
+# TTY detection for progress formatting
+if [[ -t 1 ]]; then
+  IS_TTY=1
+else
+  IS_TTY=0
+fi
+
+function progress_bar() {
+  local current="$1"
+  local total="$2"
+  local label="${3:-}"
+  local width=40
+  local filled=$(( current * width / total ))
+  local empty=$(( width - filled ))
+  local bar=""
+
+  for ((i=0; i<filled; i++)); do bar+="█"; done
+  for ((i=0; i<empty; i++)); do bar+="░"; done
+
+  if [[ "$IS_TTY" == "1" ]]; then
+    printf "\r  [%s] %d/%d %s" "$bar" "$current" "$total" "$label"
+    if (( current == total )); then
+      printf "\n"
+    fi
+  else
+    echo "  [$current/$total] $label"
+  fi
+}
+
+function pre_gate_hook() {
+  local gate_name="$1"
+  local gate_index="$2"
+  local gate_total="$3"
+  progress_bar "$gate_index" "$gate_total" "$gate_name"
 }
 
 function is_transient_xcodebuild_failure() {
@@ -518,7 +580,11 @@ function gate_ui_tests() {
   ensure_ui_test_xctestrun_path
 
   local ui_case
+  local ui_case_index=0
+  local ui_case_total=${#selected_ui_cases[@]}
   for ui_case in "${selected_ui_cases[@]}"; do
+    (( ui_case_index += 1 ))
+    progress_bar "$ui_case_index" "$ui_case_total" "UI: $ui_case"
     run_ui_test_case "$UI_TEST_XCTESTRUN_RESOLVED_PATH" "$ui_case" "glassgpt-ui"
   done
 }
@@ -714,6 +780,27 @@ function gate_doc_build() {
   log "Documentation catalogs verified"
 }
 
+function gate_performance_tests() {
+  log "Running performance regression check"
+  python3 ./scripts/check_performance_regression.py \
+    "$CI_OUTPUT_DIR/performance.json" \
+    "$CI_OUTPUT_DIR/performance-baseline.json"
+}
+
+function gate_localization_check() {
+  log "Running localization check"
+  python3 ./scripts/check_localization.py | tee "$CI_OUTPUT_DIR/localization-report.txt"
+}
+
+function gate_swiftformat_check() {
+  log "Running SwiftFormat lint check"
+  if ! command -v swiftformat &>/dev/null; then
+    log "ERROR: swiftformat not installed. Install with: brew install swiftformat"
+    return 1
+  fi
+  swiftformat --lint modules/native-chat/Sources/ modules/native-chat/Tests/ 2>&1 | tee "$CI_OUTPUT_DIR/swiftformat-report.txt"
+}
+
 function run_gate() {
   local gate="$1"
 
@@ -734,10 +821,13 @@ function run_gate() {
     format-check) gate_format_check ;;
     module-boundary) gate_module_boundary ;;
     doc-build) gate_doc_build ;;
+    performance-tests) gate_performance_tests ;;
+    localization-check) gate_localization_check ;;
+    swiftformat-check) gate_swiftformat_check ;;
     release-readiness) assert_release_readiness ;;
     *)
       echo "Unknown gate: $gate" >&2
-      echo "Valid gates: lint, python-lint, format-check, build, architecture-tests, app-tests, snapshot-tests, package-tests, coverage-report, core-tests, ui-tests, maintainability, source-share, infra-safety, module-boundary, doc-build, release-readiness" >&2
+      echo "Valid gates: lint, python-lint, format-check, build, architecture-tests, app-tests, snapshot-tests, package-tests, coverage-report, core-tests, ui-tests, maintainability, source-share, infra-safety, module-boundary, doc-build, performance-tests, localization-check, swiftformat-check, release-readiness" >&2
       exit 1
       ;;
   esac
@@ -746,7 +836,7 @@ function run_gate() {
 function usage() {
   cat <<'EOF'
 Usage:
-  ./scripts/ci.sh [all|lint|python-lint|format-check|build|architecture-tests|app-tests|snapshot-tests|package-tests|coverage-report|core-tests|ui-tests|maintainability|source-share|infra-safety|module-boundary|doc-build|release-readiness|comma-separated list]
+  ./scripts/ci.sh [all|lint|python-lint|format-check|build|architecture-tests|app-tests|snapshot-tests|package-tests|coverage-report|core-tests|ui-tests|maintainability|source-share|infra-safety|module-boundary|doc-build|performance-tests|localization-check|swiftformat-check|release-readiness|comma-separated list]
 
 Examples:
   ./scripts/ci.sh
@@ -805,6 +895,12 @@ if ! (( ${#requested_gates[@]} == 1 )) || [[ "${requested_gates[0]}" != "coverag
   clean_outputs
 fi
 
+clean_stale_xctestrun
+
+gate_index=0
+gate_total=${#requested_gates[@]}
 for gate in "${requested_gates[@]}"; do
+  (( gate_index += 1 ))
+  pre_gate_hook "$gate" "$gate_index" "$gate_total"
   run_gate "$gate"
 done

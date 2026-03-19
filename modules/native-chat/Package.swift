@@ -200,6 +200,28 @@ let package = Package(
             path: "Tests/NativeChatArchitectureTests"
         ),
         .testTarget(
+            name: "NativeChatSwiftTests",
+            dependencies: [
+                "ChatDomain",
+                "ChatPersistenceContracts",
+                "ChatPersistenceCore",
+                "ChatPersistenceSwiftData",
+                "ChatRuntimeModel",
+                "ChatRuntimePorts",
+                "ChatRuntimeWorkflows",
+                "ChatApplication",
+                "ChatPresentation",
+                "ChatUIComponents",
+                "NativeChatUI",
+                "OpenAITransport",
+                "GeneratedFilesCore",
+                "GeneratedFilesInfra",
+                "NativeChatComposition",
+                "NativeChatUITestSupport",
+            ],
+            path: "Tests/NativeChatSwiftTests"
+        ),
+        .testTarget(
             name: "NativeChatTests",
             dependencies: [
                 "ChatDomain",

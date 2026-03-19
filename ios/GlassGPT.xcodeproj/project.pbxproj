@@ -9,19 +9,10 @@
 /* Begin PBXBuildFile section */
 		00E357001AD99517003FC87E /* NativeChat in Frameworks */ = {isa = PBXBuildFile; productRef = 081B1C62D4C7E5F6EC724606 /* NativeChat */; };
 		00E357011AD99517003FC87E /* TestSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00E356F71AD99517003FC87E /* TestSupport.swift */; };
-		00E357021AD99517003FC87E /* SettingsStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00E356F81AD99517003FC87E /* SettingsStoreTests.swift */; };
-		00E357031AD99517003FC87E /* APIKeyStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00E356F91AD99517003FC87E /* APIKeyStoreTests.swift */; };
-		00E357041AD99517003FC87E /* OpenAIRequestBuilderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00E356FA1AD99517003FC87E /* OpenAIRequestBuilderTests.swift */; };
-		00E357051AD99517003FC87E /* OpenAIResponseParserTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00E356FB1AD99517003FC87E /* OpenAIResponseParserTests.swift */; };
-		00E357061AD99517003FC87E /* OpenAIStreamEventTranslatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00E356FC1AD99517003FC87E /* OpenAIStreamEventTranslatorTests.swift */; };
-		00E357071AD99517003FC87E /* GeneratedFileCoordinatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00E356FD1AD99517003FC87E /* GeneratedFileCoordinatorTests.swift */; };
-		00E357081AD99517003FC87E /* RepositoryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00E356FE1AD99517003FC87E /* RepositoryTests.swift */; };
 		02FB76D317231FE3C3FE9C26 /* SnapshotTestSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = AEB7DA53CC27898C943EE0C9 /* SnapshotTestSupport.swift */; };
 		13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB51A68108700A75B9A /* Images.xcassets */; };
 		15FE2F91277A79575837BA7F /* GlassGPTUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CC5500B0A1EE5BC8728B919 /* GlassGPTUITests.swift */; };
-		20C8E5953A2C4A9BAA0D2FD1 /* ChatSessionDecisionsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20C8E5943A2C4A9BAA0D2FD1 /* ChatSessionDecisionsTests.swift */; };
 		3E461D99554A48A4959DE609 /* SplashScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */; };
-		4E8BF1E10DCE42B1AF301A8C /* OpenAITransportConfigurationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4E8BF1E00DCE42B1AF301A8C /* OpenAITransportConfigurationTests.swift */; };
 		5776C307D8D36530E5D5481C /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 69358B5C464810283E740D47 /* PrivacyInfo.xcprivacy */; };
 		5F67A87C4A7E4BE9A0E24F61 /* NativeChatUITestSupport in Frameworks */ = {isa = PBXBuildFile; productRef = 5F67A87D4A7E4BE9A0E24F61 /* NativeChatUITestSupport */; };
 		A76E6426109752E59235E252 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 29704E88068307A76C6154BB /* Foundation.framework */; };
@@ -51,19 +42,10 @@
 /* Begin PBXFileReference section */
 		00E356EE1AD99517003FC87E /* GlassGPTTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = GlassGPTTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		00E356F71AD99517003FC87E /* TestSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TestSupport.swift; sourceTree = "<group>"; };
-		00E356F81AD99517003FC87E /* SettingsStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsStoreTests.swift; sourceTree = "<group>"; };
-		00E356F91AD99517003FC87E /* APIKeyStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIKeyStoreTests.swift; sourceTree = "<group>"; };
-		00E356FA1AD99517003FC87E /* OpenAIRequestBuilderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenAIRequestBuilderTests.swift; sourceTree = "<group>"; };
-		00E356FB1AD99517003FC87E /* OpenAIResponseParserTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenAIResponseParserTests.swift; sourceTree = "<group>"; };
-		00E356FC1AD99517003FC87E /* OpenAIStreamEventTranslatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenAIStreamEventTranslatorTests.swift; sourceTree = "<group>"; };
-		00E356FD1AD99517003FC87E /* GeneratedFileCoordinatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeneratedFileCoordinatorTests.swift; sourceTree = "<group>"; };
-		00E356FE1AD99517003FC87E /* RepositoryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RepositoryTests.swift; sourceTree = "<group>"; };
 		13B07F961A680F5B00A75B9A /* GlassGPT.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = GlassGPT.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		13B07FB51A68108700A75B9A /* Images.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; name = Images.xcassets; path = GlassGPT/Images.xcassets; sourceTree = "<group>"; };
 		13B07FB61A68108700A75B9A /* Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = Info.plist; path = GlassGPT/Info.plist; sourceTree = "<group>"; };
-		20C8E5943A2C4A9BAA0D2FD1 /* ChatSessionDecisionsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatSessionDecisionsTests.swift; sourceTree = "<group>"; };
 		29704E88068307A76C6154BB /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS18.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
-		4E8BF1E00DCE42B1AF301A8C /* OpenAITransportConfigurationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenAITransportConfigurationTests.swift; sourceTree = "<group>"; };
 		5991E9E08763AFDD43672213 /* SnapshotViewTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SnapshotViewTests.swift; sourceTree = "<group>"; };
 		5CC5500B0A1EE5BC8728B919 /* GlassGPTUITests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = GlassGPTUITests.swift; sourceTree = "<group>"; };
 		69358B5C464810283E740D47 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xml; name = PrivacyInfo.xcprivacy; path = GlassGPT/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
@@ -117,15 +99,6 @@
 			isa = PBXGroup;
 			children = (
 				00E356F71AD99517003FC87E /* TestSupport.swift */,
-				00E356F81AD99517003FC87E /* SettingsStoreTests.swift */,
-				00E356F91AD99517003FC87E /* APIKeyStoreTests.swift */,
-				00E356FA1AD99517003FC87E /* OpenAIRequestBuilderTests.swift */,
-				00E356FB1AD99517003FC87E /* OpenAIResponseParserTests.swift */,
-				00E356FC1AD99517003FC87E /* OpenAIStreamEventTranslatorTests.swift */,
-				00E356FD1AD99517003FC87E /* GeneratedFileCoordinatorTests.swift */,
-				00E356FE1AD99517003FC87E /* RepositoryTests.swift */,
-				4E8BF1E00DCE42B1AF301A8C /* OpenAITransportConfigurationTests.swift */,
-				20C8E5943A2C4A9BAA0D2FD1 /* ChatSessionDecisionsTests.swift */,
 				AEB7DA53CC27898C943EE0C9 /* SnapshotTestSupport.swift */,
 				5991E9E08763AFDD43672213 /* SnapshotViewTests.swift */,
 			);
@@ -360,15 +333,6 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				00E357031AD99517003FC87E /* APIKeyStoreTests.swift in Sources */,
-				00E357071AD99517003FC87E /* GeneratedFileCoordinatorTests.swift in Sources */,
-				00E357041AD99517003FC87E /* OpenAIRequestBuilderTests.swift in Sources */,
-				00E357051AD99517003FC87E /* OpenAIResponseParserTests.swift in Sources */,
-				00E357061AD99517003FC87E /* OpenAIStreamEventTranslatorTests.swift in Sources */,
-				00E357081AD99517003FC87E /* RepositoryTests.swift in Sources */,
-				4E8BF1E10DCE42B1AF301A8C /* OpenAITransportConfigurationTests.swift in Sources */,
-				20C8E5953A2C4A9BAA0D2FD1 /* ChatSessionDecisionsTests.swift in Sources */,
-				00E357021AD99517003FC87E /* SettingsStoreTests.swift in Sources */,
 				00E357011AD99517003FC87E /* TestSupport.swift in Sources */,
 				02FB76D317231FE3C3FE9C26 /* SnapshotTestSupport.swift in Sources */,
 				B3846B13491743A06766F455 /* SnapshotViewTests.swift in Sources */,

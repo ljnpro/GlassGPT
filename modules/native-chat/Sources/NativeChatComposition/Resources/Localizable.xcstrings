@@ -1,0 +1,247 @@
+{
+  "sourceLanguage": "en",
+  "version": "1.0",
+  "strings": {
+    "Chat": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Chat" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "聊天" } }
+      }
+    },
+    "History": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "History" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "历史" } }
+      }
+    },
+    "Settings": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Settings" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "设置" } }
+      }
+    },
+    "API Configuration": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "API Configuration" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "API 配置" } }
+      }
+    },
+    "Save": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Save" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "保存" } }
+      }
+    },
+    "Clear": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Clear" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "清除" } }
+      }
+    },
+    "Validate": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Validate" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "验证" } }
+      }
+    },
+    "Delete All": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Delete All" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "全部删除" } }
+      }
+    },
+    "Start a Conversation": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Start a Conversation" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "开始对话" } }
+      }
+    },
+    "No Conversations Yet": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "No Conversations Yet" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "暂无对话" } }
+      }
+    },
+    "Reasoning…": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Reasoning…" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "思考中…" } }
+      }
+    },
+    "Send message": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Send message" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "发送消息" } }
+      }
+    },
+    "Message": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Message" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "消息" } }
+      }
+    },
+    "Model": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Model" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "模型" } }
+      }
+    },
+    "Appearance": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Appearance" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "外观" } }
+      }
+    },
+    "About": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "About" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "关于" } }
+      }
+    },
+    "Theme": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Theme" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "主题" } }
+      }
+    },
+    "Haptic Feedback": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Haptic Feedback" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "触觉反馈" } }
+      }
+    },
+    "Searching the web…": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Searching the web…" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "正在搜索网页…" } }
+      }
+    },
+    "Running code…": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Running code…" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "正在运行代码…" } }
+      }
+    },
+    "Reading documents…": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Reading documents…" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "正在阅读文档…" } }
+      }
+    },
+    "Sources": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Sources" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "来源" } }
+      }
+    },
+    "Cancel": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Cancel" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "取消" } }
+      }
+    },
+    "Delete": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Delete" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "删除" } }
+      }
+    },
+    "Version": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Version" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "版本" } }
+      }
+    },
+    "Platform": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Platform" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "平台" } }
+      }
+    },
+    "Cloudflare Gateway": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Cloudflare Gateway" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "Cloudflare 网关" } }
+      }
+    },
+    "Chat Defaults": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Chat Defaults" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "聊天默认值" } }
+      }
+    },
+    "Check Connection": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Check Connection" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "检查连接" } }
+      }
+    },
+    "New Chat": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "New Chat" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "新对话" } }
+      }
+    },
+    "Downloading file…": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Downloading file…" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "正在下载文件…" } }
+      }
+    },
+    "Reasoning Completed": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Reasoning Completed" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "思考完成" } }
+      }
+    },
+    "Code Executed": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Code Executed" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "代码已执行" } }
+      }
+    },
+    "Reasoning": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Reasoning" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "推理" } }
+      }
+    },
+    "Reasoning Effort": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Reasoning Effort" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "推理强度" } }
+      }
+    },
+    "Connection Status": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Connection Status" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "连接状态" } }
+      }
+    },
+    "Search conversations": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Search conversations" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "搜索对话" } }
+      }
+    },
+    "conversations_count": {
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": { "stringUnit": { "state": "translated", "value": "%lld conversation" } },
+              "other": { "stringUnit": { "state": "translated", "value": "%lld conversations" } }
+            }
+          }
+        },
+        "zh-Hans": {
+          "variations": {
+            "plural": {
+              "other": { "stringUnit": { "state": "translated", "value": "%lld 个对话" } }
+            }
+          }
+        }
+      }
+    }
+  }
+}

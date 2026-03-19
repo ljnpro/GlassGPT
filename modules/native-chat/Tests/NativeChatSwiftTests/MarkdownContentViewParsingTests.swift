@@ -1,14 +1,15 @@
-import XCTest
+import Foundation
+import Testing
 import NativeChatUI
 @testable import NativeChatComposition
 
 @MainActor
-final class MarkdownContentViewParsingTests: XCTestCase {
-    func testParseInlineSegmentsExtractsInlineLatexAndPreservesEscapedDollarText() {
+struct MarkdownContentViewParsingTests {
+    @Test func parseInlineSegmentsExtractsInlineLatexAndPreservesEscapedDollarText() {
         let segments = makeView().parseInlineSegments(#"alpha $x^2$ beta \(y + z\) cost \$5"#)
 
-        XCTAssertEqual(
-            inlineSegmentDescriptions(segments),
+        #expect(
+            inlineSegmentDescriptions(segments) ==
             [
                 "text(alpha )",
                 "latex(x^2)",
@@ -19,27 +20,27 @@ final class MarkdownContentViewParsingTests: XCTestCase {
         )
     }
 
-    func testDetectHeadingRequiresSpaceAndNonEmptyText() {
+    @Test func detectHeadingRequiresSpaceAndNonEmptyText() {
         let view = makeView()
 
-        XCTAssertEqual(view.detectHeading("### Title")?.level, 3)
-        XCTAssertEqual(view.detectHeading("### Title")?.text, "Title")
-        XCTAssertNil(view.detectHeading("###Title"))
-        XCTAssertNil(view.detectHeading("### "))
-        XCTAssertNil(view.detectHeading("plain text"))
+        #expect(view.detectHeading("### Title")?.level == 3)
+        #expect(view.detectHeading("### Title")?.text == "Title")
+        #expect(view.detectHeading("###Title") == nil)
+        #expect(view.detectHeading("### ") == nil)
+        #expect(view.detectHeading("plain text") == nil)
     }
 
-    func testIsHorizontalRuleAcceptsSingleRepeatedMarkerWithSpaces() {
+    @Test func isHorizontalRuleAcceptsSingleRepeatedMarkerWithSpaces() {
         let view = makeView()
 
-        XCTAssertTrue(view.isHorizontalRule("---"))
-        XCTAssertTrue(view.isHorizontalRule("* * *"))
-        XCTAssertTrue(view.isHorizontalRule("_ _ _"))
-        XCTAssertFalse(view.isHorizontalRule("-*-"))
-        XCTAssertFalse(view.isHorizontalRule("--"))
+        #expect(view.isHorizontalRule("---"))
+        #expect(view.isHorizontalRule("* * *"))
+        #expect(view.isHorizontalRule("_ _ _"))
+        #expect(!view.isHorizontalRule("-*-"))
+        #expect(!view.isHorizontalRule("--"))
     }
 
-    func testParseBlocksSplitsStructuralMarkdownBlocksInOrder() throws {
+    @Test func parseBlocksSplitsStructuralMarkdownBlocksInOrder() throws {
         let input = """
         # Title
         Lead with $x$.
@@ -55,29 +56,29 @@ final class MarkdownContentViewParsingTests: XCTestCase {
 
         let parts = makeView().parseBlocks(input)
 
-        XCTAssertEqual(parts.map(\.id), Array(0..<parts.count))
-        XCTAssertEqual(parts.count, 6)
+        #expect(parts.map(\.id) == Array(0..<parts.count))
+        #expect(parts.count == 6)
 
-        let heading = try XCTUnwrap(headingPart(parts[0]))
-        XCTAssertEqual(heading.level, 1)
-        XCTAssertEqual(heading.text, "Title")
+        let heading = try #require(headingPart(parts[0]))
+        #expect(heading.level == 1)
+        #expect(heading.text == "Title")
 
-        XCTAssertEqual(
-            inlineSegmentDescriptions(try richTextSegments(parts[1])),
+        #expect(
+            inlineSegmentDescriptions(try richTextSegments(parts[1])) ==
             ["text(Lead with )", "latex(x)", "text(.)"]
         )
 
-        XCTAssertTrue(isHorizontalRule(parts[2]))
+        #expect(isHorizontalRule(parts[2]))
 
-        let codeBlock = try XCTUnwrap(codeBlockPart(parts[3]))
-        XCTAssertEqual(codeBlock.language, "swift")
-        XCTAssertEqual(codeBlock.code, "print(\"hi\")\n")
+        let codeBlock = try #require(codeBlockPart(parts[3]))
+        #expect(codeBlock.language == "swift")
+        #expect(codeBlock.code == "print(\"hi\")\n")
 
-        XCTAssertEqual(try XCTUnwrap(latexBlockContent(parts[4])), "a+b")
-        XCTAssertEqual(inlineSegmentDescriptions(try richTextSegments(parts[5])), ["text(\nTail)"])
+        #expect(try #require(latexBlockContent(parts[4])) == "a+b")
+        #expect(inlineSegmentDescriptions(try richTextSegments(parts[5])) == ["text(\nTail)"])
     }
 
-    func testParseBlocksLeavesUnclosedCodeFenceAsTrailingRichText() throws {
+    @Test func parseBlocksLeavesUnclosedCodeFenceAsTrailingRichText() throws {
         let input = """
         Before
         ```swift
@@ -86,13 +87,13 @@ final class MarkdownContentViewParsingTests: XCTestCase {
 
         let parts = makeView().parseBlocks(input)
 
-        XCTAssertEqual(parts.count, 2)
-        XCTAssertEqual(
-            inlineSegmentDescriptions(try richTextSegments(parts[0])),
+        #expect(parts.count == 2)
+        #expect(
+            inlineSegmentDescriptions(try richTextSegments(parts[0])) ==
             ["text(Before\n)"]
         )
-        XCTAssertEqual(
-            inlineSegmentDescriptions(try richTextSegments(parts[1])),
+        #expect(
+            inlineSegmentDescriptions(try richTextSegments(parts[1])) ==
             ["text(```swift\nlet value = 1)"]
         )
     }
@@ -113,12 +114,10 @@ final class MarkdownContentViewParsingTests: XCTestCase {
     }
 
     private func richTextSegments(
-        _ part: BlockPart,
-        file: StaticString = #filePath,
-        line: UInt = #line
+        _ part: BlockPart
     ) throws -> [InlineSegment] {
         guard case let .richText(_, segments) = part else {
-            XCTFail("Expected rich text block", file: file, line: line)
+            Issue.record("Expected rich text block")
             return []
         }
         return segments
