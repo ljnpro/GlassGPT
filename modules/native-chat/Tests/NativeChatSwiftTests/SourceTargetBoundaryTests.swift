@@ -11,7 +11,7 @@ import OpenAITransport
 import Testing
 
 struct SourceTargetBoundaryTests {
-    @Test func chatDomainPayloadModelsRoundTripAcrossSourceTargetBoundary() throws {
+    @Test func `chat domain payload models round trip across source target boundary`() {
         let citations = [
             URLCitation(url: "https://example.com/a", title: "A", startIndex: 0, endIndex: 1)
         ]
@@ -38,26 +38,26 @@ struct SourceTargetBoundaryTests {
         #expect(FilePathAnnotation.decode(FilePathAnnotation.encode(fileAnnotations)) == fileAnnotations)
     }
 
-    @Test func openAITransportSourceDTORequestIsEncodable() throws {
+    @Test func `open AI transport source DTO request is encodable`() throws {
         let request = makeStreamRequest()
         let requestData = try JSONEncoder().encode(request)
         #expect(!requestData.isEmpty)
     }
 
-    @Test func openAITransportSourceDTOPayloadRoundTrips() throws {
+    @Test func `open AI transport source DTO payload round trips`() throws {
         let payload = makeResponsePayload()
         let payloadData = try JSONEncoder().encode(payload)
         #expect(try JSONDecoder().decode(ResponsesResponseDTO.self, from: payloadData) == payload)
     }
 
-    @Test func openAITransportSourceDTOEnvelopeResolvesResponse() throws {
+    @Test func `open AI transport source DTO envelope resolves response`() throws {
         let payload = makeResponsePayload()
         let envelope = ResponsesStreamEnvelopeDTO(response: payload, sequenceNumber: 8)
         let envelopeData = try JSONEncoder().encode(envelope)
         #expect(try JSONDecoder().decode(ResponsesStreamEnvelopeDTO.self, from: envelopeData).resolvedResponse == payload)
     }
 
-    @Test func openAITransportSourceParserExtractsCompletedResult() throws {
+    @Test func `open AI transport source parser extracts completed result`() throws {
         let parser = OpenAIResponseParser()
         let payload = makeParserPayload()
         let responseData = try JSONCoding.encode(payload)
@@ -84,13 +84,13 @@ struct SourceTargetBoundaryTests {
         #expect(parsed.filePathAnnotations.first?.fileId == "file_report")
     }
 
-    @Test func openAITransportSourceTranslatorProducesCompletedEvent() throws {
+    @Test func `open AI transport source translator produces completed event`() throws {
         let payload = makeParserPayload()
-        let event = OpenAIStreamEventTranslator.translate(
+        let event = try OpenAIStreamEventTranslator.translate(
             eventType: "response.completed",
-            data: try JSONCoding.encode(ResponsesStreamEnvelopeDTO(response: payload))
+            data: JSONCoding.encode(ResponsesStreamEnvelopeDTO(response: payload))
         )
-        guard case .completed(let text, let thinking, let annotations) = event else {
+        guard case let .completed(text, thinking, annotations) = event else {
             Issue.record("Expected direct transport translation to produce completed event")
             return
         }
@@ -99,7 +99,7 @@ struct SourceTargetBoundaryTests {
         #expect(annotations?.first?.filename == "report.txt")
     }
 
-    @Test func chatUIRichTextBuilderRemovesMarkdownMarkersAcrossModes() {
+    @Test func `chat UI rich text builder removes markdown markers across modes`() {
         let richText = RichTextAttributedStringBuilder.parseRichText("**Bold** _italics_ `code`")
         let streamingText = RichTextAttributedStringBuilder.parseStreamingText("***Merged*** output")
         let thinkingText = RichTextAttributedStringBuilder.parseThinkingText("Reasoning **summary**")
@@ -109,7 +109,7 @@ struct SourceTargetBoundaryTests {
         #expect(String(thinkingText.characters) == "Reasoning summary")
     }
 
-    @Test func generatedFileDescriptorNormalizesIdentifiersAndClassifiesImages() {
+    @Test func `generated file descriptor normalizes identifiers and classifies images`() {
         let descriptor = GeneratedFileDescriptor(
             fileID: "file_123",
             containerID: " container_456 ",

@@ -1,7 +1,7 @@
 import UIKit
 
-@MainActor
 /// UIKit view that renders a `UIGlassEffect` background with configurable corner radius, border, and fill opacity.
+@MainActor
 public final class GlassBackgroundHostingView: UIView {
     private let effectView = UIVisualEffectView()
     private let stableFillView = UIView()
@@ -52,7 +52,7 @@ public final class GlassBackgroundHostingView: UIView {
     }
 
     @available(*, unavailable)
-    public required init?(coder: NSCoder) {
+    public required init?(coder _: NSCoder) {
         fatalError("init(coder:) has not been implemented")
     }
 

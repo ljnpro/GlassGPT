@@ -1,12 +1,12 @@
-import Foundation
 import ChatDomain
 import ChatPersistenceSwiftData
+import Foundation
 import OpenAITransport
 import Testing
 @testable import NativeChatComposition
 
 struct OpenAIRequestBuilderTests {
-    @Test func streamingRequestSetsHTTPHeadersAndURL() throws {
+    @Test func `streaming request sets HTTP headers and URL`() throws {
         let request = try makeMultiPartStreamingRequest()
 
         #expect(request.url?.absoluteString == "https://api.openai.com/v1/responses")
@@ -15,7 +15,7 @@ struct OpenAIRequestBuilderTests {
         #expect(request.timeoutInterval == 300)
     }
 
-    @Test func streamingRequestPayloadPreservesModelAndFlags() throws {
+    @Test func `streaming request payload preserves model and flags`() throws {
         let payload = try decodeMultiPartStreamingPayload()
 
         #expect(payload.model == ModelType.gpt5_4.rawValue)
@@ -27,7 +27,7 @@ struct OpenAIRequestBuilderTests {
         #expect(payload.reasoning?.summary == "auto")
     }
 
-    @Test func streamingRequestPayloadIncludesToolsAndInput() throws {
+    @Test func `streaming request payload includes tools and input`() throws {
         let payload = try decodeMultiPartStreamingPayload()
 
         #expect(payload.tools.count == 3)
@@ -40,7 +40,7 @@ struct OpenAIRequestBuilderTests {
         #expect(payload.input.count == 2)
         #expect(payload.input[0].role == "user")
         switch payload.input[0].content {
-        case .items(let items):
+        case let .items(items):
             #expect(items == [
                 .inputText("Describe this file"),
                 .inputImage("data:image/jpeg;base64,AQI="),
@@ -50,14 +50,14 @@ struct OpenAIRequestBuilderTests {
             Issue.record("Expected multi-part content")
         }
         switch payload.input[1].content {
-        case .text(let content):
+        case let .text(content):
             #expect(content == "Sure")
         default:
             Issue.record("Expected single text content")
         }
     }
 
-    @Test func buildInputMessagesLeavesSingleTextMessagesAsPlainStrings() {
+    @Test func `build input messages leaves single text messages as plain strings`() {
         let input = OpenAIRequestBuilder.buildInputMessages(messages: [
             APIMessage(role: .user, content: "Hello"),
             APIMessage(role: .assistant, content: "World")
@@ -65,20 +65,20 @@ struct OpenAIRequestBuilderTests {
 
         #expect(input.count == 2)
         switch input[0].content {
-        case .text(let content):
+        case let .text(content):
             #expect(content == "Hello")
         default:
             Issue.record("Expected text content")
         }
         switch input[1].content {
-        case .text(let content):
+        case let .text(content):
             #expect(content == "World")
         default:
             Issue.record("Expected text content")
         }
     }
 
-    @Test func streamingRequestOmitsBackgroundFieldWhenDisabled() throws {
+    @Test func `streaming request omits background field when disabled`() throws {
         let builder = makeDirectRequestBuilder()
         let request = try builder.streamingRequest(
             apiKey: "sk-test",
@@ -96,7 +96,7 @@ struct OpenAIRequestBuilderTests {
         #expect(payload.serviceTier == ServiceTier.standard.rawValue)
     }
 
-    @Test func fetchRequestIncludesRecoveryQueryParameters() throws {
+    @Test func `fetch request includes recovery query parameters`() throws {
         let builder = makeDirectRequestBuilder()
         let request = try builder.fetchRequest(
             responseId: "resp_123",
@@ -118,7 +118,7 @@ struct OpenAIRequestBuilderTests {
         ]))
     }
 
-    @Test func recoveryRequestUsesGatewayRouteAndAuthorizationWhenEnabled() throws {
+    @Test func `recovery request uses gateway route and authorization when enabled`() throws {
         let provider = DefaultOpenAIConfigurationProvider(
             directOpenAIBaseURL: "https://api.openai.com/v1",
             cloudflareGatewayBaseURL: DefaultOpenAIConfigurationProvider.defaultCloudflareGatewayBaseURL,
@@ -145,7 +145,7 @@ struct OpenAIRequestBuilderTests {
         #expect(request.value(forHTTPHeaderField: "cf-aig-authorization") == "Bearer cf-test-token")
     }
 
-    @Test func recoveryRequestUsesDirectRouteWithoutGatewayAuthorization() throws {
+    @Test func `recovery request uses direct route without gateway authorization`() throws {
         let provider = DefaultOpenAIConfigurationProvider(
             directOpenAIBaseURL: "https://api.openai.com/v1",
             cloudflareGatewayBaseURL: DefaultOpenAIConfigurationProvider.defaultCloudflareGatewayBaseURL,

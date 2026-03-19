@@ -1,13 +1,13 @@
-import Foundation
 import ChatDomain
 import ChatPersistenceSwiftData
-import Testing
+import Foundation
 import SwiftData
+import Testing
 @testable import NativeChatComposition
 
 struct RepositoryTests {
     @MainActor
-    @Test func conversationRepositoryFetchesMostRecentConversationAndMessage() throws {
+    @Test func `conversation repository fetches most recent conversation and message`() throws {
         let container = try makeInMemoryModelContainer()
         let context = ModelContext(container)
         let repository = ConversationRepository(modelContext: context)
@@ -41,7 +41,7 @@ struct RepositoryTests {
     }
 
     @MainActor
-    @Test func draftRepositorySeparatesRecoverableAndOrphanedDrafts() throws {
+    @Test func `draft repository separates recoverable and orphaned drafts`() throws {
         let container = try makeInMemoryModelContainer()
         let context = ModelContext(container)
         let conversationRepository = ConversationRepository(modelContext: context)

@@ -1,5 +1,5 @@
-import ChatPersistenceSwiftData
 import ChatDomain
+import ChatPersistenceSwiftData
 import NativeChatUI
 import SwiftUI
 import UIKit
@@ -34,20 +34,20 @@ extension MessageBubble {
     var isDisplayingLiveAssistantState: Bool {
         message.role == .assistant && (
             (liveContent?.isEmpty == false) ||
-            (liveThinking?.isEmpty == false) ||
-            !activeToolCalls.isEmpty ||
-            !liveCitations.isEmpty ||
-            !liveFilePathAnnotations.isEmpty ||
-            showsRecoveryIndicator
+                (liveThinking?.isEmpty == false) ||
+                !activeToolCalls.isEmpty ||
+                !liveCitations.isEmpty ||
+                !liveFilePathAnnotations.isEmpty ||
+                showsRecoveryIndicator
         )
     }
 
     private var bubbleMaxWidth: CGFloat {
         switch UIDevice.current.userInterfaceIdiom {
         case .pad:
-            return 680
+            680
         default:
-            return 520
+            520
         }
     }
 
@@ -76,7 +76,7 @@ extension MessageBubble {
                 ThinkingView(text: thinking, isLive: isDisplayingLiveAssistantState)
             }
 
-            if message.role == .user && !message.fileAttachments.isEmpty {
+            if message.role == .user, !message.fileAttachments.isEmpty {
                 VStack(alignment: .trailing, spacing: 6) {
                     ForEach(message.fileAttachments) { attachment in
                         FileAttachmentChip(attachment: attachment)
@@ -92,7 +92,7 @@ extension MessageBubble {
                     .scaledToFit()
                     .frame(maxWidth: 200, maxHeight: 200)
                     .clipShape(RoundedRectangle(cornerRadius: 12))
-                    .accessibilityLabel("Attached image")
+                    .accessibilityLabel(String(localized: "Attached image"))
                     .accessibilityIdentifier("chat.message.image")
             }
 
@@ -156,12 +156,12 @@ extension MessageBubble {
             HStack(spacing: 4) {
                 ProgressView()
                     .controlSize(.mini)
-                Text("Recovering…")
+                Text(String(localized: "Recovering…"))
                     .font(.caption2)
                     .foregroundStyle(.secondary)
             }
             .accessibilityElement(children: .combine)
-            .accessibilityLabel("Recovering response")
+            .accessibilityLabel(String(localized: "Recovering response"))
             .accessibilityIdentifier("chat.recoveryIndicator")
         }
     }
@@ -196,7 +196,7 @@ extension MessageBubble {
                 Button {
                     onRegenerate()
                 } label: {
-                    Label("Regenerate", systemImage: "arrow.trianglehead.2.counterclockwise")
+                    Label(String(localized: "Regenerate"), systemImage: "arrow.trianglehead.2.counterclockwise")
                 }
             }
 

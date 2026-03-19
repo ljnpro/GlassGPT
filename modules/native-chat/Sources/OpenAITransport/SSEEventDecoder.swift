@@ -63,7 +63,7 @@ public struct SSEEventDecoder {
 
         if let translated = OpenAIStreamEventTranslator.translate(eventType: frame.type, data: jsonData) {
             switch translated {
-            case .textDelta(let delta):
+            case let .textDelta(delta):
                 yieldResponseIdentifierIfNeeded(responseID, continuation: continuation)
                 emittedAnyOutput = true
                 accumulatedText += delta
@@ -71,7 +71,7 @@ public struct SSEEventDecoder {
                 yieldSequenceIfNeeded(sequenceNumber, continuation: continuation)
                 return .continued
 
-            case .thinkingDelta(let delta):
+            case let .thinkingDelta(delta):
                 yieldResponseIdentifierIfNeeded(responseID, continuation: continuation)
                 if !thinkingActive {
                     thinkingActive = true
@@ -89,7 +89,7 @@ public struct SSEEventDecoder {
                 yieldSequenceIfNeeded(sequenceNumber, continuation: continuation)
                 return .continued
 
-            case .responseCreated(let responseId):
+            case let .responseCreated(responseId):
                 yieldResponseIdentifierIfNeeded(responseId, continuation: continuation)
                 yieldSequenceIfNeeded(sequenceNumber, continuation: continuation)
                 return .continued
@@ -99,14 +99,14 @@ public struct SSEEventDecoder {
                 yieldSequenceIfNeeded(sequenceNumber, continuation: continuation)
                 return .continued
 
-            case .filePathAnnotationAdded(let annotation):
+            case let .filePathAnnotationAdded(annotation):
                 yieldResponseIdentifierIfNeeded(responseID, continuation: continuation)
                 accumulatedFilePathAnnotations.append(annotation)
                 continuation.yield(.filePathAnnotationAdded(annotation))
                 yieldSequenceIfNeeded(sequenceNumber, continuation: continuation)
                 return .continued
 
-            case .completed(let fullText, let fullThinking, let filePathAnnotations):
+            case let .completed(fullText, fullThinking, filePathAnnotations):
                 yieldResponseIdentifierIfNeeded(responseID, continuation: continuation)
                 sawTerminalEvent = true
                 updateTerminalState(
@@ -116,7 +116,7 @@ public struct SSEEventDecoder {
                 )
                 return .terminalCompleted
 
-            case .incomplete(let fullText, let fullThinking, let filePathAnnotations, let message):
+            case let .incomplete(fullText, fullThinking, filePathAnnotations, message):
                 yieldResponseIdentifierIfNeeded(responseID, continuation: continuation)
                 sawTerminalEvent = true
                 updateTerminalState(
@@ -126,7 +126,7 @@ public struct SSEEventDecoder {
                 )
                 return .terminalIncomplete(message)
 
-            case .error(let error):
+            case let .error(error):
                 yieldResponseIdentifierIfNeeded(responseID, continuation: continuation)
                 sawTerminalEvent = true
                 continuation.yield(.error(error))

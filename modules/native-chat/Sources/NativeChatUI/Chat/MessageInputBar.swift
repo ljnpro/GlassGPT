@@ -47,8 +47,8 @@ package struct MessageInputBar: View {
     ) {
         self.resetToken = resetToken
         self.isStreaming = isStreaming
-        self._selectedImageData = selectedImageData
-        self._pendingAttachments = pendingAttachments
+        _selectedImageData = selectedImageData
+        _pendingAttachments = pendingAttachments
         self.onSend = onSend
         self.onStop = onStop
         self.onPickImage = onPickImage
@@ -56,6 +56,7 @@ package struct MessageInputBar: View {
         self.onRemoveAttachment = onRemoveAttachment
     }
 
+    /// The composer bar content, including attachments and send controls.
     package var body: some View {
         VStack(spacing: 0) {
             // Image preview
@@ -104,7 +105,7 @@ package struct MessageInputBar: View {
                     Button {
                         onPickImage()
                     } label: {
-                        Label("Photo", systemImage: "photo")
+                        Label(String(localized: "Photo"), systemImage: "photo")
                     }
                     .accessibilityLabel(String(localized: "Attach photo"))
                     .accessibilityIdentifier("composer.attachPhoto")
@@ -112,7 +113,7 @@ package struct MessageInputBar: View {
                     Button {
                         onPickDocument()
                     } label: {
-                        Label("Document", systemImage: "doc")
+                        Label(String(localized: "Document"), systemImage: "doc")
                     }
                     .accessibilityLabel(String(localized: "Attach document"))
                     .accessibilityIdentifier("composer.attachDocument")
@@ -122,7 +123,7 @@ package struct MessageInputBar: View {
                         .foregroundStyle(.secondary)
                 }
                 .buttonStyle(.glass)
-                .accessibilityLabel("Attach")
+                .accessibilityLabel(String(localized: "Attach"))
                 .accessibilityIdentifier("composer.attach")
 
                 messageComposer
@@ -169,7 +170,7 @@ package struct MessageInputBar: View {
         MessageComposerTextView(
             text: $text,
             measuredHeight: $composerHeight,
-            placeholder: "Message",
+            placeholder: String(localized: "Message"),
             minHeight: Self.minimumComposerHeight,
             maxHeight: Self.maximumComposerHeight,
             textInsets: UIEdgeInsets(

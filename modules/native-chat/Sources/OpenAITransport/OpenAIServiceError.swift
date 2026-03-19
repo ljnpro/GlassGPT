@@ -17,15 +17,15 @@ public enum OpenAIServiceError: Error, Sendable, LocalizedError {
     public var errorDescription: String? {
         switch self {
         case .noAPIKey:
-            return "No API key configured. Please add it in Settings."
+            "No API key configured. Please add it in Settings."
         case .invalidURL:
-            return "Invalid API URL."
-        case .httpError(let code, let msg):
-            return "API error (\(code)): \(msg)"
-        case .requestFailed(let msg):
-            return msg
+            "Invalid API URL."
+        case let .httpError(code, msg):
+            "API error (\(code)): \(msg)"
+        case let .requestFailed(msg):
+            msg
         case .cancelled:
-            return "Request was cancelled."
+            "Request was cancelled."
         }
     }
 }

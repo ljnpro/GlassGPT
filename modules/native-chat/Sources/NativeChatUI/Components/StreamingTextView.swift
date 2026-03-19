@@ -11,13 +11,15 @@ import SwiftUI
 /// the full `MarkdownContentView`.
 public struct StreamingTextView: View {
     let text: String
-    var allowsSelection: Bool = false
+    var allowsSelection = false
 
+    /// Creates a streaming text view for the given incremental response text.
     public init(text: String, allowsSelection: Bool = false) {
         self.text = text
         self.allowsSelection = allowsSelection
     }
 
+    /// The lightweight streaming-text rendering used while a reply is still in flight.
     public var body: some View {
         let attributed = RichTextAttributedStringBuilder.parseStreamingText(sanitisedText)
         Text(attributed)

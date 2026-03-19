@@ -6,13 +6,15 @@ import SwiftUI
 /// Used for both user messages (showing what was uploaded) and as a preview before sending.
 package struct FileAttachmentChip: View {
     let attachment: FileAttachment
-    var onRemove: (() -> Void)? = nil
+    var onRemove: (() -> Void)?
 
+    /// Creates a file-attachment chip with an optional remove action.
     package init(attachment: FileAttachment, onRemove: (() -> Void)? = nil) {
         self.attachment = attachment
         self.onRemove = onRemove
     }
 
+    /// The compact attachment chip content.
     package var body: some View {
         HStack(spacing: 8) {
             // File type icon
@@ -49,25 +51,25 @@ package struct FileAttachmentChip: View {
                     if attachment.uploadStatus == .uploading {
                         ProgressView()
                             .controlSize(.mini)
-                            .accessibilityLabel("Uploading")
+                            .accessibilityLabel(String(localized: "Uploading"))
                     } else if attachment.uploadStatus == .failed {
                         Image(systemName: "exclamationmark.triangle.fill")
                             .font(.system(size: 9))
                             .foregroundStyle(.red)
-                            .accessibilityLabel("Upload failed")
+                            .accessibilityLabel(String(localized: "Upload failed"))
                     }
                 }
             }
 
             // Remove button (only in input bar, not in sent messages)
-            if let onRemove = onRemove {
+            if let onRemove {
                 Button(action: onRemove) {
                     Image(systemName: "xmark.circle.fill")
                         .font(.body)
                         .foregroundStyle(.tertiary)
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("Remove \(attachment.filename)")
+                .accessibilityLabel(String(localized: "Remove") + " \(attachment.filename)")
                 .accessibilityIdentifier("attachment.remove")
             }
         }
@@ -89,13 +91,15 @@ package struct FileAttachmentChip: View {
 /// Horizontal scrollable row of file attachment chips.
 package struct FileAttachmentsRow: View {
     let attachments: [FileAttachment]
-    var onRemove: ((FileAttachment) -> Void)? = nil
+    var onRemove: ((FileAttachment) -> Void)?
 
+    /// Creates a horizontal attachment row with an optional remove callback.
     package init(attachments: [FileAttachment], onRemove: ((FileAttachment) -> Void)? = nil) {
         self.attachments = attachments
         self.onRemove = onRemove
     }
 
+    /// The horizontal attachment-chip row shown above the composer or inside messages.
     package var body: some View {
         if !attachments.isEmpty {
             ScrollView(.horizontal, showsIndicators: false) {

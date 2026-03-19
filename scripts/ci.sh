@@ -15,8 +15,8 @@ APP_BUNDLE_IDENTIFIER="space.manus.liquid.glass.chat.t20260308214621"
 UI_TEST_RUNNER_BUNDLE_IDENTIFIER="${APP_BUNDLE_IDENTIFIER}UITests.xctrunner"
 SIMULATOR_DEVICE_NAME="${SIMULATOR_DEVICE_NAME:-iPhone 17}"
 SIMULATOR_DEVICE_DESTINATION="platform=iOS Simulator,name=${SIMULATOR_DEVICE_NAME}"
-DEFAULT_RELEASE_VERSION="4.8.2"
-DEFAULT_RELEASE_BUILD="20182"
+DEFAULT_RELEASE_VERSION="4.9.0"
+DEFAULT_RELEASE_BUILD="20183"
 XCODEBUILD_RETRY_ATTEMPTS="${XCODEBUILD_RETRY_ATTEMPTS:-5}"
 XCODE_TEST_TIMEOUT_ALLOWANCE="${XCODE_TEST_TIMEOUT_ALLOWANCE:-180}"
 SIMULATOR_BOOT_TIMEOUT_SECONDS="${SIMULATOR_BOOT_TIMEOUT_SECONDS:-60}"
@@ -677,7 +677,7 @@ function assert_release_readiness() {
   current_branch="${GITHUB_REF_NAME:-$(git rev-parse --abbrev-ref HEAD)}"
 
   case "$current_branch" in
-    main|codex/stable-4.1|codex/stable-4.2|codex/stable-4.3|codex/stable-4.4|codex/stable-4.5|codex/stable-4.6|codex/stable-4.7|codex/stable-4.8|codex/feature/4.7*|codex/feature/4.8*|HEAD)
+    main|codex/stable-4.1|codex/stable-4.2|codex/stable-4.3|codex/stable-4.4|codex/stable-4.5|codex/stable-4.6|codex/stable-4.7|codex/stable-4.8|codex/stable-4.9|codex/feature/4.9*|HEAD)
       ;;
     *)
       echo "Release-readiness gate does not permit branch '$current_branch'." >&2
@@ -685,18 +685,33 @@ function assert_release_readiness() {
       ;;
   esac
 
-  if ! rg -q "codex/stable-4.8" "$ROOT_DIR/docs/branch-strategy.md"; then
-    echo "branch-strategy.md does not include codex/stable-4.8." >&2
+  if ! rg -q "codex/stable-4.9" "$ROOT_DIR/docs/branch-strategy.md"; then
+    echo "branch-strategy.md does not include codex/stable-4.9." >&2
     exit 1
   fi
 
-  if ! rg -q "4.7.0|4.8.0" "$ROOT_DIR/docs/parity-baseline.md"; then
-    echo "parity-baseline.md must include the active 4.7.0 or 4.8.0 baseline marker." >&2
+  if ! rg -q "4.8.2" "$ROOT_DIR/docs/parity-baseline.md"; then
+    echo "parity-baseline.md must include the active 4.8.2 baseline marker." >&2
+    exit 1
+  fi
+
+  if ! rg -q "codex/stable-4.9" "$ROOT_DIR/docs/release.md"; then
+    echo "release.md must describe the codex/stable-4.9 release line." >&2
     exit 1
   fi
 
   if ! rg -q "release_testflight|release-testflight|tracked wrapper" "$ROOT_DIR/docs/release.md"; then
     echo "release.md must describe the tracked release entrypoint." >&2
+    exit 1
+  fi
+
+  if ! rg -q "codex/stable-4.9" "$ROOT_DIR/.github/workflows/ios.yml"; then
+    echo "ios.yml must include codex/stable-4.9." >&2
+    exit 1
+  fi
+
+  if rg -q -- '--skip-ci|--skip-readiness' "$ROOT_DIR/scripts/release_testflight.sh"; then
+    echo "release_testflight.sh must not advertise CI bypass flags." >&2
     exit 1
   fi
 
@@ -723,7 +738,9 @@ function gate_maintainability() {
   MAX_FATAL_ERRORS=0 \
   MAX_PRECONDITION_FAILURES=0 \
   MAX_UNCHECKED_SENDABLE=0 \
-  MAX_NON_UI_FAMILY_LINES=570 \
+  MAX_SWIFTLINT_DISABLES=36 \
+  MAX_NON_UI_FAMILY_LINES=550 \
+  MAX_CONTROLLER_CLUSTER_LINES=3950 \
     python3 ./scripts/check_maintainability.py | tee "$CI_OUTPUT_DIR/maintainability-report.txt"
 }
 
@@ -749,8 +766,8 @@ function gate_infra_safety() {
 function gate_format_check() {
   log "Checking SwiftFormat compliance"
   if ! command -v swiftformat &>/dev/null; then
-    echo "swiftformat not found; skipping format-check gate." >&2
-    return 0
+    echo "swiftformat not installed. Install with: brew install swiftformat" >&2
+    return 1
   fi
   swiftformat --lint \
     modules/native-chat/Sources \
@@ -764,6 +781,11 @@ function gate_python_lint() {
   python3 -m ruff check scripts/
 }
 
+function gate_ci_health() {
+  log "Running ci-health gate"
+  python3 ./scripts/check_ci_health.py | tee "$CI_OUTPUT_DIR/ci-health-report.txt"
+}
+
 function gate_module_boundary() {
   log "Running module-boundary gate"
   python3 ./scripts/check_module_boundaries.py | tee "$CI_OUTPUT_DIR/module-boundary-report.txt"
@@ -771,13 +793,21 @@ function gate_module_boundary() {
 
 function gate_doc_build() {
   log "Building documentation catalogs"
-  for module in ChatDomain OpenAITransport ChatRuntimeWorkflows; do
-    if [[ ! -d "modules/native-chat/Sources/$module/$module.docc" ]]; then
-      echo "DocC catalog missing for $module" >&2
-      exit 1
-    fi
-  done
-  log "Documentation catalogs verified"
+  {
+    for module in ChatDomain OpenAITransport ChatRuntimeWorkflows; do
+      if [[ ! -d "modules/native-chat/Sources/$module/$module.docc" ]]; then
+        echo "DocC catalog missing for $module" >&2
+        exit 1
+      fi
+      echo "OK: $module DocC catalog present"
+    done
+    echo "Documentation catalogs verified"
+  } | tee "$CI_OUTPUT_DIR/doc-build-report.txt"
+}
+
+function gate_doc_completeness() {
+  log "Running doc-completeness gate"
+  python3 ./scripts/check_doc_completeness.py | tee "$CI_OUTPUT_DIR/doc-completeness-report.txt"
 }
 
 function gate_performance_tests() {
@@ -792,19 +822,11 @@ function gate_localization_check() {
   python3 ./scripts/check_localization.py | tee "$CI_OUTPUT_DIR/localization-report.txt"
 }
 
-function gate_swiftformat_check() {
-  log "Running SwiftFormat lint check"
-  if ! command -v swiftformat &>/dev/null; then
-    log "ERROR: swiftformat not installed. Install with: brew install swiftformat"
-    return 1
-  fi
-  swiftformat --lint modules/native-chat/Sources/ modules/native-chat/Tests/ 2>&1 | tee "$CI_OUTPUT_DIR/swiftformat-report.txt"
-}
-
 function run_gate() {
   local gate="$1"
 
   case "$gate" in
+    ci-health) gate_ci_health ;;
     lint) gate_lint ;;
     build) gate_build ;;
     architecture-tests) gate_architecture_tests ;;
@@ -821,13 +843,13 @@ function run_gate() {
     format-check) gate_format_check ;;
     module-boundary) gate_module_boundary ;;
     doc-build) gate_doc_build ;;
+    doc-completeness) gate_doc_completeness ;;
     performance-tests) gate_performance_tests ;;
     localization-check) gate_localization_check ;;
-    swiftformat-check) gate_swiftformat_check ;;
     release-readiness) assert_release_readiness ;;
     *)
       echo "Unknown gate: $gate" >&2
-      echo "Valid gates: lint, python-lint, format-check, build, architecture-tests, app-tests, snapshot-tests, package-tests, coverage-report, core-tests, ui-tests, maintainability, source-share, infra-safety, module-boundary, doc-build, performance-tests, localization-check, swiftformat-check, release-readiness" >&2
+      echo "Valid gates: ci-health, lint, python-lint, format-check, build, architecture-tests, app-tests, snapshot-tests, package-tests, coverage-report, core-tests, ui-tests, maintainability, source-share, infra-safety, module-boundary, doc-build, doc-completeness, performance-tests, localization-check, release-readiness" >&2
       exit 1
       ;;
   esac
@@ -836,7 +858,7 @@ function run_gate() {
 function usage() {
   cat <<'EOF'
 Usage:
-  ./scripts/ci.sh [all|lint|python-lint|format-check|build|architecture-tests|app-tests|snapshot-tests|package-tests|coverage-report|core-tests|ui-tests|maintainability|source-share|infra-safety|module-boundary|doc-build|performance-tests|localization-check|swiftformat-check|release-readiness|comma-separated list]
+  ./scripts/ci.sh [all|ci-health|lint|python-lint|format-check|build|architecture-tests|app-tests|snapshot-tests|package-tests|coverage-report|core-tests|ui-tests|maintainability|source-share|infra-safety|module-boundary|doc-build|doc-completeness|performance-tests|localization-check|release-readiness|comma-separated list]
 
 Examples:
   ./scripts/ci.sh
@@ -849,6 +871,7 @@ EOF
 function clean_outputs() {
   find "$CI_OUTPUT_DIR" -maxdepth 1 -name '*.xcresult' -exec rm -rf {} + >/dev/null 2>&1 || true
   rm -f \
+    "$CI_OUTPUT_DIR/ci-health-report.txt" \
     "$CI_OUTPUT_DIR/glassgpt-build.log" \
     "$CI_OUTPUT_DIR/glassgpt-unit-tests.log" \
     "$CI_OUTPUT_DIR/glassgpt-ui-tests.log" \
@@ -858,11 +881,15 @@ function clean_outputs() {
     "$CI_OUTPUT_DIR/coverage-report.txt" \
     "$CI_OUTPUT_DIR/coverage-production.txt" \
     "$CI_OUTPUT_DIR/coverage-production.json" \
+    "$CI_OUTPUT_DIR/format-check-report.txt" \
     "$CI_OUTPUT_DIR/maintainability-report.txt" \
     "$CI_OUTPUT_DIR/source-share-report.txt" \
     "$CI_OUTPUT_DIR/source-share.json" \
     "$CI_OUTPUT_DIR/infra-safety-report.txt" \
-    "$CI_OUTPUT_DIR/module-boundary-report.txt"
+    "$CI_OUTPUT_DIR/module-boundary-report.txt" \
+    "$CI_OUTPUT_DIR/doc-build-report.txt" \
+    "$CI_OUTPUT_DIR/doc-completeness-report.txt" \
+    "$CI_OUTPUT_DIR/localization-report.txt"
   find "$CI_OUTPUT_DIR" -maxdepth 1 -name 'glassgpt-snapshot-*.log' -delete
   rm -f "$CI_OUTPUT_DIR/glassgpt-snapshot-suite.log"
   find "$CI_OUTPUT_DIR" -maxdepth 1 -name 'glassgpt-ui-*.log' -delete
@@ -883,7 +910,7 @@ if [[ $# -gt 1 ]]; then
 fi
 
 if [[ $# -eq 0 || "$1" == "all" ]]; then
-  requested_gates=(lint python-lint format-check build architecture-tests core-tests ui-tests coverage-report maintainability source-share infra-safety module-boundary release-readiness)
+  requested_gates=(ci-health lint python-lint format-check build architecture-tests core-tests ui-tests coverage-report maintainability source-share infra-safety module-boundary doc-build doc-completeness localization-check release-readiness)
 elif [[ "$1" == "help" || "$1" == "-h" || "$1" == "--help" ]]; then
   usage
   exit 0

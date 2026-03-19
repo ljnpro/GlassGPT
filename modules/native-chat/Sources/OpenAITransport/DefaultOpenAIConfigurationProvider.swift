@@ -36,7 +36,7 @@ public final class DefaultOpenAIConfigurationProvider: OpenAIConfigurationProvid
         self.directOpenAIBaseURL = directOpenAIBaseURL
         self.cloudflareGatewayBaseURL = cloudflareGatewayBaseURL
         self.cloudflareAIGToken = cloudflareAIGToken
-        self.state = OSAllocatedUnfairLock(
+        state = OSAllocatedUnfairLock(
             initialState: State(
                 useCloudflareGateway: useCloudflareGateway
             )

@@ -2,8 +2,8 @@ import ChatUIComponents
 import SwiftUI
 import UIKit
 
-@MainActor
 /// Renders a fenced code block with a language header, copy button, and syntax highlighting.
+@MainActor
 package struct CodeBlockView: View {
     /// Controls whether the code block renders its own glass surface or relies on a parent container.
     package enum SurfaceStyle {
@@ -35,6 +35,7 @@ package struct CodeBlockView: View {
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.hapticsEnabled) private var hapticsEnabled
 
+    /// The syntax-highlighted code block and its copy affordance.
     package var body: some View {
         Group {
             switch surfaceStyle {
@@ -92,7 +93,7 @@ package struct CodeBlockView: View {
                     hapticService.impact(.light, isEnabled: hapticsEnabled)
                 } label: {
                     Label(
-                        isCopied ? "Copied" : "Copy",
+                        isCopied ? String(localized: "Copied") : String(localized: "Copy"),
                         systemImage: isCopied ? "checkmark" : "doc.on.doc"
                     )
                     .font(.caption.weight(.semibold))
@@ -107,7 +108,7 @@ package struct CodeBlockView: View {
                     )
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel(isCopied ? "Code copied" : "Copy code")
+                .accessibilityLabel(isCopied ? String(localized: "Code copied") : String(localized: "Copy code"))
                 .accessibilityIdentifier("codeBlock.copy")
             }
             .padding(.horizontal, 12)
@@ -231,7 +232,7 @@ package struct CodeBlockView: View {
             let lower = AttributedString.Index(swiftRange.lowerBound, within: text)
             let upper = AttributedString.Index(swiftRange.upperBound, within: text)
             guard let lower, let upper else { continue }
-            text[lower..<upper].foregroundColor = color
+            text[lower ..< upper].foregroundColor = color
         }
     }
 }

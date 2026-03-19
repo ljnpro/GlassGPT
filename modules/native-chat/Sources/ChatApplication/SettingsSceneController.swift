@@ -2,6 +2,42 @@ import ChatDomain
 import ChatPersistenceCore
 import Foundation
 
+/// Identifies which generated-file cache the settings scene should operate on.
+public enum SettingsGeneratedCacheKind: Sendable {
+    /// The cache storing generated image downloads.
+    case image
+    /// The cache storing generated document and file downloads.
+    case document
+}
+
+/// Snapshot of generated-file cache usage shown in settings.
+public struct SettingsCacheSnapshot: Equatable, Sendable {
+    /// Bytes currently used by the generated image cache.
+    public let imageBytes: Int64
+    /// Bytes currently used by the generated document cache.
+    public let documentBytes: Int64
+
+    /// Creates a cache usage snapshot.
+    public init(imageBytes: Int64, documentBytes: Int64) {
+        self.imageBytes = imageBytes
+        self.documentBytes = documentBytes
+    }
+}
+
+/// Result of saving an API key through the settings scene.
+public struct SettingsAPIKeySaveOutcome: Equatable, Sendable {
+    /// The trimmed API key that was persisted.
+    public let apiKey: String
+    /// The locally resolved Cloudflare health after the save, when gateway mode is enabled.
+    public let cloudflareHealthStatus: CloudflareHealthStatus?
+
+    /// Creates a save outcome.
+    public init(apiKey: String, cloudflareHealthStatus: CloudflareHealthStatus?) {
+        self.apiKey = apiKey
+        self.cloudflareHealthStatus = cloudflareHealthStatus
+    }
+}
+
 /// Represents the current health status of the Cloudflare AI gateway.
 public enum CloudflareHealthStatus: Equatable, Sendable {
     /// Health has not been checked yet.
@@ -45,14 +81,35 @@ public final class SettingsSceneController {
         credentialHandler.loadAPIKey()
     }
 
-    /// Persists the given API key.
-    public func saveAPIKey(_ apiKey: String) throws(PersistenceError) {
-        try credentialHandler.saveAPIKey(apiKey)
+    /// Persists the given API key after trimming whitespace and resolves the new local Cloudflare state.
+    ///
+    /// - Parameters:
+    ///   - typedAPIKey: The key currently entered in the UI.
+    ///   - gatewayEnabled: Whether Cloudflare gateway routing is enabled.
+    /// - Returns: A save outcome when the trimmed key is non-empty; otherwise `nil`.
+    public func saveAPIKey(
+        _ typedAPIKey: String,
+        gatewayEnabled: Bool
+    ) throws(PersistenceError) -> SettingsAPIKeySaveOutcome? {
+        let trimmedKey = typedAPIKey.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedKey.isEmpty else {
+            return nil
+        }
+
+        try credentialHandler.saveAPIKey(trimmedKey)
+        let cloudflareHealthStatus = gatewayEnabled
+            ? resolveCloudflareHealth(typedAPIKey: trimmedKey, gatewayEnabled: gatewayEnabled)
+            : nil
+        return SettingsAPIKeySaveOutcome(
+            apiKey: trimmedKey,
+            cloudflareHealthStatus: cloudflareHealthStatus
+        )
     }
 
-    /// Removes the stored API key.
-    public func clearAPIKey() {
+    /// Removes the stored API key and resolves the resulting local Cloudflare state.
+    public func clearAPIKey(gatewayEnabled: Bool) -> CloudflareHealthStatus {
         credentialHandler.clearAPIKey()
+        return resolveCloudflareHealth(typedAPIKey: "", gatewayEnabled: gatewayEnabled)
     }
 
     /// Validates the API key against the OpenAI API.
@@ -70,24 +127,26 @@ public final class SettingsSceneController {
         await credentialHandler.checkCloudflareHealth(typedAPIKey: typedAPIKey, gatewayEnabled: gatewayEnabled)
     }
 
-    /// Returns the current generated image cache size in bytes.
-    public func refreshGeneratedImageCacheSize() async -> Int64 {
-        await cacheHandler.refreshGeneratedImageCacheSize()
+    /// Reads both generated-file cache buckets so the presenter can update one coherent snapshot.
+    public func refreshGeneratedCacheSnapshot() async -> SettingsCacheSnapshot {
+        let imageBytes = await cacheHandler.refreshGeneratedImageCacheSize()
+        let documentBytes = await cacheHandler.refreshGeneratedDocumentCacheSize()
+        return SettingsCacheSnapshot(
+            imageBytes: imageBytes,
+            documentBytes: documentBytes
+        )
     }
 
-    /// Returns the current generated document cache size in bytes.
-    public func refreshGeneratedDocumentCacheSize() async -> Int64 {
-        await cacheHandler.refreshGeneratedDocumentCacheSize()
-    }
+    /// Clears one generated-file cache bucket and returns the resulting full snapshot.
+    public func clearGeneratedCache(_ kind: SettingsGeneratedCacheKind) async -> SettingsCacheSnapshot {
+        switch kind {
+        case .image:
+            _ = await cacheHandler.clearGeneratedImageCache()
+        case .document:
+            _ = await cacheHandler.clearGeneratedDocumentCache()
+        }
 
-    /// Clears the generated image cache and returns the new size (should be zero).
-    public func clearGeneratedImageCache() async -> Int64 {
-        await cacheHandler.clearGeneratedImageCache()
-    }
-
-    /// Clears the generated document cache and returns the new size (should be zero).
-    public func clearGeneratedDocumentCache() async -> Int64 {
-        await cacheHandler.clearGeneratedDocumentCache()
+        return await refreshGeneratedCacheSnapshot()
     }
 
     /// Persists the default model preference.

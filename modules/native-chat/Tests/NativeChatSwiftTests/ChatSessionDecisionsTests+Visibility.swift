@@ -11,7 +11,7 @@ import Testing
 
 @MainActor
 extension ChatSessionDecisionsTests {
-    @Test func replySessionActorCoversLifecycleBranchTransitions() async {
+    @Test func `reply session actor covers lifecycle branch transitions`() async {
         let baseState = ReplyRuntimeState(
             assistantReplyID: AssistantReplyID(),
             messageID: UUID(),
@@ -40,7 +40,7 @@ extension ChatSessionDecisionsTests {
         )
     }
 
-    @Test func replySessionActorCoversDuplicateToolAndAnnotationNoOps() async {
+    @Test func `reply session actor covers duplicate tool and annotation no ops`() async {
         let baseState = ReplyRuntimeState(
             assistantReplyID: AssistantReplyID(),
             messageID: UUID(),
@@ -89,11 +89,11 @@ extension ChatSessionDecisionsTests {
         #expect(snapshot.buffer.text == "")
     }
 
-    @Test func replySessionActorCoversRecoveryStatusAndPollBranches() async {
+    @Test func `reply session actor covers recovery status and poll branches`() async {
         let actor = makeRecoveringStatusActor()
 
         var snapshot = await actor.apply(.recordResponseCreated("resp_updated", route: .gateway))
-        guard case .recoveringStatus(let updatedStatusTicket) = snapshot.lifecycle else {
+        guard case let .recoveringStatus(updatedStatusTicket) = snapshot.lifecycle else {
             Issue.record("Expected recoveringStatus ticket update")
             return
         }
@@ -103,7 +103,7 @@ extension ChatSessionDecisionsTests {
         #expect(snapshot.lastSequenceNumber == 9)
 
         snapshot = await actor.apply(.beginRecoveryPoll)
-        guard case .recoveringPoll(let pollTicket) = snapshot.lifecycle else {
+        guard case let .recoveringPoll(pollTicket) = snapshot.lifecycle else {
             Issue.record("Expected recoveringPoll ticket")
             return
         }
@@ -111,11 +111,11 @@ extension ChatSessionDecisionsTests {
         #expect(pollTicket.lastSequenceNumber == 9)
     }
 
-    @Test func replySessionActorCoversDetachAndFailedBranches() async {
+    @Test func `reply session actor covers detach and failed branches`() async {
         let actor = makeRecoveringStatusActor()
 
         var snapshot = await actor.apply(.detachForBackground(usedBackgroundMode: true))
-        guard case .detached(let detachedTicket) = snapshot.lifecycle else {
+        guard case let .detached(detachedTicket) = snapshot.lifecycle else {
             Issue.record("Expected detached lifecycle")
             return
         }
@@ -149,7 +149,7 @@ extension ChatSessionDecisionsTests {
         )
     }
 
-    @Test func runtimeRegistryActorStartLookupAndRemovePaths() async {
+    @Test func `runtime registry actor start lookup and remove paths`() async {
         let registry = RuntimeRegistryActor()
         let messageID = UUID()
         let conversationID = UUID()
@@ -170,7 +170,7 @@ extension ChatSessionDecisionsTests {
         #expect(activeReplyIDsAfterRemove.isEmpty)
     }
 
-    @Test func replySessionActorReplaceStateAndActiveStreamQueries() async {
+    @Test func `reply session actor replace state and active stream queries`() async {
         let streamID = UUID()
         let actor = ReplySessionActor(initialState: makeRuntimeState())
 
@@ -202,7 +202,7 @@ extension ChatSessionDecisionsTests {
 
 @MainActor
 extension ChatSessionDecisionsTests {
-    @Test func sessionVisibilityCoordinatorRendersVisibleStateFromRuntimeSnapshot() {
+    @Test func `session visibility coordinator renders visible state from runtime snapshot`() {
         let session = makeReplySession()
         let draft = Message(role: .assistant, content: "draft")
         let runtimeState = makeRecoveringStreamRuntimeState(for: session)
@@ -259,7 +259,7 @@ extension ChatSessionDecisionsTests {
         )
     }
 
-    @Test func sessionVisibilityCoordinatorClearedStateOptionallyRetainsDraft() {
+    @Test func `session visibility coordinator cleared state optionally retains draft`() {
         let draft = Message(role: .assistant, content: "draft")
 
         let retained = SessionVisibilityCoordinator.clearedState(retaining: draft, clearDraft: false)
@@ -271,7 +271,7 @@ extension ChatSessionDecisionsTests {
         #expect(!cleared.isStreaming)
     }
 
-    @Test func replySessionSnapshotReflectsRuntimeSnapshot() {
+    @Test func `reply session snapshot reflects runtime snapshot`() {
         let session = makeReplySession()
         let runtimeState = ReplyRuntimeState(
             assistantReplyID: session.assistantReplyID,
@@ -313,7 +313,7 @@ extension ChatSessionDecisionsTests {
         #expect(snapshot.requestUsesBackgroundMode)
     }
 
-    @Test func messagePersistenceAdapterPersistsDraftSnapshot() {
+    @Test func `message persistence adapter persists draft snapshot`() {
         let adapter = MessagePersistenceAdapter()
         let conversation = Conversation(title: "Persistence")
         let draftMessage = Message(
@@ -342,7 +342,7 @@ extension ChatSessionDecisionsTests {
         #expect(!draftMessage.isComplete)
     }
 
-    @Test func messagePersistenceAdapterPersistsCompletedSnapshot() {
+    @Test func `message persistence adapter persists completed snapshot`() {
         let adapter = MessagePersistenceAdapter()
         let conversation = Conversation(title: "Persistence")
         let draftMessage = Message(
@@ -371,7 +371,7 @@ extension ChatSessionDecisionsTests {
         #expect(draftMessage.isComplete)
     }
 
-    @Test func messagePersistenceAdapterPersistsPartialSnapshot() {
+    @Test func `message persistence adapter persists partial snapshot`() {
         let adapter = MessagePersistenceAdapter()
         let conversation = Conversation(title: "Persistence")
         let draftMessage = Message(

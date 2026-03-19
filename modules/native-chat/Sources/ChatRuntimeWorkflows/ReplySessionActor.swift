@@ -15,7 +15,7 @@ public actor ReplySessionActor {
     /// Creates a new reply session actor with the given initial state.
     /// - Parameter initialState: The starting runtime state for this session.
     public init(initialState: ReplyRuntimeState) {
-        self.state = initialState
+        state = initialState
     }
 
     /// Returns an immutable snapshot of the current runtime state.

@@ -13,29 +13,30 @@ public struct SettingsAboutSection: View {
         self.platformString = platformString
     }
 
+    /// The about section content for the settings screen.
     public var body: some View {
-        Section("About") {
-            LabeledContent("Version", value: appVersionString)
-                .accessibilityLabel(String(localized: "App version: \(appVersionString)"))
+        Section(String(localized: "About")) {
+            LabeledContent(String(localized: "Version"), value: appVersionString)
+                .accessibilityLabel(String(localized: "App version") + ": \(appVersionString)")
                 .accessibilityIdentifier("settings.about.version")
-            LabeledContent("Platform", value: platformString)
-                .accessibilityLabel(String(localized: "Platform: \(platformString)"))
+            LabeledContent(String(localized: "Platform"), value: platformString)
+                .accessibilityLabel(String(localized: "Platform") + ": \(platformString)")
                 .accessibilityIdentifier("settings.about.platform")
-            LabeledContent("Engine", value: "SwiftUI")
-                .accessibilityLabel("Engine: SwiftUI")
+            LabeledContent(String(localized: "Engine"), value: "SwiftUI")
+                .accessibilityLabel(String(localized: "Engine") + ": SwiftUI")
                 .accessibilityIdentifier("settings.about.engine")
 
             if let supportURL = URL(string: "https://ljnpro.github.io/liquid-glass-chat-support/") {
                 Link(destination: supportURL) {
                     HStack {
-                        Text("Support Website")
+                        Text(String(localized: "Support Website"))
                         Spacer()
                         Image(systemName: "safari")
                             .foregroundStyle(.secondary)
                             .accessibilityHidden(true)
                     }
                 }
-                .accessibilityLabel("Open support website")
+                .accessibilityLabel(String(localized: "Open support website"))
                 .accessibilityIdentifier("settings.about.support")
             }
         }

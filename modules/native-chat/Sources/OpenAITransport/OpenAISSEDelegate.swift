@@ -6,8 +6,8 @@ final class OpenAISSEDelegate: NSObject, URLSessionDataDelegate {
     let buffer = Mutex(SSEFrameBuffer())
     let decoder = Mutex(SSEEventDecoder())
     let finished = Mutex(false)
-    let session = Mutex(Optional<URLSession>.none)
-    let task = Mutex(Optional<URLSessionDataTask>.none)
+    let session = Mutex(URLSession?.none)
+    let task = Mutex(URLSessionDataTask?.none)
 
     init(continuation: AsyncStream<StreamEvent>.Continuation) {
         self.continuation = continuation
@@ -34,8 +34,8 @@ final class OpenAISSEDelegate: NSObject, URLSessionDataDelegate {
     }
 
     func urlSession(
-        _ session: URLSession,
-        dataTask: URLSessionDataTask,
+        _: URLSession,
+        dataTask _: URLSessionDataTask,
         didReceive response: URLResponse,
         completionHandler: @escaping (URLSession.ResponseDisposition) -> Void
     ) {
@@ -60,7 +60,7 @@ final class OpenAISSEDelegate: NSObject, URLSessionDataDelegate {
         completionHandler(.allow)
     }
 
-    func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive data: Data) {
+    func urlSession(_: URLSession, dataTask _: URLSessionDataTask, didReceive data: Data) {
         guard let chunk = String(data: data, encoding: .utf8) else { return }
         guard !isFinished else { return }
         let frames = buffer.withLock { $0.append(chunk) }
@@ -69,7 +69,7 @@ final class OpenAISSEDelegate: NSObject, URLSessionDataDelegate {
         }
     }
 
-    func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
+    func urlSession(_: URLSession, task _: URLSessionTask, didCompleteWithError error: Error?) {
         guard !isFinished else { return }
         let pendingFrames = buffer.withLock { $0.finishPendingFrames() }
         if process(frames: pendingFrames) {

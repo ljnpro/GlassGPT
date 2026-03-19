@@ -23,7 +23,7 @@ public struct GeneratedFilePresentationMapper {
     ) -> GeneratedFilePresentation {
         switch resource.openBehavior {
         case .imagePreview:
-            return .preview(
+            .preview(
                 makePreviewItem(
                     url: resource.localURL,
                     kind: .generatedImage,
@@ -31,7 +31,7 @@ public struct GeneratedFilePresentationMapper {
                 )
             )
         case .pdfPreview:
-            return .preview(
+            .preview(
                 makePreviewItem(
                     url: resource.localURL,
                     kind: .generatedPDF,
@@ -39,7 +39,7 @@ public struct GeneratedFilePresentationMapper {
                 )
             )
         case .directShare:
-            return .share(
+            .share(
                 SharedGeneratedFileItem(
                     url: resource.localURL,
                     filename: resource.filename
@@ -57,19 +57,19 @@ public struct GeneratedFilePresentationMapper {
             switch (openBehavior, fileError) {
             case (.imagePreview, .fileNotFound):
                 return "This generated image is no longer available. Please regenerate it."
-            case (.imagePreview, .httpError(let statusCode, _)) where statusCode == 404 || statusCode == 410:
+            case let (.imagePreview, .httpError(statusCode, _)) where statusCode == 404 || statusCode == 410:
                 return "This generated image has expired and can no longer be downloaded. Please regenerate it."
             case (.imagePreview, .invalidImageData):
                 return "This generated image could not be rendered."
             case (.pdfPreview, .fileNotFound):
                 return "This generated file is no longer available. Please regenerate it."
-            case (.pdfPreview, .httpError(let statusCode, _)) where statusCode == 404 || statusCode == 410:
+            case let (.pdfPreview, .httpError(statusCode, _)) where statusCode == 404 || statusCode == 410:
                 return "This generated file has expired and can no longer be downloaded. Please regenerate it."
             case (.pdfPreview, .invalidPDFData):
                 return "This generated PDF could not be rendered."
             case (.directShare, .fileNotFound):
                 return "This generated file is no longer available. Please regenerate it."
-            case (.directShare, .httpError(let statusCode, _)) where statusCode == 404 || statusCode == 410:
+            case let (.directShare, .httpError(statusCode, _)) where statusCode == 404 || statusCode == 410:
                 return "This generated file has expired and can no longer be downloaded. Please regenerate it."
             default:
                 break
@@ -94,11 +94,11 @@ public struct GeneratedFilePresentationMapper {
     private func openBehavior(for filename: String?) -> GeneratedFileOpenBehavior {
         switch URL(fileURLWithPath: filename ?? "").pathExtension.lowercased() {
         case "png", "jpg", "jpeg":
-            return .imagePreview
+            .imagePreview
         case "pdf":
-            return .pdfPreview
+            .pdfPreview
         default:
-            return .directShare
+            .directShare
         }
     }
 

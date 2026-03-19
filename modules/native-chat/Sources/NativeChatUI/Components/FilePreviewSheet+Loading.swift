@@ -1,8 +1,8 @@
+import ChatUIComponents
 import Foundation
 import ImageIO
 import PDFKit
 import Photos
-import ChatUIComponents
 import SwiftUI
 
 extension FilePreviewSheet {
@@ -20,12 +20,12 @@ extension FilePreviewSheet {
     func loadImagePreview() async {
         imagePreviewState = .loading
 
-        for attempt in 0..<4 {
+        for attempt in 0 ..< 4 {
             switch FilePreviewLoadingModel.loadGeneratedImagePreview(from: fileURL) {
-            case .image(let payload):
+            case let .image(payload):
                 imagePreviewState = .image(payload)
                 return
-            case .error(let message):
+            case let .error(message):
                 imagePreviewState = .error(message)
                 return
             case .unavailable:
@@ -46,12 +46,12 @@ extension FilePreviewSheet {
     func loadPDFPreview() async {
         pdfPreviewState = .loading
 
-        for attempt in 0..<4 {
+        for attempt in 0 ..< 4 {
             switch FilePreviewLoadingModel.loadGeneratedPDFPreview(from: fileURL) {
-            case .document(let document):
+            case let .document(document):
                 pdfPreviewState = .document(document)
                 return
-            case .error(let message):
+            case let .error(message):
                 pdfPreviewState = .error(message)
                 return
             case .unavailable:

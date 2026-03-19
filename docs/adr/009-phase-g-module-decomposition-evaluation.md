@@ -4,6 +4,9 @@
 
 Accepted
 
+Historical `4.8.2` decision. Superseded for the `4.9.0` release decision by
+[ADR-010](010-phase-g-module-decomposition-re-evaluation-4-9-0.md).
+
 ## Date
 
 2026-03-19

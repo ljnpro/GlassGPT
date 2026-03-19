@@ -1,7 +1,7 @@
-import ChatPersistenceSwiftData
-import GeneratedFilesCore
-import Foundation
 import ChatDomain
+import ChatPersistenceSwiftData
+import Foundation
+import GeneratedFilesCore
 
 extension ChatController {
     var proModeEnabled: Bool {

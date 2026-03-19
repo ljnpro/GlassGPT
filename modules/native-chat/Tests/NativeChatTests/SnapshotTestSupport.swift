@@ -1,7 +1,7 @@
 import ChatApplication
 import ChatDomain
-import ChatPersistenceSwiftData
 import ChatPersistenceCore
+import ChatPersistenceSwiftData
 import ChatPresentation
 import ChatUIComponents
 import GeneratedFilesInfra
@@ -23,35 +23,35 @@ enum SnapshotTestThemeVariant: CaseIterable {
     var appTheme: AppTheme {
         switch self {
         case .phoneLight, .padLight:
-            return .light
+            .light
         case .phoneDark, .padDark:
-            return .dark
+            .dark
         }
     }
 
     var snapshotSuffix: String {
         switch self {
         case .phoneLight:
-            return "phone-light"
+            "phone-light"
         case .phoneDark:
-            return "phone-dark"
+            "phone-dark"
         case .padLight:
-            return "pad-light"
+            "pad-light"
         case .padDark:
-            return "pad-dark"
+            "pad-dark"
         }
     }
 
     var imageConfig: ViewImageConfig {
         switch self {
         case .phoneLight:
-            return Self.makePhoneConfig(style: .light)
+            Self.makePhoneConfig(style: .light)
         case .phoneDark:
-            return Self.makePhoneConfig(style: .dark)
+            Self.makePhoneConfig(style: .dark)
         case .padLight:
-            return Self.makePadConfig(style: .light)
+            Self.makePadConfig(style: .light)
         case .padDark:
-            return Self.makePadConfig(style: .dark)
+            Self.makePadConfig(style: .dark)
         }
     }
 
@@ -91,14 +91,14 @@ enum SnapshotTestThemeVariant: CaseIterable {
 private let snapshotAppVersionString = "9.9.9 (99999)"
 
 @MainActor
-func assertViewSnapshots<V: View>(
+func assertViewSnapshots(
     named baseName: String,
     variants: [SnapshotTestThemeVariant] = SnapshotTestThemeVariant.allCases,
     delay: TimeInterval = 0,
     file: StaticString = #filePath,
     testName: String = #function,
     line: UInt = #line,
-    @ViewBuilder makeView: () -> V
+    @ViewBuilder makeView: () -> some View
 ) {
     for variant in variants {
         let previousTheme = UserDefaults.standard.string(forKey: SettingsStore.Keys.appTheme)
@@ -272,7 +272,7 @@ func makeHistorySnapshotContainer() throws -> ModelContainer {
     let container = try makeInMemoryModelContainer()
     let context = ModelContext(container)
 
-    for offset in 0..<4 {
+    for offset in 0 ..< 4 {
         let conversation = Conversation(
             title: "Conversation \(offset + 1)",
             createdAt: Date(timeIntervalSince1970: Double(offset)),

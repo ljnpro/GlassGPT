@@ -1,12 +1,12 @@
-import Foundation
-import ChatPersistenceSwiftData
 import ChatDomain
+import ChatPersistenceSwiftData
+import Foundation
 import OpenAITransport
 import Testing
 @testable import NativeChatComposition
 
 struct OpenAIResponseParserTests {
-    @Test func parseUploadedFileIDReadsSuccessfulResponse() throws {
+    @Test func `parse uploaded file ID reads successful response`() throws {
         let parser = OpenAIResponseParser()
         let data = try JSONCoding.encode(UploadedFileResponseDTO(id: "file_123"))
         let fileURL = try #require(URL(string: "https://example.com/files"))
@@ -25,7 +25,7 @@ struct OpenAIResponseParserTests {
         )
     }
 
-    @Test func parseFetchedResponseExtractsTextAndStatus() throws {
+    @Test func `parse fetched response extracts text and status`() throws {
         let parser = OpenAIResponseParser()
         let payload = makeStructuredPayload()
         let data = try JSONCoding.encode(payload)
@@ -42,7 +42,7 @@ struct OpenAIResponseParserTests {
         #expect(result.errorMessage == "Some warning")
     }
 
-    @Test func parseFetchedResponseExtractsCitationsAndAnnotations() throws {
+    @Test func `parse fetched response extracts citations and annotations`() throws {
         let parser = OpenAIResponseParser()
         let payload = makeStructuredPayload()
         let data = try JSONCoding.encode(payload)
@@ -73,7 +73,7 @@ struct OpenAIResponseParserTests {
         ])
     }
 
-    @Test func parseFetchedResponseExtractsToolCalls() throws {
+    @Test func `parse fetched response extracts tool calls`() throws {
         let parser = OpenAIResponseParser()
         let payload = makeStructuredPayload()
         let data = try JSONCoding.encode(payload)
@@ -93,7 +93,7 @@ struct OpenAIResponseParserTests {
         #expect(result.toolCalls[2].type == .fileSearch)
     }
 
-    @Test func parseGeneratedTitleFallsBackWhenTextMissing() throws {
+    @Test func `parse generated title falls back when text missing`() throws {
         let parser = OpenAIResponseParser()
         let data = try JSONCoding.encode(ResponsesResponseDTO(output: []))
         let response = try makeHTTPResponse(
@@ -107,7 +107,7 @@ struct OpenAIResponseParserTests {
         )
     }
 
-    @Test func parseGeneratedTitleTrimsQuotesAndLimitsToFiveWords() throws {
+    @Test func `parse generated title trims quotes and limits to five words`() throws {
         let parser = OpenAIResponseParser()
         let data = try JSONCoding.encode(
             ResponsesResponseDTO(
@@ -145,7 +145,7 @@ struct OpenAIResponseParserTests {
         )
     }
 
-    @Test func parseGeneratedTitleFallsBackOnBadData() throws {
+    @Test func `parse generated title falls back on bad data`() throws {
         let parser = OpenAIResponseParser()
         let successResponse = try makeHTTPResponse(
             url: "https://example.com/responses",
@@ -160,7 +160,7 @@ struct OpenAIResponseParserTests {
         )
     }
 
-    @Test func parseGeneratedTitleThrowsOnBadResponse() throws {
+    @Test func `parse generated title throws on bad response`() throws {
         let parser = OpenAIResponseParser()
         let failureResponse = try makeHTTPResponse(
             url: "https://example.com/responses",
@@ -171,7 +171,7 @@ struct OpenAIResponseParserTests {
             _ = try parser.parseGeneratedTitle(data: Data(), response: failureResponse)
             Issue.record("Expected requestFailed error")
         } catch {
-            guard case OpenAIServiceError.requestFailed(let message) = error else {
+            guard case let OpenAIServiceError.requestFailed(message) = error else {
                 Issue.record("Expected requestFailed, got \(error)")
                 return
             }
@@ -179,7 +179,7 @@ struct OpenAIResponseParserTests {
         }
     }
 
-    @Test func parseFetchedResponseThrowsHTTPErrorForFailureResponse() throws {
+    @Test func `parse fetched response throws HTTP error for failure response`() throws {
         let parser = OpenAIResponseParser()
         let response = try makeHTTPResponse(
             url: "https://example.com/responses/resp_123",
@@ -193,7 +193,7 @@ struct OpenAIResponseParserTests {
             )
             Issue.record("Expected httpError")
         } catch {
-            guard case OpenAIServiceError.httpError(let statusCode, let message) = error else {
+            guard case let OpenAIServiceError.httpError(statusCode, message) = error else {
                 Issue.record("Expected httpError, got \(error)")
                 return
             }
@@ -202,7 +202,7 @@ struct OpenAIResponseParserTests {
         }
     }
 
-    @Test func parseFetchedResponseRejectsInvalidResponse() throws {
+    @Test func `parse fetched response rejects invalid response`() throws {
         let parser = OpenAIResponseParser()
 
         do {
@@ -212,7 +212,7 @@ struct OpenAIResponseParserTests {
             )
             Issue.record("Expected requestFailed error")
         } catch {
-            guard case OpenAIServiceError.requestFailed(let message) = error else {
+            guard case let OpenAIServiceError.requestFailed(message) = error else {
                 Issue.record("Expected requestFailed, got \(error)")
                 return
             }
@@ -220,7 +220,7 @@ struct OpenAIResponseParserTests {
         }
     }
 
-    @Test func parseFetchedResponseRejectsMalformedPayload() throws {
+    @Test func `parse fetched response rejects malformed payload`() throws {
         let parser = OpenAIResponseParser()
         let response = try makeHTTPResponse(
             url: "https://example.com/responses/resp_bad",
@@ -234,7 +234,7 @@ struct OpenAIResponseParserTests {
             )
             Issue.record("Expected requestFailed error")
         } catch {
-            guard case OpenAIServiceError.requestFailed(let message) = error else {
+            guard case let OpenAIServiceError.requestFailed(message) = error else {
                 Issue.record("Expected requestFailed, got \(error)")
                 return
             }

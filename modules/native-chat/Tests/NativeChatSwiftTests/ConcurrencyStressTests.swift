@@ -1,18 +1,17 @@
-import Testing
-@testable import ChatRuntimeWorkflows
-@testable import ChatRuntimeModel
-@testable import ChatDomain
-@testable import OpenAITransport
 import Foundation
+import Testing
+@testable import ChatDomain
+@testable import ChatRuntimeModel
+@testable import ChatRuntimeWorkflows
+@testable import OpenAITransport
 
 @Suite(.tags(.runtime))
 struct ConcurrencyStressTests {
-
     // MARK: - ReplySessionActor stress tests
 
     /// Perform 100 concurrent state transitions on a single ReplySessionActor,
     /// then verify the final state is one of the states we set.
-    @Test func replySessionActorHandles100ConcurrentStateTransitions() async {
+    @Test func `reply session actor handles100 concurrent state transitions`() async {
         let messageID = UUID()
         let conversationID = UUID()
         let replyID = AssistantReplyID(rawValue: messageID)
@@ -25,7 +24,7 @@ struct ConcurrencyStressTests {
         let actor = ReplySessionActor(initialState: initialState)
 
         await withTaskGroup(of: Void.self) { group in
-            for iteration in 0..<100 {
+            for iteration in 0 ..< 100 {
                 group.addTask {
                     let newMessageID = UUID()
                     let newReplyID = AssistantReplyID(rawValue: newMessageID)
@@ -56,7 +55,7 @@ struct ConcurrencyStressTests {
     }
 
     /// Verify that concurrent snapshot reads and state writes do not crash.
-    @Test func replySessionActorConcurrentReadsAndWrites() async {
+    @Test func `reply session actor concurrent reads and writes`() async {
         let messageID = UUID()
         let conversationID = UUID()
         let replyID = AssistantReplyID(rawValue: messageID)
@@ -70,7 +69,7 @@ struct ConcurrencyStressTests {
 
         await withTaskGroup(of: ReplyRuntimeState?.self) { group in
             // 50 writers
-            for iteration in 0..<50 {
+            for iteration in 0 ..< 50 {
                 group.addTask {
                     let newState = ReplyRuntimeState(
                         assistantReplyID: AssistantReplyID(rawValue: UUID()),
@@ -83,9 +82,9 @@ struct ConcurrencyStressTests {
                 }
             }
             // 50 readers
-            for _ in 0..<50 {
+            for _ in 0 ..< 50 {
                 group.addTask {
-                    return await actor.snapshot()
+                    await actor.snapshot()
                 }
             }
 
@@ -104,12 +103,12 @@ struct ConcurrencyStressTests {
 
     /// Create 50 sessions in parallel, then remove all 50 in parallel,
     /// and verify the registry is empty.
-    @Test func runtimeRegistryActorParallelCreateAndDestroy() async {
+    @Test func `runtime registry actor parallel create and destroy`() async {
         let registry = RuntimeRegistryActor()
         let conversationID = UUID()
 
         // Generate 50 unique message IDs up front.
-        let messageIDs = (0..<50).map { _ in UUID() }
+        let messageIDs = (0 ..< 50).map { _ in UUID() }
 
         // Create 50 sessions in parallel.
         await withTaskGroup(of: AssistantReplyID.self) { group in
@@ -149,10 +148,10 @@ struct ConcurrencyStressTests {
     }
 
     /// Stress test: interleave creation and lookup of sessions concurrently.
-    @Test func runtimeRegistryActorConcurrentCreateAndLookup() async {
+    @Test func `runtime registry actor concurrent create and lookup`() async {
         let registry = RuntimeRegistryActor()
         let conversationID = UUID()
-        let messageIDs = (0..<50).map { _ in UUID() }
+        let messageIDs = (0 ..< 50).map { _ in UUID() }
 
         await withTaskGroup(of: Void.self) { group in
             // 50 creators
@@ -168,8 +167,8 @@ struct ConcurrencyStressTests {
             for messageID in messageIDs {
                 group.addTask {
                     let replyID = AssistantReplyID(rawValue: messageID)
-                    let _ = await registry.session(for: replyID)
-                    let _ = await registry.contains(replyID)
+                    _ = await registry.session(for: replyID)
+                    _ = await registry.contains(replyID)
                 }
             }
         }
@@ -183,17 +182,17 @@ struct ConcurrencyStressTests {
 
     /// Run 50 concurrent tasks, each with its own SSEFrameBuffer instance,
     /// verifying that independent buffers produce correct results.
-    @Test func sseFrameBufferConcurrentIndependentInstances() async {
+    @Test func `sse frame buffer concurrent independent instances`() async {
         let validSSE = "event: response.output_text.delta\ndata: {\"delta\":\"chunk\"}\n\n"
 
         let results = await withTaskGroup(of: (Int, Int).self) { group -> [(Int, Int)] in
-            for taskIndex in 0..<50 {
+            for taskIndex in 0 ..< 50 {
                 group.addTask {
                     var buffer = SSEFrameBuffer()
                     var totalFrames = 0
 
                     // Each task appends the same valid SSE payload multiple times.
-                    for _ in 0..<10 {
+                    for _ in 0 ..< 10 {
                         let frames = buffer.append(validSSE)
                         totalFrames += frames.count
                     }
@@ -227,20 +226,19 @@ struct ConcurrencyStressTests {
     }
 
     /// Stress test: 50 concurrent tasks parsing random SSE-like data independently.
-    @Test func sseFrameBufferConcurrentRandomParsing() async {
+    @Test func `sse frame buffer concurrent random parsing`() async {
         await withTaskGroup(of: Int.self) { group in
-            for _ in 0..<50 {
+            for _ in 0 ..< 50 {
                 group.addTask {
                     var buffer = SSEFrameBuffer()
                     var totalFrames = 0
 
                     // Generate a random SSE-like stream with some valid and invalid lines.
-                    for taskIndex in 0..<20 {
-                        let chunk: String
-                        if taskIndex % 4 == 0 {
-                            chunk = "event: type_\(taskIndex)\ndata: {\"v\":\(taskIndex)}\n\n"
+                    for taskIndex in 0 ..< 20 {
+                        let chunk = if taskIndex % 4 == 0 {
+                            "event: type_\(taskIndex)\ndata: {\"v\":\(taskIndex)}\n\n"
                         } else {
-                            chunk = "garbage_line_\(Int.random(in: 0...9999))\n"
+                            "garbage_line_\(Int.random(in: 0 ... 9999))\n"
                         }
                         let frames = buffer.append(chunk)
                         totalFrames += frames.count

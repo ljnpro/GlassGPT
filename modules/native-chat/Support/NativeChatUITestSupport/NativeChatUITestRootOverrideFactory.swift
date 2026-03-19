@@ -33,12 +33,11 @@ public struct NativeChatUITestRootOverrideFactory: NativeChatRootOverrideFactory
             isUITestPreviewMode: bootstrap.scenario == .preview,
             uiTestPreviewItem: bootstrap.initialPreviewItem
         )
-        let historyCoordinator = NativeChatHistoryCoordinator(
+        store.historyPresenter = NativeChatHistoryPresenterFactory.makePresenter(
             modelContext: resolvedModelContext,
             chatController: bootstrap.chatController,
             showChatTab: { store.selectedTab = 0 }
         )
-        store.historyPresenter = historyCoordinator.makePresenter()
         let initialTab = bootstrap.initialTab
         Task { @MainActor in
             await Task.yield()

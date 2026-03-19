@@ -1,8 +1,8 @@
 import UIKit
 
-@MainActor
 /// UIKit container that hosts a ``PlaceholderTextView`` over a glass background,
 /// adjusting corner radius dynamically as the text field grows from single-line to multi-line.
+@MainActor
 public final class ComposerHostingView: UIView {
     /// The editable text view displayed inside this composer.
     public let textView = PlaceholderTextView()
@@ -27,8 +27,8 @@ public final class ComposerHostingView: UIView {
         self.multilineCornerRadius = multilineCornerRadius
         self.singleLineHeightThreshold = singleLineHeightThreshold
         self.stableFillOpacity = stableFillOpacity
-        self.currentCornerRadius = singleLineCornerRadius
-        self.glassBackgroundView = GlassBackgroundHostingView(
+        currentCornerRadius = singleLineCornerRadius
+        glassBackgroundView = GlassBackgroundHostingView(
             cornerRadius: singleLineCornerRadius,
             innerInset: 0,
             stableFillOpacity: stableFillOpacity,
@@ -44,7 +44,7 @@ public final class ComposerHostingView: UIView {
     }
 
     @available(*, unavailable)
-    public required init?(coder: NSCoder) {
+    public required init?(coder _: NSCoder) {
         fatalError("init(coder:) has not been implemented")
     }
 

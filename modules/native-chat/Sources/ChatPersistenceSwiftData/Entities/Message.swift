@@ -64,7 +64,7 @@ public final class Message {
         filePathAnnotations: [FilePathAnnotation]? = nil
     ) {
         self.id = id
-        self.roleRawValue = role.rawValue
+        roleRawValue = role.rawValue
         self.content = content
         self.thinking = thinking
         self.imageData = imageData
@@ -77,10 +77,10 @@ public final class Message {
         self.lastSequenceNumber = lastSequenceNumber
         self.usedBackgroundMode = usedBackgroundMode
         self.isComplete = isComplete
-        self.annotationsData = MessagePayloadStore.encodeAnnotations(annotations)
-        self.toolCallsData = MessagePayloadStore.encodeToolCalls(toolCalls)
-        self.fileAttachmentsData = MessagePayloadStore.encodeFileAttachments(fileAttachments)
-        self.filePathAnnotationsData = MessagePayloadStore.encodeFilePathAnnotations(filePathAnnotations)
+        annotationsData = MessagePayloadStore.encodeAnnotations(annotations)
+        toolCallsData = MessagePayloadStore.encodeToolCalls(toolCalls)
+        fileAttachmentsData = MessagePayloadStore.encodeFileAttachments(fileAttachments)
+        filePathAnnotationsData = MessagePayloadStore.encodeFilePathAnnotations(filePathAnnotations)
     }
 
     /// Typed accessor for the message role, derived from ``roleRawValue``.

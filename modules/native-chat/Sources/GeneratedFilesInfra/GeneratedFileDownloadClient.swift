@@ -49,13 +49,15 @@ struct GeneratedFileDownloadClient {
                 switch openBehavior {
                 case .imagePreview:
                     guard GeneratedFileCachePolicy.isGeneratedImageFilename(filename),
-                          GeneratedFileCachePolicy.isRenderableImageData(data) else {
+                          GeneratedFileCachePolicy.isRenderableImageData(data)
+                    else {
                         lastError = FileDownloadError.invalidImageData
                         continue
                     }
                 case .pdfPreview:
                     guard GeneratedFileCachePolicy.isGeneratedPDFFilename(filename),
-                          GeneratedFileCachePolicy.isRenderablePDFData(data) else {
+                          GeneratedFileCachePolicy.isRenderablePDFData(data)
+                    else {
                         lastError = FileDownloadError.invalidPDFData
                         continue
                     }
@@ -84,12 +86,10 @@ struct GeneratedFileDownloadClient {
         useDirectBaseURL: Bool = false
     ) async throws -> (Data, URLResponse) {
         let endpoint = configurationProvider.resolvedEndpoint(useDirectBaseURL: useDirectBaseURL)
-        let urlString: String
-
-        if let containerId, !containerId.isEmpty {
-            urlString = "\(endpoint.baseURL)/containers/\(containerId)/files/\(fileId)/content"
+        let urlString = if let containerId, !containerId.isEmpty {
+            "\(endpoint.baseURL)/containers/\(containerId)/files/\(fileId)/content"
         } else {
-            urlString = "\(endpoint.baseURL)/files/\(fileId)/content"
+            "\(endpoint.baseURL)/files/\(fileId)/content"
         }
 
         guard let url = URL(string: urlString) else {

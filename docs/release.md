@@ -3,29 +3,34 @@
 ## Source Of Truth
 
 - default branch: `main`
-- active stable branch: `codex/stable-4.8`
-- frozen backup branch: `codex/stable-4.7`
+- active stable branch: `codex/stable-4.9`
+- frozen prior stable branch: `codex/stable-4.8`
 - version/build source of truth: `ios/GlassGPT/Config/Versions.xcconfig`
+- tracked release wrapper: `scripts/release_testflight.sh`
 - local publishing credentials: `.local/publish.env`
 - local release helper: `.local/one_click_release.sh`
 
 ## Tracked Release Command
 
 ```bash
-./scripts/release_testflight.sh 4.8.2 <build-number> --branch codex/stable-4.8
+./scripts/release_testflight.sh 4.9.0 20183 --branch codex/stable-4.9
 ```
 
-The wrapper runs release-readiness, full CI gates, archive/export, IPA verification, TestFlight upload, and release commit/tag creation.
+The wrapper always runs `release-readiness`, the full `./scripts/ci.sh` suite,
+archive/export, IPA verification, TestFlight upload, and release commit/tag
+creation. There are no CI bypass flags on the tracked path.
 
 ## Pre-Release Checklist
 
 1. `./scripts/ci.sh`
-2. `./scripts/ci.sh maintainability`
-3. `./scripts/ci.sh release-readiness`
-4. manual parity checklist from `docs/parity-baseline.md`
-5. clean worktree
-6. branch is `codex/stable-4.8`
-7. version/build match the intended 4.8.2 candidate
+2. `./scripts/score_4_8_1.sh`
+3. `./scripts/score_4_8_2.sh`
+4. any release-specific `4.9.0` scoring or verification scripts
+5. manual parity checklist from `docs/parity-baseline.md`
+6. clean worktree on `codex/stable-4.9`
+7. version/build match the intended `4.9.0 (20183 or next available)` candidate
+8. Phase G has been re-evaluated and the ADR updated before release
+9. workflow triggers and readiness docs all reference `codex/stable-4.9`
 
 ## Output Artifacts
 
@@ -38,7 +43,7 @@ The wrapper runs release-readiness, full CI gates, archive/export, IPA verificat
 ## Post-Release Checklist
 
 1. capture the TestFlight Delivery UUID
-2. verify `codex/stable-4.8` points to the release commit
-3. verify `v4.8.2` points to the same commit
-4. verify `git ls-remote` shows `codex/stable-4.8`, `main`, and `v<marketing-version>` aligned
-5. preserve the backup tag and source bundle
+2. verify `codex/stable-4.9` points to the release commit
+3. verify `v4.9.0` points to the same commit
+4. verify `git ls-remote` shows `codex/stable-4.9`, `main`, and `v<marketing-version>` aligned
+5. preserve the `v4.8.2-backup-before-4.9.0` tag and source bundle

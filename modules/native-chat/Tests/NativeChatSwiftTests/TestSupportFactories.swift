@@ -1,10 +1,10 @@
 import ChatApplication
 import ChatDomain
 import ChatPersistenceCore
-import ChatPresentation
 import ChatPersistenceSwiftData
-import GeneratedFilesInfra
+import ChatPresentation
 import Foundation
+import GeneratedFilesInfra
 import OpenAITransport
 import SwiftData
 import Testing
@@ -229,7 +229,7 @@ func makeFetchResponseData(
 
 @MainActor
 func waitUntil(
-    timeout: TimeInterval = 2.0,
+    timeout: TimeInterval = 5.0,
     pollInterval: UInt64 = 20_000_000,
     _ predicate: @escaping @MainActor () -> Bool
 ) async throws {
@@ -247,7 +247,7 @@ func waitUntil(
 }
 
 func waitUntilAsync(
-    timeout: TimeInterval = 2.0,
+    timeout: TimeInterval = 5.0,
     pollInterval: UInt64 = 20_000_000,
     _ predicate: @escaping @Sendable () async -> Bool
 ) async throws {

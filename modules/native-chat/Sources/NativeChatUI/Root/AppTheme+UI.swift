@@ -1,13 +1,13 @@
-import SwiftUI
 import ChatDomain
+import SwiftUI
 
-extension AppTheme {
+public extension AppTheme {
     /// Returns the `ColorScheme` for this theme, or `nil` to follow the system setting.
-    public var colorScheme: ColorScheme? {
+    var colorScheme: ColorScheme? {
         switch self {
-        case .system: return nil
-        case .light: return .light
-        case .dark: return .dark
+        case .system: nil
+        case .light: .light
+        case .dark: .dark
         }
     }
 }

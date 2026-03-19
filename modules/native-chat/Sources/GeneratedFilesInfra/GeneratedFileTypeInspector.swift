@@ -78,10 +78,10 @@ enum GeneratedFileTypeInspector {
 
         if data.count >= 12 {
             let prefix = data.prefix(12)
-            if prefix.prefix(4) == Data("RIFF".utf8) && prefix.suffix(4) == Data("WEBP".utf8) {
+            if prefix.prefix(4) == Data("RIFF".utf8), prefix.suffix(4) == Data("WEBP".utf8) {
                 return "webp"
             }
-            if prefix.prefix(4) == Data("RIFF".utf8) && prefix.suffix(4) == Data("WAVE".utf8) {
+            if prefix.prefix(4) == Data("RIFF".utf8), prefix.suffix(4) == Data("WAVE".utf8) {
                 return "wav"
             }
         }

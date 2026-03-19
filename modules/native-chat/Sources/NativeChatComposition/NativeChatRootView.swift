@@ -20,6 +20,7 @@ public struct NativeChatRootView: View {
         AppTheme(rawValue: appThemeRawValue) ?? .system
     }
 
+    /// The bootstrapped root content for the native chat feature.
     public var body: some View {
         Group {
             if let overrideContent {

@@ -15,10 +15,10 @@ REMOTE_REPO="${GITHUB_REPO_URL:-}"
 function usage() {
   cat <<'EOF'
 Usage:
-  ./scripts/release_testflight.sh <marketing_version> <build_number> [--branch <name>] [--commit-message "<message>"] [--skip-ci] [--skip-readiness]
+  ./scripts/release_testflight.sh <marketing_version> <build_number> [--branch <name>] [--commit-message "<message>"]
 
 Examples:
-  ./scripts/release_testflight.sh 4.7.0 20179 --branch codex/stable-4.7
+  ./scripts/release_testflight.sh 4.9.0 20183 --branch codex/stable-4.9
 EOF
 }
 
@@ -33,8 +33,6 @@ shift 2
 
 TARGET_BRANCH=""
 COMMIT_MESSAGE="Release $VERSION ($BUILD_NUMBER)"
-SKIP_CI=0
-SKIP_READINESS=0
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -45,14 +43,6 @@ while [[ $# -gt 0 ]]; do
     --commit-message)
       COMMIT_MESSAGE="${2:-}"
       shift 2
-      ;;
-    --skip-ci)
-      SKIP_CI=1
-      shift
-      ;;
-    --skip-readiness)
-      SKIP_READINESS=1
-      shift
       ;;
     --help|-h)
       usage
@@ -78,7 +68,7 @@ if [[ -z "$TARGET_BRANCH" ]]; then
 fi
 
 case "$TARGET_BRANCH" in
-  main|codex/stable-4.1|codex/stable-4.2|codex/stable-4.3|codex/stable-4.4|codex/stable-4.5|codex/stable-4.6|codex/stable-4.7|codex/stable-4.8)
+  main|codex/stable-4.1|codex/stable-4.2|codex/stable-4.3|codex/stable-4.4|codex/stable-4.5|codex/stable-4.6|codex/stable-4.7|codex/stable-4.8|codex/stable-4.9)
     ;;
   *)
     echo "Release target branch must be a stable branch or main. Got: $TARGET_BRANCH" >&2
@@ -111,18 +101,14 @@ if [[ ! -d "$BUILD_DIR" ]]; then
   mkdir -p "$BUILD_DIR"
 fi
 
-if (( SKIP_READINESS == 0 )); then
-  echo "==> Running release-readiness gate"
-  export RELEASE_EXPECT_MARKETING_VERSION="$VERSION"
-  export RELEASE_EXPECT_BUILD_NUMBER="$BUILD_NUMBER"
-  export RELEASE_REQUIRE_CLEAN_WORKTREE=1
-  ./scripts/ci.sh release-readiness
-fi
+echo "==> Running release-readiness gate"
+export RELEASE_EXPECT_MARKETING_VERSION="$VERSION"
+export RELEASE_EXPECT_BUILD_NUMBER="$BUILD_NUMBER"
+export RELEASE_REQUIRE_CLEAN_WORKTREE=1
+./scripts/ci.sh release-readiness
 
-if (( SKIP_CI == 0 )); then
-  echo "==> Running full CI gates"
-  ./scripts/ci.sh
-fi
+echo "==> Running full CI gates"
+./scripts/ci.sh
 
 python3 - "$VERSIONS_XCCONFIG_PATH" "$VERSION" "$BUILD_NUMBER" <<'PY'
 import pathlib

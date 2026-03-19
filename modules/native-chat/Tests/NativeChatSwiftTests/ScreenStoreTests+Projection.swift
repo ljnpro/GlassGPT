@@ -6,14 +6,14 @@ import ChatRuntimeModel
 import Foundation
 import GeneratedFilesCore
 import NativeChatUI
-import Testing
 import SwiftData
+import Testing
 @testable import NativeChatComposition
 
 // MARK: - Projection and Configuration Tests
 
 extension ScreenStoreTests {
-    @Test func projectionTogglesAndConfigurationStayInSync() throws {
+    @Test func `projection toggles and configuration stay in sync`() throws {
         let store = try makeTestChatScreenStore(
             streamClient: QueuedOpenAIStreamClient(scriptedStreams: [])
         )
@@ -27,12 +27,12 @@ extension ScreenStoreTests {
         #expect(store.serviceTier == .flex)
         #expect(
             store.conversationConfiguration
-            == ConversationConfiguration(
-                model: .gpt5_4_pro,
-                reasoningEffort: .medium,
-                backgroundModeEnabled: true,
-                serviceTier: .flex
-            )
+                == ConversationConfiguration(
+                    model: .gpt5_4_pro,
+                    reasoningEffort: .medium,
+                    backgroundModeEnabled: true,
+                    serviceTier: .flex
+                )
         )
 
         store.proModeEnabled = false
@@ -43,7 +43,7 @@ extension ScreenStoreTests {
         #expect(store.conversationConfiguration.reasoningEffort == .medium)
     }
 
-    @Test func handlePickedDocumentsAppendsReadableFilesAndSkipsFailures() throws {
+    @Test func `handle picked documents appends readable files and skips failures`() throws {
         let store = try makeTestChatScreenStore(
             streamClient: QueuedOpenAIStreamClient(scriptedStreams: [])
         )
@@ -72,7 +72,7 @@ extension ScreenStoreTests {
         #expect(store.pendingAttachments[1].localData == Data("a,b,c".utf8))
     }
 
-    @Test func removePendingAttachmentRemovesOnlyMatchingAttachment() throws {
+    @Test func `remove pending attachment removes only matching attachment`() throws {
         let store = try makeTestChatScreenStore(
             streamClient: QueuedOpenAIStreamClient(scriptedStreams: [])
         )
@@ -99,7 +99,7 @@ extension ScreenStoreTests {
         #expect(store.pendingAttachments.first?.filename == "second.txt")
     }
 
-    @Test func findMessageSearchesVisibleMessagesDraftThenRepository() throws {
+    @Test func `find message searches visible messages draft then repository`() throws {
         let store = try makeTestChatScreenStore(
             streamClient: QueuedOpenAIStreamClient(scriptedStreams: [])
         )
@@ -124,7 +124,7 @@ extension ScreenStoreTests {
         #expect(store.findMessage(byId: UUID()) == nil)
     }
 
-    @Test func liveDraftProjectionTracksVisibleMessageMembership() throws {
+    @Test func `live draft projection tracks visible message membership`() throws {
         let store = try makeTestChatScreenStore(
             streamClient: QueuedOpenAIStreamClient(scriptedStreams: [])
         )
@@ -144,7 +144,7 @@ extension ScreenStoreTests {
         #expect(store.shouldShowDetachedStreamingBubble)
     }
 
-    @Test func restoreLastConversationLoadsMostRecentWithMessages() throws {
+    @Test func `restore last conversation loads most recent with messages`() throws {
         let store = try makeTestChatScreenStore(
             streamClient: QueuedOpenAIStreamClient(scriptedStreams: [])
         )
@@ -175,12 +175,12 @@ extension ScreenStoreTests {
         #expect(store.reasoningEffort == .high)
     }
 
-    @Test func upsertMessageReplacesExistingAndMaintainsSortOrder() throws {
+    @Test func `upsert message replaces existing and maintains sort order`() throws {
         let store = try makeTestChatScreenStore(
             streamClient: QueuedOpenAIStreamClient(scriptedStreams: [])
         )
         let conversation = try seedProjectionConversation(in: store, title: "Upsert")
-        let baseDate = Date(timeIntervalSince1970: 2_000)
+        let baseDate = Date(timeIntervalSince1970: 2000)
         let first = Message(
             role: .assistant,
             content: "Older",
@@ -218,17 +218,17 @@ extension ScreenStoreTests {
         #expect(store.messages[1].content == "Middle updated")
     }
 
-    @Test func uploadAttachmentsMarksSuccessMissingDataAndFailureStates() async throws {
+    @Test func `upload attachments marks success missing data and failure states`() async throws {
         let transport = StubOpenAITransport()
-        await transport.enqueue(
+        try await transport.enqueue(
             data: Data(#"{"id":"file_uploaded_1"}"#.utf8),
             statusCode: 200,
-            url: try #require(URL(string: "https://api.test.openai.local/v1/files"))
+            url: #require(URL(string: "https://api.test.openai.local/v1/files"))
         )
-        await transport.enqueue(
+        try await transport.enqueue(
             data: Data("upload failed".utf8),
             statusCode: 500,
-            url: try #require(URL(string: "https://api.test.openai.local/v1/files"))
+            url: #require(URL(string: "https://api.test.openai.local/v1/files"))
         )
         let store = try makeTestChatScreenStore(
             transport: transport,
@@ -265,7 +265,7 @@ extension ScreenStoreTests {
         #expect(requests.map { $0.url?.path } == ["/v1/files", "/v1/files"])
     }
 
-    @Test func activeIncompleteAssistantDraftPrefersBoundDraft() throws {
+    @Test func `active incomplete assistant draft prefers bound draft`() throws {
         let store = try makeTestChatScreenStore(
             streamClient: QueuedOpenAIStreamClient(scriptedStreams: [])
         )
@@ -273,14 +273,14 @@ extension ScreenStoreTests {
         let olderDraft = Message(
             role: .assistant,
             content: "",
-            createdAt: Date(timeIntervalSince1970: 3_000),
+            createdAt: Date(timeIntervalSince1970: 3000),
             conversation: conversation,
             isComplete: false
         )
         let newestConversationDraft = Message(
             role: .assistant,
             content: "",
-            createdAt: Date(timeIntervalSince1970: 3_100),
+            createdAt: Date(timeIntervalSince1970: 3100),
             conversation: conversation,
             isComplete: false
         )

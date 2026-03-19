@@ -38,17 +38,16 @@ public struct GeneratedFileAnnotationMatcher {
             return exact
         }
 
-        let pathOnly: String
-        if sandboxURL.hasPrefix("sandbox:") {
-            pathOnly = String(sandboxURL.dropFirst("sandbox:".count))
+        let pathOnly: String = if sandboxURL.hasPrefix("sandbox:") {
+            String(sandboxURL.dropFirst("sandbox:".count))
         } else {
-            pathOnly = sandboxURL
+            sandboxURL
         }
 
         if let match = annotations.first(where: {
             $0.sandboxPath == pathOnly ||
-            $0.sandboxPath.hasSuffix(pathOnly) ||
-            pathOnly.hasSuffix($0.sandboxPath)
+                $0.sandboxPath.hasSuffix(pathOnly) ||
+                pathOnly.hasSuffix($0.sandboxPath)
         }) {
             return match
         }
@@ -57,7 +56,7 @@ public struct GeneratedFileAnnotationMatcher {
         if !filename.isEmpty,
            let match = annotations.first(where: {
                URL(fileURLWithPath: $0.sandboxPath).lastPathComponent == filename ||
-               $0.filename == filename
+                   $0.filename == filename
            }) {
             return match
         }
@@ -70,11 +69,10 @@ public struct GeneratedFileAnnotationMatcher {
     }
 
     private func extractFilename(from sandboxURL: String) -> String? {
-        let path: String
-        if sandboxURL.hasPrefix("sandbox:") {
-            path = String(sandboxURL.dropFirst("sandbox:".count))
+        let path: String = if sandboxURL.hasPrefix("sandbox:") {
+            String(sandboxURL.dropFirst("sandbox:".count))
         } else {
-            path = sandboxURL
+            sandboxURL
         }
         let filename = URL(fileURLWithPath: path).lastPathComponent
         return filename.isEmpty ? nil : filename

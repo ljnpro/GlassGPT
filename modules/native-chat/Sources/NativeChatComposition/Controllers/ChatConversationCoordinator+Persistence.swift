@@ -13,11 +13,11 @@ extension ChatConversationCoordinator {
         logContext: String
     ) -> Bool {
         do {
-            try controller.conversationRepository.save()
+            try services.conversationRepository.save()
             return true
         } catch {
             if let userError {
-                controller.errorMessage = userError
+                state.errorMessage = userError
             }
             Loggers.persistence.error("[\(logContext)] \(error.localizedDescription)")
             return false
@@ -29,14 +29,14 @@ extension ChatConversationCoordinator {
     }
 
     func loadDefaultsFromSettings() {
-        let defaults = controller.settingsStore.defaultConversationConfiguration
-        controller.selectedModel = defaults.model
-        controller.reasoningEffort = defaults.reasoningEffort
-        controller.backgroundModeEnabled = defaults.backgroundModeEnabled
-        controller.serviceTier = defaults.serviceTier
+        let defaults = services.settingsStore.defaultConversationConfiguration
+        state.selectedModel = defaults.model
+        state.reasoningEffort = defaults.reasoningEffort
+        state.backgroundModeEnabled = defaults.backgroundModeEnabled
+        state.serviceTier = defaults.serviceTier
 
-        if !controller.selectedModel.availableEfforts.contains(controller.reasoningEffort) {
-            controller.reasoningEffort = controller.selectedModel.defaultEffort
+        if !state.selectedModel.availableEfforts.contains(state.reasoningEffort) {
+            state.reasoningEffort = state.selectedModel.defaultEffort
         }
     }
 
@@ -46,25 +46,25 @@ extension ChatConversationCoordinator {
         let resolvedEffort = model.availableEfforts.contains(storedEffort) ? storedEffort : model.defaultEffort
         let resolvedTier = ServiceTier(rawValue: conversation.serviceTierRawValue) ?? .standard
 
-        controller.isApplyingStoredConversationConfiguration = true
-        controller.selectedModel = model
-        controller.reasoningEffort = resolvedEffort
-        controller.backgroundModeEnabled = conversation.backgroundModeEnabled
-        controller.serviceTier = resolvedTier
-        controller.isApplyingStoredConversationConfiguration = false
+        state.isApplyingStoredConversationConfiguration = true
+        state.selectedModel = model
+        state.reasoningEffort = resolvedEffort
+        state.backgroundModeEnabled = conversation.backgroundModeEnabled
+        state.serviceTier = resolvedTier
+        state.isApplyingStoredConversationConfiguration = false
     }
 
     func applyConversationConfiguration(_ configuration: ConversationConfiguration) {
-        controller.isApplyingConversationConfigurationBatch = true
-        defer { controller.isApplyingConversationConfigurationBatch = false }
+        state.isApplyingConversationConfigurationBatch = true
+        defer { state.isApplyingConversationConfigurationBatch = false }
 
-        controller.selectedModel = configuration.model
-        controller.reasoningEffort = configuration.reasoningEffort
-        controller.backgroundModeEnabled = configuration.backgroundModeEnabled
-        controller.serviceTier = configuration.serviceTier
+        state.selectedModel = configuration.model
+        state.reasoningEffort = configuration.reasoningEffort
+        state.backgroundModeEnabled = configuration.backgroundModeEnabled
+        state.serviceTier = configuration.serviceTier
 
-        if !controller.selectedModel.availableEfforts.contains(controller.reasoningEffort) {
-            controller.reasoningEffort = controller.selectedModel.defaultEffort
+        if !state.selectedModel.availableEfforts.contains(state.reasoningEffort) {
+            state.reasoningEffort = state.selectedModel.defaultEffort
         }
 
         syncConversationConfiguration()
@@ -72,10 +72,10 @@ extension ChatConversationCoordinator {
 
     func sessionRequestConfiguration(for conversation: Conversation?) -> (ModelType, ReasoningEffort, ServiceTier) {
         guard let conversation else {
-            let effort = controller.selectedModel.availableEfforts.contains(controller.reasoningEffort)
-                ? controller.reasoningEffort
-                : controller.selectedModel.defaultEffort
-            return (controller.selectedModel, effort, controller.serviceTier)
+            let effort = state.selectedModel.availableEfforts.contains(state.reasoningEffort)
+                ? state.reasoningEffort
+                : state.selectedModel.defaultEffort
+            return (state.selectedModel, effort, state.serviceTier)
         }
 
         let model = ModelType(rawValue: conversation.model) ?? .gpt5_4
@@ -100,16 +100,16 @@ extension ChatConversationCoordinator {
     }
 
     func findMessage(byId id: UUID) -> Message? {
-        if let msg = controller.messages.first(where: { $0.id == id }) {
+        if let msg = state.messages.first(where: { $0.id == id }) {
             return msg
         }
 
-        if let draft = controller.draftMessage, draft.id == id {
+        if let draft = state.draftMessage, draft.id == id {
             return draft
         }
 
         do {
-            return try controller.conversationRepository.fetchMessage(id: id)
+            return try services.conversationRepository.fetchMessage(id: id)
         } catch {
             Loggers.persistence.error("[findMessage] \(error.localizedDescription)")
             return nil
@@ -119,8 +119,8 @@ extension ChatConversationCoordinator {
     @discardableResult
     func detachBackgroundResponseIfPossible(reason: String) -> Bool {
         guard
-            let session = controller.currentVisibleSession,
-            let draft = controller.draftMessage,
+            let session = sessions.currentVisibleSession,
+            let draft = state.draftMessage,
             RuntimeSessionDecisionPolicy.canDetachBackgroundResponse(
                 hasVisibleSession: true,
                 usedBackgroundMode: draft.usedBackgroundMode,
@@ -130,10 +130,10 @@ extension ChatConversationCoordinator {
             return false
         }
 
-        controller.sessionCoordinator.saveSessionNow(session)
-        controller.errorMessage = nil
-        controller.sessionCoordinator.detachVisibleSessionBinding()
-        controller.endBackgroundTask()
+        sessions.saveSessionNow(session)
+        state.errorMessage = nil
+        sessions.detachVisibleSessionBinding()
+        services.backgroundTaskCoordinator.endBackgroundTask()
 
         #if DEBUG
         Loggers.chat.debug("[Detach] Detached background response for \(reason)")
@@ -174,25 +174,25 @@ extension ChatConversationCoordinator {
     }
 
     func syncConversationConfiguration() {
-        guard let currentConversation = controller.currentConversation else { return }
-        currentConversation.model = controller.selectedModel.rawValue
-        currentConversation.reasoningEffort = controller.reasoningEffort.rawValue
-        currentConversation.backgroundModeEnabled = controller.backgroundModeEnabled
-        currentConversation.serviceTierRawValue = controller.serviceTier.rawValue
+        guard let currentConversation = state.currentConversation else { return }
+        currentConversation.model = state.selectedModel.rawValue
+        currentConversation.reasoningEffort = state.reasoningEffort.rawValue
+        currentConversation.backgroundModeEnabled = state.backgroundModeEnabled
+        currentConversation.serviceTierRawValue = state.serviceTier.rawValue
         currentConversation.updatedAt = .now
         saveContextIfPossible("syncConversationConfiguration")
     }
 
     func upsertMessage(_ message: Message) {
-        guard message.conversation?.id == controller.currentConversation?.id else {
+        guard message.conversation?.id == state.currentConversation?.id else {
             return
         }
 
-        if let idx = controller.messages.firstIndex(where: { $0.id == message.id }) {
-            controller.messages[idx] = message
+        if let idx = state.messages.firstIndex(where: { $0.id == message.id }) {
+            state.messages[idx] = message
         } else {
-            controller.messages.append(message)
-            controller.messages.sort { $0.createdAt < $1.createdAt }
+            state.messages.append(message)
+            state.messages.sort { $0.createdAt < $1.createdAt }
         }
     }
 }

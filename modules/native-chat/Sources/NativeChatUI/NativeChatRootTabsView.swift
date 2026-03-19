@@ -6,10 +6,11 @@ public struct NativeChatRootTabsView: View {
     private let title: String
 
     /// Creates a root tabs view with the given title string.
-    public init(title: String = "Native Chat") {
+    public init(title: String = String(localized: "Native Chat")) {
         self.title = title
     }
 
+    /// The placeholder glass-shell content shown for the root tabs surface.
     public var body: some View {
         Text(title)
             .padding()

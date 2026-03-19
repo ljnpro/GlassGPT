@@ -1,8 +1,8 @@
-import ChatPersistenceSwiftData
 import ChatDomain
-import Foundation
 import ChatPersistenceCore
+import ChatPersistenceSwiftData
 import ChatPresentation
+import Foundation
 import GeneratedFilesCore
 import GeneratedFilesInfra
 import NativeChatComposition
@@ -15,7 +15,7 @@ package enum UITestScenarioLoader {
         let processInfo = ProcessInfo.processInfo
         guard let scenario = currentScenario(
             arguments: processInfo.arguments,
-            environment: processInfo.environment
+            environment: processInfo.environment,
         ) else {
             return nil
         }
@@ -26,13 +26,13 @@ package enum UITestScenarioLoader {
     // swiftlint:disable:next function_body_length
     package static func makeBootstrap(
         for scenario: UITestScenario,
-        modelContext: ModelContext
+        modelContext: ModelContext,
     ) -> UITestBootstrap {
         let settingsValueStore = ScenarioSettingsValueStore()
         let settingsStore = SettingsStore(valueStore: settingsValueStore)
         let apiKeyBackend: APIKeyPersisting = scenario.usesLiveKeychain
             ? KeychainAPIKeyBackend(
-                service: KeychainAPIKeyBackend.defaultServiceIdentifier(bundleIdentifier: Bundle.main.bundleIdentifier)
+                service: KeychainAPIKeyBackend.defaultServiceIdentifier(bundleIdentifier: Bundle.main.bundleIdentifier),
             )
             : ScenarioAPIKeyBackend()
         let apiKeyStore = PersistedAPIKeyStore(backend: apiKeyBackend)
@@ -42,7 +42,7 @@ package enum UITestScenarioLoader {
             directOpenAIBaseURL: DefaultOpenAIConfigurationProvider.defaultOpenAIBaseURL,
             cloudflareGatewayBaseURL: "https://gateway.test.openai.local/v1",
             cloudflareAIGToken: scenario == .settingsGateway ? "cf-ui-test-token" : "",
-            useCloudflareGateway: false
+            useCloudflareGateway: false,
         )
 
         clearAllConversations(in: modelContext)
@@ -50,7 +50,7 @@ package enum UITestScenarioLoader {
         let seededConversations = seedConversationsIfNeeded(in: modelContext, scenario: scenario)
 
         let transport = OpenAIURLSessionTransport(
-            session: OpenAITransportSessionFactory.makeRequestSession()
+            session: OpenAITransportSessionFactory.makeRequestSession(),
         )
         let chatController = ChatController(
             modelContext: modelContext,
@@ -58,13 +58,13 @@ package enum UITestScenarioLoader {
             apiKeyStore: apiKeyStore,
             configurationProvider: configurationProvider,
             transport: transport,
-            bootstrapPolicy: .testing
+            bootstrapPolicy: .testing,
         )
         let requestBuilder = OpenAIRequestBuilder(configuration: configurationProvider)
         let openAIService = OpenAIService(
             requestBuilder: requestBuilder,
             streamClient: SSEEventStream(),
-            transport: transport
+            transport: transport,
         )
         let settingsPresenter = makeSettingsPresenter(
             settingsStore: settingsStore,
@@ -73,17 +73,17 @@ package enum UITestScenarioLoader {
             requestBuilder: requestBuilder,
             transport: transport,
             configurationProvider: configurationProvider,
-            fileDownloadService: GeneratedFilesInfra.FileDownloadService(configurationProvider: configurationProvider)
+            fileDownloadService: GeneratedFilesInfra.FileDownloadService(configurationProvider: configurationProvider),
         )
 
         if scenario == .settingsGateway {
-            settingsPresenter.cloudflareEnabled = true
+            settingsPresenter.defaults.cloudflareEnabled = true
         }
 
         applyScenario(
             scenario,
             conversations: seededConversations,
-            to: chatController
+            to: chatController,
         )
 
         return UITestBootstrap(
@@ -91,13 +91,13 @@ package enum UITestScenarioLoader {
             settingsPresenter: settingsPresenter,
             initialTab: scenario.initialTab,
             scenario: scenario,
-            initialPreviewItem: scenario == .preview ? chatController.filePreviewItem : nil
+            initialPreviewItem: scenario == .preview ? chatController.filePreviewItem : nil,
         )
     }
 
     package static func currentScenario(
         arguments: [String],
-        environment: [String: String]
+        environment: [String: String],
     ) -> UITestScenario? {
         if let argument = arguments.first(where: { $0.hasPrefix("UITestScenario=") }) {
             return UITestScenario(rawValue: String(argument.dropFirst("UITestScenario=".count)))
@@ -123,7 +123,7 @@ package enum UITestScenarioLoader {
     private static func applyScenario(
         _ scenario: UITestScenario,
         conversations: [Conversation],
-        to viewModel: ChatController
+        to viewModel: ChatController,
     ) {
         switch scenario {
         case .empty, .history, .settings, .settingsGateway, .reinstallSeed, .reinstallVerify, .freshInstall:
@@ -163,7 +163,7 @@ package enum UITestScenarioLoader {
                     url: previewURL,
                     kind: .generatedImage,
                     displayName: "Generated Chart",
-                    viewerFilename: "chart.png"
+                    viewerFilename: "chart.png",
                 )
             }
         }

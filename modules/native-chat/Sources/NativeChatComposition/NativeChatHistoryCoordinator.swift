@@ -6,106 +6,103 @@ import ChatPresentation
 import Foundation
 import SwiftData
 
+/// Coordinator bridging the history presenter to SwiftData persistence and conversation selection flows.
 @MainActor
-/// Coordinator bridging the history presenter to SwiftData persistence and the chat controller.
 package final class NativeChatHistoryCoordinator {
     private let modelContext: ModelContext
-    private let chatController: ChatController
+    private unowned let state: any ChatConversationSelectionAccess
+    private let conversations: any ChatConversationManaging
     private let showChatTab: @MainActor () -> Void
 
-    /// Creates a history coordinator with the given SwiftData context, chat controller, and tab switch closure.
-    package init(
+    /// Creates a history coordinator with the given SwiftData context, conversation access, and tab switch closure.
+    init(
         modelContext: ModelContext,
-        chatController: ChatController,
+        state: any ChatConversationSelectionAccess,
+        conversations: any ChatConversationManaging,
         showChatTab: @escaping @MainActor () -> Void
     ) {
         self.modelContext = modelContext
-        self.chatController = chatController
+        self.state = state
+        self.conversations = conversations
         self.showChatTab = showChatTab
     }
 
     /// Constructs a ``HistoryPresenter`` wired to load, select, and delete conversations via SwiftData.
-    // swiftlint:disable:next function_body_length
+    /// Builds the history presenter backed by SwiftData queries and chat selection callbacks.
     package func makePresenter() -> HistoryPresenter {
-        let modelContext = self.modelContext
-        let chatController = self.chatController
-        let showChatTab = self.showChatTab
-
-        func fetchConversation(id: UUID) -> Conversation? {
-            let predicate = #Predicate<Conversation> { conversation in
-                conversation.id == id
-            }
-            let descriptor = FetchDescriptor<Conversation>(predicate: predicate)
-            do {
-                return try modelContext.fetch(descriptor).first
-            } catch {
-                Loggers.persistence.error("[NativeChatHistoryCoordinator.fetchConversation] \(error.localizedDescription)")
-                return nil
-            }
-        }
-
-        func fetchAllConversations() -> [Conversation] {
-            let descriptor = FetchDescriptor<Conversation>(
-                sortBy: [SortDescriptor(\.updatedAt, order: .reverse)]
-            )
-            do {
-                return try modelContext.fetch(descriptor)
-            } catch {
-                Loggers.persistence.error("[NativeChatHistoryCoordinator.fetchAllConversations] \(error.localizedDescription)")
-                return []
-            }
-        }
-
-        return HistoryPresenter(
-            conversations: fetchAllConversations().map { conversation in
-                HistoryConversationSummary(
-                    id: conversation.id,
-                    title: conversation.title,
-                    preview: self.historyPreview(for: conversation),
-                    updatedAt: conversation.updatedAt,
-                    modelDisplayName: ModelType(rawValue: conversation.model)?.displayName ?? conversation.model
-                )
-            },
+        HistoryPresenter(
+            conversations: makeHistorySummaries(),
             loadConversations: {
-                fetchAllConversations().map { conversation in
-                    HistoryConversationSummary(
-                        id: conversation.id,
-                        title: conversation.title,
-                        preview: self.historyPreview(for: conversation),
-                        updatedAt: conversation.updatedAt,
-                        modelDisplayName: ModelType(rawValue: conversation.model)?.displayName ?? conversation.model
-                    )
-                }
+                self.makeHistorySummaries()
             },
-            selectConversation: { conversationID in
+            selectConversation: { [self] conversationID in
                 if let conversation = fetchConversation(id: conversationID) {
-                    chatController.conversationCoordinator.loadConversation(conversation)
+                    conversations.loadConversation(conversation)
                     showChatTab()
                 }
             },
-            deleteConversation: { deletedConversationID in
+            deleteConversation: { [self] deletedConversationID in
                 if let conversation = fetchConversation(id: deletedConversationID) {
                     modelContext.delete(conversation)
-                    self.saveHistoryChanges(context: "deleteConversation")
+                    saveHistoryChanges(context: "deleteConversation")
                 }
-                if chatController.currentConversation?.id == deletedConversationID {
-                    chatController.conversationCoordinator.startNewChat()
+                if state.currentConversation?.id == deletedConversationID {
+                    conversations.startNewChat()
                 }
             },
-            deleteAllConversations: {
+            deleteAllConversations: { [self] in
                 for conversation in fetchAllConversations() {
                     modelContext.delete(conversation)
                 }
-                self.saveHistoryChanges(context: "deleteAllConversations")
-                chatController.conversationCoordinator.startNewChat()
+                saveHistoryChanges(context: "deleteAllConversations")
+                conversations.startNewChat()
             }
         )
+    }
+
+    private func makeHistorySummaries() -> [HistoryConversationSummary] {
+        fetchAllConversations().map(makeHistorySummary(for:))
+    }
+
+    private func makeHistorySummary(for conversation: Conversation) -> HistoryConversationSummary {
+        HistoryConversationSummary(
+            id: conversation.id,
+            title: conversation.title,
+            preview: historyPreview(for: conversation),
+            updatedAt: conversation.updatedAt,
+            modelDisplayName: ModelType(rawValue: conversation.model)?.displayName ?? conversation.model
+        )
+    }
+
+    private func fetchConversation(id: UUID) -> Conversation? {
+        let predicate = #Predicate<Conversation> { conversation in
+            conversation.id == id
+        }
+        let descriptor = FetchDescriptor<Conversation>(predicate: predicate)
+        do {
+            return try modelContext.fetch(descriptor).first
+        } catch {
+            Loggers.persistence.error("[NativeChatHistoryCoordinator.fetchConversation] \(error.localizedDescription)")
+            return nil
+        }
+    }
+
+    private func fetchAllConversations() -> [Conversation] {
+        let descriptor = FetchDescriptor<Conversation>(
+            sortBy: [SortDescriptor(\.updatedAt, order: .reverse)]
+        )
+        do {
+            return try modelContext.fetch(descriptor)
+        } catch {
+            Loggers.persistence.error("[NativeChatHistoryCoordinator.fetchAllConversations] \(error.localizedDescription)")
+            return []
+        }
     }
 
     private func historyPreview(for conversation: Conversation) -> String {
         let sortedMessages = conversation.messages.sorted { $0.createdAt < $1.createdAt }
         guard let lastMessage = sortedMessages.last else {
-            return "No messages"
+            return String(localized: "No messages")
         }
 
         let trimmedContent = lastMessage.content.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -113,16 +110,16 @@ package final class NativeChatHistoryCoordinator {
             return trimmedContent.prefix(100).description
         }
 
-        if lastMessage.role == .assistant && !lastMessage.isComplete {
+        if lastMessage.role == .assistant, !lastMessage.isComplete {
             if let thinking = lastMessage.thinking?.trimmingCharacters(in: .whitespacesAndNewlines),
                !thinking.isEmpty {
                 return thinking.prefix(100).description
             }
 
-            return "Generating..."
+            return String(localized: "Generating...")
         }
 
-        return "No messages"
+        return String(localized: "No messages")
     }
 
     private func saveHistoryChanges(context: String) {

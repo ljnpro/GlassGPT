@@ -1,7 +1,7 @@
 import ChatDomain
+import ChatUIComponents
 import SwiftUI
 import UIKit
-import ChatUIComponents
 
 /// Sheet that lets the user choose model, background mode, flex mode, and reasoning effort for a chat session.
 public struct ModelSelectorSheet: View {
@@ -14,9 +14,11 @@ public struct ModelSelectorSheet: View {
     private var selectedModel: ModelType {
         proModeEnabled ? .gpt5_4_pro : .gpt5_4
     }
+
     private var metrics: Metrics {
         Metrics(idiom: UIDevice.current.userInterfaceIdiom)
     }
+
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.verticalSizeClass) private var verticalSizeClass
     @Environment(\.hapticsEnabled) private var hapticsEnabled
@@ -29,10 +31,10 @@ public struct ModelSelectorSheet: View {
         reasoningEffort: Binding<ReasoningEffort>,
         onDone: @escaping () -> Void
     ) {
-        self._proModeEnabled = proModeEnabled
-        self._backgroundModeEnabled = backgroundModeEnabled
-        self._flexModeEnabled = flexModeEnabled
-        self._reasoningEffort = reasoningEffort
+        _proModeEnabled = proModeEnabled
+        _backgroundModeEnabled = backgroundModeEnabled
+        _flexModeEnabled = flexModeEnabled
+        _reasoningEffort = reasoningEffort
         self.onDone = onDone
     }
 
@@ -49,7 +51,7 @@ public struct ModelSelectorSheet: View {
         parts.append(backgroundModeEnabled ? String(localized: "Background") : String(localized: "Standard"))
 
         if flexModeEnabled {
-            parts.append("Flex")
+            parts.append(String(localized: "Flex"))
         }
 
         parts.append(reasoningEffort.displayName)
@@ -77,6 +79,7 @@ public struct ModelSelectorSheet: View {
         HapticService()
     }
 
+    /// The model selector card, including mode toggles and reasoning controls.
     public var body: some View {
         VStack(spacing: metrics.sectionSpacing) {
             header
@@ -113,7 +116,7 @@ public struct ModelSelectorSheet: View {
     private var reasoningControl: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
-                Text("Reasoning")
+                Text(String(localized: "Reasoning"))
                     .font(.subheadline.weight(.medium))
                     .foregroundStyle(.secondary)
 
@@ -124,7 +127,7 @@ public struct ModelSelectorSheet: View {
                     .foregroundStyle(.primary)
                     .contentTransition(.numericText())
                     .animation(.easeInOut(duration: 0.15), value: reasoningEffort)
-                    .accessibilityLabel("Current reasoning effort: \(reasoningEffort.displayName)")
+                    .accessibilityLabel(String(localized: "Current reasoning effort") + ": \(reasoningEffort.displayName)")
                     .accessibilityIdentifier("modelSelector.reasoningValue")
             }
             .padding(.horizontal, 4)
@@ -132,10 +135,10 @@ public struct ModelSelectorSheet: View {
             VStack(spacing: 4) {
                 Slider(
                     value: sliderBinding,
-                    in: 0...Double(max(efforts.count - 1, 1)),
+                    in: 0 ... Double(max(efforts.count - 1, 1)),
                     step: 1
                 ) {
-                    Text("Reasoning Effort")
+                    Text(String(localized: "Reasoning Effort"))
                 } minimumValueLabel: {
                     Text(effortShortLabel(efforts.first ?? .none))
                         .font(.caption2)
@@ -146,7 +149,7 @@ public struct ModelSelectorSheet: View {
                         .foregroundStyle(.secondary)
                 }
                 .tint(.accentColor)
-                .accessibilityLabel("Reasoning effort slider")
+                .accessibilityLabel(String(localized: "Reasoning effort slider"))
                 .accessibilityIdentifier("modelSelector.reasoningSlider")
 
                 HStack {
@@ -175,7 +178,7 @@ public struct ModelSelectorSheet: View {
     private var header: some View {
         HStack(alignment: .top, spacing: 12) {
             VStack(alignment: .leading, spacing: 4) {
-                Text("Model")
+                Text(String(localized: "Model"))
                     .font(.title3.weight(.semibold))
 
                 Text(configurationSummary)
@@ -183,7 +186,7 @@ public struct ModelSelectorSheet: View {
                     .foregroundStyle(.secondary)
                     .lineLimit(2)
                     .fixedSize(horizontal: false, vertical: true)
-                    .accessibilityLabel("Current configuration: \(configurationSummary)")
+                    .accessibilityLabel(String(localized: "Current configuration") + ": \(configurationSummary)")
                     .accessibilityIdentifier("modelSelector.summary")
             }
 
@@ -192,7 +195,7 @@ public struct ModelSelectorSheet: View {
             Button {
                 onDone()
             } label: {
-                Text("Save")
+                Text(String(localized: "Save"))
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(.primary)
                     .padding(.horizontal, 12)
@@ -214,24 +217,24 @@ public struct ModelSelectorSheet: View {
     private var toggleGroup: some View {
         VStack(spacing: 0) {
             toggleRow(
-                title: "Pro Mode",
-                subtitle: "Switches between GPT-5.4 and GPT-5.4 Pro.",
+                title: String(localized: "Pro Mode"),
+                subtitle: String(localized: "Switches between GPT-5.4 and GPT-5.4 Pro."),
                 isOn: $proModeEnabled,
                 accessibilityIdentifier: "modelSelector.proMode",
                 rowAccessibilityIdentifier: "modelSelector.proModeRow"
             )
             Divider().padding(.leading, metrics.rowHorizontalPadding)
             toggleRow(
-                title: "Background Mode",
-                subtitle: "Slower initial response, but better resume for long-running generations.",
+                title: String(localized: "Background Mode"),
+                subtitle: String(localized: "Slower initial response, but better resume for long-running generations."),
                 isOn: $backgroundModeEnabled,
                 accessibilityIdentifier: "modelSelector.backgroundMode",
                 rowAccessibilityIdentifier: "modelSelector.backgroundModeRow"
             )
             Divider().padding(.leading, metrics.rowHorizontalPadding)
             toggleRow(
-                title: "Flex Mode",
-                subtitle: "Lower cost, but slower and less consistent response times.",
+                title: String(localized: "Flex Mode"),
+                subtitle: String(localized: "Lower cost, but slower and less consistent response times."),
                 isOn: $flexModeEnabled,
                 accessibilityIdentifier: "modelSelector.flexMode",
                 rowAccessibilityIdentifier: "modelSelector.flexModeRow"

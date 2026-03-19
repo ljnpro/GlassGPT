@@ -5,15 +5,29 @@ import Foundation
 
 @MainActor
 final class ChatGeneratedFilePrefetchCoordinator {
-    unowned let controller: ChatController
+    unowned let state: any ChatConversationSelectionAccess
+    unowned let services: any (
+        ChatPersistenceAccess &
+            ChatTransportServiceAccess &
+            ChatGeneratedFileServiceAccess
+    )
+    unowned var conversations: (any ChatConversationManaging)!
 
-    init(controller: ChatController) {
-        self.controller = controller
+    init(
+        state: any ChatConversationSelectionAccess,
+        services: any(
+            ChatPersistenceAccess &
+                ChatTransportServiceAccess &
+                ChatGeneratedFileServiceAccess
+        )
+    ) {
+        self.state = state
+        self.services = services
     }
 
     // swiftlint:disable:next function_body_length
     func prefetchGeneratedFilesIfNeeded(for message: Message) {
-        let key = controller.apiKey.trimmingCharacters(in: .whitespacesAndNewlines)
+        let key = services.apiKeyStore.loadAPIKey()?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         guard !key.isEmpty else { return }
 
         let initialAnnotations = message.filePathAnnotations.filter { !$0.fileId.isEmpty }
@@ -22,25 +36,25 @@ final class ChatGeneratedFilePrefetchCoordinator {
         let messageID = message.id
         let responseId = message.responseId
         let task = Task(priority: .utility) { @MainActor in
-            defer { controller.generatedFilePrefetchRegistry.finish(messageID: messageID) }
+            defer { self.services.generatedFilePrefetchRegistry.finish(messageID: messageID) }
             var annotationsToPrefetch = initialAnnotations
 
-            if annotationsToPrefetch.contains(where: { !controller.generatedFileCoordinator.annotationCanDownloadDirectly($0) }),
+            if annotationsToPrefetch.contains(where: { !self.services.generatedFileCoordinator.annotationCanDownloadDirectly($0) }),
                let responseId,
                !responseId.isEmpty {
                 do {
-                    let result = try await controller.openAIService.fetchResponse(responseId: responseId, apiKey: key)
+                    let result = try await self.services.openAIService.fetchResponse(responseId: responseId, apiKey: key)
                     let refreshedAnnotations = result.filePathAnnotations.filter { !$0.fileId.isEmpty }
 
                     if !refreshedAnnotations.isEmpty {
                         annotationsToPrefetch = refreshedAnnotations
 
-                        if let persistedMessage = controller.conversationCoordinator.findMessage(byId: messageID) {
-                            controller.messagePersistence.refreshFileAnnotations(refreshedAnnotations, on: persistedMessage)
-                            controller.conversationCoordinator.saveContextIfPossible("prefetchGeneratedFilesIfNeeded.refreshAnnotations")
+                        if let persistedMessage = self.conversations.findMessage(byId: messageID) {
+                            self.services.messagePersistence.refreshFileAnnotations(refreshedAnnotations, on: persistedMessage)
+                            self.conversations.saveContextIfPossible("prefetchGeneratedFilesIfNeeded.refreshAnnotations")
 
-                            if persistedMessage.conversation?.id == controller.currentConversation?.id {
-                                controller.conversationCoordinator.upsertMessage(persistedMessage)
+                            if persistedMessage.conversation?.id == self.state.currentConversation?.id {
+                                self.conversations.upsertMessage(persistedMessage)
                             }
                         }
                     }
@@ -51,7 +65,7 @@ final class ChatGeneratedFilePrefetchCoordinator {
                 }
             }
 
-            controller.generatedFilePrefetchRegistry.setRequests(
+            self.services.generatedFilePrefetchRegistry.setRequests(
                 annotationsToPrefetch.map {
                     GeneratedFilePrefetchRequest(fileID: $0.fileId, containerID: $0.containerId)
                 },
@@ -61,7 +75,7 @@ final class ChatGeneratedFilePrefetchCoordinator {
             for annotation in annotationsToPrefetch {
                 guard !Task.isCancelled else { return }
                 do {
-                    _ = try await controller.fileDownloadService.prefetchGeneratedFile(
+                    _ = try await self.services.fileDownloadService.prefetchGeneratedFile(
                         fileId: annotation.fileId,
                         containerId: annotation.containerId,
                         suggestedFilename: annotation.filename,
@@ -75,6 +89,6 @@ final class ChatGeneratedFilePrefetchCoordinator {
             }
         }
 
-        controller.generatedFilePrefetchRegistry.replace(messageID: messageID, with: task)
+        services.generatedFilePrefetchRegistry.replace(messageID: messageID, with: task)
     }
 }

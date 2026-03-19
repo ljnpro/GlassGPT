@@ -59,12 +59,10 @@ public final class OpenAIService {
         )
 
         let (responseData, response) = try await transport.data(for: request)
-        let fileId = try responseParser.parseUploadedFileID(
+        return try responseParser.parseUploadedFileID(
             responseData: responseData,
             response: response
         )
-
-        return fileId
     }
 
     /// Starts a streaming chat completion, cancelling any active stream first.

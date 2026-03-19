@@ -6,9 +6,9 @@ import Foundation
 extension ChatSendCoordinator {
     func uploadAttachments(_ attachments: [ChatDomain.FileAttachment]) async -> [ChatDomain.FileAttachment] {
         var uploadedAttachments = attachments
-        let requestBuilder = controller.openAIService.requestBuilder
-        let responseParser = controller.openAIService.responseParser
-        let transport = controller.openAIService.transport
+        let requestBuilder = services.openAIService.requestBuilder
+        let responseParser = services.openAIService.responseParser
+        let transport = services.openAIService.transport
 
         for index in uploadedAttachments.indices {
             uploadedAttachments[index].uploadStatus = .uploading

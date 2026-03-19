@@ -25,7 +25,7 @@ struct GeneratedFileNamingResolver {
            let disposition = httpResponse.value(forHTTPHeaderField: "Content-Disposition"),
            let filenameRange = disposition.range(of: "filename=\""),
            let endRange = disposition[filenameRange.upperBound...].range(of: "\"") {
-            let extracted = String(disposition[filenameRange.upperBound..<endRange.lowerBound])
+            let extracted = String(disposition[filenameRange.upperBound ..< endRange.lowerBound])
             if let normalized = normalizedFilename(extracted, inferredExtension: inferredExtension) {
                 return normalized
             }

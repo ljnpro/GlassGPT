@@ -8,6 +8,7 @@ package struct ThinkingIndicator: View {
     /// Creates a new thinking indicator.
     package init() {}
 
+    /// The capsule indicator shown while the model is still reasoning.
     package var body: some View {
         HStack(spacing: 8) {
             Image(systemName: "brain")
@@ -16,7 +17,7 @@ package struct ThinkingIndicator: View {
                 .symbolEffect(.pulse, options: .repeating)
                 .accessibilityHidden(true)
 
-            Text("Reasoning…")
+            Text(String(localized: "Reasoning…"))
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
         }
@@ -41,12 +42,12 @@ package struct ThinkingView: View {
     /// The reasoning text emitted by the model.
     let text: String
     /// Whether the thinking is still in progress (streaming). When true, starts expanded.
-    var isLive: Bool = false
+    var isLive = false
     /// Optional external binding for expanded state (used during streaming to preserve state across re-renders)
     @Binding var externalIsExpanded: Bool?
 
-    @State private var internalIsExpanded: Bool = false
-    @State private var hasInitialized: Bool = false
+    @State private var internalIsExpanded = false
+    @State private var hasInitialized = false
 
     /// Use external binding if provided, otherwise fall back to internal state
     private var isExpanded: Bool {
@@ -65,9 +66,10 @@ package struct ThinkingView: View {
     package init(text: String, isLive: Bool = false, externalIsExpanded: Binding<Bool?> = .constant(nil)) {
         self.text = text
         self.isLive = isLive
-        self._externalIsExpanded = externalIsExpanded
+        _externalIsExpanded = externalIsExpanded
     }
 
+    /// The collapsible reasoning card and any expanded reasoning content.
     package var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             // Header — tap entire row to toggle expand/collapse
@@ -78,7 +80,7 @@ package struct ThinkingView: View {
                     .symbolEffect(.pulse, options: .repeating, isActive: isLive)
                     .accessibilityHidden(true)
 
-                Text(isLive ? "Reasoning…" : "Reasoning Completed")
+                Text(isLive ? String(localized: "Reasoning…") : String(localized: "Reasoning Completed"))
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(.secondary)
 
@@ -94,7 +96,11 @@ package struct ThinkingView: View {
             .padding(.vertical, 8)
             .contentShape(Rectangle())
             .accessibilityLabel(isLive ? String(localized: "Reasoning in progress") : String(localized: "Reasoning completed"))
-            .accessibilityHint(isExpanded ? "Double-tap to collapse" : "Double-tap to expand")
+            .accessibilityHint(
+                isExpanded
+                    ? String(localized: "Double-tap to collapse")
+                    : String(localized: "Double-tap to expand")
+            )
             .accessibilityIdentifier("thinking.header")
             .accessibilityAddTraits(.isButton)
             .onTapGesture {
@@ -128,7 +134,7 @@ package struct ThinkingView: View {
         }
         .onChange(of: isLive) { _, newValue in
             // When streaming finishes, auto-collapse
-            if !newValue && isExpanded {
+            if !newValue, isExpanded {
                 withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
                     setExpanded(false)
                 }
@@ -157,7 +163,7 @@ private struct ThinkingSurfaceModifier: ViewModifier {
 
 private struct ThinkingMarkdownText: View {
     let text: String
-    var allowsSelection: Bool = true
+    var allowsSelection = true
 
     var body: some View {
         let attributed = RichTextAttributedStringBuilder.parseThinkingText(text)
@@ -177,11 +183,13 @@ private struct ThinkingMarkdownText: View {
 package struct TypingIndicator: View {
     @State private var animating = false
 
+    /// Creates a typing indicator for the assistant streaming state.
     package init() {}
 
+    /// The animated typing indicator view.
     package var body: some View {
         HStack(spacing: 4) {
-            ForEach(0..<3) { index in
+            ForEach(0 ..< 3) { index in
                 Circle()
                     .fill(.secondary)
                     .frame(width: 8, height: 8)

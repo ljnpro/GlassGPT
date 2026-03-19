@@ -1,7 +1,7 @@
 import ChatPersistenceCore
 import Foundation
-import SwiftData
 import os
+import SwiftData
 
 /// Result of bootstrapping the persistent store, including the container and any recovery status.
 public struct NativeChatPersistenceBootstrap {
@@ -73,8 +73,8 @@ public enum NativeChatPersistence {
         _ = ReleaseResetCoordinator.performIfNeeded(bundleIdentifier: bundleIdentifier)
 
         do {
-            return NativeChatPersistenceBootstrap(
-                container: try makeContainer(),
+            return try NativeChatPersistenceBootstrap(
+                container: makeContainer(),
                 didRecoverPersistentStore: false,
                 startupErrorDescription: nil
             )
@@ -83,13 +83,13 @@ public enum NativeChatPersistence {
         }
 
         let preservationResult = preserveExistingStoreForRecovery()
-        if case .failed(let message) = preservationResult {
+        if case let .failed(message) = preservationResult {
             Loggers.persistence.error("[NativeChatPersistence] \(message)")
         }
 
         do {
-            return NativeChatPersistenceBootstrap(
-                container: try makeContainer(),
+            return try NativeChatPersistenceBootstrap(
+                container: makeContainer(),
                 didRecoverPersistentStore: preservationResult.didRecoverPersistentStore,
                 startupErrorDescription: nil
             )

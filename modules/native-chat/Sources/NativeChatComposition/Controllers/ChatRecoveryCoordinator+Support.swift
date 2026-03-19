@@ -1,5 +1,5 @@
-import ChatPersistenceSwiftData
 import ChatPersistenceCore
+import ChatPersistenceSwiftData
 import ChatUIComponents
 import Foundation
 import OpenAITransport
@@ -7,6 +7,6 @@ import OpenAITransport
 @MainActor
 extension ChatRecoveryCoordinator {
     func syncCompletionState(for message: Message) {
-        controller.fileInteractionCoordinator.prefetchGeneratedFilesIfNeeded(for: message)
+        files.prefetchGeneratedFilesIfNeeded(for: message)
     }
 }

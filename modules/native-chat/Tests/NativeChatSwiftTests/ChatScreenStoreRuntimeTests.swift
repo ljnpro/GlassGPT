@@ -1,20 +1,20 @@
-import Foundation
 import ChatApplication
-import Testing
+import ChatDomain
 import ChatPersistenceCore
 import ChatPersistenceSwiftData
+import ChatRuntimeModel
 import ChatUIComponents
+import Foundation
 import GeneratedFilesInfra
 import OpenAITransport
 import SwiftData
-import ChatDomain
-import ChatRuntimeModel
+import Testing
 @testable import NativeChatComposition
 
 @Suite(.serialized)
 @MainActor
 struct ChatScreenStoreRuntimeTests {
-    @Test func sendMessageWithoutStoredAPIKeyFailsFastAndLeavesFreshInstallStateUsable() async throws {
+    @Test func `send message without stored API key fails fast and leaves fresh install state usable`() throws {
         let streamClient = QueuedOpenAIStreamClient(scriptedStreams: [])
         let store = try makeTestChatScreenStore(apiKey: "", streamClient: streamClient)
         let conversation = try seedConversation(in: store, title: "Missing Key")
@@ -32,7 +32,7 @@ struct ChatScreenStoreRuntimeTests {
         #expect(streamClient.recordedRequests.isEmpty)
     }
 
-    @Test func sendMessageStreamsThroughStoreAndFinalizesAssistantDraft() async throws {
+    @Test func `send message streams through store and finalizes assistant draft`() async throws {
         let streamClient = QueuedOpenAIStreamClient(
             scriptedStreams: [[
                 .responseCreated("resp_stream_1"),
@@ -64,7 +64,7 @@ struct ChatScreenStoreRuntimeTests {
         #expect(store.sendMessage(text: "Ship the refactor"))
 
         try await waitUntil {
-            self.latestAssistantMessage(in: store)?.isComplete == true
+            latestAssistantMessage(in: store)?.isComplete == true
         }
 
         let userMessage = try #require(store.messages.first(where: { $0.role == .user }))
@@ -85,7 +85,7 @@ struct ChatScreenStoreRuntimeTests {
         #expect(!store.isThinking)
     }
 
-    @Test func stopGenerationFinalizesVisibleDraftThroughStoreAPI() async throws {
+    @Test func `stop generation finalizes visible draft through store API`() async throws {
         let streamClient = ControlledOpenAIStreamClient()
         let store = try makeTestChatScreenStore(streamClient: streamClient)
         let conversation = try seedConversation(in: store, title: "Stop Generation")
@@ -110,7 +110,7 @@ struct ChatScreenStoreRuntimeTests {
         let runtimeSnapshotValue = await runtimeSession?.snapshot()
         let runtimeSnapshot = try #require(runtimeSnapshotValue)
         #expect(runtimeSnapshot.buffer.text == "Partial answer")
-        guard case .streaming(let cursor) = runtimeSnapshot.lifecycle else {
+        guard case let .streaming(cursor) = runtimeSnapshot.lifecycle else {
             Issue.record("Expected runtime registry to track an active streaming reply")
             return
         }
@@ -119,7 +119,7 @@ struct ChatScreenStoreRuntimeTests {
         store.stopGeneration(savePartial: true)
 
         try await waitUntil {
-            self.latestAssistantMessage(in: store)?.isComplete == true
+            latestAssistantMessage(in: store)?.isComplete == true
         }
 
         let assistantMessage = try #require(latestAssistantMessage(in: store))
@@ -131,7 +131,7 @@ struct ChatScreenStoreRuntimeTests {
         #expect(streamClient.cancelCallCount >= 1)
         var runtimeSessionStillRegistered = await store.runtimeRegistry.contains(activeReplyID)
         if runtimeSessionStillRegistered {
-            for _ in 0..<10 where runtimeSessionStillRegistered {
+            for _ in 0 ..< 10 where runtimeSessionStillRegistered {
                 try await Task.sleep(nanoseconds: 20_000_000)
                 runtimeSessionStillRegistered = await store.runtimeRegistry.contains(activeReplyID)
             }
@@ -139,7 +139,7 @@ struct ChatScreenStoreRuntimeTests {
         #expect(!runtimeSessionStillRegistered)
     }
 
-    @Test func handleDidEnterBackgroundDoesNotInterruptActiveSessionImmediately() async throws {
+    @Test func `handle did enter background does not interrupt active session immediately`() async throws {
         let streamClient = ControlledOpenAIStreamClient()
         let store = try makeTestChatScreenStore(streamClient: streamClient)
         let conversation = try seedConversation(in: store, title: "Background Session")
@@ -166,7 +166,7 @@ struct ChatScreenStoreRuntimeTests {
         streamClient.yield(.completed("", nil, nil))
 
         try await waitUntil {
-            self.latestAssistantMessage(in: store)?.isComplete == true && store.currentVisibleSession == nil
+            latestAssistantMessage(in: store)?.isComplete == true && store.currentVisibleSession == nil
         }
 
         let assistantMessage = try #require(latestAssistantMessage(in: store))

@@ -23,6 +23,7 @@ public struct ResponsesInputMessageDTO: Codable, Equatable, Sendable {
         /// A list of multi-modal content items (text, images, files).
         case items([Item])
 
+        /// Decodes either a plain-text input payload or a multi-item payload.
         public init(from decoder: Decoder) throws {
             let container = try decoder.singleValueContainer()
             do {
@@ -30,18 +31,19 @@ public struct ResponsesInputMessageDTO: Codable, Equatable, Sendable {
                 self = .text(value)
                 return
             } catch DecodingError.typeMismatch {
-                self = .items(try container.decode([Item].self))
+                self = try .items(container.decode([Item].self))
             } catch {
                 throw error
             }
         }
 
-        public func encode(to encoder: Encoder) throws(any Error) {
+        /// Encodes the content using the schema expected by the Responses API.
+        public func encode(to encoder: Encoder) throws {
             var container = encoder.singleValueContainer()
             switch self {
-            case .text(let value):
+            case let .text(value):
                 try container.encode(value)
-            case .items(let items):
+            case let .items(items):
                 try container.encode(items)
             }
         }
@@ -63,15 +65,16 @@ public struct ResponsesInputMessageDTO: Codable, Equatable, Sendable {
             case fileID = "file_id"
         }
 
+        /// Decodes a typed multi-modal input item from the Responses API schema.
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             switch try container.decode(String.self, forKey: .type) {
             case "input_text":
-                self = .inputText(try container.decode(String.self, forKey: .text))
+                self = try .inputText(container.decode(String.self, forKey: .text))
             case "input_image":
-                self = .inputImage(try container.decode(String.self, forKey: .imageURL))
+                self = try .inputImage(container.decode(String.self, forKey: .imageURL))
             case "input_file":
-                self = .inputFile(try container.decode(String.self, forKey: .fileID))
+                self = try .inputFile(container.decode(String.self, forKey: .fileID))
             default:
                 throw DecodingError.dataCorruptedError(
                     forKey: .type,
@@ -81,16 +84,17 @@ public struct ResponsesInputMessageDTO: Codable, Equatable, Sendable {
             }
         }
 
-        public func encode(to encoder: Encoder) throws(any Error) {
+        /// Encodes the item using the Responses API multi-modal input schema.
+        public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
             switch self {
-            case .inputText(let text):
+            case let .inputText(text):
                 try container.encode("input_text", forKey: .type)
                 try container.encode(text, forKey: .text)
-            case .inputImage(let imageURL):
+            case let .inputImage(imageURL):
                 try container.encode("input_image", forKey: .type)
                 try container.encode(imageURL, forKey: .imageURL)
-            case .inputFile(let fileID):
+            case let .inputFile(fileID):
                 try container.encode("input_file", forKey: .type)
                 try container.encode(fileID, forKey: .fileID)
             }

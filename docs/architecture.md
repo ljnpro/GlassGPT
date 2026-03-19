@@ -1,8 +1,10 @@
-# 4.7.0 Architecture
+# 4.9.0 Architecture
 
 ## Goal
 
-`4.7.0` is the 20/20 baseline release. The final system removes split runtime mutation, composition-root drift, and controller-centric orchestration while tightening credential, lifecycle, and governance hygiene.
+`4.9.0` hardens ownership truth, not just file structure. The production system
+must show one coherent story across runtime ownership, composition, presenter
+policy, CI gates, and release governance.
 
 ## Production Topology
 
@@ -19,53 +21,54 @@
 - `ChatPersistenceContracts`
   - persistence-facing contracts and snapshots
 - `ChatPersistenceCore`
-  - settings, keychain, reset, and logging concerns
+  - keychain, reset, logging, and persistence support
 - `ChatPersistenceSwiftData`
-  - SwiftData entities, repositories, and persistence adapters
+  - SwiftData entities, repositories, and adapters
 - `OpenAITransport`
   - typed request building, parsing, streaming, and service operations
 - `GeneratedFilesCore`
   - generated-file models and policy
 - `GeneratedFilesInfra`
-  - generated-file caching, downloads, inference, and presentation mapping
+  - generated-file caching, downloads, inspection, and presentation mapping
 - `ChatRuntimeModel`
-  - reply identity, cursor, lifecycle, buffer, and pure runtime policy
+  - reply identity, cursor, lifecycle, buffers, and pure runtime policy
 - `ChatRuntimePorts`
   - narrow runtime-facing contracts
 - `ChatRuntimeWorkflows`
-  - actor-owned runtime transitions and registry
+  - authoritative runtime transitions, recovery planning, and session registry
 - `ChatApplication`
-  - bootstrap policy only
+  - scene-level settings/history policies and feature bootstrapping
 - `ChatPresentation`
-  - view-facing presenters and file-preview state
+  - presenter/store projection for settings, history, and file preview state
 - `ChatUIComponents`
   - reusable UIKit/SwiftUI primitives
 - `NativeChatUI`
   - feature views only
 - `NativeChatComposition`
-  - composition root, chat coordinators, app-store shell, and production assembly
+  - the sole production composition root plus orchestration adapters
 - `NativeChat`
   - umbrella export
 
 ## Ownership Model
 
 - Runtime
-  - `ReplySessionActor` owns lifecycle, stream cursor, buffer accumulation, recovery state, and terminal status.
+  - `ReplySessionActor` owns live reply lifecycle, cursor, buffering, and terminal state.
+  - `ReplyStreamEventPlanner` and `ReplyRecoveryPlanner` own stream/recovery transition policy.
   - `RuntimeRegistryActor` only registers and looks up runtime sessions.
-- Chat feature
-  - `ChatController` owns observable projection state only.
-  - behavior lives in the coordinator set:
-    - `ChatConversationCoordinator`
-    - `ChatSendCoordinator`
-    - `ChatStreamingCoordinator`
-    - `ChatRecoveryCoordinator`
-    - `ChatRecoveryMaintenanceCoordinator`
-    - `ChatFileInteractionCoordinator`
-    - `ChatLifecycleCoordinator`
 - Composition
-  - `NativeChatCompositionRoot` configures shared services and assembles the production graph once.
-  - `NativeChatRootView` creates the app store from the composition root.
-  - `ContentView` renders the shell only and does not mutate app-scope services.
-- Persistence
-  - SwiftData repositories and adapters are final production boundaries.
-  - no production type self-describes as “legacy” or “mid-cutover”.
+  - `NativeChatCompositionRoot` is the only production composition root.
+  - `ChatController` is an observable projection facade, not the hidden source of truth.
+  - composition coordinators depend on narrow state/service protocols; no composition coordinator owns the full `ChatController`.
+  - `NativeChatHistoryCoordinator` bridges `HistoryPresenter` to persistence and selection flows without widening controller ownership.
+- Application and presentation
+  - `HistorySceneController`, `SettingsSceneController`, and the settings handlers own scene-level mutations and policy.
+  - `SettingsPresenter`, `HistoryPresenter`, and `FilePreviewStore` project view state and user actions without absorbing infrastructure wiring.
+- Persistence and transport
+  - SwiftData repositories/adapters and the transport layer remain final production boundaries.
+  - no production type self-describes as “legacy”, “relay”, or “mid-cutover”.
+
+## Integrity
+
+- the package graph is a real 16-module acyclic graph enforced by `scripts/check_module_boundaries.py`
+- maintainability reporting enforces controller-cluster budgets, `swiftlint:disable` visibility, and controller-backed coordinator bans
+- documentation completeness and UI-surface localization completeness are hard CI gates, not follow-up tasks

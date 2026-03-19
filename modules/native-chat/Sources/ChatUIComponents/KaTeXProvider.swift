@@ -1,7 +1,7 @@
 import Foundation
 
-@MainActor
 /// Provides cached access to bundled KaTeX CSS and JavaScript resources for offline LaTeX rendering.
+@MainActor
 public enum KaTeXProvider {
     private static var cachedCSS: String?
     private static var cachedJS: String?

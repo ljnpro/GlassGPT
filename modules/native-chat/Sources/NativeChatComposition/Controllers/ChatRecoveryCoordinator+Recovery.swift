@@ -1,5 +1,5 @@
 import ChatPersistenceSwiftData
-import ChatRuntimeModel
+import ChatRuntimeWorkflows
 import Foundation
 import os
 
@@ -18,106 +18,111 @@ extension ChatRecoveryCoordinator {
         let signpostState = recoverySignposter.beginInterval("RecoverResponse", id: signpostID)
         defer { recoverySignposter.endInterval("RecoverResponse", signpostState) }
 
-        guard !controller.apiKey.isEmpty else { return }
-        guard let message = controller.conversationCoordinator.findMessage(byId: messageId) else { return }
+        let storedAPIKey = services.apiKeyStore.loadAPIKey()?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        guard !storedAPIKey.isEmpty else { return }
+        guard let message = conversations.findMessage(byId: messageId) else { return }
 
         let session: ReplySession
-        if let existing = controller.sessionRegistry.session(for: messageId) {
+        if let existing = services.sessionRegistry.session(for: messageId) {
             session = existing
-        } else if let created = controller.sessionCoordinator.makeRecoverySession(for: message) {
+        } else if let created = sessions.makeRecoverySession(for: message) {
             session = created
-            controller.sessionCoordinator.registerSession(
+            sessions.registerSession(
                 created,
-                execution: SessionExecutionState(service: controller.serviceFactory()),
+                execution: SessionExecutionState(service: services.serviceFactory()),
                 visible: visible
             )
         } else {
             return
         }
 
-        if controller.sessionCoordinator.isSessionActive(session),
-           controller.sessionRegistry.execution(for: messageId)?.task != nil,
-           controller.sessionCoordinator.cachedRuntimeState(for: session)?.responseID == responseId {
+        let hasMatchingActiveRecoveryTask =
+            sessions.isSessionActive(session) &&
+            services.sessionRegistry.execution(for: messageId)?.task != nil &&
+            sessions.cachedRuntimeState(for: session)?.responseID == responseId
+
+        if hasMatchingActiveRecoveryTask {
             if visible {
-                controller.sessionCoordinator.bindVisibleSession(messageID: messageId)
+                sessions.bindVisibleSession(messageID: messageId)
             }
             return
         }
 
-        let controller = controller
-        Task { @MainActor in
-            _ = await controller.sessionCoordinator.applyRuntimeTransition(
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            _ = await sessions.applyRuntimeTransition(
                 .beginRecoveryStatus(
                     responseID: responseId,
                     lastSequenceNumber: message.lastSequenceNumber,
                     usedBackgroundMode: message.usedBackgroundMode,
-                    route: controller.sessionCoordinator.runtimeRoute(for: session)
+                    route: sessions.runtimeRoute(for: session)
                 ),
                 to: session
             )
-            controller.sessionCoordinator.syncVisibleState(from: session)
+            sessions.syncVisibleState(from: session)
         }
 
         if visible {
-            controller.errorMessage = nil
-            controller.sessionCoordinator.bindVisibleSession(messageID: messageId)
+            state.errorMessage = nil
+            sessions.bindVisibleSession(messageID: messageId)
         }
 
-        let execution = controller.sessionRegistry.execution(for: messageId) ?? SessionExecutionState(service: controller.serviceFactory())
-        controller.sessionRegistry.registerExecution(execution, for: messageId) { existing in
+        let execution = services.sessionRegistry.execution(for: messageId) ?? SessionExecutionState(service: services.serviceFactory())
+        services.sessionRegistry.registerExecution(execution, for: messageId) { existing in
             existing.task?.cancel()
             existing.service.cancelStream()
         }
 
         execution.task?.cancel()
-        execution.task = Task { @MainActor in
-            guard controller.sessionCoordinator.isSessionActive(session) else { return }
-            let apiKey = self.resultApplier.activeAPIKey(for: session)
+        execution.task = Task { @MainActor [weak self] in
+            guard let self else { return }
+            guard sessions.isSessionActive(session) else { return }
+            let apiKey = resultApplier.activeAPIKey(for: session)
 
             do {
                 let result = try await execution.service.fetchResponse(responseId: responseId, apiKey: apiKey)
 
-                switch result.status {
-                case .completed:
-                    self.resultApplier.finishRecovery(
+                switch ReplyRecoveryPlanner.fetchAction(
+                    for: result,
+                    preferStreamingResume: preferStreamingResume,
+                    usedBackgroundMode: message.usedBackgroundMode,
+                    lastSequenceNumber: message.lastSequenceNumber
+                ) {
+                case .finish(.completed):
+                    resultApplier.finishRecovery(
                         for: message,
                         session: session,
                         result: result,
-                        fallbackText: self.resultApplier.recoveryFallbackText(for: message, session: session),
-                        fallbackThinking: self.resultApplier.recoveryFallbackThinking(for: message, session: session)
+                        fallbackText: resultApplier.recoveryFallbackText(for: message, session: session),
+                        fallbackThinking: resultApplier.recoveryFallbackThinking(for: message, session: session)
                     )
 
-                case .failed, .incomplete, .unknown:
+                case let .finish(.failed(errorMessage)):
                     if visible {
-                        controller.errorMessage = result.errorMessage ?? "Response did not complete."
+                        state.errorMessage = errorMessage ?? "Response did not complete."
                     }
-                    self.resultApplier.finishRecovery(
+                    resultApplier.finishRecovery(
                         for: message,
                         session: session,
                         result: result,
-                        fallbackText: self.resultApplier.recoveryFallbackText(for: message, session: session),
-                        fallbackThinking: self.resultApplier.recoveryFallbackThinking(for: message, session: session)
+                        fallbackText: resultApplier.recoveryFallbackText(for: message, session: session),
+                        fallbackThinking: resultApplier.recoveryFallbackThinking(for: message, session: session)
                     )
 
-                case .queued, .inProgress:
-                    switch RuntimeSessionDecisionPolicy.recoveryResumeMode(
-                        preferStreamingResume: preferStreamingResume,
-                        usedBackgroundMode: message.usedBackgroundMode,
-                        lastSequenceNumber: message.lastSequenceNumber
-                    ) {
-                    case .stream(let lastSequenceNumber):
-                        await self.controller.startStreamingRecovery(
-                            session: session,
-                            responseId: responseId,
-                            lastSeq: lastSequenceNumber,
-                            apiKey: apiKey
-                        )
-                    case .poll:
-                        await self.controller.pollResponseUntilTerminal(session: session, responseId: responseId)
-                    }
+                case let .startStream(lastSequenceNumber):
+                    await startStreamingRecovery(
+                        session: session,
+                        responseId: responseId,
+                        lastSeq: lastSequenceNumber,
+                        apiKey: apiKey,
+                        useDirectEndpoint: false
+                    )
+
+                case .poll:
+                    await pollResponseUntilTerminal(session: session, responseId: responseId)
                 }
             } catch {
-                if self.resultApplier.handleUnrecoverableRecoveryError(
+                if resultApplier.handleUnrecoverableRecoveryError(
                     error,
                     for: message,
                     responseId: responseId,
@@ -126,7 +131,7 @@ extension ChatRecoveryCoordinator {
                 ) {
                     return
                 }
-                await self.controller.pollResponseUntilTerminal(session: session, responseId: responseId)
+                await pollResponseUntilTerminal(session: session, responseId: responseId)
             }
         }
     }

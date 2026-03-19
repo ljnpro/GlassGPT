@@ -38,30 +38,30 @@ struct HeadingView: View {
 
     private var fontForLevel: Font {
         switch level {
-        case 1: return .title
-        case 2: return .title2
-        case 3: return .title3
-        case 4: return .headline
-        default: return .subheadline
+        case 1: .title
+        case 2: .title2
+        case 3: .title3
+        case 4: .headline
+        default: .subheadline
         }
     }
 
     private var weightForLevel: Font.Weight {
         switch level {
-        case 1: return .bold
-        case 2: return .bold
-        case 3: return .semibold
-        case 4: return .semibold
-        default: return .medium
+        case 1: .bold
+        case 2: .bold
+        case 3: .semibold
+        case 4: .semibold
+        default: .medium
         }
     }
 
     private var topPadding: CGFloat {
         switch level {
-        case 1: return 12
-        case 2: return 10
-        case 3: return 8
-        default: return 6
+        case 1: 12
+        case 2: 10
+        case 3: 8
+        default: 6
         }
     }
 }

@@ -6,9 +6,9 @@ Only the latest minor release is actively supported with security updates.
 
 | Version | Supported          |
 |---------|--------------------|
-| 4.8.x   | Yes                |
-| 4.7.x   | Security fixes only|
-| < 4.7   | No                 |
+| 4.9.x   | Yes                |
+| 4.8.x   | Security fixes only|
+| < 4.8   | No                 |
 
 ## Reporting a Vulnerability
 

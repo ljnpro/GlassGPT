@@ -76,13 +76,12 @@ public struct FileAttachment: PayloadCodable, Identifiable, Equatable {
     /// The SF Symbol name appropriate for this file's type.
     public var iconName: String {
         switch fileType.lowercased() {
-        case "pdf": return "doc.richtext"
-        case "docx", "doc": return "doc.text"
-        case "pptx", "ppt": return "doc.text.image"
-        case "csv": return "tablecells"
-        case "xlsx", "xls": return "tablecells.badge.ellipsis"
-        default: return "doc"
+        case "pdf": "doc.richtext"
+        case "docx", "doc": "doc.text"
+        case "pptx", "ppt": "doc.text.image"
+        case "csv": "tablecells"
+        case "xlsx", "xls": "tablecells.badge.ellipsis"
+        default: "doc"
         }
     }
-
 }

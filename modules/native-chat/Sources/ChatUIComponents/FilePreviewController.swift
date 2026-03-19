@@ -42,12 +42,12 @@ public struct FilePreviewController: UIViewControllerRepresentable {
         }
 
         /// Returns 1 since this controller previews a single file.
-        public func numberOfPreviewItems(in controller: QLPreviewController) -> Int {
+        public func numberOfPreviewItems(in _: QLPreviewController) -> Int {
             1
         }
 
         /// Returns the file URL as the preview item.
-        public func previewController(_ controller: QLPreviewController, previewItemAt index: Int) -> any QLPreviewItem {
+        public func previewController(_: QLPreviewController, previewItemAt _: Int) -> any QLPreviewItem {
             fileURL as NSURL
         }
     }

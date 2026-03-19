@@ -1,11 +1,11 @@
 import ChatApplication
 import ChatDomain
 import ChatPersistenceCore
-import ChatPresentation
 import ChatPersistenceSwiftData
+import ChatPresentation
 import ChatUIComponents
-import GeneratedFilesInfra
 import Foundation
+import GeneratedFilesInfra
 import OpenAITransport
 import SwiftData
 import Testing

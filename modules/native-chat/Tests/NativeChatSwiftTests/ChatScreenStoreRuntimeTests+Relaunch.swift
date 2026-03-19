@@ -12,7 +12,7 @@ import Testing
 // MARK: - Relaunch Recovery Tests
 
 extension ChatScreenStoreRuntimeTests {
-    @Test func relaunchedStoreFetchesCompletedResponseDirectlyAfterBackgroundDetachment() async throws {
+    @Test func `relaunched store fetches completed response directly after background detachment`() async throws {
         let deps = try makeRelaunchDependencies()
 
         let initialStreamClient = ControlledOpenAIStreamClient()
@@ -29,8 +29,8 @@ extension ChatScreenStoreRuntimeTests {
         let relaunchURL = try #require(
             URL(string: "https://api.test.openai.local/v1/responses/resp_relaunch_completed")
         )
-        await relaunchTransport.enqueue(
-            data: try makeFetchResponseData(
+        try await relaunchTransport.enqueue(
+            data: makeFetchResponseData(
                 status: .completed,
                 text: "Fetched after relaunch",
                 thinking: "Server-side completion"
@@ -60,7 +60,7 @@ extension ChatScreenStoreRuntimeTests {
         #expect(relaunchStreamClient.recordedRequests.isEmpty)
     }
 
-    @Test func relaunchedBackgroundModeSessionResumesStreamingWhenResponseStillInProgress() async throws {
+    @Test func `relaunched background mode session resumes streaming when response still in progress`() async throws {
         let deps = try makeRelaunchDependencies()
 
         let initialStreamClient = ControlledOpenAIStreamClient()
@@ -76,8 +76,8 @@ extension ChatScreenStoreRuntimeTests {
         let streamURL = try #require(
             URL(string: "https://api.test.openai.local/v1/responses/resp_relaunch_stream")
         )
-        await relaunchTransport.enqueue(
-            data: try makeFetchResponseData(status: .inProgress, text: ""),
+        try await relaunchTransport.enqueue(
+            data: makeFetchResponseData(status: .inProgress, text: ""),
             url: streamURL
         )
 

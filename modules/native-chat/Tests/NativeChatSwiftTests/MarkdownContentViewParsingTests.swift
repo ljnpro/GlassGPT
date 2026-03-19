@@ -1,26 +1,26 @@
 import Foundation
-import Testing
 import NativeChatUI
+import Testing
 @testable import NativeChatComposition
 
 @MainActor
 struct MarkdownContentViewParsingTests {
-    @Test func parseInlineSegmentsExtractsInlineLatexAndPreservesEscapedDollarText() {
+    @Test func `parse inline segments extracts inline latex and preserves escaped dollar text`() {
         let segments = makeView().parseInlineSegments(#"alpha $x^2$ beta \(y + z\) cost \$5"#)
 
         #expect(
             inlineSegmentDescriptions(segments) ==
-            [
-                "text(alpha )",
-                "latex(x^2)",
-                "text( beta )",
-                "latex(y + z)",
-                #"text( cost \$5)"#
-            ]
+                [
+                    "text(alpha )",
+                    "latex(x^2)",
+                    "text( beta )",
+                    "latex(y + z)",
+                    #"text( cost \$5)"#
+                ]
         )
     }
 
-    @Test func detectHeadingRequiresSpaceAndNonEmptyText() {
+    @Test func `detect heading requires space and non empty text`() {
         let view = makeView()
 
         #expect(view.detectHeading("### Title")?.level == 3)
@@ -30,7 +30,7 @@ struct MarkdownContentViewParsingTests {
         #expect(view.detectHeading("plain text") == nil)
     }
 
-    @Test func isHorizontalRuleAcceptsSingleRepeatedMarkerWithSpaces() {
+    @Test func `is horizontal rule accepts single repeated marker with spaces`() {
         let view = makeView()
 
         #expect(view.isHorizontalRule("---"))
@@ -40,7 +40,7 @@ struct MarkdownContentViewParsingTests {
         #expect(!view.isHorizontalRule("--"))
     }
 
-    @Test func parseBlocksSplitsStructuralMarkdownBlocksInOrder() throws {
+    @Test func `parse blocks splits structural markdown blocks in order`() throws {
         let input = """
         # Title
         Lead with $x$.
@@ -56,7 +56,7 @@ struct MarkdownContentViewParsingTests {
 
         let parts = makeView().parseBlocks(input)
 
-        #expect(parts.map(\.id) == Array(0..<parts.count))
+        #expect(parts.map(\.id) == Array(0 ..< parts.count))
         #expect(parts.count == 6)
 
         let heading = try #require(headingPart(parts[0]))
@@ -64,8 +64,8 @@ struct MarkdownContentViewParsingTests {
         #expect(heading.text == "Title")
 
         #expect(
-            inlineSegmentDescriptions(try richTextSegments(parts[1])) ==
-            ["text(Lead with )", "latex(x)", "text(.)"]
+            try inlineSegmentDescriptions(richTextSegments(parts[1])) ==
+                ["text(Lead with )", "latex(x)", "text(.)"]
         )
 
         #expect(isHorizontalRule(parts[2]))
@@ -75,10 +75,10 @@ struct MarkdownContentViewParsingTests {
         #expect(codeBlock.code == "print(\"hi\")\n")
 
         #expect(try #require(latexBlockContent(parts[4])) == "a+b")
-        #expect(inlineSegmentDescriptions(try richTextSegments(parts[5])) == ["text(\nTail)"])
+        #expect(try inlineSegmentDescriptions(richTextSegments(parts[5])) == ["text(\nTail)"])
     }
 
-    @Test func parseBlocksLeavesUnclosedCodeFenceAsTrailingRichText() throws {
+    @Test func `parse blocks leaves unclosed code fence as trailing rich text`() throws {
         let input = """
         Before
         ```swift
@@ -89,12 +89,12 @@ struct MarkdownContentViewParsingTests {
 
         #expect(parts.count == 2)
         #expect(
-            inlineSegmentDescriptions(try richTextSegments(parts[0])) ==
-            ["text(Before\n)"]
+            try inlineSegmentDescriptions(richTextSegments(parts[0])) ==
+                ["text(Before\n)"]
         )
         #expect(
-            inlineSegmentDescriptions(try richTextSegments(parts[1])) ==
-            ["text(```swift\nlet value = 1)"]
+            try inlineSegmentDescriptions(richTextSegments(parts[1])) ==
+                ["text(```swift\nlet value = 1)"]
         )
     }
 
@@ -106,9 +106,9 @@ struct MarkdownContentViewParsingTests {
         segments.map { segment in
             switch segment {
             case let .text(text):
-                return "text(\(text))"
+                "text(\(text))"
             case let .latexInline(latex):
-                return "latex(\(latex))"
+                "latex(\(latex))"
             }
         }
     }

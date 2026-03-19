@@ -1,19 +1,19 @@
-import Foundation
 import ChatApplication
 import ChatDomain
 import ChatPersistenceSwiftData
 import ChatPresentation
 import ChatRuntimeModel
+import Foundation
 import GeneratedFilesCore
 import NativeChatUI
-import Testing
 import SwiftData
+import Testing
 @testable import NativeChatComposition
 
 @Suite(.serialized)
 @MainActor
 struct ScreenStoreTests {
-    @Test func chatScreenStoreFreshInstallStartsEmptyButUsableWithoutAPIKey() throws {
+    @Test func `chat screen store fresh install starts empty but usable without API key`() throws {
         let store = try makeTestChatScreenStore(
             apiKey: "",
             streamClient: QueuedOpenAIStreamClient(scriptedStreams: [])
@@ -35,7 +35,7 @@ struct ScreenStoreTests {
         #expect(store.fileDownloadError == nil)
     }
 
-    @Test func chatScreenStoreReinstallPathReadsPreexistingAPIKeyWithoutRestoringHistory() throws {
+    @Test func `chat screen store reinstall path reads preexisting API key without restoring history`() throws {
         let store = try makeTestChatScreenStore(
             apiKey: "sk-existing-keychain",
             streamClient: QueuedOpenAIStreamClient(scriptedStreams: [])
@@ -48,7 +48,7 @@ struct ScreenStoreTests {
         #expect(!store.isRestoringConversation)
     }
 
-    @Test func chatScreenStoreHasAPIKeyReflectsBackendValue() throws {
+    @Test func `chat screen store has API key reflects backend value`() throws {
         let populatedStore = try makeTestChatScreenStore(
             apiKey: "sk-present",
             streamClient: QueuedOpenAIStreamClient(scriptedStreams: [])
@@ -64,7 +64,7 @@ struct ScreenStoreTests {
         #expect(!emptyStore.hasAPIKey)
     }
 
-    @Test func startNewChatClearsTransientStateBasicFields() throws {
+    @Test func `start new chat clears transient state basic fields`() throws {
         let store = try makeTestChatScreenStore(
             streamClient: QueuedOpenAIStreamClient(scriptedStreams: [])
         )
@@ -92,7 +92,7 @@ struct ScreenStoreTests {
         #expect(store.draftMessage == nil)
     }
 
-    @Test func startNewChatRestoresDefaultConfiguration() throws {
+    @Test func `start new chat restores default configuration`() throws {
         let store = try makeTestChatScreenStore(
             streamClient: QueuedOpenAIStreamClient(scriptedStreams: [])
         )
@@ -127,7 +127,7 @@ struct ScreenStoreTests {
         #expect(store.serviceTier == expectedDefaultServiceTier)
     }
 
-    @Test func loadConversationAppliesStoredConfiguration() throws {
+    @Test func `load conversation applies stored configuration`() throws {
         let store = try makeTestChatScreenStore(
             streamClient: QueuedOpenAIStreamClient(scriptedStreams: [])
         )
@@ -158,7 +158,7 @@ struct ScreenStoreTests {
         #expect(store.serviceTier == .flex)
     }
 
-    @Test func loadConversationClearsTransientState() throws {
+    @Test func `load conversation clears transient state`() throws {
         let store = try makeTestChatScreenStore(
             streamClient: QueuedOpenAIStreamClient(scriptedStreams: [])
         )
@@ -183,7 +183,7 @@ struct ScreenStoreTests {
         #expect(store.fileDownloadError == nil)
     }
 
-    @Test func sessionRequestConfigurationNormalizesStoredEffortAndTier() throws {
+    @Test func `session request configuration normalizes stored effort and tier`() throws {
         let store = try makeTestChatScreenStore(
             streamClient: QueuedOpenAIStreamClient(scriptedStreams: [])
         )
@@ -214,7 +214,7 @@ struct ScreenStoreTests {
         #expect(storedSelection.2 == .standard)
     }
 
-    @Test func buildRequestMessagesFiltersIncompleteAssistantDrafts() throws {
+    @Test func `build request messages filters incomplete assistant drafts`() throws {
         let store = try makeTestChatScreenStore(
             streamClient: QueuedOpenAIStreamClient(scriptedStreams: [])
         )
@@ -244,7 +244,7 @@ struct ScreenStoreTests {
         #expect(apiMessages[1].content == "Answer")
     }
 
-    @Test func shouldHideOnlyTrulyEmptyIncompleteAssistantDrafts() throws {
+    @Test func `should hide only truly empty incomplete assistant drafts`() throws {
         let store = try makeTestChatScreenStore(
             streamClient: QueuedOpenAIStreamClient(scriptedStreams: [])
         )
@@ -279,7 +279,6 @@ struct ScreenStoreTests {
         #expect(!store.conversationCoordinator.shouldHideMessage(thinkingDraft))
         #expect(!store.conversationCoordinator.shouldHideMessage(userMessage))
     }
-
 }
 
 // MARK: - Private Helpers

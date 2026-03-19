@@ -5,7 +5,7 @@ public final class PlaceholderTextView: UITextView {
     private let placeholderLabel = UILabel()
 
     /// The placeholder string shown when the text view is empty.
-    public var placeholderText: String = "" {
+    public var placeholderText = "" {
         didSet {
             placeholderLabel.text = placeholderText
         }
@@ -36,7 +36,7 @@ public final class PlaceholderTextView: UITextView {
     }
 
     @available(*, unavailable)
-    public required init?(coder: NSCoder) {
+    public required init?(coder _: NSCoder) {
         fatalError("init(coder:) has not been implemented")
     }
 
@@ -80,8 +80,8 @@ public final class PlaceholderTextView: UITextView {
             let className = NSStringFromClass(type(of: subview))
             let shouldPreserve =
                 className.contains("Selection")
-                || className.contains("Caret")
-                || className.contains("Loupe")
+                    || className.contains("Caret")
+                    || className.contains("Loupe")
 
             if !shouldPreserve {
                 subview.isOpaque = false

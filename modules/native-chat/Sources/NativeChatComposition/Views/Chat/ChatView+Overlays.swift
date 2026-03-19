@@ -6,14 +6,14 @@ import UIKit
 
 extension ChatView {
     var restoringOverlay: some View {
-        statusOverlay(title: "Restoring conversation…")
-            .accessibilityLabel("Restoring conversation")
+        statusOverlay(title: String(localized: "Restoring conversation…"))
+            .accessibilityLabel(String(localized: "Restoring conversation"))
             .accessibilityIdentifier("chat.restoringOverlay")
     }
 
     var fileDownloadingOverlay: some View {
-        statusOverlay(title: "Downloading file…")
-            .accessibilityLabel("Downloading file")
+        statusOverlay(title: String(localized: "Downloading file…"))
+            .accessibilityLabel(String(localized: "Downloading file"))
             .accessibilityIdentifier("chat.downloadingOverlay")
     }
 
@@ -25,15 +25,15 @@ extension ChatView {
                 .symbolEffect(.breathe)
                 .accessibilityHidden(true)
 
-            Text("Start a Conversation")
+            Text(String(localized: "Start a Conversation"))
                 .font(.title2.weight(.semibold))
 
             if !viewModel.hasAPIKey {
-                Label("Add your API key in Settings", systemImage: "key.fill")
+                Label(String(localized: "Add your API key in Settings"), systemImage: "key.fill")
                     .font(.callout)
                     .foregroundStyle(.orange)
                     .padding(.top, 8)
-                    .accessibilityLabel("Add your API key in Settings")
+                    .accessibilityLabel(String(localized: "Add your API key in Settings"))
                     .accessibilityIdentifier("chat.missingAPIKeyHint")
             }
         }
@@ -111,7 +111,7 @@ extension ChatView {
             lightBorderOpacity: 0.08
         )
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("Error: \(message)")
+        .accessibilityLabel(String(localized: "Error") + ": \(message)")
         .accessibilityIdentifier("chat.errorBanner")
     }
 

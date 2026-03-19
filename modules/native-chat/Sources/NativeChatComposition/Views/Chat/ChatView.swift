@@ -1,12 +1,12 @@
-import ChatPersistenceSwiftData
+import ChatDomain
 import ChatPersistenceCore
-import PhotosUI
+import ChatPersistenceSwiftData
+import ChatUIComponents
 import GeneratedFilesCore
 import NativeChatUI
+import PhotosUI
 import SwiftUI
 import UIKit
-import ChatUIComponents
-import ChatDomain
 
 /// Main chat screen displaying the message list, composer bar, model selector, and generated file previews.
 package struct ChatView: View {
@@ -41,14 +41,15 @@ package struct ChatView: View {
     var modelSelectorInterfaceStyle: UIUserInterfaceStyle {
         switch selectedTheme {
         case .system:
-            return .unspecified
+            .unspecified
         case .light:
-            return .light
+            .light
         case .dark:
-            return .dark
+            .dark
         }
     }
 
+    /// The composed chat screen content, including navigation, overlays, and previews.
     package var body: some View {
         ZStack {
             NavigationStack {
@@ -96,7 +97,7 @@ package struct ChatView: View {
                                 )
                         }
                         .buttonStyle(GlassPressButtonStyle())
-                        .accessibilityLabel("Start new chat")
+                        .accessibilityLabel(String(localized: "Start new chat"))
                         .accessibilityIdentifier("chat.newChat")
                         .allowsHitTesting(!shouldShowGeneratedPreviewTouchShield)
                     }
@@ -157,12 +158,12 @@ package struct ChatView: View {
                         viewModel.handlePickedDocuments(urls)
                     }
                 }
-                .alert("File Download Error", isPresented: fileDownloadErrorBinding) {
-                    Button("OK", role: .cancel) {
+                .alert(String(localized: "File Download Error"), isPresented: fileDownloadErrorBinding) {
+                    Button(String(localized: "OK"), role: .cancel) {
                         viewModel.fileDownloadError = nil
                     }
                 } message: {
-                    Text(viewModel.fileDownloadError ?? "An unknown error occurred.")
+                    Text(viewModel.fileDownloadError ?? String(localized: "An unknown error occurred."))
                 }
                 .onAppear {
                     syncGeneratedPreviewPresentation()
