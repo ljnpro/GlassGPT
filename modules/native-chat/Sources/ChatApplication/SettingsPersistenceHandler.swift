@@ -1,7 +1,8 @@
 import ChatDomain
 
 /// Handler protocol for persisting user setting changes from the settings scene.
-package protocol SettingsPersistenceHandler: Sendable {
+@MainActor
+package protocol SettingsPersistenceHandler {
     /// Persists the default model preference.
     func persistDefaultModel(_ model: ModelType)
     /// Persists the default reasoning effort preference.

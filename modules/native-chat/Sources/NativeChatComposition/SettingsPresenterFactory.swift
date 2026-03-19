@@ -111,13 +111,14 @@ package func makeSettingsPresenter(
 
 // MARK: - Handler Implementations
 
+@MainActor
 private struct SettingsCredentialHandlerImpl: SettingsCredentialHandler {
     let apiKeyStore: PersistedAPIKeyStore
     let openAIService: OpenAIService
     let requestBuilder: OpenAIRequestBuilder
     let transport: OpenAIDataTransport
-    let resolvedCloudflareHealth: @Sendable (_ typedAPIKey: String, _ gatewayEnabled: Bool) -> CloudflareHealthStatus
-    let loadConfigurationProvider: @Sendable () -> OpenAIConfigurationProvider
+    let resolvedCloudflareHealth: (_ typedAPIKey: String, _ gatewayEnabled: Bool) -> CloudflareHealthStatus
+    let loadConfigurationProvider: () -> OpenAIConfigurationProvider
 
     func loadAPIKey() -> String? {
         apiKeyStore.loadAPIKey()
@@ -188,6 +189,7 @@ private struct SettingsCredentialHandlerImpl: SettingsCredentialHandler {
     }
 }
 
+@MainActor
 private struct SettingsCacheHandlerImpl: SettingsCacheHandler {
     let fileDownloadService: GeneratedFilesInfra.FileDownloadService
 
@@ -210,9 +212,10 @@ private struct SettingsCacheHandlerImpl: SettingsCacheHandler {
     }
 }
 
+@MainActor
 private struct SettingsPersistenceHandlerImpl: SettingsPersistenceHandler {
     let settingsStore: SettingsStore
-    let applyCloudflareEnabled: @Sendable (Bool) -> Void
+    let applyCloudflareEnabled: (Bool) -> Void
 
     func persistDefaultModel(_ model: ModelType) {
         settingsStore.defaultModel = model

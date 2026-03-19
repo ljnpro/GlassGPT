@@ -1,7 +1,8 @@
 import ChatDomain
 
 /// Handler protocol for API key credential operations used by the settings scene.
-package protocol SettingsCredentialHandler: Sendable {
+@MainActor
+package protocol SettingsCredentialHandler {
     /// Loads the stored API key, returning `nil` if none exists.
     func loadAPIKey() -> String?
     /// Persists the given API key.
