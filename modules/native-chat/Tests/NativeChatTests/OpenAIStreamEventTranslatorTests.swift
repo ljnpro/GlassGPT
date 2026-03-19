@@ -1,9 +1,11 @@
+// swiftlint:disable file_length
 import ChatDomain
 import ChatPersistenceSwiftData
 import OpenAITransport
 import XCTest
 @testable import NativeChatComposition
 
+// swiftlint:disable:next type_body_length
 final class OpenAIStreamEventTranslatorTests: XCTestCase {
     func testTranslateRecognizesResponseCreatedAndTextDelta() throws {
         let created = OpenAIStreamEventTranslator.translate(
@@ -54,6 +56,7 @@ final class OpenAIStreamEventTranslatorTests: XCTestCase {
         }
     }
 
+    // swiftlint:disable:next function_body_length
     func testTranslateRecognizesFailureAndAnnotationEvents() throws {
         let errorEvent = OpenAIStreamEventTranslator.translate(
             eventType: "response.failed",
@@ -115,6 +118,7 @@ final class OpenAIStreamEventTranslatorTests: XCTestCase {
         }
     }
 
+    // swiftlint:disable:next function_body_length cyclomatic_complexity
     func testTranslateRecognizesToolLifecycleEvents() throws {
         assertTranslation(
             eventType: "response.web_search_call.in_progress",
@@ -229,6 +233,7 @@ final class OpenAIStreamEventTranslatorTests: XCTestCase {
         }
     }
 
+    // swiftlint:disable:next function_body_length
     func testTranslateHandlesTerminalAndErrorEvents() throws {
         let fileAnnotation = ResponsesAnnotationDTO(
             type: "file_path",
@@ -459,6 +464,7 @@ final class OpenAIStreamEventTranslatorTests: XCTestCase {
         ])
     }
 
+    // swiftlint:disable:next function_body_length
     func testExtractionHelpersPreferStructuredContentAndGracefullyHandleEdgeCases() {
         let response = ResponsesResponseDTO(
             outputText: "top level text",
@@ -533,6 +539,7 @@ final class OpenAIStreamEventTranslatorTests: XCTestCase {
         XCTAssertEqual(annotations.first?.sandboxPath, "body")
     }
 
+    // swiftlint:disable:next function_body_length
     func testAnnotationHelpersValidatePayloadsAndSubstringBounds() {
         let urlAnnotation = ResponsesAnnotationDTO(
             type: "url_citation",
@@ -634,6 +641,7 @@ final class OpenAIStreamEventTranslatorTests: XCTestCase {
         )
     }
 
+    // swiftlint:disable:next function_body_length
     func testSSEEventDecoderTracksThinkingAndTerminalPayload() async throws {
         var decoder = SSEEventDecoder()
         let continuation = makeTestAsyncStream() as (
@@ -733,6 +741,7 @@ final class OpenAIStreamEventTranslatorTests: XCTestCase {
         }
     }
 
+    // swiftlint:disable:next function_body_length
     func testSSEEventDecoderHandlesOutputDoneAndIncompleteTerminalMessage() async throws {
         var decoder = SSEEventDecoder()
         let continuation = makeTestAsyncStream() as (

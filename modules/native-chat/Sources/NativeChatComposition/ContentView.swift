@@ -4,9 +4,12 @@ import GeneratedFilesCore
 import NativeChatUI
 import SwiftUI
 
+/// Root tab view that composes the Chat, History, and Settings tabs.
 package struct ContentView: View {
+    /// The shared application store driving all tab content.
     @Bindable var appStore: NativeChatAppStore
 
+    /// Creates the content view backed by the given app store.
     package init(appStore: NativeChatAppStore) {
         self.appStore = appStore
     }

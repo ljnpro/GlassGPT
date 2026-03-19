@@ -6,6 +6,7 @@ import OpenAITransport
 
 @MainActor
 extension ChatStreamingCoordinator {
+    // swiftlint:disable:next cyclomatic_complexity function_body_length
     func startStreamingRequest(for session: ReplySession, reconnectAttempt: Int = 0) {
         guard let requestMessages = session.request.messages else { return }
         guard let execution = controller.sessionRegistry.execution(for: session.messageID) else { return }

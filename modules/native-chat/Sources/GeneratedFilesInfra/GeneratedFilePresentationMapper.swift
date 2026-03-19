@@ -2,14 +2,21 @@ import ChatDomain
 import Foundation
 import GeneratedFilesCore
 
+/// The resolved presentation mode for a generated file.
 public enum GeneratedFilePresentation {
+    /// Show the file in the in-app preview viewer.
     case preview(FilePreviewItem)
+    /// Present the file via the system share sheet.
     case share(SharedGeneratedFileItem)
 }
 
+/// Maps a ``GeneratedFileLocalResource`` to its user-facing presentation and builds
+/// error messages for failed downloads.
 public struct GeneratedFilePresentationMapper {
+    /// Creates a new presentation mapper.
     public init() {}
 
+    /// Builds the appropriate ``GeneratedFilePresentation`` for a local resource.
     public func presentation(
         for resource: GeneratedFileLocalResource,
         suggestedFilename: String?
@@ -41,6 +48,7 @@ public struct GeneratedFilePresentationMapper {
         }
     }
 
+    /// Returns a user-facing error message for a failed file download, customized by open behavior.
     public func userFacingDownloadError(
         _ error: Error,
         openBehavior: GeneratedFileOpenBehavior
@@ -71,6 +79,7 @@ public struct GeneratedFilePresentationMapper {
         return error.localizedDescription
     }
 
+    /// Determines the open behavior for a file based on its annotation's filename or sandbox path extension.
     public func generatedOpenBehavior(for annotation: FilePathAnnotation) -> GeneratedFileOpenBehavior {
         if let filename = annotation.filename {
             return openBehavior(for: filename)
@@ -78,7 +87,7 @@ public struct GeneratedFilePresentationMapper {
 
         let sandboxPath = annotation.sandboxPath
         guard !sandboxPath.isEmpty else { return .directShare }
-        let filename = (sandboxPath as NSString).lastPathComponent
+        let filename = URL(fileURLWithPath: sandboxPath).lastPathComponent
         return openBehavior(for: filename)
     }
 

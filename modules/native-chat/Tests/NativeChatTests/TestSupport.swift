@@ -1,3 +1,4 @@
+// swiftlint:disable file_length
 import ChatApplication
 import ChatDomain
 import ChatPersistenceCore
@@ -10,7 +11,6 @@ import OpenAITransport
 import SwiftData
 import XCTest
 @testable import NativeChatComposition
-
 final class RuntimeTestOpenAIConfigurationProvider: OpenAIConfigurationProvider, @unchecked Sendable {
     var directOpenAIBaseURL: String
     var cloudflareGatewayBaseURL: String
@@ -100,6 +100,7 @@ func makeTestAsyncStream<Element>() -> (
     let stream = AsyncStream<Element> { continuation in
         capturedContinuation = continuation
     }
+    // swiftlint:disable:next force_unwrapping
     return (stream, capturedContinuation!)
 }
 
@@ -176,6 +177,7 @@ actor StubOpenAITransport: OpenAIDataTransport {
     func enqueue(
         data: Data,
         statusCode: Int = 200,
+        // swiftlint:disable:next force_unwrapping
         url: URL = URL(string: "https://api.test.openai.local/v1/responses/test")!
     ) {
         let response = HTTPURLResponse(
@@ -183,6 +185,7 @@ actor StubOpenAITransport: OpenAIDataTransport {
             statusCode: statusCode,
             httpVersion: nil,
             headerFields: nil
+        // swiftlint:disable:next force_unwrapping
         )!
         queuedResponses.append(.success((data, response)))
     }

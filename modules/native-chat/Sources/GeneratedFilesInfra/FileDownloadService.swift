@@ -4,7 +4,9 @@ import OpenAITransport
 
 /// Actor responsible for downloading files from OpenAI.
 public actor FileDownloadService {
+    /// Maximum size in bytes for the generated image cache (250 MB).
     public static let generatedImageCacheLimitBytes: Int64 = 250 * 1024 * 1024
+    /// Maximum size in bytes for the generated document cache (250 MB).
     public static let generatedDocumentCacheLimitBytes: Int64 = 250 * 1024 * 1024
 
     struct GeneratedFilePayload {
@@ -24,6 +26,7 @@ public actor FileDownloadService {
     let namingResolver: GeneratedFileNamingResolver
     let downloadClient: GeneratedFileDownloadClient
 
+    /// Creates a download service with the given configuration and optional overrides.
     public init(
         configurationProvider: OpenAIConfigurationProvider,
         requestAuthorizer: OpenAIRequestAuthorizer? = nil,
@@ -49,6 +52,7 @@ public actor FileDownloadService {
         )
     }
 
+    /// Downloads a file to a temporary directory, deduplicating concurrent requests for the same key.
     public func downloadFile(
         fileId: String,
         containerId: String?,
@@ -75,6 +79,7 @@ public actor FileDownloadService {
         return try await task.value
     }
 
+    /// Downloads and caches a generated file, returning a local resource. Returns a cached copy if available.
     public func prefetchGeneratedFile(
         fileId: String,
         containerId: String?,
@@ -109,6 +114,7 @@ public actor FileDownloadService {
         return try await task.value
     }
 
+    /// Returns a previously cached generated file resource, or `nil` if not cached.
     public func cachedGeneratedFile(
         fileId: String,
         containerId: String?,
@@ -142,31 +148,38 @@ public actor FileDownloadService {
         return nil
     }
 
+    /// Returns the current size in bytes of the generated image cache.
     public func generatedImageCacheSize() -> Int64 {
         generatedFileCacheSize(for: .image)
     }
 
+    /// Removes all cached generated images.
     public func clearGeneratedImageCache() {
         clearGeneratedFileCache(for: .image)
     }
 
+    /// Returns the current size in bytes of the generated document cache.
     public func generatedDocumentCacheSize() -> Int64 {
         generatedFileCacheSize(for: .document)
     }
 
+    /// Removes all cached generated documents.
     public func clearGeneratedDocumentCache() {
         clearGeneratedFileCache(for: .document)
     }
 
+    /// Returns the open behavior for a given filename based on its extension.
     public static func openBehavior(for filename: String?) -> GeneratedFileOpenBehavior {
         GeneratedFileCachePolicy.openBehavior(for: filename)
     }
 
+    /// Cancels an in-flight prefetch for the specified file.
     public func cancelGeneratedFilePrefetch(fileId: String, containerId: String?) {
         let key = namingResolver.downloadKey(fileId: fileId, containerId: containerId)
         inFlightGeneratedFileDownloads.removeValue(forKey: key)?.cancel()
     }
 
+    /// Cancels all in-flight generated file prefetch tasks.
     public func cancelAllGeneratedFilePrefetches() {
         for task in inFlightGeneratedFileDownloads.values {
             task.cancel()

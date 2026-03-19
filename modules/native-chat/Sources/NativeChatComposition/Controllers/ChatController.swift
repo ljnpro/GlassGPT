@@ -14,14 +14,22 @@ import OpenAITransport
 
 @Observable
 @MainActor
+/// Central controller managing the active chat session, message state, streaming, and recovery.
+///
+/// Owns a set of single-responsibility coordinators that handle conversation management,
+/// session lifecycle, file interactions, streaming, and recovery.
 package final class ChatController {
 
     // MARK: - State
 
     var messages: [Message] = []
+    /// The text being streamed from the assistant's current response.
     package var currentStreamingText: String = ""
+    /// The reasoning/thinking text being emitted by the model.
     package var currentThinkingText: String = ""
+    /// Whether the assistant is actively streaming a response.
     package var isStreaming: Bool = false
+    /// Whether the model is actively in a reasoning phase.
     package var isThinking: Bool = false
     var isRecovering: Bool = false
     var isRestoringConversation: Bool = false
@@ -56,11 +64,13 @@ package final class ChatController {
             conversationCoordinator.syncConversationConfiguration()
         }
     }
+    /// The currently loaded conversation, if any.
     package var currentConversation: ChatPersistenceSwiftData.Conversation?
     var errorMessage: String?
     var selectedImageData: Data?
 
     // Tool call state
+    /// Tool calls currently being executed by the model.
     package var activeToolCalls: [ToolCallInfo] = []
     var liveCitations: [URLCitation] = []
     var liveFilePathAnnotations: [FilePathAnnotation] = []
@@ -93,6 +103,7 @@ package final class ChatController {
     @ObservationIgnored
     lazy var sendCoordinator = ChatSendCoordinator(controller: self)
     @ObservationIgnored
+    /// Coordinator managing conversation CRUD, configuration sync, and message projection.
     package lazy var conversationCoordinator = ChatConversationCoordinator(controller: self)
     @ObservationIgnored
     lazy var sessionCoordinator = ChatSessionCoordinator(controller: self)
@@ -112,6 +123,7 @@ package final class ChatController {
     let generatedFilePrefetchRegistry = GeneratedFilePrefetchRegistry()
     // MARK: - Init
 
+    /// Creates a chat controller with the given persistence context, stores, and transport layer.
     package init(
         modelContext: ModelContext,
         settingsStore: SettingsStore,

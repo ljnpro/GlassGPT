@@ -6,12 +6,13 @@ extension MarkdownContentView {
 
     /// First pass: extract code blocks and LaTeX blocks from raw text.
     /// Returns a mix of code/latex blocks and raw text chunks.
+    // swiftlint:disable:next cyclomatic_complexity function_body_length
     package func parseBlocks(_ input: String) -> [BlockPart] {
         var firstPass: [BlockPart] = []
         var inlineBuffer = ""
         let chars = Array(input)
         let count = chars.count
-        var i = 0
+        var index = 0
         var nextID = 0
 
         func makeID() -> Int {
@@ -27,10 +28,10 @@ extension MarkdownContentView {
             inlineBuffer = ""
         }
 
-        while i < count {
-            if i + 2 < count && chars[i] == "`" && chars[i + 1] == "`" && chars[i + 2] == "`" {
+        while index < count {
+            if index + 2 < count && chars[index] == "`" && chars[index + 1] == "`" && chars[index + 2] == "`" {
                 flushInline()
-                let start = i + 3
+                let start = index + 3
                 var langEnd = start
                 while langEnd < count && chars[langEnd] != "\n" {
                     langEnd += 1
@@ -52,20 +53,20 @@ extension MarkdownContentView {
                 if found {
                     let code = String(chars[codeStart..<codeEnd])
                     firstPass.append(.codeBlock(id: makeID(), language: lang.isEmpty ? nil : lang, code: code))
-                    i = codeEnd + 3
-                    if i < count && chars[i] == "\n" {
-                        i += 1
+                    index = codeEnd + 3
+                    if index < count && chars[index] == "\n" {
+                        index += 1
                     }
                 } else {
                     inlineBuffer += "```"
-                    i = start
+                    index = start
                 }
                 continue
             }
 
-            if i + 1 < count && chars[i] == "\\" && chars[i + 1] == "[" {
+            if index + 1 < count && chars[index] == "\\" && chars[index + 1] == "[" {
                 flushInline()
-                let start = i + 2
+                let start = index + 2
                 var end = start
                 var found = false
                 while end + 1 < count {
@@ -81,17 +82,17 @@ extension MarkdownContentView {
                     if !latex.isEmpty {
                         firstPass.append(.latexBlock(id: makeID(), content: latex))
                     }
-                    i = end + 2
+                    index = end + 2
                 } else {
                     inlineBuffer.append("\\[")
-                    i = start
+                    index = start
                 }
                 continue
             }
 
-            if i + 1 < count && chars[i] == "$" && chars[i + 1] == "$" {
+            if index + 1 < count && chars[index] == "$" && chars[index + 1] == "$" {
                 flushInline()
-                let start = i + 2
+                let start = index + 2
                 var end = start
                 var found = false
                 while end + 1 < count {
@@ -107,16 +108,16 @@ extension MarkdownContentView {
                     if !latex.isEmpty {
                         firstPass.append(.latexBlock(id: makeID(), content: latex))
                     }
-                    i = end + 2
+                    index = end + 2
                 } else {
                     inlineBuffer.append("$$")
-                    i = start
+                    index = start
                 }
                 continue
             }
 
-            inlineBuffer.append(chars[i])
-            i += 1
+            inlineBuffer.append(chars[index])
+            index += 1
         }
 
         flushInline()

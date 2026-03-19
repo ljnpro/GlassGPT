@@ -6,6 +6,7 @@ import SwiftUI
 
 @MainActor
 extension ChatStreamingCoordinator {
+    // swiftlint:disable:next cyclomatic_complexity function_body_length
     func applyStreamEvent(_ event: StreamEvent, to session: ReplySession, animated: Bool) async -> StreamEventDisposition {
         let shouldAnimate = animated && controller.visibleSessionMessageID == session.messageID
         let route = controller.sessionCoordinator.runtimeRoute(for: session)
@@ -100,7 +101,8 @@ extension ChatStreamingCoordinator {
             return .continued
 
         case .codeInterpreterInterpreting(let callId):
-            _ = await controller.sessionCoordinator.applyRuntimeTransition(.setToolCallStatus(id: callId, status: .interpreting), to: session)
+            let transition = ReplyRuntimeTransition.setToolCallStatus(id: callId, status: .interpreting)
+            _ = await controller.sessionCoordinator.applyRuntimeTransition(transition, to: session)
             animateStreamEvent(shouldAnimate, animation: .easeInOut(duration: 0.2)) {
                 self.controller.sessionCoordinator.syncVisibleState(from: session)
             }
@@ -136,7 +138,8 @@ extension ChatStreamingCoordinator {
             return .continued
 
         case .fileSearchSearching(let callId):
-            _ = await controller.sessionCoordinator.applyRuntimeTransition(.setToolCallStatus(id: callId, status: .fileSearching), to: session)
+            let transition = ReplyRuntimeTransition.setToolCallStatus(id: callId, status: .fileSearching)
+            _ = await controller.sessionCoordinator.applyRuntimeTransition(transition, to: session)
             animateStreamEvent(shouldAnimate, animation: .easeInOut(duration: 0.2)) {
                 self.controller.sessionCoordinator.syncVisibleState(from: session)
             }

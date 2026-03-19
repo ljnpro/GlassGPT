@@ -1,12 +1,19 @@
 import SwiftUI
 import UIKit
 
+/// Layout strategy for the chat scroll container.
 public enum ChatScrollLayoutMode: Equatable {
+    /// Content is vertically centered within the viewport.
     case centered
+    /// Content sticks to the bottom and follows new messages.
     case bottomAnchored
 }
 
 @MainActor
+/// UIKit view controller that manages a scroll view containing chat messages and a pinned composer.
+///
+/// Handles bottom-anchored auto-scrolling during streaming, keyboard avoidance,
+/// and layout transitions between centered and bottom-anchored modes.
 public final class ChatScrollContainerController: UIViewController, UIScrollViewDelegate, UIGestureRecognizerDelegate {
     let scrollView = UIScrollView()
     let contentHostingController = UIHostingController(rootView: AnyView(EmptyView()))
@@ -33,6 +40,7 @@ public final class ChatScrollContainerController: UIViewController, UIScrollView
     var lastComposerHeight: CGFloat = 0
     let pinnedThreshold: CGFloat = 28
 
+    /// Creates a new chat scroll container controller.
     public init() {
         super.init(nibName: nil, bundle: nil)
     }
@@ -56,6 +64,7 @@ public final class ChatScrollContainerController: UIViewController, UIScrollView
         reconcileLayout()
     }
 
+    /// Applies updated state from the SwiftUI representable, reconciling layout and scroll position.
     public func update(
         content: AnyView,
         composer: AnyView,
@@ -106,6 +115,7 @@ public final class ChatScrollContainerController: UIViewController, UIScrollView
         view.setNeedsLayout()
     }
 
+    /// Tracks whether the user has scrolled away from the bottom to suspend auto-follow.
     public func scrollViewDidScroll(_ scrollView: UIScrollView) {
         guard !isApplyingProgrammaticScroll else { return }
         guard layoutMode == .bottomAnchored else { return }
@@ -120,6 +130,7 @@ public final class ChatScrollContainerController: UIViewController, UIScrollView
         }
     }
 
+    /// Allows the background tap gesture to work alongside the scroll view's own gestures.
     public func gestureRecognizer(
         _ gestureRecognizer: UIGestureRecognizer,
         shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer

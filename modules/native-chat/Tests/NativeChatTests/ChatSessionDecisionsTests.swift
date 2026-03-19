@@ -1,3 +1,4 @@
+// swiftlint:disable file_length
 import ChatDomain
 import ChatPersistenceSwiftData
 import ChatRuntimeModel
@@ -7,6 +8,7 @@ import XCTest
 @testable import NativeChatComposition
 
 @MainActor
+// swiftlint:disable:next type_body_length
 final class ChatSessionDecisionsTests: XCTestCase {
     func testRecoveryResumeModeUsesStreamingWhenBackgroundModeAndSequenceExist() {
         let mode = RuntimeSessionDecisionPolicy.recoveryResumeMode(
@@ -494,6 +496,7 @@ final class ChatSessionDecisionsTests: XCTestCase {
         XCTAssertTrue(snapshot.requestUsesBackgroundMode)
     }
 
+    // swiftlint:disable:next function_body_length
     func testMessagePersistenceAdapterPersistsDraftCompletedAndPartialSnapshots() {
         let adapter = MessagePersistenceAdapter()
         let conversation = Conversation(title: "Persistence")

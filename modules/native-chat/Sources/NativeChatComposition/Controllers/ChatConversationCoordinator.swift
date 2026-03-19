@@ -7,13 +7,16 @@ import Foundation
 import OpenAITransport
 
 @MainActor
+/// Coordinator responsible for conversation lifecycle: starting new chats, loading, restoring, and regenerating messages.
 package final class ChatConversationCoordinator {
     unowned let controller: ChatController
 
+    /// Creates a coordinator bound to the given chat controller.
     package init(controller: ChatController) {
         self.controller = controller
     }
 
+    /// Resets the controller to a blank conversation, saving any active session first.
     package func startNewChat() {
         if let session = controller.currentVisibleSession {
             controller.sessionCoordinator.saveSessionNow(session)
@@ -43,6 +46,7 @@ package final class ChatConversationCoordinator {
         controller.hapticService.selection(isEnabled: controller.hapticsEnabled)
     }
 
+    /// Deletes the given assistant message and re-submits a fresh request for it.
     package func regenerateMessage(_ message: Message) {
         guard !controller.isStreaming else { return }
         guard message.role == .assistant else { return }
@@ -104,6 +108,7 @@ package final class ChatConversationCoordinator {
         controller.startStreamingRequest(for: session)
     }
 
+    /// Loads an existing conversation from persistence, replacing the current session.
     package func loadConversation(_ conversation: Conversation) {
         if let session = controller.currentVisibleSession {
             controller.sessionCoordinator.saveSessionNow(session)
@@ -140,6 +145,7 @@ package final class ChatConversationCoordinator {
         }
     }
 
+    /// Attempts to restore the most recent conversation from persistence on app launch.
     package func restoreLastConversationIfAvailable() {
         do {
             if let lastConversation = try controller.conversationRepository.fetchMostRecentConversationWithMessages() {
@@ -157,6 +163,7 @@ package final class ChatConversationCoordinator {
         }
     }
 
+    /// Returns the current incomplete assistant draft message, if one exists.
     package func activeIncompleteAssistantDraft() -> Message? {
         if let draft = controller.draftMessage, !draft.isComplete, draft.role == .assistant {
             return draft

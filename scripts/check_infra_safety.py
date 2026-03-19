@@ -1,12 +1,9 @@
 #!/usr/bin/env python3
 
-from __future__ import annotations
-
 import re
 import sys
 from dataclasses import dataclass
 from pathlib import Path
-
 
 ROOT = Path(__file__).resolve().parent.parent
 PRODUCTION_ROOTS = (
@@ -25,6 +22,7 @@ SHARED_SESSION_PATTERNS = (
 
 DETACHED_TASK_PATTERN = re.compile(r"\bTask\.detached\b")
 CONTINUATION_PATTERN = re.compile(r"\bwithChecked(?:Throwing)?Continuation\b")
+NSSTRING_BRIDGE_PATTERN = re.compile(r"\bas\s+NSString\b")
 
 
 @dataclass(frozen=True)
@@ -69,6 +67,9 @@ def main() -> int:
                     "checked continuations are forbidden in transport/download infra; use native async APIs",
                 )
             )
+
+        if NSSTRING_BRIDGE_PATTERN.search(text):
+            failures.append(Failure(relative(path), "as NSString bridge is forbidden; use native Swift String APIs"))
 
     print("Infra-safety report")
     print(f"Scanned Swift files: {len(files)}")

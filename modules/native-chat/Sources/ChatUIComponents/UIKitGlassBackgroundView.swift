@@ -1,16 +1,26 @@
 import SwiftUI
 import UIKit
 
+/// SwiftUI representable that wraps ``GlassBackgroundHostingView`` for use as a view background.
 public struct UIKitGlassBackgroundView: UIViewRepresentable {
+    /// Corner radius of the glass effect shape.
     public let cornerRadius: CGFloat
+    /// Inset between the outer effect and the inner stable fill.
     public var innerInset: CGFloat = 0
+    /// Opacity of the stable solid fill overlaid on the glass effect.
     public var stableFillOpacity: CGFloat = 0.04
+    /// Opacity of the tint color applied to the glass effect.
     public var tintOpacity: CGFloat = 0
+    /// Whether a thin border is drawn around the glass shape.
     public var showsBorder: Bool = true
+    /// Width of the border stroke in points.
     public var borderWidth: CGFloat = 0.9
+    /// Border opacity used in dark mode.
     public var darkBorderOpacity: CGFloat = 0.13
+    /// Border opacity used in light mode.
     public var lightBorderOpacity: CGFloat = 0.08
 
+    /// Creates a glass background view with the given visual parameters.
     public init(
         cornerRadius: CGFloat,
         innerInset: CGFloat = 0,
@@ -31,6 +41,7 @@ public struct UIKitGlassBackgroundView: UIViewRepresentable {
         self.lightBorderOpacity = lightBorderOpacity
     }
 
+    /// Creates the underlying ``GlassBackgroundHostingView``.
     public func makeUIView(context: Context) -> GlassBackgroundHostingView {
         GlassBackgroundHostingView(
             cornerRadius: cornerRadius,
@@ -44,6 +55,7 @@ public struct UIKitGlassBackgroundView: UIViewRepresentable {
         )
     }
 
+    /// Reconfigures the glass background when SwiftUI state changes.
     public func updateUIView(_ uiView: GlassBackgroundHostingView, context: Context) {
         uiView.configure(
             cornerRadius: cornerRadius,

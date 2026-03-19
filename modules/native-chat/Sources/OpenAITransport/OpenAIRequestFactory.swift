@@ -1,14 +1,23 @@
 import Foundation
 
+/// Describes the parameters needed to construct an API request.
 public struct OpenAIRequestDescriptor: Sendable {
+    /// The API path relative to the base URL (e.g. "/responses").
     public let path: String
+    /// The HTTP method (e.g. "GET", "POST").
     public let method: String
+    /// The Accept header value.
     public let accept: String
+    /// The request timeout interval in seconds.
     public let timeoutInterval: TimeInterval
+    /// URL query items to append to the request.
     public let queryItems: [URLQueryItem]
+    /// Override for whether to include Cloudflare authorization, or `nil` for auto.
     public let includeCloudflareAuthorization: Bool?
+    /// Override for the Content-Type header, or `nil` for auto.
     public let contentType: String?
 
+    /// Creates a new request descriptor.
     public init(
         path: String,
         method: String,
@@ -28,10 +37,17 @@ public struct OpenAIRequestDescriptor: Sendable {
     }
 }
 
+/// Low-level factory for constructing authorized ``URLRequest`` instances for the OpenAI API.
 public struct OpenAIRequestFactory {
+    /// The configuration provider for endpoint resolution.
     let configuration: any OpenAIConfigurationProvider
+    /// The authorizer for applying authentication headers.
     let requestAuthorizer: any OpenAIRequestAuthorizer
 
+    /// Creates a new request factory.
+    /// - Parameters:
+    ///   - configuration: The configuration provider.
+    ///   - requestAuthorizer: An optional custom authorizer. Defaults to ``OpenAIStandardRequestAuthorizer``.
     public init(
         configuration: any OpenAIConfigurationProvider,
         requestAuthorizer: (any OpenAIRequestAuthorizer)? = nil
@@ -42,6 +58,10 @@ public struct OpenAIRequestFactory {
         )
     }
 
+    /// Returns the URL for the responses endpoint.
+    /// - Parameter useDirectBaseURL: Whether to force the direct OpenAI endpoint.
+    /// - Returns: The responses endpoint URL.
+    /// - Throws: ``OpenAIServiceError/invalidURL`` if the URL cannot be constructed.
     public func responsesURL(useDirectBaseURL: Bool = false) throws -> URL {
         try url(
             for: OpenAIRequestDescriptor(path: "/responses", method: "GET"),
@@ -49,6 +69,15 @@ public struct OpenAIRequestFactory {
         )
     }
 
+    /// Returns the URL for a specific response, with optional streaming and pagination parameters.
+    /// - Parameters:
+    ///   - responseID: The API response identifier.
+    ///   - stream: Whether to request streaming output.
+    ///   - startingAfter: The sequence number to resume after, if any.
+    ///   - include: Additional include parameters for the response.
+    ///   - useDirectBaseURL: Whether to force the direct OpenAI endpoint.
+    /// - Returns: The response URL.
+    /// - Throws: ``OpenAIServiceError/invalidURL`` if the URL cannot be constructed.
     public func responseURL(
         responseID: String,
         stream: Bool,
@@ -80,6 +109,14 @@ public struct OpenAIRequestFactory {
         )
     }
 
+    /// Builds a fully authorized ``URLRequest`` from a descriptor.
+    /// - Parameters:
+    ///   - descriptor: The request descriptor specifying path, method, and headers.
+    ///   - apiKey: The API key for authentication.
+    ///   - body: Optional HTTP body data.
+    ///   - useDirectBaseURL: Whether to force the direct OpenAI endpoint.
+    /// - Returns: A configured and authorized URL request.
+    /// - Throws: ``OpenAIServiceError/invalidURL`` if the URL cannot be constructed.
     public func request(
         for descriptor: OpenAIRequestDescriptor,
         apiKey: String,
@@ -108,6 +145,12 @@ public struct OpenAIRequestFactory {
         return request
     }
 
+    /// Constructs the URL for a request descriptor.
+    /// - Parameters:
+    ///   - descriptor: The request descriptor.
+    ///   - useDirectBaseURL: Whether to force the direct OpenAI endpoint.
+    /// - Returns: The constructed URL.
+    /// - Throws: ``OpenAIServiceError/invalidURL`` if the URL cannot be constructed.
     public func url(
         for descriptor: OpenAIRequestDescriptor,
         useDirectBaseURL: Bool = false

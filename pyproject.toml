@@ -1,0 +1,13 @@
+[project]
+requires-python = ">=3.14"
+
+[tool.ruff]
+target-version = "py314"
+line-length = 140
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "N", "UP", "ANN", "B", "SIM", "TCH"]
+
+[tool.mypy]
+python_version = "3.14"
+strict = true

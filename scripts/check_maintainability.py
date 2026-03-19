@@ -1,13 +1,10 @@
 #!/usr/bin/env python3
 
-from __future__ import annotations
-
 import os
 import re
 import sys
 from dataclasses import dataclass
 from pathlib import Path
-
 
 ROOT = Path(__file__).resolve().parent.parent
 PRODUCTION_ROOTS = [
@@ -24,6 +21,7 @@ MAX_JSON_SERIALIZATION = int(os.environ.get("MAX_JSON_SERIALIZATION", "0"))
 MAX_FATAL_ERRORS = int(os.environ.get("MAX_FATAL_ERRORS", "0"))
 MAX_PRECONDITION_FAILURES = int(os.environ.get("MAX_PRECONDITION_FAILURES", "0"))
 MAX_UNCHECKED_SENDABLE = int(os.environ.get("MAX_UNCHECKED_SENDABLE", "0"))
+MAX_EMPTY_CATCH = int(os.environ.get("MAX_EMPTY_CATCH", "0"))
 MAX_NON_UI_FAMILY_LINES = int(os.environ.get("MAX_NON_UI_FAMILY_LINES", "500"))
 MAX_UI_FAMILY_LINES = int(os.environ.get("MAX_UI_FAMILY_LINES", "700"))
 MAX_SCREEN_STORE_FAMILY_LINES = int(os.environ.get("MAX_SCREEN_STORE_FAMILY_LINES", "260"))
@@ -179,22 +177,16 @@ def family_length_results(files: list[Path]) -> list[CheckResult]:
         is_screen_store = any(classify_screen_store(path) for path in family_files)
         is_ui = any(classify_ui(path) for path in family_files)
 
-        limit = None
-        if is_screen_store:
-            family_limit = limit if limit is not None else MAX_SCREEN_STORE_FAMILY_LINES
-            if total_lines > family_limit:
-                screen_store_over.append(entry)
-            continue
-
-        if is_ui:
-            family_limit = limit if limit is not None else MAX_UI_FAMILY_LINES
-            if total_lines > family_limit:
-                ui_over.append(entry)
-            continue
-
-        family_limit = limit if limit is not None else MAX_NON_UI_FAMILY_LINES
-        if total_lines > family_limit:
-            non_ui_over.append(entry)
+        match (is_screen_store, is_ui):
+            case (True, _):
+                if total_lines > MAX_SCREEN_STORE_FAMILY_LINES:
+                    screen_store_over.append(entry)
+            case (_, True):
+                if total_lines > MAX_UI_FAMILY_LINES:
+                    ui_over.append(entry)
+            case _:
+                if total_lines > MAX_NON_UI_FAMILY_LINES:
+                    non_ui_over.append(entry)
 
     return [
         CheckResult(
@@ -233,6 +225,7 @@ def main() -> int:
         count_fatal_errors(files, MAX_FATAL_ERRORS),
         count_pattern(files, "production preconditionFailure()", r"\bpreconditionFailure\s*\(", MAX_PRECONDITION_FAILURES),
         count_pattern(files, "production @unchecked Sendable", r"@unchecked\s+Sendable", MAX_UNCHECKED_SENDABLE),
+        count_pattern(files, "production empty catch blocks", r"catch\s*\{\s*\}", MAX_EMPTY_CATCH),
     ]
     checks.extend(line_length_results(files))
     checks.extend(family_length_results(files))

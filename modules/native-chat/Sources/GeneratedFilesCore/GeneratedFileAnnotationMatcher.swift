@@ -1,13 +1,19 @@
 import ChatDomain
 import Foundation
 
+/// Matches sandbox file URLs to their corresponding ``FilePathAnnotation`` entries
+/// and extracts filenames for download.
 public struct GeneratedFileAnnotationMatcher {
+    /// Creates a new matcher.
     public init() {}
 
+    /// Returns the annotation's filename if available, otherwise extracts the filename from the sandbox URL.
     public func requestedFilename(for sandboxURL: String, annotation: FilePathAnnotation?) -> String? {
         annotation?.filename ?? extractFilename(from: sandboxURL)
     }
 
+    /// Returns `true` if the annotation has a container ID or a non-legacy file ID,
+    /// meaning it can be downloaded directly from the files API.
     public func annotationCanDownloadDirectly(_ annotation: FilePathAnnotation) -> Bool {
         if let containerId = annotation.containerId, !containerId.isEmpty {
             return true
@@ -16,6 +22,8 @@ public struct GeneratedFileAnnotationMatcher {
         return !annotation.fileId.hasPrefix("cfile_")
     }
 
+    /// Finds the best-matching ``FilePathAnnotation`` for a sandbox URL using progressively
+    /// looser matching strategies (exact file ID, exact path, suffix, filename, singleton fallback).
     public func findMatchingFilePathAnnotation(
         in annotations: [FilePathAnnotation],
         sandboxURL: String,
@@ -45,10 +53,10 @@ public struct GeneratedFileAnnotationMatcher {
             return match
         }
 
-        let filename = (pathOnly as NSString).lastPathComponent
+        let filename = URL(fileURLWithPath: pathOnly).lastPathComponent
         if !filename.isEmpty,
            let match = annotations.first(where: {
-               ($0.sandboxPath as NSString).lastPathComponent == filename ||
+               URL(fileURLWithPath: $0.sandboxPath).lastPathComponent == filename ||
                $0.filename == filename
            }) {
             return match
@@ -68,7 +76,7 @@ public struct GeneratedFileAnnotationMatcher {
         } else {
             path = sandboxURL
         }
-        let filename = (path as NSString).lastPathComponent
+        let filename = URL(fileURLWithPath: path).lastPathComponent
         return filename.isEmpty ? nil : filename
     }
 }

@@ -34,6 +34,7 @@ public struct StreamingTextView: View {
         Self.sanitiseText(text)
     }
 
+    /// Strips LaTeX delimiters and fenced code-block markers from the text for safe inline Markdown parsing.
     public static func sanitiseText(_ text: String) -> String {
         var result = text
 

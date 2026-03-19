@@ -3,15 +3,25 @@ import ChatUIComponents
 import SwiftUI
 import UIKit
 
+/// Composable message input bar with text composer, attachment previews, and send/stop controls.
 package struct MessageInputBar: View {
+    /// Token that resets the composer text when changed.
     let resetToken: UUID
+    /// Whether the assistant is currently streaming a response.
     let isStreaming: Bool
+    /// Raw data of a selected photo attachment, if any.
     @Binding var selectedImageData: Data?
+    /// File attachments pending upload.
     @Binding var pendingAttachments: [FileAttachment]
+    /// Callback to send a message; returns `true` if the send was accepted.
     let onSend: (String) -> Bool
+    /// Callback to stop the active streaming response.
     let onStop: () -> Void
+    /// Callback to present the image picker.
     let onPickImage: () -> Void
+    /// Callback to present the document picker.
     let onPickDocument: () -> Void
+    /// Callback to remove a pending file attachment.
     let onRemoveAttachment: (FileAttachment) -> Void
 
     @State private var text = ""
@@ -23,6 +33,7 @@ package struct MessageInputBar: View {
     private static let minimumComposerHeight = ceil(composerFont.lineHeight + (verticalTextInset * 2))
     private static let maximumComposerHeight = ceil((composerFont.lineHeight * 6) + (verticalTextInset * 2))
 
+    /// Creates a message input bar with the given bindings and action callbacks.
     package init(
         resetToken: UUID,
         isStreaming: Bool,
@@ -63,6 +74,8 @@ package struct MessageInputBar: View {
                         Image(systemName: "xmark.circle.fill")
                             .foregroundStyle(.secondary)
                     }
+                    .accessibilityLabel("Remove image")
+                    .accessibilityIdentifier("composer.removeImage")
 
                     Spacer()
                 }
@@ -103,6 +116,8 @@ package struct MessageInputBar: View {
                         .foregroundStyle(.secondary)
                 }
                 .buttonStyle(.glass)
+                .accessibilityLabel("Attach")
+                .accessibilityIdentifier("composer.attach")
 
                 messageComposer
 
@@ -115,6 +130,8 @@ package struct MessageInputBar: View {
                             .symbolEffect(.pulse)
                     }
                     .buttonStyle(.glass)
+                    .accessibilityLabel("Stop generating")
+                    .accessibilityIdentifier("composer.stop")
                 } else {
                     Button(action: handleSend) {
                         Image(systemName: "arrow.up.circle.fill")
@@ -123,6 +140,8 @@ package struct MessageInputBar: View {
                     }
                     .buttonStyle(.glass)
                     .disabled(!canSend)
+                    .accessibilityLabel("Send message")
+                    .accessibilityIdentifier("composer.send")
                 }
             }
             .padding(.horizontal, 16)

@@ -1,19 +1,29 @@
 import Foundation
 
+/// Performs a one-time data reset when upgrading to a new major release.
+///
+/// Deletes the persistent store, recovered stores, generated-file caches,
+/// temporary previews, user defaults, and the keychain API key. The reset
+/// is guarded by a version marker in `UserDefaults` so it only runs once.
 public enum ReleaseResetCoordinator {
+    /// The release version that triggers the reset.
     public static let targetVersion = "4.5.0"
+    /// The `UserDefaults` key used to record that the reset has been completed.
     public static let resetMarkerKey = "release_reset_completed_version"
 
     private static let persistentStoreFilenames = [
         "default.store",
         "default.store-shm",
-        "default.store-wal",
+        "default.store-wal"
     ]
 
     private static let recoveredStoreDirectory = ["NativeChat", "RecoveredStores"]
     private static let generatedFileCacheDirectories = ["generated-images", "generated-documents"]
     private static let previewDirectory = ["file_previews"]
 
+    /// Runs the release reset if it has not already been performed for ``targetVersion``.
+    ///
+    /// - Returns: `true` if the reset was executed, `false` if it was already completed.
     @discardableResult
     public static func performIfNeeded(
         userDefaults: UserDefaults = .standard,

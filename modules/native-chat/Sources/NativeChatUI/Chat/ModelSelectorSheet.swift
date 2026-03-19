@@ -3,6 +3,7 @@ import SwiftUI
 import UIKit
 import ChatUIComponents
 
+/// Sheet that lets the user choose model, background mode, flex mode, and reasoning effort for a chat session.
 public struct ModelSelectorSheet: View {
     @Binding var proModeEnabled: Bool
     @Binding var backgroundModeEnabled: Bool
@@ -20,6 +21,7 @@ public struct ModelSelectorSheet: View {
     @Environment(\.verticalSizeClass) private var verticalSizeClass
     @Environment(\.hapticsEnabled) private var hapticsEnabled
 
+    /// Creates a model selector sheet bound to the given session configuration.
     public init(
         proModeEnabled: Binding<Bool>,
         backgroundModeEnabled: Binding<Bool>,

@@ -5,6 +5,7 @@ import Foundation
 
 @MainActor
 extension ChatRecoveryCoordinator {
+    // swiftlint:disable:next cyclomatic_complexity function_body_length
     func startStreamingRecovery(
         session: ReplySession,
         responseId: String,
@@ -63,7 +64,8 @@ extension ChatRecoveryCoordinator {
             receivedAnyRecoveryEvent = true
             gatewayFallbackTask?.cancel()
 
-            switch await controller.applyStreamEvent(event, to: session, animated: controller.visibleSessionMessageID == session.messageID) {
+            let isVisible = controller.visibleSessionMessageID == session.messageID
+            switch await controller.applyStreamEvent(event, to: session, animated: isVisible) {
             case .continued:
                 break
             case .terminalCompleted:

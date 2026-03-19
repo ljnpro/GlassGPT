@@ -5,6 +5,7 @@ import XCTest
 @testable import NativeChatComposition
 
 final class OpenAIRequestBuilderTests: XCTestCase {
+    // swiftlint:disable:next function_body_length
     func testStreamingRequestPreservesWireDefaults() throws {
         let builder = makeDirectRequestBuilder()
         let request = try builder.streamingRequest(

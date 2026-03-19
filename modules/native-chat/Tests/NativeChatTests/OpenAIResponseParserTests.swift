@@ -1,15 +1,18 @@
+// swiftlint:disable file_length
 import ChatPersistenceSwiftData
 import ChatDomain
 import OpenAITransport
 import XCTest
 @testable import NativeChatComposition
 
+// swiftlint:disable:next type_body_length
 final class OpenAIResponseParserTests: XCTestCase {
     func testParseUploadedFileIDReadsSuccessfulResponse() throws {
         let parser = OpenAIResponseParser()
         let data = try JSONCoding.encode(UploadedFileResponseDTO(id: "file_123"))
         let response = try XCTUnwrap(
             HTTPURLResponse(
+                // swiftlint:disable:next force_unwrapping
                 url: URL(string: "https://example.com/files")!,
                 statusCode: 200,
                 httpVersion: nil,
@@ -23,6 +26,7 @@ final class OpenAIResponseParserTests: XCTestCase {
         )
     }
 
+    // swiftlint:disable:next function_body_length
     func testParseFetchedResponseExtractsStructuredFields() throws {
         let parser = OpenAIResponseParser()
         let outputText = "sandbox:/mnt/data/chart.png"
@@ -129,6 +133,7 @@ final class OpenAIResponseParserTests: XCTestCase {
         let data = try JSONCoding.encode(payload)
         let response = try XCTUnwrap(
             HTTPURLResponse(
+                // swiftlint:disable:next force_unwrapping
                 url: URL(string: "https://example.com/responses/resp_123")!,
                 statusCode: 200,
                 httpVersion: nil,
@@ -174,6 +179,7 @@ final class OpenAIResponseParserTests: XCTestCase {
         let data = try JSONCoding.encode(ResponsesResponseDTO(output: []))
         let response = try XCTUnwrap(
             HTTPURLResponse(
+                // swiftlint:disable:next force_unwrapping
                 url: URL(string: "https://example.com/responses")!,
                 statusCode: 200,
                 httpVersion: nil,
@@ -216,6 +222,7 @@ final class OpenAIResponseParserTests: XCTestCase {
         )
         let response = try XCTUnwrap(
             HTTPURLResponse(
+                // swiftlint:disable:next force_unwrapping
                 url: URL(string: "https://example.com/responses")!,
                 statusCode: 200,
                 httpVersion: nil,
@@ -233,6 +240,7 @@ final class OpenAIResponseParserTests: XCTestCase {
         let parser = OpenAIResponseParser()
         let successResponse = try XCTUnwrap(
             HTTPURLResponse(
+                // swiftlint:disable:next force_unwrapping
                 url: URL(string: "https://example.com/responses")!,
                 statusCode: 200,
                 httpVersion: nil,
@@ -241,6 +249,7 @@ final class OpenAIResponseParserTests: XCTestCase {
         )
         let failureResponse = try XCTUnwrap(
             HTTPURLResponse(
+                // swiftlint:disable:next force_unwrapping
                 url: URL(string: "https://example.com/responses")!,
                 statusCode: 503,
                 httpVersion: nil,
@@ -267,6 +276,7 @@ final class OpenAIResponseParserTests: XCTestCase {
         let parser = OpenAIResponseParser()
         let response = try XCTUnwrap(
             HTTPURLResponse(
+                // swiftlint:disable:next force_unwrapping
                 url: URL(string: "https://example.com/responses/resp_123")!,
                 statusCode: 429,
                 httpVersion: nil,
@@ -305,6 +315,7 @@ final class OpenAIResponseParserTests: XCTestCase {
 
         let response = try XCTUnwrap(
             HTTPURLResponse(
+                // swiftlint:disable:next force_unwrapping
                 url: URL(string: "https://example.com/responses/resp_bad")!,
                 statusCode: 200,
                 httpVersion: nil,
@@ -325,6 +336,7 @@ final class OpenAIResponseParserTests: XCTestCase {
         }
     }
 
+    // swiftlint:disable:next function_body_length
     func testParseFetchedResponseUsesActionQueriesAndOutputFallbacks() throws {
         let parser = OpenAIResponseParser()
         let payload = ResponsesResponseDTO(
@@ -406,6 +418,7 @@ final class OpenAIResponseParserTests: XCTestCase {
         let data = try JSONCoding.encode(payload)
         let response = try XCTUnwrap(
             HTTPURLResponse(
+                // swiftlint:disable:next force_unwrapping
                 url: URL(string: "https://example.com/responses/resp_456")!,
                 statusCode: 200,
                 httpVersion: nil,
@@ -430,6 +443,7 @@ final class OpenAIResponseParserTests: XCTestCase {
         let parser = OpenAIResponseParser()
         let response = try XCTUnwrap(
             HTTPURLResponse(
+                // swiftlint:disable:next force_unwrapping
                 url: URL(string: "https://example.com/files")!,
                 statusCode: 200,
                 httpVersion: nil,
@@ -465,8 +479,10 @@ final class OpenAIResponseParserTests: XCTestCase {
             XCTAssertEqual(message, "Invalid response")
         }
 
+        // swiftlint:disable:next force_try
         let response = try! XCTUnwrap(
             HTTPURLResponse(
+                // swiftlint:disable:next force_unwrapping
                 url: URL(string: "https://example.com/files")!,
                 statusCode: 500,
                 httpVersion: nil,
@@ -518,6 +534,7 @@ final class OpenAIResponseParserTests: XCTestCase {
         XCTAssertEqual(OpenAIServiceError.cancelled.errorDescription, "Request was cancelled.")
     }
 
+    // swiftlint:disable:next function_body_length
     func testPayloadStoreRoundTripsBetweenMessageAndRenderDigest() {
         let citations = [
             URLCitation(

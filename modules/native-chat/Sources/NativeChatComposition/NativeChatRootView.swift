@@ -3,6 +3,7 @@ import NativeChatUI
 import SwiftData
 import SwiftUI
 
+/// Top-level SwiftUI view that bootstraps the native chat composition root from the environment's model context.
 public struct NativeChatRootView: View {
     @Environment(\.modelContext) private var modelContext
     @AppStorage("appTheme") private var appThemeRawValue: String = AppTheme.system.rawValue
@@ -10,6 +11,7 @@ public struct NativeChatRootView: View {
     @State private var overrideContent: AnyView?
     private let rootOverrideFactory: (any NativeChatRootOverrideFactory)?
 
+    /// Creates the root view with an optional override factory.
     public init(rootOverrideFactory: (any NativeChatRootOverrideFactory)? = nil) {
         self.rootOverrideFactory = rootOverrideFactory
     }

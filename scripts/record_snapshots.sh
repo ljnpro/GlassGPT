@@ -1,4 +1,4 @@
-#!/bin/zsh
+#!/usr/bin/env bash
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
@@ -15,8 +15,6 @@ PY
 RECORD_SNAPSHOTS=1 ./scripts/ci.sh snapshot-tests
 
 python3 - "$SNAPSHOT_DIR" "$start_epoch" <<'PY'
-from __future__ import annotations
-
 import os
 import shutil
 import sys

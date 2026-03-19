@@ -46,6 +46,7 @@ extension ChatController {
         )
     }
 
+    /// The file preview item currently being displayed or pending display.
     package var filePreviewItem: FilePreviewItem? {
         get { filePreviewStore.filePreviewItem }
         set { filePreviewStore.filePreviewItem = newValue }

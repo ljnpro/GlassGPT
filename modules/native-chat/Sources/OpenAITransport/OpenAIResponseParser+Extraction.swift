@@ -2,6 +2,9 @@ import ChatDomain
 import Foundation
 
 extension OpenAIResponseParser {
+    /// Extracts all URL citations from a completed response.
+    /// - Parameter response: The response DTO to extract from.
+    /// - Returns: An array of URL citations found in the response output.
     public static func extractCitations(from response: ResponsesResponseDTO) -> [URLCitation] {
         var annotations: [URLCitation] = []
 
@@ -39,6 +42,10 @@ extension OpenAIResponseParser {
         return annotations
     }
 
+    /// Extracts all tool call information from a completed response.
+    /// - Parameter response: The response DTO to extract from.
+    /// - Returns: An array of tool call info objects.
+    // swiftlint:disable:next cyclomatic_complexity function_body_length
     public static func extractToolCalls(from response: ResponsesResponseDTO) -> [ToolCallInfo] {
         guard let output = response.output else {
             return []
@@ -119,6 +126,9 @@ extension OpenAIResponseParser {
         return toolCalls
     }
 
+    /// Extracts the text outputs from a code interpreter output item.
+    /// - Parameter item: The output item DTO to extract from.
+    /// - Returns: An array of output strings.
     public static func extractCodeInterpreterOutputs(from item: ResponsesOutputItemDTO) -> [String] {
         var outputs: [String] = []
 

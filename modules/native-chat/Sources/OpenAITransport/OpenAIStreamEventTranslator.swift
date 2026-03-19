@@ -1,6 +1,16 @@
 import Foundation
+import OSLog
 
+/// Translates raw SSE event frames into typed ``StreamEvent`` values.
+///
+/// This is a stateless translator that decodes each frame independently. For stateful
+/// accumulation of stream content, see ``SSEEventDecoder``.
 public enum OpenAIStreamEventTranslator {
+    private static let logger = Logger(subsystem: "GlassGPT", category: "sse")
+
+    /// Extracts the response identifier from a raw SSE event data payload.
+    /// - Parameter data: The raw JSON data from the SSE frame.
+    /// - Returns: The response identifier, or `nil` if not present.
     public static func extractResponseIdentifier(from data: Data) -> String? {
         guard let envelope = decodeEnvelope(from: data) else {
             return nil
@@ -8,6 +18,9 @@ public enum OpenAIStreamEventTranslator {
         return responseIdentifier(from: envelope)
     }
 
+    /// Extracts the event sequence number from a raw SSE event data payload.
+    /// - Parameter data: The raw JSON data from the SSE frame.
+    /// - Returns: The sequence number, or `nil` if not present.
     public static func extractSequenceNumber(from data: Data) -> Int? {
         guard let envelope = decodeEnvelope(from: data) else {
             return nil
@@ -15,6 +28,11 @@ public enum OpenAIStreamEventTranslator {
         return envelope.sequenceNumber ?? envelope.response?.sequenceNumber
     }
 
+    /// Translates a raw SSE event into a typed ``StreamEvent``.
+    /// - Parameters:
+    ///   - eventType: The SSE event type string.
+    ///   - data: The raw JSON data from the SSE frame.
+    /// - Returns: The translated stream event, or `nil` if the event type is not recognized.
     public static func translate(
         eventType: String,
         data: Data
@@ -25,6 +43,7 @@ public enum OpenAIStreamEventTranslator {
         return translate(eventType: eventType, envelope: envelope)
     }
 
+    // swiftlint:disable:next cyclomatic_complexity function_body_length
     private static func translate(
         eventType: String,
         envelope: ResponsesStreamEnvelopeDTO
@@ -147,6 +166,7 @@ public enum OpenAIStreamEventTranslator {
         do {
             return try JSONCoding.decode(ResponsesStreamEnvelopeDTO.self, from: data)
         } catch {
+            logger.debug("Stream event envelope decode failed: \(error.localizedDescription, privacy: .public)")
             return nil
         }
     }

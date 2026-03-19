@@ -68,6 +68,7 @@ final class ChatSendCoordinator {
         return true
     }
 
+    // swiftlint:disable:next function_body_length
     func prepareSendMessage(text rawText: String) throws -> PreparedAssistantReply {
         if controller.isStreaming {
             throw SendMessagePreparationError.alreadyStreaming

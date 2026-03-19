@@ -1,10 +1,14 @@
 import SwiftUI
 import SwiftData
 
+/// Entry-point view that initializes the SwiftData model container and presents the native chat root.
+///
+/// If the persistence bootstrap fails, displays an unavailable content view with the error description.
 public struct NativeChatBootstrapRootView: View {
     let bootstrap: NativeChatPersistenceBootstrap
     let rootOverrideFactory: NativeChatRootOverrideFactory?
 
+    /// Creates a bootstrap root view with the given persistence bootstrap and optional override factory.
     public init(
         bootstrap: NativeChatPersistenceBootstrap,
         rootOverrideFactory: NativeChatRootOverrideFactory? = nil

@@ -1,10 +1,12 @@
 import ChatPresentation
 import SwiftUI
 
+/// Main settings screen with API key, Cloudflare gateway, chat defaults, appearance, and cache management.
 public struct SettingsView: View {
     @State private var viewModel: SettingsPresenter
 
     @MainActor
+    /// Creates a settings view backed by the given presenter.
     public init(viewModel: SettingsPresenter) {
         _viewModel = State(initialValue: viewModel)
     }
@@ -59,6 +61,7 @@ public struct SettingsView: View {
                 SettingsCacheSection(
                     title: "Image Cache",
                     usedValue: viewModel.generatedImageCacheSizeString,
+                    // swiftlint:disable:next line_length
                     footerText: "Generated images are cached automatically so old download links still open later. Maximum cache size: \(viewModel.generatedImageCacheLimitString).",
                     isClearing: viewModel.isClearingImageCache,
                     hasCachedContent: viewModel.generatedImageCacheSizeBytes > 0,
@@ -70,6 +73,7 @@ public struct SettingsView: View {
                 SettingsCacheSection(
                     title: "Document Cache",
                     usedValue: viewModel.generatedDocumentCacheSizeString,
+                    // swiftlint:disable:next line_length
                     footerText: "Generated PDFs and other files are cached automatically so old download links still open or share later. Maximum cache size: \(viewModel.generatedDocumentCacheLimitString).",
                     isClearing: viewModel.isClearingDocumentCache,
                     hasCachedContent: viewModel.generatedDocumentCacheSizeBytes > 0,

@@ -1,13 +1,10 @@
 #!/usr/bin/env python3
 
-from __future__ import annotations
-
 import argparse
 import datetime as dt
 import re
 import subprocess
 from pathlib import Path
-
 
 INCLUDE_SUFFIXES = {
     ".css",
@@ -132,9 +129,7 @@ def should_include(rel_path: Path) -> bool:
         return False
     if rel_path.suffix.lower() in EXCLUDE_SUFFIXES:
         return False
-    if rel_path.suffix.lower() not in INCLUDE_SUFFIXES:
-        return False
-    return True
+    return rel_path.suffix.lower() in INCLUDE_SUFFIXES
 
 
 def collect_files(root: Path, output: Path) -> list[Path]:
@@ -158,48 +153,54 @@ def line_count(text: str) -> int:
 
 def language_hint(path: Path) -> str:
     suffix = path.suffix.lower()
-    return {
-        ".css": "css",
-        ".entitlements": "xml",
-        ".js": "javascript",
-        ".json": "json",
-        ".md": "markdown",
-        ".pbxproj": "pbxproj",
-        ".plist": "xml",
-        ".py": "python",
-        ".resolved": "json",
-        ".sh": "bash",
-        ".storyboard": "xml",
-        ".swift": "swift",
-        ".toml": "toml",
-        ".xcconfig": "ini",
-        ".xcprivacy": "xml",
-        ".xcscheme": "xml",
-        ".xcworkspacedata": "xml",
-        ".yaml": "yaml",
-        ".yml": "yaml",
-    }.get(suffix, "")
+    match suffix:
+        case ".css":
+            return "css"
+        case ".entitlements" | ".plist" | ".storyboard" | ".xcprivacy" | ".xcscheme" | ".xcworkspacedata":
+            return "xml"
+        case ".js":
+            return "javascript"
+        case ".json" | ".resolved":
+            return "json"
+        case ".md":
+            return "markdown"
+        case ".pbxproj":
+            return "pbxproj"
+        case ".py":
+            return "python"
+        case ".sh":
+            return "bash"
+        case ".swift":
+            return "swift"
+        case ".toml":
+            return "toml"
+        case ".xcconfig":
+            return "ini"
+        case ".yaml" | ".yml":
+            return "yaml"
+        case _:
+            return ""
 
 
 def build_tree(paths: list[Path]) -> str:
-    tree: dict[str, dict] = {}
+    tree: dict[str, dict[str, object]] = {}
     for path in paths:
-        node = tree
+        node: dict[str, object] = tree
         for part in path.parts:
-            node = node.setdefault(part, {})
+            node = node.setdefault(part, {})  # type: ignore[assignment]
     return render_tree(tree)
 
 
-def render_tree(node: dict[str, dict], prefix: str = "") -> str:
+def render_tree(node: dict[str, dict[str, object]], prefix: str = "") -> str:
     lines: list[str] = []
     items = sorted(node.items())
     for index, (name, child) in enumerate(items):
         is_last = index == len(items) - 1
-        branch = "└── " if is_last else "├── "
+        branch = "\u2514\u2500\u2500 " if is_last else "\u251c\u2500\u2500 "
         lines.append(f"{prefix}{branch}{name}")
         if child:
-            child_prefix = f"{prefix}{'    ' if is_last else '│   '}"
-            lines.append(render_tree(child, child_prefix))
+            child_prefix = f"{prefix}{'    ' if is_last else '\u2502   '}"
+            lines.append(render_tree(child, child_prefix))  # type: ignore[arg-type]
     return "\n".join(line for line in lines if line)
 
 
@@ -267,11 +268,15 @@ def write_bundle(root: Path, output: Path, title: str) -> None:
         "",
         "## Export Intent",
         "",
-        "This bundle is designed for deep refactor planning. It preserves repository structure and all code-bearing or structurally relevant text files while excluding binary assets, local archives, and build artifacts.",
+        "This bundle is designed for deep refactor planning. It preserves repository structure and all"
+        " code-bearing or structurally relevant text files while excluding binary assets, local"
+        " archives, and build artifacts.",
         "",
         "## Inclusion Rules",
         "",
-        "- Includes all repository text/code/config files under the tracked workspace that match the exporter allowlist, including scripts, docs, Swift source, JS/CSS resources, asset metadata, and Xcode workspace/project files.",
+        "- Includes all repository text/code/config files under the tracked workspace that match the"
+        " exporter allowlist, including scripts, docs, Swift source, JS/CSS resources, asset"
+        " metadata, and Xcode workspace/project files.",
         "- Excludes `.git`, `.build`, `.local`, `build`, snapshot images, fonts, binary assets, archives, and other non-text payloads.",
         "- Keeps relative paths exactly as they exist in the repository so external reviewers can reference concrete files and modules.",
         "",

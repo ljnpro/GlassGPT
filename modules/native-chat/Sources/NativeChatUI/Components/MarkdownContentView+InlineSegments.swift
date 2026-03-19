@@ -1,12 +1,14 @@
 import Foundation
 
 extension MarkdownContentView {
+    /// Splits a raw text line into plain text and inline LaTeX segments.
+    // swiftlint:disable:next cyclomatic_complexity function_body_length
     package func parseInlineSegments(_ input: String) -> [InlineSegment] {
         var segments: [InlineSegment] = []
         var textBuffer = ""
         let chars = Array(input)
         let count = chars.count
-        var i = 0
+        var index = 0
 
         func flushText() {
             if !textBuffer.isEmpty {
@@ -15,10 +17,10 @@ extension MarkdownContentView {
             }
         }
 
-        while i < count {
-            if i + 1 < count && chars[i] == "\\" && chars[i + 1] == "(" {
+        while index < count {
+            if index + 1 < count && chars[index] == "\\" && chars[index + 1] == "(" {
                 flushText()
-                let start = i + 2
+                let start = index + 2
                 var end = start
                 var found = false
                 while end + 1 < count {
@@ -34,16 +36,16 @@ extension MarkdownContentView {
                     if !latex.isEmpty {
                         segments.append(.latexInline(latex))
                     }
-                    i = end + 2
+                    index = end + 2
                 } else {
                     textBuffer.append("\\(")
-                    i = start
+                    index = start
                 }
                 continue
             }
 
-            if chars[i] == "$" && (i == 0 || chars[i - 1] != "\\") {
-                let start = i + 1
+            if chars[index] == "$" && (index == 0 || chars[index - 1] != "\\") {
+                let start = index + 1
                 var end = start
                 var found = false
                 while end < count && chars[end] != "\n" {
@@ -60,16 +62,16 @@ extension MarkdownContentView {
                     if !latex.isEmpty {
                         segments.append(.latexInline(latex))
                     }
-                    i = end + 1
+                    index = end + 1
                 } else {
-                    textBuffer.append(chars[i])
-                    i += 1
+                    textBuffer.append(chars[index])
+                    index += 1
                 }
                 continue
             }
 
-            textBuffer.append(chars[i])
-            i += 1
+            textBuffer.append(chars[index])
+            index += 1
         }
 
         flushText()

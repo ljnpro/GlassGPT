@@ -1,6 +1,12 @@
 import Foundation
+import OSLog
+
+private let katexLogger = Logger(subsystem: "GlassGPT", category: "katex")
 
 extension KaTeXProvider {
+    /// Generates a self-contained HTML page that renders the given LaTeX string using KaTeX.
+    ///
+    /// Falls back to CDN-hosted KaTeX when offline bundle resources are unavailable.
     public static func htmlForLatex(
         _ latex: String,
         isDark: Bool,
@@ -43,6 +49,8 @@ extension KaTeXProvider {
                 return json
             }
         } catch {
+            // swiftlint:disable:next line_length
+            katexLogger.debug("JSON encoding failed for LaTeX string, using manual escaping: \(error.localizedDescription, privacy: .public)")
         }
 
         let escaped = latex
@@ -51,6 +59,7 @@ extension KaTeXProvider {
         return "\"\(escaped)\""
     }
 
+    // swiftlint:disable:next function_body_length
     private static func offlineHTML(
         css: String,
         js: String,
@@ -124,6 +133,7 @@ extension KaTeXProvider {
         """
     }
 
+    // swiftlint:disable:next function_body_length
     private static func cdnHTML(
         textColor: String,
         clampedMaxWidth: Int,

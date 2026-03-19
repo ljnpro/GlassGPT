@@ -12,9 +12,12 @@ excluded:
 
 only_rules:
   - blanket_disable_command
+  - closing_brace
   - colon
   - comma
   - control_statement
+  - cyclomatic_complexity
+  - discouraged_direct_init
   - duplicate_conditions
   - duplicate_enum_cases
   - duplicate_imports
@@ -22,10 +25,21 @@ only_rules:
   - empty_enum_arguments
   - empty_parameters
   - explicit_init
+  - file_length
   - first_where
   - force_cast
+  - force_try
+  - force_unwrapping
+  - function_body_length
+  - identifier_name
   - implicit_getter
+  - legacy_cggeometry_functions
+  - legacy_constructor
+  - line_length
   - modifier_order
+  - multiline_arguments
+  - multiline_parameters
+  - opening_brace
   - operator_usage_whitespace
   - private_over_fileprivate
   - redundant_nil_coalescing
@@ -33,8 +47,45 @@ only_rules:
   - return_arrow_whitespace
   - statement_position
   - toggle_bool
+  - trailing_comma
   - trailing_whitespace
+  - type_body_length
+  - type_name
+  - unavailable_function
+  - unowned_variable_capture
+  - unused_closure_parameter
+  - unused_enumerated
   - unused_optional_binding
   - vertical_whitespace
+  - void_return
+  - weak_delegate
+
+cyclomatic_complexity:
+  warning: 10
+  error: 20
+
+function_body_length:
+  warning: 50
+  error: 100
+
+type_body_length:
+  warning: 250
+  error: 500
+
+file_length:
+  warning: 400
+  error: 600
+
+line_length:
+  warning: 140
+  error: 200
+
+identifier_name:
+  min_length: 2
+  max_length: 50
+
+type_name:
+  min_length: 3
+  max_length: 50
 
 reporter: "xcode"

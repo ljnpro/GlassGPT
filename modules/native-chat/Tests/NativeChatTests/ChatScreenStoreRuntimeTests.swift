@@ -1,3 +1,4 @@
+// swiftlint:disable file_length
 import ChatApplication
 import XCTest
 import ChatPersistenceCore
@@ -9,8 +10,8 @@ import SwiftData
 import ChatDomain
 import ChatRuntimeModel
 @testable import NativeChatComposition
-
 @MainActor
+// swiftlint:disable:next type_body_length
 final class ChatScreenStoreRuntimeTests: XCTestCase {
     func testSendMessageWithoutStoredAPIKeyFailsFastAndLeavesFreshInstallStateUsable() async throws {
         let streamClient = QueuedOpenAIStreamClient(scriptedStreams: [])
@@ -147,6 +148,7 @@ final class ChatScreenStoreRuntimeTests: XCTestCase {
         let transport = StubOpenAITransport()
         await transport.enqueue(
             data: try makeFetchResponseData(status: .inProgress, text: ""),
+            // swiftlint:disable:next force_unwrapping
             url: URL(string: "https://api.test.openai.local/v1/responses/resp_stream_resume")!
         )
 
@@ -199,6 +201,7 @@ final class ChatScreenStoreRuntimeTests: XCTestCase {
         await transport.enqueue(
             data: Data("gone".utf8),
             statusCode: 404,
+            // swiftlint:disable:next force_unwrapping
             url: URL(string: "https://api.test.openai.local/v1/responses/resp_missing")!
         )
 
@@ -302,6 +305,7 @@ final class ChatScreenStoreRuntimeTests: XCTestCase {
                 text: "Recovered via polling",
                 thinking: "Recovered hidden reasoning"
             ),
+            // swiftlint:disable:next force_unwrapping
             url: URL(string: "https://api.test.openai.local/v1/responses/resp_hidden_resume")!
         )
 
@@ -386,6 +390,7 @@ final class ChatScreenStoreRuntimeTests: XCTestCase {
         XCTAssertFalse(store.isStreaming)
     }
 
+    // swiftlint:disable:next function_body_length
     func testRelaunchedStoreFetchesCompletedResponseDirectlyAfterBackgroundDetachment() async throws {
         let container = try makeInMemoryModelContainer()
         let settingsValueStore = InMemorySettingsValueStore()
@@ -444,6 +449,7 @@ final class ChatScreenStoreRuntimeTests: XCTestCase {
                 text: "Fetched after relaunch",
                 thinking: "Server-side completion"
             ),
+            // swiftlint:disable:next force_unwrapping
             url: URL(string: "https://api.test.openai.local/v1/responses/resp_relaunch_completed")!
         )
 
@@ -477,6 +483,7 @@ final class ChatScreenStoreRuntimeTests: XCTestCase {
         XCTAssertTrue(relaunchStreamClient.recordedRequests.isEmpty)
     }
 
+    // swiftlint:disable:next function_body_length
     func testRelaunchedBackgroundModeSessionResumesStreamingWhenResponseStillInProgress() async throws {
         let container = try makeInMemoryModelContainer()
         let settingsValueStore = InMemorySettingsValueStore()
@@ -534,6 +541,7 @@ final class ChatScreenStoreRuntimeTests: XCTestCase {
         let relaunchTransport = StubOpenAITransport()
         await relaunchTransport.enqueue(
             data: try makeFetchResponseData(status: .inProgress, text: ""),
+            // swiftlint:disable:next force_unwrapping
             url: URL(string: "https://api.test.openai.local/v1/responses/resp_relaunch_stream")!
         )
 
@@ -653,10 +661,12 @@ private actor SlowGeneratedFileDownloadTransport: OpenAIDataTransport {
         do {
             try await Task.sleep(nanoseconds: 60_000_000_000)
             let response = HTTPURLResponse(
+                // swiftlint:disable:next force_unwrapping
                 url: request.url ?? URL(string: "https://api.test.openai.local/v1/files/file_prefetch/content")!,
                 statusCode: 200,
                 httpVersion: nil,
                 headerFields: nil
+            // swiftlint:disable:next force_unwrapping
             )!
             return (Data("%PDF".utf8), response)
         } catch {

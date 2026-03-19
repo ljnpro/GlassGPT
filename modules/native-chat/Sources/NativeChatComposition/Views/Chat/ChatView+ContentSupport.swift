@@ -3,6 +3,19 @@ import SwiftUI
 import UIKit
 import ChatDomain
 
+/// Encapsulates UIKit keyboard dismissal so the legacy `sendAction` pattern
+/// is isolated to a single call-site and easy to replace later.
+enum KeyboardDismisser {
+    static func dismiss() {
+        UIApplication.shared.sendAction(
+            #selector(UIResponder.resignFirstResponder),
+            to: nil,
+            from: nil,
+            for: nil
+        )
+    }
+}
+
 extension ChatView {
     var liveBottomAnchorKey: Int {
         var hasher = Hasher()
@@ -45,7 +58,7 @@ extension ChatView {
     }
 
     func dismissKeyboard() {
-        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+        KeyboardDismisser.dismiss()
     }
 
     func presentModelSelector() {
