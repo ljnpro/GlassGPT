@@ -1,3 +1,4 @@
+import ChatDomain
 import ChatPersistenceCore
 import ChatPersistenceSwiftData
 import Foundation
@@ -138,7 +139,7 @@ extension ChatStreamingCoordinator {
             return .continued
 
         case .fileSearchSearching(let callId):
-            let transition = ReplyRuntimeTransition.setToolCallStatus(id: callId, status: ToolCallStatus.fileSearching)
+            let transition = ReplyRuntimeTransition.setToolCallStatus(id: callId, status: .fileSearching)
             _ = await controller.sessionCoordinator.applyRuntimeTransition(transition, to: session)
             animateStreamEvent(shouldAnimate, animation: .easeInOut(duration: 0.2)) {
                 self.controller.sessionCoordinator.syncVisibleState(from: session)
