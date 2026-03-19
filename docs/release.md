@@ -39,6 +39,11 @@ The workflow materializes `.local/publish.env` and the App Store Connect API
 key at runtime, then runs `./scripts/release_testflight.sh` with the supplied
 version, build number, and target branch.
 
+If `marketing_version` is left blank, the workflow automatically bumps the
+current patch version from `Versions.xcconfig`. If `build_number` is left
+blank, the workflow automatically increments the current build number from
+`Versions.xcconfig`.
+
 ## Pre-Release Checklist
 
 1. `./scripts/ci.sh`
