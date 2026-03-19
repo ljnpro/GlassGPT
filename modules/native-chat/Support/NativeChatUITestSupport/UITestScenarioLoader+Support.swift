@@ -57,7 +57,7 @@ final class ScenarioSettingsValueStore: SettingsValueStore {
 final class ScenarioAPIKeyBackend: APIKeyPersisting {
     private let storedKey = OSAllocatedUnfairLock(initialState: Optional<String>.none)
 
-    func saveAPIKey(_ apiKey: String) throws {
+    func saveAPIKey(_ apiKey: String) throws(PersistenceError) {
         storedKey.withLock { value in
             value = apiKey
         }

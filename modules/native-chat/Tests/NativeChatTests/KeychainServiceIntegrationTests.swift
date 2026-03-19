@@ -51,7 +51,7 @@ final class KeychainServiceIntegrationTests: XCTestCase {
     private func skipWhenKeychainEntitlementIsUnavailable(_ block: () throws -> Void) throws {
         do {
             try block()
-        } catch KeychainAPIKeyBackend.KeychainError.unexpectedStatus(let status) where status == errSecMissingEntitlement {
+        } catch PersistenceError.keychainFailure(let status) where status == errSecMissingEntitlement {
             throw XCTSkip("Package test bundles do not always receive Keychain entitlements on simulator hosts.")
         }
     }

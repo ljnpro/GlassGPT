@@ -36,7 +36,7 @@ public struct ResponsesInputMessageDTO: Codable, Equatable, Sendable {
             }
         }
 
-        public func encode(to encoder: Encoder) throws {
+        public func encode(to encoder: Encoder) throws(any Error) {
             var container = encoder.singleValueContainer()
             switch self {
             case .text(let value):
@@ -81,7 +81,7 @@ public struct ResponsesInputMessageDTO: Codable, Equatable, Sendable {
             }
         }
 
-        public func encode(to encoder: Encoder) throws {
+        public func encode(to encoder: Encoder) throws(any Error) {
             var container = encoder.container(keyedBy: CodingKeys.self)
             switch self {
             case .inputText(let text):

@@ -122,7 +122,16 @@ final class OpenAITransportConfigurationTests: XCTestCase {
             _ = try await task.value
             XCTFail("Expected cancellation")
         } catch {
-            XCTAssertTrue(error is CancellationError || (error as? URLError)?.code == .cancelled)
+            let isCancelledServiceError: Bool
+            if case .cancelled = error as? OpenAIServiceError {
+                isCancelledServiceError = true
+            } else {
+                isCancelledServiceError = false
+            }
+            let isExpected = error is CancellationError
+                || (error as? URLError)?.code == .cancelled
+                || isCancelledServiceError
+            XCTAssertTrue(isExpected)
         }
 
         XCTAssertTrue(CancellationAwareURLProtocol.state.waitForCancellation(timeout: 1))
@@ -413,13 +422,17 @@ private final class MockOpenAIDataTransport: OpenAIDataTransport, @unchecked Sen
     var queuedResponses: [(Data, HTTPURLResponse)] = []
     var queuedErrors: [Error] = []
 
-    func data(for request: URLRequest) async throws -> (Data, URLResponse) {
+    func data(for request: URLRequest) async throws(OpenAIServiceError) -> (Data, URLResponse) {
         requestCalled = true
         lastRequest = request
         requests.append(request)
 
         if !queuedErrors.isEmpty {
-            throw queuedErrors.removeFirst()
+            let error = queuedErrors.removeFirst()
+            if let serviceError = error as? OpenAIServiceError {
+                throw serviceError
+            }
+            throw .requestFailed(error.localizedDescription)
         }
 
         if !queuedResponses.isEmpty {

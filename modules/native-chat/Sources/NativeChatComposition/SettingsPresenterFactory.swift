@@ -124,7 +124,7 @@ private struct SettingsCredentialHandlerImpl: SettingsCredentialHandler {
         apiKeyStore.loadAPIKey()
     }
 
-    func saveAPIKey(_ apiKey: String) throws {
+    func saveAPIKey(_ apiKey: String) throws(PersistenceError) {
         try apiKeyStore.saveAPIKey(apiKey)
     }
 

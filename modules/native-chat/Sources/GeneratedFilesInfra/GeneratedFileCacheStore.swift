@@ -1,19 +1,26 @@
 import Foundation
 import GeneratedFilesCore
+import os
 
 /// Errors originating from cache store filesystem operations.
 package enum GeneratedFileStoreError: Error, LocalizedError, Sendable {
     /// The cache root directory could not be created.
     case invalidCacheRoot
+    /// A filesystem operation failed with an underlying system error.
+    case fileSystemError(underlying: any Error)
 
     /// A human-readable description of the error.
     package var errorDescription: String? {
         switch self {
         case .invalidCacheRoot:
             return "Unable to create the generated file cache."
+        case .fileSystemError(let underlying):
+            return "File system operation failed: \(underlying.localizedDescription)"
         }
     }
 }
+
+private let cacheStoreSignposter = OSSignposter(subsystem: "GlassGPT", category: "files")
 
 /// Filesystem-backed cache store for generated files, organized by bucket and cache key.
 package struct GeneratedFileCacheStore {
@@ -76,7 +83,7 @@ package struct GeneratedFileCacheStore {
     package func cacheDirectoryURL(
         for cacheKey: String,
         bucket: GeneratedFileCacheBucket
-    ) throws -> URL {
+    ) throws(GeneratedFileStoreError) -> URL {
         guard let rootURL = cacheRootURL(for: bucket, createIfNeeded: true) else {
             throw GeneratedFileStoreError.invalidCacheRoot
         }
@@ -90,13 +97,25 @@ package struct GeneratedFileCacheStore {
         filename: String,
         cacheKey: String,
         bucket: GeneratedFileCacheBucket
-    ) throws -> URL {
+    ) throws(GeneratedFileStoreError) -> URL {
+        let signpostID = cacheStoreSignposter.makeSignpostID()
+        let signpostState = cacheStoreSignposter.beginInterval("StoreGeneratedFile", id: signpostID)
+        defer { cacheStoreSignposter.endInterval("StoreGeneratedFile", signpostState) }
+
         let directoryURL = try cacheDirectoryURL(for: cacheKey, bucket: bucket)
         removeItemIfExists(at: directoryURL, logContext: "storeGeneratedFile.clearDirectory")
-        try fileManager.createDirectory(at: directoryURL, withIntermediateDirectories: true)
+        do {
+            try fileManager.createDirectory(at: directoryURL, withIntermediateDirectories: true)
+        } catch {
+            throw GeneratedFileStoreError.fileSystemError(underlying: error)
+        }
 
         let fileURL = directoryURL.appendingPathComponent(filename)
-        try data.write(to: fileURL, options: .atomic)
+        do {
+            try data.write(to: fileURL, options: .atomic)
+        } catch {
+            throw GeneratedFileStoreError.fileSystemError(underlying: error)
+        }
         touchGeneratedFile(at: fileURL)
         return fileURL
     }

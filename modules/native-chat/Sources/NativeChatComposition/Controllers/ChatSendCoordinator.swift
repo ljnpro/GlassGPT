@@ -4,6 +4,9 @@ import ChatPersistenceSwiftData
 import ChatRuntimeModel
 import ChatUIComponents
 import Foundation
+import os
+
+private let chatSendSignposter = OSSignposter(subsystem: "GlassGPT", category: "chat")
 
 @MainActor
 final class ChatSendCoordinator {
@@ -23,6 +26,10 @@ final class ChatSendCoordinator {
 
     @discardableResult
     func sendMessage(text rawText: String) -> Bool {
+        let signpostID = chatSendSignposter.makeSignpostID()
+        let state = chatSendSignposter.beginInterval("SendMessage", id: signpostID)
+        defer { chatSendSignposter.endInterval("SendMessage", state) }
+
         let preparedReply: PreparedAssistantReply
         do {
             preparedReply = try prepareSendMessage(text: rawText)
@@ -69,7 +76,7 @@ final class ChatSendCoordinator {
     }
 
     // swiftlint:disable:next function_body_length
-    func prepareSendMessage(text rawText: String) throws -> PreparedAssistantReply {
+    func prepareSendMessage(text rawText: String) throws(SendMessagePreparationError) -> PreparedAssistantReply {
         if controller.isStreaming {
             throw SendMessagePreparationError.alreadyStreaming
         }
@@ -158,7 +165,7 @@ final class ChatSendCoordinator {
         controller.conversationCoordinator.upsertMessage(userMessage)
     }
 
-    func prepareExistingDraft(_ draft: Message) throws -> PreparedAssistantReply {
+    func prepareExistingDraft(_ draft: Message) throws(SendMessagePreparationError) -> PreparedAssistantReply {
         let apiKey = apiKey.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !apiKey.isEmpty else {
             throw SendMessagePreparationError.missingAPIKey

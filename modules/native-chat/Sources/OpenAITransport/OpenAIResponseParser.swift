@@ -12,7 +12,7 @@ public struct OpenAIResponseParser {
     ///   - response: The URL response metadata.
     /// - Returns: The API-assigned file identifier.
     /// - Throws: ``OpenAIServiceError`` if the response indicates an error or cannot be parsed.
-    public func parseUploadedFileID(responseData: Data, response: URLResponse) throws -> String {
+    public func parseUploadedFileID(responseData: Data, response: URLResponse) throws(OpenAIServiceError) -> String {
         guard let httpResponse = response as? HTTPURLResponse else {
             throw OpenAIServiceError.requestFailed("Invalid response")
         }
@@ -35,7 +35,7 @@ public struct OpenAIResponseParser {
     ///   - response: The URL response metadata.
     /// - Returns: The generated title, or "New Chat" as a fallback.
     /// - Throws: ``OpenAIServiceError`` if the response indicates an HTTP error.
-    public func parseGeneratedTitle(data: Data, response: URLResponse) throws -> String {
+    public func parseGeneratedTitle(data: Data, response: URLResponse) throws(OpenAIServiceError) -> String {
         guard let httpResponse = response as? HTTPURLResponse,
               (200...299).contains(httpResponse.statusCode) else {
             throw OpenAIServiceError.requestFailed("Title generation failed")
@@ -68,7 +68,7 @@ public struct OpenAIResponseParser {
     ///   - response: The URL response metadata.
     /// - Returns: A structured fetch result with status, text, and annotations.
     /// - Throws: ``OpenAIServiceError`` if the response indicates an error or cannot be parsed.
-    public func parseFetchedResponse(data: Data, response: URLResponse) throws -> OpenAIResponseFetchResult {
+    public func parseFetchedResponse(data: Data, response: URLResponse) throws(OpenAIServiceError) -> OpenAIResponseFetchResult {
         guard let httpResponse = response as? HTTPURLResponse else {
             throw OpenAIServiceError.requestFailed("Invalid response")
         }

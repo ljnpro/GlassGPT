@@ -6,7 +6,7 @@ import UIKit
 /// Utility for saving image data to the user's photo library.
 public enum PhotoLibraryImageSaver {
     /// Saves raw image data to the Photos library using the given original filename.
-    public static func saveImageData(_ data: Data, originalFilename: String) async throws {
+    public static func saveImageData(_ data: Data, originalFilename: String) async throws(any Error) {
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
             PHPhotoLibrary.shared().performChanges({
                 let request = PHAssetCreationRequest.forAsset()

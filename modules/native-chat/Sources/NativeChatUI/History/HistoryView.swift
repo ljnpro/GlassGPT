@@ -55,6 +55,7 @@ public struct HistoryView: View {
                                 )
                         }
                         .buttonStyle(GlassPressButtonStyle())
+                        .accessibilityLabel("Delete all conversations")
                         .accessibilityIdentifier("history.deleteAll")
                     }
                 }
@@ -79,6 +80,7 @@ public struct HistoryView: View {
             systemImage: "clock.badge.questionmark",
             description: Text("Your chat history will appear here.")
         )
+        .accessibilityIdentifier("history.emptyState")
     }
 
     private func deleteConversations(at offsets: IndexSet) {

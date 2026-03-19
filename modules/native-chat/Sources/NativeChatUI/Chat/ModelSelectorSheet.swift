@@ -98,8 +98,7 @@ public struct ModelSelectorSheet: View {
         }
         .frame(maxWidth: metrics.sheetMaxWidth)
         .padding(.horizontal, metrics.contentHorizontalPadding)
-        .padding(.top, metrics.contentVerticalPadding)
-        .padding(.bottom, metrics.contentVerticalPadding)
+        .padding(.vertical, metrics.contentVerticalPadding)
         .singleSurfaceGlass(
             cornerRadius: metrics.panelCornerRadius,
             stableFillOpacity: 0.014,
@@ -125,6 +124,8 @@ public struct ModelSelectorSheet: View {
                     .foregroundStyle(.primary)
                     .contentTransition(.numericText())
                     .animation(.easeInOut(duration: 0.15), value: reasoningEffort)
+                    .accessibilityLabel("Current reasoning effort: \(reasoningEffort.displayName)")
+                    .accessibilityIdentifier("modelSelector.reasoningValue")
             }
             .padding(.horizontal, 4)
 
@@ -145,6 +146,8 @@ public struct ModelSelectorSheet: View {
                         .foregroundStyle(.secondary)
                 }
                 .tint(.accentColor)
+                .accessibilityLabel("Reasoning effort slider")
+                .accessibilityIdentifier("modelSelector.reasoningSlider")
 
                 HStack {
                     ForEach(Array(efforts.enumerated()), id: \.offset) { _, effort in
@@ -180,6 +183,8 @@ public struct ModelSelectorSheet: View {
                     .foregroundStyle(.secondary)
                     .lineLimit(2)
                     .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityLabel("Current configuration: \(configurationSummary)")
+                    .accessibilityIdentifier("modelSelector.summary")
             }
 
             Spacer(minLength: 12)
@@ -200,6 +205,7 @@ public struct ModelSelectorSheet: View {
                     )
             }
             .buttonStyle(GlassPressButtonStyle())
+            .accessibilityLabel("Save model settings")
             .accessibilityIdentifier("modelSelector.save")
         }
         .padding(.horizontal, 2)
@@ -214,10 +220,7 @@ public struct ModelSelectorSheet: View {
                 accessibilityIdentifier: "modelSelector.proMode",
                 rowAccessibilityIdentifier: "modelSelector.proModeRow"
             )
-
-            Divider()
-                .padding(.leading, metrics.rowHorizontalPadding)
-
+            Divider().padding(.leading, metrics.rowHorizontalPadding)
             toggleRow(
                 title: "Background Mode",
                 subtitle: "Slower initial response, but better resume for long-running generations.",
@@ -225,10 +228,7 @@ public struct ModelSelectorSheet: View {
                 accessibilityIdentifier: "modelSelector.backgroundMode",
                 rowAccessibilityIdentifier: "modelSelector.backgroundModeRow"
             )
-
-            Divider()
-                .padding(.leading, metrics.rowHorizontalPadding)
-
+            Divider().padding(.leading, metrics.rowHorizontalPadding)
             toggleRow(
                 title: "Flex Mode",
                 subtitle: "Lower cost, but slower and less consistent response times.",

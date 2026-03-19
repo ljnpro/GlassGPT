@@ -130,6 +130,7 @@ package struct DetachedStreamingBubbleView: View, Equatable {
                 lightBorderOpacity: 0.09
             )
             .accessibilityElement(children: .contain)
+            .accessibilityLabel("Assistant response in progress")
             .accessibilityIdentifier("chat.assistant.detachedSurface")
             .frame(maxWidth: assistantBubbleMaxWidth, alignment: .leading)
 

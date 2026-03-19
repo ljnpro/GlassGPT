@@ -12,7 +12,9 @@ print(time.time())
 PY
 )"
 
-RECORD_SNAPSHOTS=1 ./scripts/ci.sh snapshot-tests
+# Recording snapshots intentionally produces mismatches against committed references.
+# Keep going so we can copy the newly recorded images out of the simulator sandbox.
+RECORD_SNAPSHOTS=1 ./scripts/ci.sh snapshot-tests || true
 
 python3 - "$SNAPSHOT_DIR" "$start_epoch" <<'PY'
 import os

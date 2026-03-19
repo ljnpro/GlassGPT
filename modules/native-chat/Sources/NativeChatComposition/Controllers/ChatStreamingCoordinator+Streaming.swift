@@ -3,11 +3,18 @@ import ChatPersistenceCore
 import ChatUIComponents
 import Foundation
 import OpenAITransport
+import os
+
+private let streamingSignposter = OSSignposter(subsystem: "GlassGPT", category: "streaming")
 
 @MainActor
 extension ChatStreamingCoordinator {
     // swiftlint:disable:next cyclomatic_complexity function_body_length
     func startStreamingRequest(for session: ReplySession, reconnectAttempt: Int = 0) {
+        let signpostID = streamingSignposter.makeSignpostID()
+        let signpostState = streamingSignposter.beginInterval("StreamingRequest", id: signpostID)
+        defer { streamingSignposter.endInterval("StreamingRequest", signpostState) }
+
         guard let requestMessages = session.request.messages else { return }
         guard let execution = controller.sessionRegistry.execution(for: session.messageID) else { return }
 

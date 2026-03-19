@@ -7,7 +7,7 @@ public extension OpenAIRequestBuilder {
     ///   - apiKey: The API key for authentication.
     /// - Returns: A configured URL request.
     /// - Throws: If URL construction fails.
-    func titleRequest(conversationPreview: String, apiKey: String) throws -> URLRequest {
+    func titleRequest(conversationPreview: String, apiKey: String) throws(OpenAIServiceError) -> URLRequest {
         try requestFactory.titleRequest(
             conversationPreview: conversationPreview,
             apiKey: apiKey
@@ -21,7 +21,7 @@ public extension OpenAIRequestBuilder {
     ///   - useDirectBaseURL: Whether to force the direct OpenAI endpoint.
     /// - Returns: A configured URL request.
     /// - Throws: If URL construction fails.
-    func cancelRequest(responseId: String, apiKey: String, useDirectBaseURL: Bool) throws -> URLRequest {
+    func cancelRequest(responseId: String, apiKey: String, useDirectBaseURL: Bool) throws(OpenAIServiceError) -> URLRequest {
         try requestFactory.cancelRequest(
             responseID: responseId,
             apiKey: apiKey,
@@ -36,7 +36,7 @@ public extension OpenAIRequestBuilder {
     ///   - useDirectBaseURL: Whether to force the direct OpenAI endpoint.
     /// - Returns: A configured URL request.
     /// - Throws: If URL construction fails.
-    func fetchRequest(responseId: String, apiKey: String, useDirectBaseURL: Bool) throws -> URLRequest {
+    func fetchRequest(responseId: String, apiKey: String, useDirectBaseURL: Bool) throws(OpenAIServiceError) -> URLRequest {
         try requestFactory.fetchRequest(
             responseID: responseId,
             apiKey: apiKey,
@@ -48,7 +48,7 @@ public extension OpenAIRequestBuilder {
     /// - Parameter apiKey: The API key for authentication.
     /// - Returns: A configured URL request.
     /// - Throws: If URL construction fails.
-    func modelsRequest(apiKey: String) throws -> URLRequest {
+    func modelsRequest(apiKey: String) throws(OpenAIServiceError) -> URLRequest {
         try requestFactory.modelsRequest(apiKey: apiKey)
     }
 }

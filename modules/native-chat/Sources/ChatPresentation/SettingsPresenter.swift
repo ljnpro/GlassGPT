@@ -2,7 +2,7 @@ import ChatApplication
 import ChatDomain
 import Foundation
 import Observation
-import OSLog
+import os
 
 /// Observable presenter that drives the settings view, managing API key validation,
 /// cache sizes, and preference changes.

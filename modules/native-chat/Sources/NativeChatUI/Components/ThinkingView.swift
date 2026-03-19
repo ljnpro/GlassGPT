@@ -14,6 +14,7 @@ package struct ThinkingIndicator: View {
                 .font(.subheadline.weight(.medium))
                 .foregroundStyle(.orange)
                 .symbolEffect(.pulse, options: .repeating)
+                .accessibilityHidden(true)
 
             Text("Reasoning…")
                 .font(.subheadline)
@@ -75,6 +76,7 @@ package struct ThinkingView: View {
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(.orange)
                     .symbolEffect(.pulse, options: .repeating, isActive: isLive)
+                    .accessibilityHidden(true)
 
                 Text(isLive ? "Reasoning…" : "Reasoning Completed")
                     .font(.caption.weight(.semibold))
@@ -86,12 +88,14 @@ package struct ThinkingView: View {
                     .font(.caption2.weight(.bold))
                     .foregroundStyle(.tertiary)
                     .rotationEffect(.degrees(isExpanded ? 90 : 0))
+                    .accessibilityHidden(true)
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
             .contentShape(Rectangle())
             .accessibilityLabel(isLive ? "Reasoning in progress" : "Reasoning completed")
             .accessibilityHint(isExpanded ? "Double-tap to collapse" : "Double-tap to expand")
+            .accessibilityIdentifier("thinking.header")
             .accessibilityAddTraits(.isButton)
             .onTapGesture {
                 withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {

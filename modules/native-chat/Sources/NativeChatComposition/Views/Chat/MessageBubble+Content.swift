@@ -92,6 +92,8 @@ extension MessageBubble {
                     .scaledToFit()
                     .frame(maxWidth: 200, maxHeight: 200)
                     .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .accessibilityLabel("Attached image")
+                    .accessibilityIdentifier("chat.message.image")
             }
 
             assistantToolIndicators
@@ -158,6 +160,9 @@ extension MessageBubble {
                     .font(.caption2)
                     .foregroundStyle(.secondary)
             }
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel("Recovering response")
+            .accessibilityIdentifier("chat.recoveryIndicator")
         }
     }
 
@@ -167,6 +172,8 @@ extension MessageBubble {
             .padding(12)
             .foregroundStyle(.white)
             .background(.blue.gradient, in: RoundedRectangle(cornerRadius: 20))
+            .accessibilityLabel("You said: \(displayedContent)")
+            .accessibilityIdentifier("chat.user.bubble")
             .contextMenu {
                 copyButton
                 shareButton
