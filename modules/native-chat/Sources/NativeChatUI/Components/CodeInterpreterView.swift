@@ -28,7 +28,6 @@ package struct CodeInterpreterIndicator: View {
             darkBorderOpacity: 0.14,
             lightBorderOpacity: 0.08
         )
-        .accessibilityLabel("Running code")
         .accessibilityIdentifier("indicator.codeInterpreter")
     }
 }
