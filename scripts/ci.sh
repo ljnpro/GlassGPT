@@ -94,6 +94,9 @@ function search_quiet() {
 function clean_stale_xctestrun() {
   local derived_data="${DERIVED_DATA_PATH:-$HOME/Library/Developer/Xcode/DerivedData}"
   local stale_count
+  if [[ ! -d "$derived_data" ]]; then
+    return 0
+  fi
   stale_count=$(find "$derived_data" -name '*.xctestrun' -mtime +1 2>/dev/null | wc -l | tr -d ' ')
   if [ "$stale_count" -gt 0 ]; then
     log "Removing $stale_count stale .xctestrun bundles from derived data"
