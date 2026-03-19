@@ -6,7 +6,6 @@ from __future__ import annotations
 import argparse
 import pathlib
 import re
-import sys
 
 
 def read_versions(path: pathlib.Path) -> tuple[str, str]:
