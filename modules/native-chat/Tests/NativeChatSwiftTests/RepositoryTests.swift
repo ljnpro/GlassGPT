@@ -1,12 +1,13 @@
+import Foundation
 import ChatDomain
 import ChatPersistenceSwiftData
-import XCTest
+import Testing
 import SwiftData
 @testable import NativeChatComposition
 
-final class RepositoryTests: XCTestCase {
+struct RepositoryTests {
     @MainActor
-    func testConversationRepositoryFetchesMostRecentConversationAndMessage() throws {
+    @Test func conversationRepositoryFetchesMostRecentConversationAndMessage() throws {
         let container = try makeInMemoryModelContainer()
         let context = ModelContext(container)
         let repository = ConversationRepository(modelContext: context)
@@ -34,13 +35,13 @@ final class RepositoryTests: XCTestCase {
 
         try repository.save()
 
-        XCTAssertEqual(try repository.fetchMostRecentConversation()?.id, latest.id)
-        XCTAssertEqual(try repository.fetchMessage(id: message.id)?.content, "Hello")
-        XCTAssertEqual(try repository.fetchUntitledConversations().map(\.id), [latest.id])
+        #expect(try repository.fetchMostRecentConversation()?.id == latest.id)
+        #expect(try repository.fetchMessage(id: message.id)?.content == "Hello")
+        #expect(try repository.fetchUntitledConversations().map(\.id) == [latest.id])
     }
 
     @MainActor
-    func testDraftRepositorySeparatesRecoverableAndOrphanedDrafts() throws {
+    @Test func draftRepositorySeparatesRecoverableAndOrphanedDrafts() throws {
         let container = try makeInMemoryModelContainer()
         let context = ModelContext(container)
         let conversationRepository = ConversationRepository(modelContext: context)
@@ -74,8 +75,8 @@ final class RepositoryTests: XCTestCase {
 
         try conversationRepository.save()
 
-        XCTAssertEqual(try draftRepository.fetchIncompleteDrafts().map(\.id).count, 2)
-        XCTAssertEqual(try draftRepository.fetchRecoverableDrafts().map(\.id), [recoverable.id])
-        XCTAssertEqual(try draftRepository.fetchOrphanedDrafts().map(\.id), [orphaned.id])
+        #expect(try draftRepository.fetchIncompleteDrafts().map(\.id).count == 2)
+        #expect(try draftRepository.fetchRecoverableDrafts().map(\.id) == [recoverable.id])
+        #expect(try draftRepository.fetchOrphanedDrafts().map(\.id) == [orphaned.id])
     }
 }

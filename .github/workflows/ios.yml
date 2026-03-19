@@ -67,10 +67,18 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        gate:
-          - architecture-tests
-          - core-tests
-          - ui-tests
+        include:
+          - gate: architecture-tests
+          - gate: core-tests
+          - gate: ui-tests
+            ui_filter: "shard-1"
+            ui-tests-shard: 1
+          - gate: ui-tests
+            ui_filter: "shard-2"
+            ui-tests-shard: 2
+          - gate: ui-tests
+            ui_filter: "shard-3"
+            ui-tests-shard: 3
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -88,12 +96,14 @@ jobs:
 
       - name: Run ${{ matrix.gate }}
         run: ./scripts/ci.sh ${{ matrix.gate }}
+        env:
+          UI_TEST_FILTER: ${{ matrix.ui_filter || '' }}
 
       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: test-results-${{ matrix.gate }}
+          name: test-results-${{ matrix.gate }}${{ matrix.ui-tests-shard && format('-shard-{0}', matrix.ui-tests-shard) || '' }}
           path: .local/build/ci/*.xcresult
           retention-days: 14
 

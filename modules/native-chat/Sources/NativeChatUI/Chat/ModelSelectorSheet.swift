@@ -46,7 +46,7 @@ public struct ModelSelectorSheet: View {
 
     private var configurationSummary: String {
         var parts: [String] = [selectedModel.displayName]
-        parts.append(backgroundModeEnabled ? "Background" : "Standard")
+        parts.append(backgroundModeEnabled ? String(localized: "Background") : String(localized: "Standard"))
 
         if flexModeEnabled {
             parts.append("Flex")
@@ -205,7 +205,7 @@ public struct ModelSelectorSheet: View {
                     )
             }
             .buttonStyle(GlassPressButtonStyle())
-            .accessibilityLabel("Save model settings")
+            .accessibilityLabel(String(localized: "Save model settings"))
             .accessibilityIdentifier("modelSelector.save")
         }
         .padding(.horizontal, 2)

@@ -35,7 +35,7 @@ package struct WebSearchIndicator: View {
                 darkBorderOpacity: 0.14,
                 lightBorderOpacity: 0.08
             )
-            .accessibilityLabel("Searching the web")
+            .accessibilityLabel(String(localized: "Searching the web"))
             .accessibilityIdentifier("indicator.webSearch")
             .transition(.opacity.combined(with: .scale(scale: 0.95)))
             .onAppear {

@@ -1,27 +1,29 @@
+import Foundation
+import Testing
 import SwiftUI
-import XCTest
+import UIKit
 import ChatUIComponents
 
 @MainActor
-final class ChatUISourceTargetTests: XCTestCase {
-    func testRichTextBuilderPreservesLinksAndRemovesMarkdownMarkers() {
+struct ChatUISourceTargetTests {
+    @Test func richTextBuilderPreservesLinksAndRemovesMarkdownMarkers() {
         let richText = RichTextAttributedStringBuilder.parseRichText(
             "Visit [OpenAI](https://openai.com) and **ship** _cleanly_."
         )
         let rendered = String(richText.characters)
 
-        XCTAssertEqual(rendered, "Visit OpenAI and ship cleanly.")
-        XCTAssertTrue(richText.runs.contains(where: { $0.link?.absoluteString == "https://openai.com" }))
+        #expect(rendered == "Visit OpenAI and ship cleanly.")
+        #expect(richText.runs.contains(where: { $0.link?.absoluteString == "https://openai.com" }))
     }
 
-    func testStreamingRichTextBuilderResolvesInlineCode() {
+    @Test func streamingRichTextBuilderResolvesInlineCode() {
         let richText = RichTextAttributedStringBuilder.parseStreamingText("Use `swift test` for coverage.")
         let rendered = String(richText.characters)
 
-        XCTAssertEqual(rendered, "Use swift test for coverage.")
+        #expect(rendered == "Use swift test for coverage.")
     }
 
-    func testStableRoundedGlassModifierHostsWithoutCrashing() {
+    @Test func stableRoundedGlassModifierHostsWithoutCrashing() {
         let controller = UIHostingController(
             rootView: Text("Glass").modifier(
                 StableRoundedGlassModifier(
@@ -35,10 +37,10 @@ final class ChatUISourceTargetTests: XCTestCase {
 
         controller.loadViewIfNeeded()
 
-        XCTAssertNotNil(controller.view)
+        #expect(controller.view != nil)
     }
 
-    func testStaticRoundedGlassShellModifierHostsWithoutCrashing() {
+    @Test func staticRoundedGlassShellModifierHostsWithoutCrashing() {
         let controller = UIHostingController(
             rootView: Text("Shell").modifier(
                 StaticRoundedGlassShellModifier(
@@ -50,6 +52,6 @@ final class ChatUISourceTargetTests: XCTestCase {
 
         controller.loadViewIfNeeded()
 
-        XCTAssertNotNil(controller.view)
+        #expect(controller.view != nil)
     }
 }

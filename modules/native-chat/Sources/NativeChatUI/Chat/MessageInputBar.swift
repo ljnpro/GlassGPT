@@ -67,7 +67,7 @@ package struct MessageInputBar: View {
                         .scaledToFit()
                         .frame(height: 60)
                         .clipShape(RoundedRectangle(cornerRadius: 8))
-                        .accessibilityLabel("Attached image preview")
+                        .accessibilityLabel(String(localized: "Attached image preview"))
                         .accessibilityIdentifier("composer.imagePreview")
 
                     Button {
@@ -76,7 +76,7 @@ package struct MessageInputBar: View {
                         Image(systemName: "xmark.circle.fill")
                             .foregroundStyle(.secondary)
                     }
-                    .accessibilityLabel("Remove image")
+                    .accessibilityLabel(String(localized: "Remove image"))
                     .accessibilityIdentifier("composer.removeImage")
 
                     Spacer()
@@ -106,7 +106,7 @@ package struct MessageInputBar: View {
                     } label: {
                         Label("Photo", systemImage: "photo")
                     }
-                    .accessibilityLabel("Attach photo")
+                    .accessibilityLabel(String(localized: "Attach photo"))
                     .accessibilityIdentifier("composer.attachPhoto")
 
                     Button {
@@ -114,7 +114,7 @@ package struct MessageInputBar: View {
                     } label: {
                         Label("Document", systemImage: "doc")
                     }
-                    .accessibilityLabel("Attach document")
+                    .accessibilityLabel(String(localized: "Attach document"))
                     .accessibilityIdentifier("composer.attachDocument")
                 } label: {
                     Image(systemName: "plus.circle")
@@ -136,7 +136,7 @@ package struct MessageInputBar: View {
                             .symbolEffect(.pulse)
                     }
                     .buttonStyle(.glass)
-                    .accessibilityLabel("Stop generating")
+                    .accessibilityLabel(String(localized: "Stop generating"))
                     .accessibilityIdentifier("composer.stop")
                 } else {
                     Button(action: handleSend) {
@@ -146,7 +146,7 @@ package struct MessageInputBar: View {
                     }
                     .buttonStyle(.glass)
                     .disabled(!canSend)
-                    .accessibilityLabel("Send message")
+                    .accessibilityLabel(String(localized: "Send message"))
                     .accessibilityIdentifier("composer.send")
                 }
             }

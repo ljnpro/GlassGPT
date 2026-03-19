@@ -16,10 +16,10 @@ public struct SettingsAboutSection: View {
     public var body: some View {
         Section("About") {
             LabeledContent("Version", value: appVersionString)
-                .accessibilityLabel("App version: \(appVersionString)")
+                .accessibilityLabel(String(localized: "App version: \(appVersionString)"))
                 .accessibilityIdentifier("settings.about.version")
             LabeledContent("Platform", value: platformString)
-                .accessibilityLabel("Platform: \(platformString)")
+                .accessibilityLabel(String(localized: "Platform: \(platformString)"))
                 .accessibilityIdentifier("settings.about.platform")
             LabeledContent("Engine", value: "SwiftUI")
                 .accessibilityLabel("Engine: SwiftUI")

@@ -26,7 +26,7 @@ struct SettingsAPIConfigurationSection: View {
                         .foregroundStyle(isValid ? .green : .red)
                 }
                 .accessibilityElement(children: .combine)
-                .accessibilityLabel(isValid ? "API key is valid" : "API key is invalid")
+                .accessibilityLabel(isValid ? String(localized: "API key is valid") : String(localized: "API key is invalid"))
                 .accessibilityIdentifier("settings.apiKeyStatus")
             }
 
@@ -110,7 +110,7 @@ struct SettingsCloudflareSection: View {
                     }
                 }
                 .accessibilityElement(children: .combine)
-                .accessibilityLabel("Cloudflare connection status: \(statusText)")
+                .accessibilityLabel(String(localized: "Cloudflare connection status: \(statusText)"))
                 .accessibilityIdentifier("settings.cloudflareStatus")
 
                 Button("Check Connection") {
@@ -120,7 +120,7 @@ struct SettingsCloudflareSection: View {
                 }
                 .buttonStyle(.glass)
                 .disabled(viewModel.isCheckingCloudflareHealth || !canCheckConnection)
-                .accessibilityLabel("Check Cloudflare connection")
+                .accessibilityLabel(String(localized: "Check Cloudflare connection"))
                 .accessibilityIdentifier("settings.checkConnection")
             }
         } header: {
