@@ -20,6 +20,8 @@ ios/build/
 *.tgz
 *.tar.gz
 .cache/
+__pycache__/
+*.pyc
 
 # Legacy JS and Expo artifacts
 node_modules/

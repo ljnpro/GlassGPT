@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+export PYTHONDONTWRITEBYTECODE="${PYTHONDONTWRITEBYTECODE:-1}"
+
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 LOCAL_RELEASE_SCRIPT="$ROOT_DIR/.local/one_click_release.sh"
 ENV_FILE="$ROOT_DIR/.local/publish.env"

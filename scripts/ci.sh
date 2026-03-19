@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+export PYTHONDONTWRITEBYTECODE="${PYTHONDONTWRITEBYTECODE:-1}"
+
 python3 -c "import sys; assert sys.version_info >= (3, 14), f'Python 3.14+ required, got {sys.version}'"
 swift --version | grep -q "6.2" || { echo "Swift 6.2+ required"; exit 1; }
 
