@@ -45,9 +45,8 @@ def check_file(filepath: str) -> list[tuple[str, int, str]]:
         lines = f.readlines()
 
     for i, line in enumerate(lines):
-        if DECLARATION_RE.search(line):
-            if not has_doc_comment(lines, i):
-                missing.append((filepath, i + 1, line.rstrip()))
+        if DECLARATION_RE.search(line) and not has_doc_comment(lines, i):
+            missing.append((filepath, i + 1, line.rstrip()))
     return missing
 
 

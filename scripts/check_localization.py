@@ -43,7 +43,7 @@ def main() -> None:
     # 3. Verify required locales present
     for locale in REQUIRED_LOCALES:
         locale_found = False
-        for key, entry in strings.items():
+        for _key, entry in strings.items():
             localizations = entry.get("localizations", {})
             if locale in localizations:
                 locale_found = True
