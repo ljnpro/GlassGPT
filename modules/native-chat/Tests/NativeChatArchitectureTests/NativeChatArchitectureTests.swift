@@ -50,7 +50,7 @@ final class NativeChatArchitectureTests: XCTestCase {
             "NativeChatComposition",
             "NativeChatUITestSupport",
             "NativeChat",
-            "NativeChatArchitectureTests",
+            "NativeChatArchitectureTests"
         ]
 
         for target in requiredTargets {
@@ -81,7 +81,7 @@ final class NativeChatArchitectureTests: XCTestCase {
             "ChatUIComponents",
             "NativeChatUI",
             "NativeChatComposition",
-            "NativeChat",
+            "NativeChat"
         ]
         let fileManager = FileManager.default
 
@@ -162,6 +162,7 @@ final class NativeChatArchitectureTests: XCTestCase {
         )
     }
 
+    // swiftlint:disable:next function_body_length
     func testNewArchitectureModulesAreDirectlyCallable() async throws {
         let conversation = StoredConversationSnapshot(
             id: UUID(),
@@ -217,6 +218,7 @@ final class NativeChatArchitectureTests: XCTestCase {
         XCTAssertEqual(String(streamingText.characters), "Ship release")
 
         await MainActor.run {
+            // swiftlint:disable:next force_try
             let container = try! ModelContainer(
                 for: Schema([Conversation.self, Message.self]),
                 configurations: [ModelConfiguration(isStoredInMemoryOnly: true)]

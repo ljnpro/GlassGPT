@@ -1,6 +1,7 @@
 import Foundation
 
 extension MarkdownContentView {
+    /// Detects a Markdown heading (e.g. `## Title`) and returns its level and text, or nil.
     package func detectHeading(_ line: String) -> (level: Int, text: String)? {
         var level = 0
         let chars = Array(line)
@@ -14,6 +15,7 @@ extension MarkdownContentView {
         return (level, text)
     }
 
+    /// Returns `true` if the line is a Markdown horizontal rule (e.g. `---`, `***`, `___`).
     package func isHorizontalRule(_ line: String) -> Bool {
         let condensed = line.replacingOccurrences(of: " ", with: "")
         guard condensed.count >= 3 else { return false }

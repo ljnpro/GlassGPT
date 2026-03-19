@@ -1,6 +1,7 @@
 import UIKit
 
 @MainActor
+/// UIKit view that renders a `UIGlassEffect` background with configurable corner radius, border, and fill opacity.
 public final class GlassBackgroundHostingView: UIView {
     private let effectView = UIVisualEffectView()
     private let stableFillView = UIView()
@@ -14,6 +15,7 @@ public final class GlassBackgroundHostingView: UIView {
     private var darkBorderOpacity: CGFloat
     private var lightBorderOpacity: CGFloat
 
+    /// Creates a glass background view with the specified visual parameters.
     public init(
         cornerRadius: CGFloat,
         innerInset: CGFloat,
@@ -73,6 +75,7 @@ public final class GlassBackgroundHostingView: UIView {
         stableFillView.layer.cornerCurve = .continuous
     }
 
+    /// Reconfigures all visual properties and triggers a layout and color update.
     public func configure(
         cornerRadius: CGFloat,
         innerInset: CGFloat,

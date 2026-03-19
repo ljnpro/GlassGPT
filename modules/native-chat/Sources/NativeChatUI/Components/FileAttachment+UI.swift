@@ -2,6 +2,7 @@ import SwiftUI
 import ChatDomain
 
 package extension FileAttachment {
+    /// Returns a color representing the file type for use in attachment chips.
     var iconColor: Color {
         switch fileType.lowercased() {
         case "pdf": return .red

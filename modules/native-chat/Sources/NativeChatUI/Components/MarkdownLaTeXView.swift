@@ -4,6 +4,7 @@ import SwiftUI
 
 // MARK: - Block LaTeX View
 
+/// Renders a block-level LaTeX expression using a WKWebView backed by KaTeX.
 package struct BlockLaTeXView: View {
     let latex: String
 
@@ -44,6 +45,7 @@ package struct BlockLaTeXView: View {
     }
 }
 
+/// Wraps ``BlockLaTeXView`` in a standalone glass surface card.
 package struct StandaloneBlockLaTeXCardView: View {
     let latex: String
 

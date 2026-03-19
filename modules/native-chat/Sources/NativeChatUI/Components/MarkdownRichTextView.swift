@@ -3,11 +3,13 @@ import ChatUIComponents
 import Foundation
 import SwiftUI
 
+/// Renders inline segments (text and inline LaTeX converted to Unicode) as rich attributed text with link handling.
 package struct RichTextView: View {
     let segments: [InlineSegment]
     var filePathAnnotations: [FilePathAnnotation] = []
     var onSandboxLinkTap: ((String, FilePathAnnotation?) -> Void)?
 
+    /// Creates a rich text view with inline segments and optional sandbox link handling.
     package init(
         segments: [InlineSegment],
         filePathAnnotations: [FilePathAnnotation] = [],
@@ -43,6 +45,7 @@ package struct RichTextView: View {
             })
     }
 
+    /// Looks up a ``FilePathAnnotation`` matching the given sandbox URL using progressively looser matching.
     package func findFilePathAnnotation(for sandboxURL: String) -> FilePathAnnotation? {
         if let exact = filePathAnnotations.first(where: { $0.sandboxPath == sandboxURL }) {
             return exact
@@ -63,10 +66,10 @@ package struct RichTextView: View {
             return match
         }
 
-        let filename = (pathOnly as NSString).lastPathComponent
+        let filename = URL(fileURLWithPath: pathOnly).lastPathComponent
         if !filename.isEmpty {
             if let match = filePathAnnotations.first(where: {
-                ($0.sandboxPath as NSString).lastPathComponent == filename ||
+                URL(fileURLWithPath: $0.sandboxPath).lastPathComponent == filename ||
                 $0.filename == filename
             }) {
                 return match
@@ -80,6 +83,8 @@ package struct RichTextView: View {
         return nil
     }
 
+    /// Converts a LaTeX expression to a best-effort Unicode approximation for inline display.
+    // swiftlint:disable:next cyclomatic_complexity function_body_length
     package func latexToUnicode(_ latex: String) -> String {
         var result = latex
 

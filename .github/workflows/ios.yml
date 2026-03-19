@@ -4,12 +4,17 @@ on:
   push:
     branches:
       - main
-      - codex/stable-4.7
+      - codex/stable-4.8
       - codex/feature/**
   pull_request:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  build-and-test:
+  lint:
+    name: Lint & Format
     runs-on: macos-15
     steps:
       - name: Checkout
@@ -27,20 +32,81 @@ jobs:
       - name: Lint Gate
         run: ./scripts/ci.sh lint
 
+      - name: Python Lint Gate
+        run: ./scripts/ci.sh python-lint
+
+      - name: Format Check Gate
+        run: ./scripts/ci.sh format-check
+
+  build:
+    name: Build
+    runs-on: macos-15
+    needs: lint
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode.app
+
+      - name: Cache SPM packages
+        uses: actions/cache@v4
+        with:
+          path: .local/build/ci/SourcePackages
+          key: ${{ runner.os }}-spm-${{ hashFiles('modules/native-chat/Package.resolved') }}
+          restore-keys: |
+            ${{ runner.os }}-spm-
+
       - name: Build Gate
         run: ./scripts/ci.sh build
 
-      - name: Architecture Tests Gate
-        run: ./scripts/ci.sh architecture-tests
+  test:
+    name: Tests
+    runs-on: macos-15
+    needs: build
+    strategy:
+      fail-fast: false
+      matrix:
+        gate:
+          - architecture-tests
+          - core-tests
+          - ui-tests
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - name: Core Tests Gate
-        run: ./scripts/ci.sh core-tests
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode.app
 
-      - name: UI Tests Gate
-        run: ./scripts/ci.sh ui-tests
+      - name: Cache SPM packages
+        uses: actions/cache@v4
+        with:
+          path: .local/build/ci/SourcePackages
+          key: ${{ runner.os }}-spm-${{ hashFiles('modules/native-chat/Package.resolved') }}
+          restore-keys: |
+            ${{ runner.os }}-spm-
 
-      - name: Coverage Report Gate
-        run: ./scripts/ci.sh coverage-report
+      - name: Run ${{ matrix.gate }}
+        run: ./scripts/ci.sh ${{ matrix.gate }}
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-${{ matrix.gate }}
+          path: .local/build/ci/*.xcresult
+          retention-days: 14
+
+  quality:
+    name: Quality Gates
+    runs-on: macos-15
+    needs: build
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode.app
 
       - name: Maintainability Gate
         run: ./scripts/ci.sh maintainability
@@ -53,6 +119,38 @@ jobs:
 
       - name: Module Boundary Gate
         run: ./scripts/ci.sh module-boundary
+
+      - name: Upload quality reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: quality-reports
+          path: |
+            .local/build/ci/maintainability-report.txt
+            .local/build/ci/source-share-report.txt
+            .local/build/ci/infra-safety-report.txt
+            .local/build/ci/module-boundary-report.txt
+          retention-days: 14
+
+  release-readiness:
+    name: Release Readiness
+    runs-on: macos-15
+    needs: [test, quality]
+    if: github.ref == 'refs/heads/codex/stable-4.8' || github.ref == 'refs/heads/main'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode.app
+
+      - name: Cache SPM packages
+        uses: actions/cache@v4
+        with:
+          path: .local/build/ci/SourcePackages
+          key: ${{ runner.os }}-spm-${{ hashFiles('modules/native-chat/Package.resolved') }}
+          restore-keys: |
+            ${{ runner.os }}-spm-
 
       - name: Release Readiness Gate
         run: ./scripts/ci.sh release-readiness

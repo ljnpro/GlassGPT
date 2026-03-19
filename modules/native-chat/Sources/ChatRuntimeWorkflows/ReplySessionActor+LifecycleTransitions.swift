@@ -2,6 +2,12 @@ import ChatRuntimeModel
 import Foundation
 
 extension ReplySessionActor {
+    /// Applies a lifecycle-affecting transition (recovery, detach, cancel, finalize, complete, fail).
+    ///
+    /// Non-lifecycle transitions are ignored and the current state is returned unchanged.
+    /// - Parameter transition: The transition to apply.
+    /// - Returns: The updated runtime state after applying the transition.
+    // swiftlint:disable:next cyclomatic_complexity function_body_length
     func applyLifecycleTransition(_ transition: ReplyRuntimeTransition) -> ReplyRuntimeState {
         switch transition {
         case .beginRecoveryStatus(let responseID, let lastSequenceNumber, let usedBackgroundMode, let route):
@@ -90,13 +96,20 @@ extension ReplySessionActor {
             state.lifecycle = .failed(message)
             state.isThinking = false
 
-        case .beginSubmitting, .beginUploadingAttachments, .beginStreaming, .recordResponseCreated, .recordSequenceUpdate, .appendText, .appendThinking, .setThinking, .startToolCall, .setToolCallStatus, .appendToolCode, .setToolCode, .addCitation, .addFilePathAnnotation, .mergeTerminalPayload:
+        case .beginSubmitting, .beginUploadingAttachments, .beginStreaming,
+             .recordResponseCreated, .recordSequenceUpdate,
+             .appendText, .appendThinking, .setThinking,
+             .startToolCall, .setToolCallStatus, .appendToolCode, .setToolCode,
+             .addCitation, .addFilePathAnnotation, .mergeTerminalPayload:
             break
         }
 
         return state
     }
 
+    /// Updates the stream cursor's sequence number to the maximum of the current and provided values.
+    /// - Parameter sequence: The new sequence number to consider.
+    // swiftlint:disable:next function_body_length
     func updateCursor(lastSequenceNumber sequence: Int) {
         guard let cursor = state.cursor else {
             return

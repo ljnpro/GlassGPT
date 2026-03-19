@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Get staged Swift files
+STAGED_SWIFT=$(git diff --cached --name-only --diff-filter=ACM -- '*.swift')
+
+if [ -z "$STAGED_SWIFT" ]; then
+    exit 0
+fi
+
+echo "Running SwiftLint on staged files..."
+echo "$STAGED_SWIFT" | xargs swiftlint lint --strict --quiet 2>/dev/null || {
+    echo "SwiftLint failed. Fix violations before committing."
+    exit 1
+}
+
+if command -v swiftformat &>/dev/null; then
+    echo "Checking SwiftFormat..."
+    echo "$STAGED_SWIFT" | xargs swiftformat --lint --quiet 2>/dev/null || {
+        echo "SwiftFormat check failed. Run 'swiftformat .' to fix."
+        exit 1
+    }
+fi
+
+echo "Pre-commit checks passed."

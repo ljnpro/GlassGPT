@@ -2,9 +2,12 @@ import ChatPresentation
 import ChatUIComponents
 import SwiftUI
 
+/// A single row in the conversation history list, showing the title, preview, timestamp, and model badge.
 public struct HistoryRow: View {
+    /// The conversation data to display.
     let conversation: HistoryConversationRow
 
+    /// Creates a history row for the given conversation.
     public init(conversation: HistoryConversationRow) {
         self.conversation = conversation
     }
@@ -45,5 +48,8 @@ public struct HistoryRow: View {
             }
         }
         .padding(.vertical, 6)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(conversation.title), \(conversation.modelDisplayName)")
+        .accessibilityHint(conversation.preview)
     }
 }

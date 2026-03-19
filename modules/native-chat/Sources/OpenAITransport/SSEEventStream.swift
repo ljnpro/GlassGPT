@@ -1,11 +1,17 @@
 import Foundation
 
+/// Concrete ``OpenAIStreamClient`` implementation that creates SSE streaming sessions
+/// using ``URLSession`` with a delegate-based data pipeline.
 @MainActor
 public final class SSEEventStream: OpenAIStreamClient {
-    private var currentDelegate: OpenAISSEDelegate?
+    private weak var currentDelegate: OpenAISSEDelegate?
 
+    /// Creates a new SSE event stream.
     public init() {}
 
+    /// Creates a new async stream for the given request, setting up the SSE delegate pipeline.
+    /// - Parameter request: The URL request to stream.
+    /// - Returns: An async stream of ``StreamEvent`` values.
     public func makeStream(request: URLRequest) -> AsyncStream<StreamEvent> {
         AsyncStream(bufferingPolicy: .unbounded) { continuation in
             let delegate = OpenAISSEDelegate(continuation: continuation)
@@ -25,6 +31,7 @@ public final class SSEEventStream: OpenAIStreamClient {
         }
     }
 
+    /// Cancels the current SSE delegate and cleans up resources.
     public func cancel() {
         currentDelegate?.cancel()
         currentDelegate = nil

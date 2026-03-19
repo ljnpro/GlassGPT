@@ -7,11 +7,13 @@ import Foundation
 import SwiftData
 
 @MainActor
+/// Coordinator bridging the history presenter to SwiftData persistence and the chat controller.
 package final class NativeChatHistoryCoordinator {
     private let modelContext: ModelContext
     private let chatController: ChatController
     private let showChatTab: @MainActor () -> Void
 
+    /// Creates a history coordinator with the given SwiftData context, chat controller, and tab switch closure.
     package init(
         modelContext: ModelContext,
         chatController: ChatController,
@@ -22,6 +24,8 @@ package final class NativeChatHistoryCoordinator {
         self.showChatTab = showChatTab
     }
 
+    /// Constructs a ``HistoryPresenter`` wired to load, select, and delete conversations via SwiftData.
+    // swiftlint:disable:next function_body_length
     package func makePresenter() -> HistoryPresenter {
         let modelContext = self.modelContext
         let chatController = self.chatController

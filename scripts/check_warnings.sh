@@ -1,4 +1,4 @@
-#!/bin/zsh
+#!/usr/bin/env bash
 set -euo pipefail
 
 ALLOWED_VENDOR_WARNING_PATTERNS="${ALLOWED_VENDOR_WARNING_PATTERNS:-Metadata extraction skipped\\. No AppIntents\\.framework dependency found\\.}"

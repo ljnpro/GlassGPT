@@ -1,3 +1,4 @@
+// swiftlint:disable file_length
 import XCTest
 import ChatDomain
 import ChatPersistenceContracts
@@ -8,7 +9,7 @@ import ChatRuntimeModel
 import ChatApplication
 import ChatUIComponents
 import OpenAITransport
-
+// swiftlint:disable:next type_body_length
 final class SourceTargetBoundaryTests: XCTestCase {
     func testChatDomainPayloadModelsRoundTripAcrossSourceTargetBoundary() throws {
         let citations = [
@@ -37,6 +38,7 @@ final class SourceTargetBoundaryTests: XCTestCase {
         XCTAssertEqual(FilePathAnnotation.decode(FilePathAnnotation.encode(fileAnnotations)), fileAnnotations)
     }
 
+    // swiftlint:disable:next function_body_length
     func testOpenAITransportSourceDTOsRemainDirectlyConstructibleAndCodable() throws {
         let request = ResponsesStreamRequestDTO(
             model: "gpt-5.4",
@@ -102,6 +104,7 @@ final class SourceTargetBoundaryTests: XCTestCase {
         XCTAssertEqual(try JSONDecoder().decode(ResponsesStreamEnvelopeDTO.self, from: envelopeData).resolvedResponse, payload)
     }
 
+    // swiftlint:disable:next function_body_length
     func testOpenAITransportSourceParserAndTranslatorRemainDirectlyCallable() throws {
         let parser = OpenAIResponseParser()
         let payload = ResponsesResponseDTO(
@@ -132,6 +135,7 @@ final class SourceTargetBoundaryTests: XCTestCase {
         let responseData = try JSONCoding.encode(payload)
         let response = try XCTUnwrap(
             HTTPURLResponse(
+                // swiftlint:disable:next force_unwrapping
                 url: URL(string: "https://example.com/responses/resp_123")!,
                 statusCode: 200,
                 httpVersion: nil,

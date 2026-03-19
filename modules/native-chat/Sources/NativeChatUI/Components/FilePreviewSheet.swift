@@ -7,6 +7,7 @@ import SwiftUI
 import UIKit
 import ChatDomain
 
+/// Full-screen preview sheet for generated images and PDFs, with save-to-photos and share actions.
 public struct FilePreviewSheet: View {
     let previewItem: FilePreviewItem
     var isDismissPending: Bool = false
@@ -184,6 +185,7 @@ public struct FilePreviewSheet: View {
         }
     }
 
+    /// Creates a file preview sheet for the given item with optional dismiss callbacks.
     public init(
         previewItem: FilePreviewItem,
         isDismissPending: Bool = false,

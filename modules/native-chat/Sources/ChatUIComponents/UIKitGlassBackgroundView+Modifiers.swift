@@ -1,6 +1,7 @@
 import SwiftUI
 
 public extension View {
+    /// Adds a UIKit-backed single-surface glass background with configurable border and fill opacity.
     func singleSurfaceGlass(
         cornerRadius: CGFloat,
         innerInset: CGFloat = 0,
@@ -25,6 +26,7 @@ public extension View {
         }
     }
 
+    /// Clips the view to a capsule shape and applies a single-surface glass background.
     func singleFrameGlassCapsuleControl(
         tintOpacity: CGFloat = 0.018,
         borderWidth: CGFloat = 0.8,
@@ -43,6 +45,7 @@ public extension View {
             )
     }
 
+    /// Clips the view to a circle shape and applies a single-surface glass background.
     func singleFrameGlassCircleControl(
         tintOpacity: CGFloat = 0.018,
         borderWidth: CGFloat = 0.8,
@@ -61,6 +64,7 @@ public extension View {
             )
     }
 
+    /// Clips the view to a rounded rectangle and applies a single-surface glass background.
     func singleFrameGlassRoundedControl(
         cornerRadius: CGFloat,
         tintOpacity: CGFloat = 0.018,

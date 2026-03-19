@@ -7,6 +7,7 @@ import SwiftData
 
 @MainActor
 extension ChatController {
+    /// The SwiftData model context used for persistence.
     package var modelContext: ModelContext { services.modelContext }
     var settingsStore: SettingsStore { services.settingsStore }
     var apiKeyStore: PersistedAPIKeyStore { services.apiKeyStore }

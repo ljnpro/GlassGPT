@@ -2,6 +2,7 @@ import SwiftUI
 import UIKit
 
 public extension View {
+    /// Presents content in an `.overFullScreen` modal with a cross-dissolve transition.
     func overFullScreenCover<PresentedContent: View>(
         isPresented: Binding<Bool>,
         interfaceStyle: UIUserInterfaceStyle = .unspecified,

@@ -1,5 +1,6 @@
 import SwiftUI
 
+/// Parses inline Markdown (bold, italic, code) into `AttributedString` values for display in SwiftUI text views.
 public enum RichTextAttributedStringBuilder {
     struct Style {
         let baseFont: Font
@@ -31,14 +32,17 @@ public enum RichTextAttributedStringBuilder {
         supportsUnderscoreBold: false
     )
 
+    /// Parses body-styled Markdown text, preserving auto-detected links from Apple's parser.
     public static func parseRichText(_ text: String) -> AttributedString {
         parse(text, style: bodyStyle, preserveLinksFromAppleParser: true)
     }
 
+    /// Parses body-styled Markdown suitable for live-streaming text where links are not yet stable.
     public static func parseStreamingText(_ text: String) -> AttributedString {
         parse(text, style: bodyStyle, preserveLinksFromAppleParser: false)
     }
 
+    /// Parses caption-styled Markdown used for "thinking" indicator text.
     public static func parseThinkingText(_ text: String) -> AttributedString {
         parse(text, style: captionStyle, preserveLinksFromAppleParser: false)
     }
@@ -78,6 +82,7 @@ public enum RichTextAttributedStringBuilder {
         }
     }
 
+    // swiftlint:disable:next cyclomatic_complexity function_body_length
     private static func manualMarkdownParse(_ text: String, style: Style) -> AttributedString {
         var result = AttributedString()
         let chars = Array(text)

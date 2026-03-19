@@ -1,12 +1,9 @@
 #!/usr/bin/env python3
 
-from __future__ import annotations
-
 import re
 import sys
 from dataclasses import dataclass
 from pathlib import Path
-
 
 ROOT = Path(__file__).resolve().parent.parent
 SOURCES_ROOT = ROOT / "modules" / "native-chat" / "Sources"
@@ -65,7 +62,10 @@ TARGET_RULES: dict[str, TargetRule] = {
         ),
     ),
     "ChatPersistenceSwiftData": TargetRule(
-        allowed_imports=frozenset({"Foundation", "SwiftData", "CryptoKit", "ChatDomain", "ChatPersistenceContracts", "ChatPersistenceCore", "OpenAITransport"}),
+        allowed_imports=frozenset({
+            "Foundation", "SwiftData", "CryptoKit", "ChatDomain",
+            "ChatPersistenceContracts", "ChatPersistenceCore", "OpenAITransport",
+        }),
         forbidden_patterns=(
             ("Bundle.main", "ChatPersistenceSwiftData must not reach app bundle state"),
             ("ProcessInfo.processInfo", "ChatPersistenceSwiftData must not read process environment"),
@@ -122,7 +122,10 @@ TARGET_RULES: dict[str, TargetRule] = {
         ),
     ),
     "ChatApplication": TargetRule(
-        allowed_imports=frozenset({"Foundation", "ChatDomain", "ChatPersistenceContracts", "ChatRuntimeModel", "ChatRuntimePorts", "ChatRuntimeWorkflows"}),
+        allowed_imports=frozenset({
+            "Foundation", "ChatDomain", "ChatPersistenceContracts",
+            "ChatRuntimeModel", "ChatRuntimePorts", "ChatRuntimeWorkflows",
+        }),
         forbidden_patterns=(
             ("Bundle.main", "ChatApplication must not reach app bundle state"),
             ("ProcessInfo.processInfo", "ChatApplication must not read process environment"),
@@ -148,7 +151,11 @@ TARGET_RULES: dict[str, TargetRule] = {
         ),
     ),
     "NativeChatUI": TargetRule(
-        allowed_imports=frozenset({"Foundation", "SwiftUI", "UIKit", "WebKit", "PDFKit", "Photos", "ImageIO", "ChatDomain", "ChatPresentation", "ChatUIComponents", "GeneratedFilesCore"}),
+        allowed_imports=frozenset({
+            "Foundation", "SwiftUI", "UIKit", "WebKit", "PDFKit", "Photos",
+            "ImageIO", "ChatDomain", "ChatPresentation", "ChatUIComponents",
+            "GeneratedFilesCore",
+        }),
         forbidden_patterns=(
             ("Bundle.main", "NativeChatUI should consume resolved configuration rather than Bundle.main"),
             ("ProcessInfo.processInfo", "NativeChatUI should not read process environment"),

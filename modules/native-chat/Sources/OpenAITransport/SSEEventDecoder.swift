@@ -1,24 +1,49 @@
 import ChatDomain
 import Foundation
+import OSLog
 
+/// The result of processing an SSE frame, indicating whether the stream should continue.
 public enum SSEEventTerminalResult {
+    /// The frame was processed and the stream should continue.
     case continued
+    /// A terminal "completed" event was received.
     case terminalCompleted
+    /// A terminal "incomplete" event was received with an optional message.
     case terminalIncomplete(String?)
+    /// A terminal error event was received.
     case terminalError
 }
 
+/// Stateful decoder that processes SSE frames, accumulates content, and emits ``StreamEvent`` values.
+///
+/// Tracks accumulated text, thinking content, response IDs, and terminal states across
+/// the lifetime of a single streaming session.
 public struct SSEEventDecoder {
+    private static let logger = Logger(subsystem: "GlassGPT", category: "sse")
+    /// The accumulated output text from all text deltas.
     public private(set) var accumulatedText = ""
+    /// The accumulated reasoning/thinking text.
     public private(set) var accumulatedThinking = ""
+    /// File path annotations accumulated during the stream.
     public private(set) var accumulatedFilePathAnnotations: [FilePathAnnotation] = []
+    /// Whether the model is currently in its thinking phase.
     public private(set) var thinkingActive = false
+    /// Whether any output (text or thinking) has been emitted.
     public private(set) var emittedAnyOutput = false
+    /// Whether a terminal event (completed, incomplete, or error) has been received.
     public private(set) var sawTerminalEvent = false
+    /// The response ID that has been emitted, if any.
     public private(set) var emittedResponseID: String?
 
+    /// Creates a new empty SSE event decoder.
     public init() {}
 
+    /// Decodes a single SSE frame, emitting stream events and returning the terminal status.
+    /// - Parameters:
+    ///   - frame: The SSE frame to decode.
+    ///   - continuation: The async stream continuation to yield events to.
+    /// - Returns: The terminal result indicating whether the stream should continue.
+    // swiftlint:disable:next cyclomatic_complexity function_body_length
     public mutating func decode(
         frame: SSEFrame,
         continuation: AsyncStream<StreamEvent>.Continuation
@@ -138,6 +163,8 @@ public struct SSEEventDecoder {
         }
     }
 
+    /// Emits a thinking-finished event if thinking is currently active, then deactivates thinking.
+    /// - Parameter continuation: The async stream continuation to yield the event to.
     public mutating func yieldThinkingFinishedIfNeeded(
         continuation: AsyncStream<StreamEvent>.Continuation
     ) {
@@ -146,10 +173,12 @@ public struct SSEEventDecoder {
         continuation.yield(.thinkingFinished)
     }
 
+    /// The accumulated thinking text for terminal events, or `nil` if empty.
     public var terminalThinking: String? {
         accumulatedThinking.isEmpty ? nil : accumulatedThinking
     }
 
+    /// The accumulated file path annotations for terminal events, or `nil` if empty.
     public var terminalFilePathAnnotations: [FilePathAnnotation]? {
         accumulatedFilePathAnnotations.isEmpty ? nil : accumulatedFilePathAnnotations
     }
@@ -192,6 +221,7 @@ public struct SSEEventDecoder {
         do {
             return try JSONCoding.decode(ResponsesStreamEnvelopeDTO.self, from: data)
         } catch {
+            Self.logger.debug("SSE envelope decode failed: \(error.localizedDescription, privacy: .public)")
             return nil
         }
     }

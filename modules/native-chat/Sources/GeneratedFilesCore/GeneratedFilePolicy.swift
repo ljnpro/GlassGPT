@@ -1,10 +1,14 @@
 import ChatDomain
 import Foundation
 
+/// Identifies the cache storage bucket for a generated file.
 public enum GeneratedFileCacheBucket: String, CaseIterable, Sendable {
+    /// Bucket for generated image files (PNG, JPEG, etc.).
     case image
+    /// Bucket for generated document files (PDF, XLSX, etc.).
     case document
 
+    /// The filesystem directory name used for this bucket under the caches root.
     public var directoryName: String {
         switch self {
         case .image:
@@ -15,26 +19,38 @@ public enum GeneratedFileCacheBucket: String, CaseIterable, Sendable {
     }
 }
 
+/// Determines how a generated file is presented to the user when opened.
 public enum GeneratedFileOpenBehavior: String, CaseIterable, Sendable {
+    /// Show the file in the in-app image preview viewer.
     case imagePreview
+    /// Show the file in the in-app PDF preview viewer.
     case pdfPreview
+    /// Present the file via the system share sheet for direct export.
     case directShare
 }
 
+/// Composite key used to look up a cached generated file.
 public struct GeneratedFileCacheKey: Equatable, Hashable, Sendable {
+    /// The download key (typically `fileId` or `containerId:fileId`).
     public let identity: String
+    /// The cache bucket this file belongs to.
     public let bucket: GeneratedFileCacheBucket
 
+    /// Creates a cache key.
     public init(identity: String, bucket: GeneratedFileCacheBucket) {
         self.identity = identity
         self.bucket = bucket
     }
 }
 
+/// Filename hints extracted from an HTTP download response.
 public struct GeneratedFileResponseMetadata: Equatable, Sendable {
+    /// Filename suggested by the URL response object.
     public let suggestedFilename: String?
+    /// Filename extracted from the `Content-Disposition` header.
     public let contentDispositionFilename: String?
 
+    /// Creates response metadata with optional filename hints.
     public init(
         suggestedFilename: String? = nil,
         contentDispositionFilename: String? = nil
@@ -44,11 +60,15 @@ public struct GeneratedFileResponseMetadata: Equatable, Sendable {
     }
 }
 
+/// Pure-function policy that resolves cache buckets, open behaviors, cache keys, and filenames
+/// for generated files based on their descriptors and response metadata.
 public enum GeneratedFilePolicy {
+    /// Returns the appropriate cache bucket for the given file descriptor.
     public static func cacheBucket(for descriptor: GeneratedFileDescriptor) -> GeneratedFileCacheBucket {
         descriptor.isImage ? .image : .document
     }
 
+    /// Returns the appropriate open behavior (image preview, PDF preview, or share) for the descriptor.
     public static func openBehavior(for descriptor: GeneratedFileDescriptor) -> GeneratedFileOpenBehavior {
         if descriptor.isImage {
             return .imagePreview
@@ -61,6 +81,7 @@ public enum GeneratedFilePolicy {
         return .directShare
     }
 
+    /// Builds a ``GeneratedFileCacheKey`` from the descriptor's download key and cache bucket.
     public static func cacheKey(for descriptor: GeneratedFileDescriptor) -> GeneratedFileCacheKey {
         GeneratedFileCacheKey(
             identity: descriptor.downloadKey,
@@ -68,6 +89,7 @@ public enum GeneratedFilePolicy {
         )
     }
 
+    /// Resolves the best filename from the descriptor, response metadata, and an optional inferred extension.
     public static func resolvedFilename(
         for descriptor: GeneratedFileDescriptor,
         responseMetadata: GeneratedFileResponseMetadata = .init(),
@@ -89,6 +111,7 @@ public enum GeneratedFilePolicy {
         return "\(descriptor.fileID).\(inferredExtension ?? "bin")"
     }
 
+    /// Sanitizes a candidate filename, optionally appending an inferred extension if none is present.
     public static func normalizedFilename(
         _ candidate: String?,
         inferredExtension: String? = nil

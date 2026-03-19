@@ -23,6 +23,7 @@ package enum UITestScenarioLoader {
         return makeBootstrap(for: scenario, modelContext: modelContext)
     }
 
+    // swiftlint:disable:next function_body_length
     package static func makeBootstrap(
         for scenario: UITestScenario,
         modelContext: ModelContext

@@ -1,3 +1,4 @@
+// swiftlint:disable file_length
 import ChatPersistenceCore
 import ChatDomain
 import ChatPersistenceSwiftData
@@ -5,7 +6,7 @@ import Foundation
 import OpenAITransport
 import XCTest
 @testable import NativeChatComposition
-
+// swiftlint:disable:next type_body_length
 final class OpenAITransportConfigurationTests: XCTestCase {
     func testDefaultConfigurationProviderTracksGatewayToggleState() {
         let provider = DefaultOpenAIConfigurationProvider(
@@ -47,6 +48,7 @@ final class OpenAITransportConfigurationTests: XCTestCase {
             cloudflareAIGToken: "gateway-token",
             useCloudflareGateway: false
         )
+        // swiftlint:disable:next force_unwrapping
         var request = URLRequest(url: URL(string: "https://example.com")!)
 
         OpenAIStandardRequestAuthorizer(configuration: config).applyAuthorization(
@@ -66,6 +68,7 @@ final class OpenAITransportConfigurationTests: XCTestCase {
             cloudflareAIGToken: "gateway-token",
             useCloudflareGateway: true
         )
+        // swiftlint:disable:next force_unwrapping
         var request = URLRequest(url: URL(string: "https://example.com")!)
 
         OpenAIStandardRequestAuthorizer(configuration: config).applyAuthorization(
@@ -105,6 +108,7 @@ final class OpenAITransportConfigurationTests: XCTestCase {
         configuration.protocolClasses = [CancellationAwareURLProtocol.self]
         let session = URLSession(configuration: configuration)
         let transport = OpenAIURLSessionTransport(session: session)
+        // swiftlint:disable:next force_unwrapping
         let request = URLRequest(url: URL(string: "https://example.com/cancel")!)
 
         let task = Task {
@@ -169,11 +173,14 @@ final class OpenAITransportConfigurationTests: XCTestCase {
         let responseData = try JSONSerialization.data(withJSONObject: ["id": "file_123"])
         let transport = MockOpenAIDataTransport()
         transport.nextResponseData = responseData
+        // swiftlint:disable:next force_unwrapping
         transport.nextResponse = HTTPURLResponse(
+            // swiftlint:disable:next force_unwrapping
             url: URL(string: "https://api.openai.com/v1/files")!,
             statusCode: 200,
             httpVersion: nil,
             headerFields: nil
+        // swiftlint:disable:next force_unwrapping
         )!
 
         let config = TransportConfigurationFixture(
@@ -206,6 +213,7 @@ final class OpenAITransportConfigurationTests: XCTestCase {
     }
 
     @MainActor
+    // swiftlint:disable:next function_body_length
     func testOpenAIServiceFetchResponseFallsBackToDirectRouteAfterGatewayFailure() async throws {
         let transport = MockOpenAIDataTransport()
         transport.queuedErrors = [URLError(.cannotConnectToHost)]
@@ -237,11 +245,14 @@ final class OpenAITransportConfigurationTests: XCTestCase {
                         ]
                     )
                 ),
+                // swiftlint:disable:next force_unwrapping
                 HTTPURLResponse(
+                    // swiftlint:disable:next force_unwrapping
                     url: URL(string: "https://api.openai.com/v1/responses/resp_123")!,
                     statusCode: 200,
                     httpVersion: nil,
                     headerFields: nil
+                // swiftlint:disable:next force_unwrapping
                 )!
             )
         ]
@@ -284,11 +295,14 @@ final class OpenAITransportConfigurationTests: XCTestCase {
         transport.queuedResponses = [
             (
                 Data(),
+                // swiftlint:disable:next force_unwrapping
                 HTTPURLResponse(
+                    // swiftlint:disable:next force_unwrapping
                     url: URL(string: "https://api.openai.com/v1/responses/resp_123/cancel")!,
                     statusCode: 200,
                     httpVersion: nil,
                     headerFields: nil
+                // swiftlint:disable:next force_unwrapping
                 )!
             )
         ]
@@ -364,11 +378,14 @@ final class OpenAITransportConfigurationTests: XCTestCase {
                         ]
                     )
                 ),
+                // swiftlint:disable:next force_unwrapping
                 HTTPURLResponse(
+                    // swiftlint:disable:next force_unwrapping
                     url: URL(string: "https://api.openai.com/v1/responses")!,
                     statusCode: 200,
                     httpVersion: nil,
                     headerFields: nil
+                // swiftlint:disable:next force_unwrapping
                 )!
             )
         ]
@@ -414,11 +431,14 @@ private final class MockOpenAIDataTransport: OpenAIDataTransport, @unchecked Sen
             return (nextResponseData, nextResponse)
         }
 
+        // swiftlint:disable:next force_unwrapping
         let fallback = HTTPURLResponse(
+            // swiftlint:disable:next force_unwrapping
             url: request.url ?? URL(string: "https://api.openai.com")!,
             statusCode: 200,
             httpVersion: nil,
             headerFields: nil
+        // swiftlint:disable:next force_unwrapping
         )!
         return (nextResponseData, fallback)
     }

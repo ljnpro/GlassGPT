@@ -2,6 +2,9 @@ import ChatDomain
 import Foundation
 
 extension OpenAIStreamEventTranslator {
+    /// Extracts the output text from a completed response.
+    /// - Parameter response: The response DTO.
+    /// - Returns: The concatenated output text, or `nil` if none is present.
     public static func extractOutputText(from response: ResponsesResponseDTO) -> String? {
         if let text = response.outputText, !text.isEmpty {
             return text
@@ -25,6 +28,9 @@ extension OpenAIStreamEventTranslator {
         return joined.isEmpty ? nil : joined
     }
 
+    /// Extracts the reasoning/thinking text from a completed response.
+    /// - Parameter response: The response DTO.
+    /// - Returns: The concatenated reasoning text, or `nil` if none is present.
     public static func extractReasoningText(from response: ResponsesResponseDTO) -> String? {
         var texts: [String] = []
 
@@ -55,6 +61,9 @@ extension OpenAIStreamEventTranslator {
         return joined.isEmpty ? nil : joined
     }
 
+    /// Extracts file path annotations from a completed response.
+    /// - Parameter response: The response DTO.
+    /// - Returns: An array of file path annotations found in the response.
     public static func extractFilePathAnnotations(from response: ResponsesResponseDTO) -> [FilePathAnnotation] {
         guard let output = response.output else {
             return []
@@ -98,6 +107,9 @@ extension OpenAIStreamEventTranslator {
         return annotations
     }
 
+    /// Extracts the error message from a failed or incomplete response.
+    /// - Parameter response: The response DTO.
+    /// - Returns: The error message, or `nil` if none is present.
     public static func extractErrorMessage(from response: ResponsesResponseDTO) -> String? {
         if let message = response.error?.message, !message.isEmpty {
             return message

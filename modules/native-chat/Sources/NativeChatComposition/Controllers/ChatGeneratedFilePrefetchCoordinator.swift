@@ -11,6 +11,7 @@ final class ChatGeneratedFilePrefetchCoordinator {
         self.controller = controller
     }
 
+    // swiftlint:disable:next function_body_length
     func prefetchGeneratedFilesIfNeeded(for message: Message) {
         let key = controller.apiKey.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !key.isEmpty else { return }

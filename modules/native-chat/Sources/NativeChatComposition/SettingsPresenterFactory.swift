@@ -8,6 +8,8 @@ import Foundation
 import UIKit
 
 @MainActor
+/// Assembles a ``SettingsPresenter`` wired to the given stores, services, and transport layer.
+// swiftlint:disable:next function_body_length — composition root wires many dependencies
 package func makeSettingsPresenter(
     settingsStore: SettingsStore,
     apiKeyStore: PersistedAPIKeyStore,
@@ -29,6 +31,7 @@ package func makeSettingsPresenter(
         }
         return true
     }
+    // swiftlint:disable:next line_length
     let resolvedCloudflareHealth: (_ typedAPIKey: String, _ gatewayEnabled: Bool) -> CloudflareHealthStatus = { typedAPIKey, gatewayEnabled in
         guard gatewayEnabled else {
             return .unknown
@@ -59,103 +62,30 @@ package func makeSettingsPresenter(
         return .unknown
     }
 
-    let controller = SettingsSceneController(
-        loadAPIKey: {
-            apiKeyStore.loadAPIKey()
-        },
-        saveAPIKey: { trimmedKey in
-            try apiKeyStore.saveAPIKey(trimmedKey)
-        },
-        clearAPIKey: {
-            apiKeyStore.deleteAPIKey()
-        },
-        validateAPIKey: { trimmedKey in
-            await openAIService.validateAPIKey(trimmedKey)
-        },
-        resolveCloudflareHealth: { typedAPIKey, gatewayEnabled in
-            resolvedCloudflareHealth(typedAPIKey, gatewayEnabled)
-        },
-        checkCloudflareHealth: { typedAPIKey, gatewayEnabled in
-            let localStatus = resolvedCloudflareHealth(typedAPIKey, gatewayEnabled)
-            guard localStatus == .unknown else {
-                return localStatus
-            }
+    let credentialHandler = SettingsCredentialHandlerImpl(
+        apiKeyStore: apiKeyStore,
+        openAIService: openAIService,
+        requestBuilder: requestBuilder,
+        transport: transport,
+        resolvedCloudflareHealth: resolvedCloudflareHealth,
+        loadConfigurationProvider: { mutableConfigurationProvider }
+    )
 
-            let trimmedKey = typedAPIKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                ? (apiKeyStore.loadAPIKey()?.trimmingCharacters(in: .whitespacesAndNewlines) ?? "")
-                : typedAPIKey.trimmingCharacters(in: .whitespacesAndNewlines)
+    let cacheHandler = SettingsCacheHandlerImpl(
+        fileDownloadService: fileDownloadService
+    )
 
-            let gatewayRequest: URLRequest
-            do {
-                gatewayRequest = try requestBuilder.modelsRequest(apiKey: trimmedKey)
-            } catch {
-                return .invalidGatewayURL
-            }
-
-            var request = gatewayRequest
-            request.url = URL(string: "\(mutableConfigurationProvider.cloudflareGatewayBaseURL.trimmingCharacters(in: .whitespacesAndNewlines))/models")
-
-            do {
-                let (data, response) = try await transport.data(for: request)
-
-                guard let httpResponse = response as? HTTPURLResponse else {
-                    return .remoteError("Invalid gateway response")
-                }
-
-                if (200...299).contains(httpResponse.statusCode) {
-                    return .connected
-                }
-
-                do {
-                    let payload = try JSONCoding.decode(SettingsErrorResponseDTO.self, from: data)
-                    if let message = payload.message ?? payload.error?.message,
-                       !message.isEmpty {
-                        return .remoteError(message)
-                    }
-                } catch {
-                }
-
-                return .remoteError(String(data: data, encoding: .utf8) ?? "Status \(httpResponse.statusCode)")
-            } catch {
-                return .remoteError(error.localizedDescription)
-            }
-        },
-        refreshGeneratedImageCacheSize: {
-            await fileDownloadService.generatedImageCacheSize()
-        },
-        refreshGeneratedDocumentCacheSize: {
-            await fileDownloadService.generatedDocumentCacheSize()
-        },
-        clearGeneratedImageCache: {
-            await fileDownloadService.clearGeneratedImageCache()
-            return await fileDownloadService.generatedImageCacheSize()
-        },
-        clearGeneratedDocumentCache: {
-            await fileDownloadService.clearGeneratedDocumentCache()
-            return await fileDownloadService.generatedDocumentCacheSize()
-        },
-        persistDefaultModel: { model in
-            settingsStore.defaultModel = model
-        },
-        persistDefaultEffort: { effort in
-            settingsStore.defaultEffort = effort
-        },
-        persistDefaultBackgroundModeEnabled: { enabled in
-            settingsStore.defaultBackgroundModeEnabled = enabled
-        },
-        persistDefaultServiceTier: { serviceTier in
-            settingsStore.defaultServiceTier = serviceTier
-        },
-        persistAppTheme: { theme in
-            settingsStore.appTheme = theme
-        },
-        persistHapticEnabled: { enabled in
-            settingsStore.hapticEnabled = enabled
-        },
-        persistCloudflareEnabled: { enabled in
-            settingsStore.cloudflareGatewayEnabled = enabled
+    let persistenceHandler = SettingsPersistenceHandlerImpl(
+        settingsStore: settingsStore,
+        applyCloudflareEnabled: { enabled in
             mutableConfigurationProvider.useCloudflareGateway = enabled
         }
+    )
+
+    let controller = SettingsSceneController(
+        credentialHandler: credentialHandler,
+        cacheHandler: cacheHandler,
+        persistenceHandler: persistenceHandler
     )
 
     return SettingsPresenter(
@@ -177,6 +107,141 @@ package func makeSettingsPresenter(
         ),
         controller: controller
     )
+}
+
+// MARK: - Handler Implementations
+
+private struct SettingsCredentialHandlerImpl: SettingsCredentialHandler {
+    let apiKeyStore: PersistedAPIKeyStore
+    let openAIService: OpenAIService
+    let requestBuilder: OpenAIRequestBuilder
+    let transport: OpenAIDataTransport
+    let resolvedCloudflareHealth: @Sendable (_ typedAPIKey: String, _ gatewayEnabled: Bool) -> CloudflareHealthStatus
+    let loadConfigurationProvider: @Sendable () -> OpenAIConfigurationProvider
+
+    func loadAPIKey() -> String? {
+        apiKeyStore.loadAPIKey()
+    }
+
+    func saveAPIKey(_ apiKey: String) throws {
+        try apiKeyStore.saveAPIKey(apiKey)
+    }
+
+    func clearAPIKey() {
+        apiKeyStore.deleteAPIKey()
+    }
+
+    func validateAPIKey(_ apiKey: String) async -> Bool {
+        await openAIService.validateAPIKey(apiKey)
+    }
+
+    func resolveCloudflareHealth(typedAPIKey: String, gatewayEnabled: Bool) -> CloudflareHealthStatus {
+        resolvedCloudflareHealth(typedAPIKey, gatewayEnabled)
+    }
+
+    func checkCloudflareHealth(typedAPIKey: String, gatewayEnabled: Bool) async -> CloudflareHealthStatus {
+        let localStatus = resolvedCloudflareHealth(typedAPIKey, gatewayEnabled)
+        guard localStatus == .unknown else {
+            return localStatus
+        }
+
+        let trimmedKey = typedAPIKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            ? (apiKeyStore.loadAPIKey()?.trimmingCharacters(in: .whitespacesAndNewlines) ?? "")
+            : typedAPIKey.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        let gatewayRequest: URLRequest
+        do {
+            gatewayRequest = try requestBuilder.modelsRequest(apiKey: trimmedKey)
+        } catch {
+            return .invalidGatewayURL
+        }
+
+        let configProvider = loadConfigurationProvider()
+        var request = gatewayRequest
+        request.url = URL(string: "\(configProvider.cloudflareGatewayBaseURL.trimmingCharacters(in: .whitespacesAndNewlines))/models")
+
+        do {
+            let (data, response) = try await transport.data(for: request)
+
+            guard let httpResponse = response as? HTTPURLResponse else {
+                return .remoteError("Invalid gateway response")
+            }
+
+            if (200...299).contains(httpResponse.statusCode) {
+                return .connected
+            }
+
+            do {
+                let payload = try JSONCoding.decode(SettingsErrorResponseDTO.self, from: data)
+                if let message = payload.message ?? payload.error?.message,
+                   !message.isEmpty {
+                    return .remoteError(message)
+                }
+            } catch {
+                Loggers.settings.debug("Cloudflare error response JSON parsing failed: \(error.localizedDescription)")
+            }
+
+            return .remoteError(String(data: data, encoding: .utf8) ?? "Status \(httpResponse.statusCode)")
+        } catch {
+            return .remoteError(error.localizedDescription)
+        }
+    }
+}
+
+private struct SettingsCacheHandlerImpl: SettingsCacheHandler {
+    let fileDownloadService: GeneratedFilesInfra.FileDownloadService
+
+    func refreshGeneratedImageCacheSize() async -> Int64 {
+        await fileDownloadService.generatedImageCacheSize()
+    }
+
+    func refreshGeneratedDocumentCacheSize() async -> Int64 {
+        await fileDownloadService.generatedDocumentCacheSize()
+    }
+
+    func clearGeneratedImageCache() async -> Int64 {
+        await fileDownloadService.clearGeneratedImageCache()
+        return await fileDownloadService.generatedImageCacheSize()
+    }
+
+    func clearGeneratedDocumentCache() async -> Int64 {
+        await fileDownloadService.clearGeneratedDocumentCache()
+        return await fileDownloadService.generatedDocumentCacheSize()
+    }
+}
+
+private struct SettingsPersistenceHandlerImpl: SettingsPersistenceHandler {
+    let settingsStore: SettingsStore
+    let applyCloudflareEnabled: @Sendable (Bool) -> Void
+
+    func persistDefaultModel(_ model: ModelType) {
+        settingsStore.defaultModel = model
+    }
+
+    func persistDefaultEffort(_ effort: ReasoningEffort) {
+        settingsStore.defaultEffort = effort
+    }
+
+    func persistDefaultBackgroundModeEnabled(_ enabled: Bool) {
+        settingsStore.defaultBackgroundModeEnabled = enabled
+    }
+
+    func persistDefaultServiceTier(_ serviceTier: ServiceTier) {
+        settingsStore.defaultServiceTier = serviceTier
+    }
+
+    func persistAppTheme(_ theme: AppTheme) {
+        settingsStore.appTheme = theme
+    }
+
+    func persistHapticEnabled(_ enabled: Bool) {
+        settingsStore.hapticEnabled = enabled
+    }
+
+    func persistCloudflareEnabled(_ enabled: Bool) {
+        settingsStore.cloudflareGatewayEnabled = enabled
+        applyCloudflareEnabled(enabled)
+    }
 }
 
 @MainActor

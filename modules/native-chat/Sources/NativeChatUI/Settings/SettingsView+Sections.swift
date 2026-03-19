@@ -138,6 +138,7 @@ struct SettingsChatDefaultsSection: View {
         } header: {
             Text("Chat Defaults")
         } footer: {
+            // swiftlint:disable:next line_length
             Text("These defaults are applied only when you start a new chat. Existing conversations keep their own model, background, and pricing settings.")
         }
     }

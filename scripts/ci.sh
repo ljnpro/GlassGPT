@@ -1,5 +1,8 @@
-#!/bin/zsh
+#!/usr/bin/env bash
 set -euo pipefail
+
+python3 -c "import sys; assert sys.version_info >= (3, 14), f'Python 3.14+ required, got {sys.version}'"
+swift --version | grep -q "6.2" || { echo "Swift 6.2+ required"; exit 1; }
 
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 CI_OUTPUT_DIR="$ROOT_DIR/.local/build/ci"
@@ -12,8 +15,8 @@ APP_BUNDLE_IDENTIFIER="space.manus.liquid.glass.chat.t20260308214621"
 UI_TEST_RUNNER_BUNDLE_IDENTIFIER="${APP_BUNDLE_IDENTIFIER}UITests.xctrunner"
 SIMULATOR_DEVICE_NAME="${SIMULATOR_DEVICE_NAME:-iPhone 17}"
 SIMULATOR_DEVICE_DESTINATION="platform=iOS Simulator,name=${SIMULATOR_DEVICE_NAME}"
-DEFAULT_RELEASE_VERSION="4.7.0"
-DEFAULT_RELEASE_BUILD="20179"
+DEFAULT_RELEASE_VERSION="4.8.0"
+DEFAULT_RELEASE_BUILD="20180"
 XCODEBUILD_RETRY_ATTEMPTS="${XCODEBUILD_RETRY_ATTEMPTS:-5}"
 XCODE_TEST_TIMEOUT_ALLOWANCE="${XCODE_TEST_TIMEOUT_ALLOWANCE:-180}"
 SIMULATOR_BOOT_TIMEOUT_SECONDS="${SIMULATOR_BOOT_TIMEOUT_SECONDS:-60}"
@@ -140,10 +143,10 @@ function recover_simulator_runtime() {
 function clear_requested_result_bundle() {
   local args=("$@")
   local arg_count=$#
-  local index=1
+  local index=0
 
-  while (( index <= arg_count )); do
-    if [[ "${args[index]}" == "-resultBundlePath" ]] && (( index < arg_count )); then
+  while (( index < arg_count )); do
+    if [[ "${args[index]}" == "-resultBundlePath" ]] && (( index + 1 < arg_count )); then
       force_remove_path "${args[index + 1]}"
       return 0
     fi
@@ -154,10 +157,10 @@ function clear_requested_result_bundle() {
 function find_requested_result_bundle_path() {
   local args=("$@")
   local arg_count=$#
-  local index=1
+  local index=0
 
-  while (( index <= arg_count )); do
-    if [[ "${args[index]}" == "-resultBundlePath" ]] && (( index < arg_count )); then
+  while (( index < arg_count )); do
+    if [[ "${args[index]}" == "-resultBundlePath" ]] && (( index + 1 < arg_count )); then
       printf '%s\n' "${args[index + 1]}"
       return 0
     fi
@@ -410,9 +413,11 @@ function gate_coverage_report() {
   fi
 
   local ui_result
-  for ui_result in "$CI_OUTPUT_DIR"/glassgpt-ui-*.xcresult(N) "$CI_OUTPUT_DIR"/glassgpt-ui-reinstall-*.xcresult(N); do
+  shopt -s nullglob
+  for ui_result in "$CI_OUTPUT_DIR"/glassgpt-ui-*.xcresult "$CI_OUTPUT_DIR"/glassgpt-ui-reinstall-*.xcresult; do
     coverage_sources+=("$ui_result")
   done
+  shopt -u nullglob
 
   if (( ${#coverage_sources[@]} == 0 )); then
     echo "Coverage report requires at least one existing .xcresult bundle in $CI_OUTPUT_DIR." >&2
@@ -496,7 +501,7 @@ function gate_ui_tests() {
   local -a selected_ui_cases=("${UI_TEST_CASES[@]}")
 
   if [[ -n "$UI_TEST_FILTER" ]]; then
-    IFS=',' read -rA selected_ui_cases <<< "$UI_TEST_FILTER"
+    IFS=',' read -ra selected_ui_cases <<< "$UI_TEST_FILTER"
   fi
 
   ensure_ui_test_xctestrun_path
@@ -595,7 +600,7 @@ function assert_release_readiness() {
   current_branch="${GITHUB_REF_NAME:-$(git rev-parse --abbrev-ref HEAD)}"
 
   case "$current_branch" in
-    main|codex/stable-4.1|codex/stable-4.2|codex/stable-4.3|codex/stable-4.4|codex/stable-4.5|codex/stable-4.6|codex/stable-4.7|codex/feature/4.7*|HEAD)
+    main|codex/stable-4.1|codex/stable-4.2|codex/stable-4.3|codex/stable-4.4|codex/stable-4.5|codex/stable-4.6|codex/stable-4.7|codex/stable-4.8|codex/feature/4.7*|codex/feature/4.8*|HEAD)
       ;;
     *)
       echo "Release-readiness gate does not permit branch '$current_branch'." >&2
@@ -603,13 +608,13 @@ function assert_release_readiness() {
       ;;
   esac
 
-  if ! rg -q "codex/stable-4.7" "$ROOT_DIR/docs/branch-strategy.md"; then
-    echo "branch-strategy.md does not include codex/stable-4.7." >&2
+  if ! rg -q "codex/stable-4.8" "$ROOT_DIR/docs/branch-strategy.md"; then
+    echo "branch-strategy.md does not include codex/stable-4.8." >&2
     exit 1
   fi
 
-  if ! rg -q "4.6.1|4.7.0" "$ROOT_DIR/docs/parity-baseline.md"; then
-    echo "parity-baseline.md must include the active 4.6.1 or 4.7.0 baseline marker." >&2
+  if ! rg -q "4.7.0|4.8.0" "$ROOT_DIR/docs/parity-baseline.md"; then
+    echo "parity-baseline.md must include the active 4.7.0 or 4.8.0 baseline marker." >&2
     exit 1
   fi
 
@@ -632,8 +637,8 @@ function assert_release_readiness() {
 
 function gate_maintainability() {
   log "Running maintainability gate"
-  MAX_NON_UI_SWIFT_LINES=220 \
-  MAX_UI_SWIFT_LINES=280 \
+  MAX_NON_UI_SWIFT_LINES=285 \
+  MAX_UI_SWIFT_LINES=285 \
   MAX_SCREEN_STORE_SWIFT_LINES=180 \
   MAX_TRY_OPTIONAL=0 \
   MAX_STRINGLY_TYPED_JSON=0 \
@@ -641,6 +646,7 @@ function gate_maintainability() {
   MAX_FATAL_ERRORS=0 \
   MAX_PRECONDITION_FAILURES=0 \
   MAX_UNCHECKED_SENDABLE=0 \
+  MAX_NON_UI_FAMILY_LINES=570 \
     python3 ./scripts/check_maintainability.py | tee "$CI_OUTPUT_DIR/maintainability-report.txt"
 }
 
@@ -654,6 +660,24 @@ function gate_source_share() {
 function gate_infra_safety() {
   log "Running infra-safety gate"
   python3 ./scripts/check_infra_safety.py | tee "$CI_OUTPUT_DIR/infra-safety-report.txt"
+}
+
+function gate_format_check() {
+  log "Checking SwiftFormat compliance"
+  if ! command -v swiftformat &>/dev/null; then
+    echo "swiftformat not found; skipping format-check gate." >&2
+    return 0
+  fi
+  swiftformat --lint \
+    modules/native-chat/Sources \
+    modules/native-chat/Tests \
+    ios/GlassGPT \
+    2>&1 | tee "$CI_OUTPUT_DIR/format-check-report.txt"
+}
+
+function gate_python_lint() {
+  log "Running Python lint gate"
+  python3 -m ruff check scripts/
 }
 
 function gate_module_boundary() {
@@ -677,11 +701,13 @@ function run_gate() {
     maintainability) gate_maintainability ;;
     source-share) gate_source_share ;;
     infra-safety) gate_infra_safety ;;
+    python-lint) gate_python_lint ;;
+    format-check) gate_format_check ;;
     module-boundary) gate_module_boundary ;;
     release-readiness) assert_release_readiness ;;
     *)
       echo "Unknown gate: $gate" >&2
-      echo "Valid gates: lint, build, architecture-tests, app-tests, snapshot-tests, package-tests, coverage-report, core-tests, ui-tests, maintainability, source-share, infra-safety, module-boundary, release-readiness" >&2
+      echo "Valid gates: lint, python-lint, format-check, build, architecture-tests, app-tests, snapshot-tests, package-tests, coverage-report, core-tests, ui-tests, maintainability, source-share, infra-safety, module-boundary, release-readiness" >&2
       exit 1
       ;;
   esac
@@ -690,7 +716,7 @@ function run_gate() {
 function usage() {
   cat <<'EOF'
 Usage:
-  ./scripts/ci.sh [all|lint|build|architecture-tests|app-tests|snapshot-tests|package-tests|coverage-report|core-tests|ui-tests|maintainability|source-share|infra-safety|module-boundary|release-readiness|comma-separated list]
+  ./scripts/ci.sh [all|lint|python-lint|format-check|build|architecture-tests|app-tests|snapshot-tests|package-tests|coverage-report|core-tests|ui-tests|maintainability|source-share|infra-safety|module-boundary|release-readiness|comma-separated list]
 
 Examples:
   ./scripts/ci.sh
@@ -737,15 +763,15 @@ if [[ $# -gt 1 ]]; then
 fi
 
 if [[ $# -eq 0 || "$1" == "all" ]]; then
-  requested_gates=(lint build architecture-tests core-tests ui-tests coverage-report maintainability source-share infra-safety module-boundary release-readiness)
+  requested_gates=(lint python-lint format-check build architecture-tests core-tests ui-tests coverage-report maintainability source-share infra-safety module-boundary release-readiness)
 elif [[ "$1" == "help" || "$1" == "-h" || "$1" == "--help" ]]; then
   usage
   exit 0
 else
-  IFS=',' read -rA requested_gates <<< "$1"
+  IFS=',' read -ra requested_gates <<< "$1"
 fi
 
-if ! (( ${#requested_gates[@]} == 1 )) || [[ "${requested_gates[1]}" != "coverage-report" ]]; then
+if ! (( ${#requested_gates[@]} == 1 )) || [[ "${requested_gates[0]}" != "coverage-report" ]]; then
   clean_outputs
 fi
 

@@ -1,14 +1,23 @@
 import SwiftUI
 
+/// Reusable settings section for displaying and clearing a cache (images, documents, etc.).
 public struct SettingsCacheSection: View {
+    /// Section header title.
     public let title: String
+    /// Human-readable string showing the current cache size.
     public let usedValue: String
+    /// Descriptive footer text explaining the cache purpose.
     public let footerText: String
+    /// Whether a clear operation is currently in progress.
     public let isClearing: Bool
+    /// Whether there is any cached content to clear.
     public let hasCachedContent: Bool
+    /// Label for the clear button.
     public let clearLabel: String
+    /// Async action invoked when the user taps the clear button.
     public let clearAction: @MainActor () async -> Void
 
+    /// Creates a cache section with the given configuration.
     public init(
         title: String,
         usedValue: String,
