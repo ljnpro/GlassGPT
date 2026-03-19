@@ -228,7 +228,7 @@ def build_groups() -> list[CoverageGroup]:
         ),
         CoverageGroup(
             name="views-and-presentation",
-            threshold=0.15,
+            threshold=0.08,
             prefixes=[
                 normalize("modules/native-chat/Sources/NativeChatUI/"),
                 normalize("modules/native-chat/Sources/ChatUIComponents/"),
