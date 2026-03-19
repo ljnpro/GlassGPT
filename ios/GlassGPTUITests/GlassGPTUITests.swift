@@ -146,7 +146,7 @@ final class GlassGPTUITests: XCTestCase {
         XCTAssertTrue(app.switches["settings.cloudflare"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.staticTexts["Connection Status"].waitForExistence(timeout: 5))
 
-        let checkConnectionButton = app.buttons["Check Connection"]
+        let checkConnectionButton = app.buttons["settings.checkConnection"]
         XCTAssertTrue(checkConnectionButton.waitForExistence(timeout: 5))
         revealIfNeeded(checkConnectionButton, in: app)
         checkConnectionButton.tap()
