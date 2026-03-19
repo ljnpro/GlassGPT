@@ -9,6 +9,8 @@
 - tracked release wrapper: `scripts/release_testflight.sh`
 - local publishing credentials: `.local/publish.env`
 - local release helper: `.local/one_click_release.sh`
+- GitHub release workflow: `.github/workflows/release-testflight.yml`
+- GitHub release environment: `testflight`
 
 ## Tracked Release Command
 
@@ -19,6 +21,23 @@
 The wrapper always runs `release-readiness`, the full `./scripts/ci.sh` suite,
 archive/export, IPA verification, TestFlight upload, and release commit/tag
 creation. There are no CI bypass flags on the tracked path.
+
+## GitHub Release Path
+
+GitHub can run the same tracked release wrapper through the manual
+`Release TestFlight` workflow in
+`.github/workflows/release-testflight.yml`.
+
+Required `testflight` environment secrets:
+
+- `ASC_API_KEY_ID`
+- `ASC_ISSUER_ID`
+- `ASC_API_KEY_P8`
+- `RELEASE_GITHUB_PAT`
+
+The workflow materializes `.local/publish.env` and the App Store Connect API
+key at runtime, then runs `./scripts/release_testflight.sh` with the supplied
+version, build number, and target branch.
 
 ## Pre-Release Checklist
 

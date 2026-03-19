@@ -1,0 +1,124 @@
+name: Release TestFlight
+
+on:
+  workflow_dispatch:
+    inputs:
+      marketing_version:
+        description: Marketing version to publish
+        required: true
+        type: string
+      build_number:
+        description: Build number to publish
+        required: true
+        type: string
+      target_branch:
+        description: Stable branch or main to release from
+        required: true
+        default: codex/stable-4.9
+        type: string
+
+concurrency:
+  group: release-testflight-${{ github.event.inputs.target_branch }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+env:
+  DEVELOPER_DIR: /Applications/Xcode_26.3.app/Contents/Developer
+  EXPECTED_XCODE_VERSION: "26.3"
+  EXPECTED_SWIFT_DRIVER_VERSION: "1.127.15"
+  EXPECTED_PYTHON_VERSION: "3.14"
+
+jobs:
+  release:
+    name: Release To TestFlight
+    runs-on: macos-26
+    environment: testflight
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.target_branch }}
+          fetch-depth: 0
+          fetch-tags: true
+          token: ${{ secrets.RELEASE_GITHUB_PAT }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.EXPECTED_PYTHON_VERSION }}
+
+      - name: Install Python lint tools
+        run: python3 -m pip install --upgrade pip ruff
+
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode_26.3.app
+
+      - name: Print toolchain versions
+        run: |
+          python3 --version
+          xcodebuild -version
+          swift --version
+
+      - name: Install SwiftLint
+        run: |
+          if ! command -v swiftlint >/dev/null 2>&1; then
+            HOMEBREW_NO_AUTO_UPDATE=1 brew install swiftlint
+          fi
+
+      - name: Install SwiftFormat
+        run: |
+          if ! command -v swiftformat >/dev/null 2>&1; then
+            HOMEBREW_NO_AUTO_UPDATE=1 brew install swiftformat
+          fi
+
+      - name: Install ripgrep
+        run: |
+          if ! command -v rg >/dev/null 2>&1; then
+            HOMEBREW_NO_AUTO_UPDATE=1 brew install ripgrep
+          fi
+
+      - name: Configure git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Materialize release credentials
+        env:
+          ASC_API_KEY_ID: ${{ secrets.ASC_API_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_API_KEY_P8: ${{ secrets.ASC_API_KEY_P8 }}
+        run: |
+          mkdir -p .local/keys .local/build
+          key_path=".local/keys/AuthKey_${ASC_API_KEY_ID}.p8"
+          printf '%s' "$ASC_API_KEY_P8" > "$key_path"
+          chmod 600 "$key_path"
+          cat > .local/publish.env <<EOF
+          WORKSPACE_ROOT=$GITHUB_WORKSPACE
+          XCODE_PROJECT_PATH=$GITHUB_WORKSPACE/ios/GlassGPT.xcodeproj
+          XCODE_PBXPROJ_PATH=$GITHUB_WORKSPACE/ios/GlassGPT.xcodeproj/project.pbxproj
+          XCODE_SCHEME=GlassGPT
+          EXPORT_OPTIONS_PLIST=$GITHUB_WORKSPACE/.github/testflight/export-options-app-store.plist
+          LOCAL_BUILD_DIR=$GITHUB_WORKSPACE/.local/build
+          ASC_API_KEY_ID=$ASC_API_KEY_ID
+          ASC_ISSUER_ID=$ASC_ISSUER_ID
+          ASC_API_KEY_PATH=$GITHUB_WORKSPACE/$key_path
+          APPLE_TEAM_ID=R4RP4C66XQ
+          GITHUB_REMOTE=origin
+          GITHUB_REPO_URL=https://github.com/${{ github.repository }}.git
+          EOF
+
+      - name: Run tracked release wrapper
+        run: ./scripts/release_testflight.sh "${{ inputs.marketing_version }}" "${{ inputs.build_number }}" --branch "${{ inputs.target_branch }}"
+
+      - name: Upload release logs
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: release-testflight-${{ inputs.marketing_version }}-${{ inputs.build_number }}
+          path: |
+            .local/build/archive-*.log
+            .local/build/export-*.log
+            .local/build/upload-*.log
+          retention-days: 14

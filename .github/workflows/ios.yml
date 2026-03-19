@@ -106,25 +106,16 @@ jobs:
       - name: Build Gate
         run: ./scripts/ci.sh build
 
-  test:
-    name: Tests
+  core-tests:
+    name: Test ${{ matrix.gate }}
     runs-on: macos-26
     needs: build
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - gate: architecture-tests
-          - gate: core-tests
-          - gate: ui-tests
-            ui_filter: "shard-1"
-            ui-tests-shard: 1
-          - gate: ui-tests
-            ui_filter: "shard-2"
-            ui-tests-shard: 2
-          - gate: ui-tests
-            ui_filter: "shard-3"
-            ui-tests-shard: 3
+        gate:
+          - architecture-tests
+          - core-tests
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -153,14 +144,105 @@ jobs:
 
       - name: Run ${{ matrix.gate }}
         run: ./scripts/ci.sh ${{ matrix.gate }}
-        env:
-          UI_TEST_FILTER: ${{ matrix.ui_filter || '' }}
 
       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@v6
         with:
-          name: test-results-${{ matrix.gate }}${{ matrix.ui-tests-shard && format('-shard-{0}', matrix.ui-tests-shard) || '' }}
+          name: test-results-${{ matrix.gate }}
+          path: .local/build/ci/*.xcresult
+          retention-days: 14
+
+  ui-test-build:
+    name: UI Test Build
+    runs-on: macos-26
+    needs: build
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.EXPECTED_PYTHON_VERSION }}
+
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode_26.3.app
+
+      - name: Print toolchain versions
+        run: |
+          python3 --version
+          xcodebuild -version
+          swift --version
+
+      - name: Cache SPM packages
+        uses: actions/cache@v5
+        with:
+          path: .local/build/ci/SourcePackages
+          key: ${{ runner.os }}-spm-${{ hashFiles('modules/native-chat/Package.resolved') }}
+          restore-keys: |
+            ${{ runner.os }}-spm-
+
+      - name: Build UI tests for distribution
+        run: ./scripts/ci.sh ui-build-for-testing
+
+      - name: Upload UI test bundle
+        uses: actions/upload-artifact@v6
+        with:
+          name: ui-test-products
+          path: .local/build/ci/DerivedData/Build/Products
+          retention-days: 14
+          if-no-files-found: error
+
+  ui-tests:
+    name: UI Tests (Shard ${{ matrix.ui_tests_shard }})
+    runs-on: macos-26
+    needs: ui-test-build
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - ui_filter: "shard-1"
+            ui_tests_shard: 1
+          - ui_filter: "shard-2"
+            ui_tests_shard: 2
+          - ui_filter: "shard-3"
+            ui_tests_shard: 3
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.EXPECTED_PYTHON_VERSION }}
+
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode_26.3.app
+
+      - name: Print toolchain versions
+        run: |
+          python3 --version
+          xcodebuild -version
+          swift --version
+
+      - name: Download UI test bundle
+        uses: actions/download-artifact@v6
+        with:
+          name: ui-test-products
+          path: .local/build/ci/ui-test-products
+
+      - name: Run UI tests
+        run: ./scripts/ci.sh ui-tests
+        env:
+          UI_TEST_FILTER: ${{ matrix.ui_filter }}
+          UI_TEST_XCTESTRUN_ROOT: .local/build/ci/ui-test-products
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: test-results-ui-tests-shard-${{ matrix.ui_tests_shard }}
           path: .local/build/ci/*.xcresult
           retention-days: 14
 
@@ -225,7 +307,7 @@ jobs:
   release-readiness:
     name: Release Readiness
     runs-on: macos-26
-    needs: [test, quality]
+    needs: [core-tests, ui-tests, quality]
     if: github.ref == 'refs/heads/codex/stable-4.9' || github.ref == 'refs/heads/main'
     steps:
       - name: Checkout
@@ -245,13 +327,13 @@ jobs:
           xcodebuild -version
           swift --version
 
-      - name: Cache SPM packages
-        uses: actions/cache@v5
+      - name: Download UI test bundle
+        uses: actions/download-artifact@v6
         with:
-          path: .local/build/ci/SourcePackages
-          key: ${{ runner.os }}-spm-${{ hashFiles('modules/native-chat/Package.resolved') }}
-          restore-keys: |
-            ${{ runner.os }}-spm-
+          name: ui-test-products
+          path: .local/build/ci/ui-test-products
 
       - name: Release Readiness Gate
         run: ./scripts/ci.sh release-readiness
+        env:
+          UI_TEST_XCTESTRUN_ROOT: .local/build/ci/ui-test-products
