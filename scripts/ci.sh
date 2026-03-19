@@ -3,8 +3,16 @@ set -euo pipefail
 
 export PYTHONDONTWRITEBYTECODE="${PYTHONDONTWRITEBYTECODE:-1}"
 
+EXPECTED_SWIFT_DRIVER_VERSION="${EXPECTED_SWIFT_DRIVER_VERSION:-1.127.15}"
+
 python3 -c "import sys; assert sys.version_info >= (3, 14), f'Python 3.14+ required, got {sys.version}'"
-swift --version | grep -q "6.2" || { echo "Swift 6.2+ required"; exit 1; }
+SWIFT_VERSION_OUTPUT="$(swift --version 2>&1)"
+printf '%s\n' "$SWIFT_VERSION_OUTPUT" | grep -q "6.2" || { echo "Swift 6.2+ required"; exit 1; }
+printf '%s\n' "$SWIFT_VERSION_OUTPUT" | grep -q "swift-driver version: ${EXPECTED_SWIFT_DRIVER_VERSION}" || {
+  echo "Swift driver ${EXPECTED_SWIFT_DRIVER_VERSION} required"
+  printf '%s\n' "$SWIFT_VERSION_OUTPUT"
+  exit 1
+}
 
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 CI_OUTPUT_DIR="$ROOT_DIR/.local/build/ci"

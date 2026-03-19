@@ -14,6 +14,8 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 VERSIONS_XCCONFIG = ROOT / "ios" / "GlassGPT" / "Config" / "Versions.xcconfig"
 SIMULATOR_DEVICE_NAME = os.environ.get("SIMULATOR_DEVICE_NAME", "iPhone 17")
 REQUIRED_RUNTIME_MARKER = "iOS 26"
+EXPECTED_SWIFT_DRIVER_VERSION = os.environ.get("EXPECTED_SWIFT_DRIVER_VERSION", "1.127.15")
+EXPECTED_XCODE_VERSION = os.environ.get("EXPECTED_XCODE_VERSION", "26.3")
 
 
 def command_output(*args: str) -> str:
@@ -67,6 +69,11 @@ def main() -> int:
     else:
         if "6.2" not in swift_version:
             failures.append(f"Swift 6.2+ required, found: {swift_version}")
+        elif f"swift-driver version: {EXPECTED_SWIFT_DRIVER_VERSION}" not in swift_version:
+            failures.append(
+                "Swift driver "
+                f"{EXPECTED_SWIFT_DRIVER_VERSION} required, found: {swift_version.splitlines()[0]}"
+            )
         else:
             print(f"[PASS] Swift toolchain: {swift_version.splitlines()[0]}")
 
@@ -75,7 +82,11 @@ def main() -> int:
     except subprocess.CalledProcessError as exc:
         failures.append(f"xcodebuild -version failed: {exc}")
     else:
-        print(f"[PASS] Xcode: {xcode_version.splitlines()[0]}")
+        first_line = xcode_version.splitlines()[0]
+        if not first_line.startswith(f"Xcode {EXPECTED_XCODE_VERSION}"):
+            failures.append(f"Xcode {EXPECTED_XCODE_VERSION} required, found: {first_line}")
+        else:
+            print(f"[PASS] Xcode: {first_line}")
 
     try:
         selected_xcode = command_output("xcode-select", "-p")
@@ -83,6 +94,9 @@ def main() -> int:
         failures.append(f"xcode-select -p failed: {exc}")
     else:
         print(f"[PASS] xcode-select: {selected_xcode}")
+        developer_dir = os.environ.get("DEVELOPER_DIR")
+        if developer_dir:
+            print(f"[PASS] DEVELOPER_DIR: {developer_dir}")
 
     try:
         swiftformat_version = command_output("swiftformat", "--version")
