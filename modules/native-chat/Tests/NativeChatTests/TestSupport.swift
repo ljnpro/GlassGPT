@@ -59,9 +59,12 @@ final class InMemoryAPIKeyBackend: APIKeyPersisting, @unchecked Sendable {
     var saveError: Error?
     var didDelete = false
 
-    func saveAPIKey(_ apiKey: String) throws {
+    func saveAPIKey(_ apiKey: String) throws(PersistenceError) {
         if let saveError {
-            throw saveError
+            if let persistenceError = saveError as? PersistenceError {
+                throw persistenceError
+            }
+            throw .keychainFailure(-1)
         }
         storedKey = apiKey
     }
@@ -194,12 +197,19 @@ actor StubOpenAITransport: OpenAIDataTransport {
         queuedResponses.append(.failure(error))
     }
 
-    func data(for request: URLRequest) async throws -> (Data, URLResponse) {
+    func data(for request: URLRequest) async throws(OpenAIServiceError) -> (Data, URLResponse) {
         recordedRequests.append(request)
         guard !queuedResponses.isEmpty else {
-            throw NativeChatTestError.missingStubbedTransportResponse
+            throw .requestFailed("Missing stubbed transport response")
         }
-        return try queuedResponses.removeFirst().get()
+        do {
+            return try queuedResponses.removeFirst().get()
+        } catch {
+            if let serviceError = error as? OpenAIServiceError {
+                throw serviceError
+            }
+            throw .requestFailed(error.localizedDescription)
+        }
     }
 
     func requestedPaths() -> [String] {

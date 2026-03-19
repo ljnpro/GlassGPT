@@ -15,8 +15,8 @@ APP_BUNDLE_IDENTIFIER="space.manus.liquid.glass.chat.t20260308214621"
 UI_TEST_RUNNER_BUNDLE_IDENTIFIER="${APP_BUNDLE_IDENTIFIER}UITests.xctrunner"
 SIMULATOR_DEVICE_NAME="${SIMULATOR_DEVICE_NAME:-iPhone 17}"
 SIMULATOR_DEVICE_DESTINATION="platform=iOS Simulator,name=${SIMULATOR_DEVICE_NAME}"
-DEFAULT_RELEASE_VERSION="4.8.0"
-DEFAULT_RELEASE_BUILD="20180"
+DEFAULT_RELEASE_VERSION="4.8.1"
+DEFAULT_RELEASE_BUILD="20181"
 XCODEBUILD_RETRY_ATTEMPTS="${XCODEBUILD_RETRY_ATTEMPTS:-5}"
 XCODE_TEST_TIMEOUT_ALLOWANCE="${XCODE_TEST_TIMEOUT_ALLOWANCE:-180}"
 SIMULATOR_BOOT_TIMEOUT_SECONDS="${SIMULATOR_BOOT_TIMEOUT_SECONDS:-60}"
@@ -51,6 +51,9 @@ UI_TEST_CASES=(
   testPreviewScenarioShowsAndDismissesGeneratedPreview
   testPreviewScenarioExposesDownloadAndShareActions
   testReplySplitScenarioKeepsOneAssistantSurface
+  AccessibilityAuditTests/testChatTabAccessibilityAudit
+  AccessibilityAuditTests/testHistoryTabAccessibilityAudit
+  AccessibilityAuditTests/testSettingsTabAccessibilityAudit
 )
 REINSTALL_UI_TEST_CASES=(
   testPreparePersistedAPIKeyForReinstall
@@ -482,6 +485,14 @@ function run_ui_test_case() {
   local result_bundle_name
   result_bundle_name="$(result_bundle_slug "${label_prefix}-${ui_case}")"
 
+  # Support entries in the form "ClassName/testMethod" for tests outside GlassGPTUITests.
+  local test_specifier
+  if [[ "$ui_case" == */* ]]; then
+    test_specifier="GlassGPTUITests/${ui_case}"
+  else
+    test_specifier="GlassGPTUITests/GlassGPTUITests/${ui_case}"
+  fi
+
   log "Running UI test ${ui_case}"
   run_checked_xcodebuild "$result_bundle_name" \
     xcodebuild \
@@ -493,7 +504,7 @@ function run_ui_test_case() {
     -maximum-test-execution-time-allowance "$XCODE_TEST_TIMEOUT_ALLOWANCE" \
     -destination "$SIMULATOR_DEVICE_DESTINATION" \
     -resultBundlePath "$CI_OUTPUT_DIR/${result_bundle_name}.xcresult" \
-    -only-testing:"GlassGPTUITests/GlassGPTUITests/${ui_case}"
+    -only-testing:"${test_specifier}"
 }
 
 function gate_ui_tests() {
@@ -660,6 +671,13 @@ function gate_source_share() {
 function gate_infra_safety() {
   log "Running infra-safety gate"
   python3 ./scripts/check_infra_safety.py | tee "$CI_OUTPUT_DIR/infra-safety-report.txt"
+
+  signpost_count=$(grep -r 'OSSignposter\|signposter\.beginInterval\|signposter\.endInterval' \
+    modules/native-chat/Sources/ | grep -v '//' | wc -l | tr -d ' ')
+  if (( signpost_count < 12 )); then
+    echo "Signpost count ($signpost_count) below minimum (12)." >&2
+    exit 1
+  fi
 }
 
 function gate_format_check() {
@@ -685,6 +703,17 @@ function gate_module_boundary() {
   python3 ./scripts/check_module_boundaries.py | tee "$CI_OUTPUT_DIR/module-boundary-report.txt"
 }
 
+function gate_doc_build() {
+  log "Building documentation catalogs"
+  for module in ChatDomain OpenAITransport ChatRuntimeWorkflows; do
+    if [[ ! -d "modules/native-chat/Sources/$module/$module.docc" ]]; then
+      echo "DocC catalog missing for $module" >&2
+      exit 1
+    fi
+  done
+  log "Documentation catalogs verified"
+}
+
 function run_gate() {
   local gate="$1"
 
@@ -704,10 +733,11 @@ function run_gate() {
     python-lint) gate_python_lint ;;
     format-check) gate_format_check ;;
     module-boundary) gate_module_boundary ;;
+    doc-build) gate_doc_build ;;
     release-readiness) assert_release_readiness ;;
     *)
       echo "Unknown gate: $gate" >&2
-      echo "Valid gates: lint, python-lint, format-check, build, architecture-tests, app-tests, snapshot-tests, package-tests, coverage-report, core-tests, ui-tests, maintainability, source-share, infra-safety, module-boundary, release-readiness" >&2
+      echo "Valid gates: lint, python-lint, format-check, build, architecture-tests, app-tests, snapshot-tests, package-tests, coverage-report, core-tests, ui-tests, maintainability, source-share, infra-safety, module-boundary, doc-build, release-readiness" >&2
       exit 1
       ;;
   esac
@@ -716,7 +746,7 @@ function run_gate() {
 function usage() {
   cat <<'EOF'
 Usage:
-  ./scripts/ci.sh [all|lint|python-lint|format-check|build|architecture-tests|app-tests|snapshot-tests|package-tests|coverage-report|core-tests|ui-tests|maintainability|source-share|infra-safety|module-boundary|release-readiness|comma-separated list]
+  ./scripts/ci.sh [all|lint|python-lint|format-check|build|architecture-tests|app-tests|snapshot-tests|package-tests|coverage-report|core-tests|ui-tests|maintainability|source-share|infra-safety|module-boundary|doc-build|release-readiness|comma-separated list]
 
 Examples:
   ./scripts/ci.sh

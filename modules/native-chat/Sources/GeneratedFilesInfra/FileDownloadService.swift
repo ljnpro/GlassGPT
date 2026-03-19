@@ -58,7 +58,7 @@ public actor FileDownloadService {
         containerId: String?,
         suggestedFilename: String?,
         apiKey: String
-    ) async throws -> URL {
+    ) async throws(any Error) -> URL {
         let key = namingResolver.downloadKey(fileId: fileId, containerId: containerId)
 
         if let existingTask = inFlightDownloads[key] {
@@ -85,7 +85,7 @@ public actor FileDownloadService {
         containerId: String?,
         suggestedFilename: String?,
         apiKey: String
-    ) async throws -> GeneratedFileLocalResource {
+    ) async throws(any Error) -> GeneratedFileLocalResource {
         let key = namingResolver.downloadKey(fileId: fileId, containerId: containerId)
 
         if let cached = cachedGeneratedFile(

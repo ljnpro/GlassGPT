@@ -1,12 +1,12 @@
-# 4.8.0 Parity Baseline
+# 4.8.1 Parity Baseline
 
-This document records the `4.7.0` production baseline that `4.8.0` must preserve.
+This document records the `4.7.0` production baseline that `4.8.1` must preserve.
 
 ## Stable Baseline
 
 - source branch: `codex/stable-4.8`
 - baseline branch: `codex/stable-4.7`
-- development branch: `codex/feature/4.8.0-*`
+- development branch: `codex/feature/4.8.1-*`
 - baseline app version: `4.7.0 (20179)`
 
 ## User-Visible Invariants
@@ -22,7 +22,7 @@ This document records the `4.7.0` production baseline that `4.8.0` must preserve
 
 ## Manual Acceptance
 
-Run this checklist against `v4.7.0` and the current `4.8.0` candidate:
+Run this checklist against `v4.7.0` and the current `4.8.1` candidate:
 
 1. launch the app and confirm empty-shell parity
 2. send a standard message and a long streaming message

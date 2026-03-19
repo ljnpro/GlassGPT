@@ -39,6 +39,8 @@ public struct SettingsCacheSection: View {
     public var body: some View {
         Section {
             LabeledContent("Used", value: usedValue)
+                .accessibilityLabel("\(title) used: \(usedValue)")
+                .accessibilityIdentifier("settings.cache.\(title.lowercased().replacingOccurrences(of: " ", with: "")).used")
 
             Button(role: .destructive) {
                 Task { @MainActor in
@@ -49,11 +51,14 @@ public struct SettingsCacheSection: View {
                     if isClearing {
                         ProgressView()
                             .controlSize(.small)
+                            .accessibilityLabel("Clearing cache")
                     }
                     Text(clearLabel)
                 }
             }
             .disabled(isClearing || !hasCachedContent)
+            .accessibilityLabel(clearLabel)
+            .accessibilityIdentifier("settings.cache.\(title.lowercased().replacingOccurrences(of: " ", with: "")).clear")
         } header: {
             Text(title)
         } footer: {

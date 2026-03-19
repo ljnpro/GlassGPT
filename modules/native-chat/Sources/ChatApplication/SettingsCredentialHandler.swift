@@ -1,4 +1,5 @@
 import ChatDomain
+import ChatPersistenceCore
 
 /// Handler protocol for API key credential operations used by the settings scene.
 @MainActor
@@ -6,7 +7,7 @@ package protocol SettingsCredentialHandler {
     /// Loads the stored API key, returning `nil` if none exists.
     func loadAPIKey() -> String?
     /// Persists the given API key.
-    func saveAPIKey(_ apiKey: String) throws
+    func saveAPIKey(_ apiKey: String) throws(PersistenceError)
     /// Removes the stored API key.
     func clearAPIKey()
     /// Validates the API key against the OpenAI API.

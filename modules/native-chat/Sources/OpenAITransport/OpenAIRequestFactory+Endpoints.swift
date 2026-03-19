@@ -17,7 +17,7 @@ public extension OpenAIRequestFactory {
     func modelsRequest(
         apiKey: String,
         useDirectBaseURL: Bool = false
-    ) throws -> URLRequest {
+    ) throws(OpenAIServiceError) -> URLRequest {
         try request(
             for: OpenAIRequestDescriptor(
                 path: "/models",
@@ -40,7 +40,7 @@ public extension OpenAIRequestFactory {
         responseID: String,
         apiKey: String,
         useDirectBaseURL: Bool = false
-    ) throws -> URLRequest {
+    ) throws(OpenAIServiceError) -> URLRequest {
         try request(
             for: OpenAIRequestDescriptor(
                 path: "/responses/\(responseID)/cancel",
@@ -66,7 +66,7 @@ public extension OpenAIRequestFactory {
         apiKey: String,
         include: [String] = defaultFetchIncludes,
         useDirectBaseURL: Bool = false
-    ) throws -> URLRequest {
+    ) throws(OpenAIServiceError) -> URLRequest {
         try request(
             for: OpenAIRequestDescriptor(
                 path: "/responses/\(responseID)",
@@ -96,7 +96,7 @@ public extension OpenAIRequestFactory {
         purpose: String = "user_data",
         useDirectBaseURL: Bool = false,
         boundary: String = "Boundary-\(UUID().uuidString)"
-    ) throws -> URLRequest {
+    ) throws(OpenAIServiceError) -> URLRequest {
         let body = OpenAIMultipartFormBody(
             boundary: boundary,
             purpose: purpose,

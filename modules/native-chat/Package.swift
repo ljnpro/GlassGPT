@@ -5,7 +5,8 @@ import PackageDescription
 let boundaryTargets: [Target] = [
     .target(
         name: "ChatDomain",
-        path: "Sources/ChatDomain"
+        path: "Sources/ChatDomain",
+        resources: [.process("ChatDomain.docc")]
     ),
     .target(
         name: "ChatPersistenceContracts",
@@ -30,7 +31,8 @@ let boundaryTargets: [Target] = [
     .target(
         name: "OpenAITransport",
         dependencies: ["ChatDomain"],
-        path: "Sources/OpenAITransport"
+        path: "Sources/OpenAITransport",
+        resources: [.process("OpenAITransport.docc")]
     ),
     .target(
         name: "GeneratedFilesCore",
@@ -68,13 +70,15 @@ let boundaryTargets: [Target] = [
             "ChatRuntimeModel",
             "ChatRuntimePorts"
         ],
-        path: "Sources/ChatRuntimeWorkflows"
+        path: "Sources/ChatRuntimeWorkflows",
+        resources: [.process("ChatRuntimeWorkflows.docc")]
     ),
     .target(
         name: "ChatApplication",
         dependencies: [
             "ChatDomain",
             "ChatPersistenceContracts",
+            "ChatPersistenceCore",
             "ChatRuntimeModel",
             "ChatRuntimePorts",
             "ChatRuntimeWorkflows"

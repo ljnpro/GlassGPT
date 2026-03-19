@@ -1,3 +1,4 @@
+import ChatPersistenceCore
 import Foundation
 import SwiftData
 
@@ -14,32 +15,44 @@ public final class DraftRepository {
     }
 
     /// Returns incomplete messages that have a `responseId`, making them eligible for recovery.
-    public func fetchRecoverableDrafts() throws -> [Message] {
-        let descriptor = FetchDescriptor<Message>(
-            predicate: #Predicate<Message> { message in
-                message.isComplete == false && message.responseId != nil
-            }
-        )
-        return try modelContext.fetch(descriptor)
+    public func fetchRecoverableDrafts() throws(PersistenceError) -> [Message] {
+        do {
+            let descriptor = FetchDescriptor<Message>(
+                predicate: #Predicate<Message> { message in
+                    message.isComplete == false && message.responseId != nil
+                }
+            )
+            return try modelContext.fetch(descriptor)
+        } catch {
+            throw .migrationFailure(underlying: error)
+        }
     }
 
     /// Returns all incomplete messages regardless of recovery eligibility.
-    public func fetchIncompleteDrafts() throws -> [Message] {
-        let descriptor = FetchDescriptor<Message>(
-            predicate: #Predicate<Message> { message in
-                message.isComplete == false
-            }
-        )
-        return try modelContext.fetch(descriptor)
+    public func fetchIncompleteDrafts() throws(PersistenceError) -> [Message] {
+        do {
+            let descriptor = FetchDescriptor<Message>(
+                predicate: #Predicate<Message> { message in
+                    message.isComplete == false
+                }
+            )
+            return try modelContext.fetch(descriptor)
+        } catch {
+            throw .migrationFailure(underlying: error)
+        }
     }
 
     /// Returns incomplete messages without a `responseId`, which cannot be recovered from the API.
-    public func fetchOrphanedDrafts() throws -> [Message] {
-        let descriptor = FetchDescriptor<Message>(
-            predicate: #Predicate<Message> { message in
-                message.isComplete == false && message.responseId == nil
-            }
-        )
-        return try modelContext.fetch(descriptor)
+    public func fetchOrphanedDrafts() throws(PersistenceError) -> [Message] {
+        do {
+            let descriptor = FetchDescriptor<Message>(
+                predicate: #Predicate<Message> { message in
+                    message.isComplete == false && message.responseId == nil
+                }
+            )
+            return try modelContext.fetch(descriptor)
+        } catch {
+            throw .migrationFailure(underlying: error)
+        }
     }
 }

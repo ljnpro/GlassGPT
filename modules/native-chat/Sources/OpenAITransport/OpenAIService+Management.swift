@@ -11,7 +11,7 @@ public extension OpenAIService {
     ///   - responseId: The API response identifier to cancel.
     ///   - apiKey: The API key for authentication.
     /// - Throws: ``OpenAIServiceError`` if cancellation fails on all routes.
-    func cancelResponse(responseId: String, apiKey: String) async throws {
+    func cancelResponse(responseId: String, apiKey: String) async throws(OpenAIServiceError) {
         do {
             try await cancelResponse(
                 responseId: responseId,
@@ -37,7 +37,7 @@ public extension OpenAIService {
     ///   - apiKey: The API key for authentication.
     /// - Returns: The generated title string.
     /// - Throws: ``OpenAIServiceError`` if title generation fails.
-    func generateTitle(for conversationPreview: String, apiKey: String) async throws -> String {
+    func generateTitle(for conversationPreview: String, apiKey: String) async throws(OpenAIServiceError) -> String {
         let request = try requestBuilder.titleRequest(
             conversationPreview: conversationPreview,
             apiKey: apiKey
@@ -52,7 +52,7 @@ public extension OpenAIService {
     ///   - apiKey: The API key for authentication.
     /// - Returns: The structured fetch result.
     /// - Throws: ``OpenAIServiceError`` if fetching fails on all routes.
-    func fetchResponse(responseId: String, apiKey: String) async throws -> OpenAIResponseFetchResult {
+    func fetchResponse(responseId: String, apiKey: String) async throws(OpenAIServiceError) -> OpenAIResponseFetchResult {
         do {
             return try await fetchResponse(
                 responseId: responseId,
@@ -106,7 +106,7 @@ public extension OpenAIService {
         responseId: String,
         apiKey: String,
         useDirectBaseURL: Bool
-    ) async throws {
+    ) async throws(OpenAIServiceError) {
         let request = try requestBuilder.cancelRequest(
             responseId: responseId,
             apiKey: apiKey,
@@ -129,7 +129,7 @@ public extension OpenAIService {
         responseId: String,
         apiKey: String,
         useDirectBaseURL: Bool
-    ) async throws -> OpenAIResponseFetchResult {
+    ) async throws(OpenAIServiceError) -> OpenAIResponseFetchResult {
         let request = try requestBuilder.fetchRequest(
             responseId: responseId,
             apiKey: apiKey,

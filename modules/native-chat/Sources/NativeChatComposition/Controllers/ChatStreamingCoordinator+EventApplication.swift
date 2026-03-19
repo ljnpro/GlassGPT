@@ -5,11 +5,17 @@ import ChatRuntimeWorkflows
 import Foundation
 import OpenAITransport
 import SwiftUI
+import os
+
+private let eventApplicationSignposter = OSSignposter(subsystem: "GlassGPT", category: "streaming")
 
 @MainActor
 extension ChatStreamingCoordinator {
     // swiftlint:disable:next cyclomatic_complexity function_body_length
     func applyStreamEvent(_ event: StreamEvent, to session: ReplySession, animated: Bool) async -> StreamEventDisposition {
+        let signpostID = eventApplicationSignposter.makeSignpostID()
+        let signpostState = eventApplicationSignposter.beginInterval("ApplyStreamEvent", id: signpostID)
+        defer { eventApplicationSignposter.endInterval("ApplyStreamEvent", signpostState) }
         let shouldAnimate = animated && controller.visibleSessionMessageID == session.messageID
         let route = controller.sessionCoordinator.runtimeRoute(for: session)
 

@@ -24,6 +24,7 @@ package struct FileAttachmentChip: View {
                     RoundedRectangle(cornerRadius: 6, style: .continuous)
                         .fill(attachment.iconColor.opacity(0.12))
                 }
+                .accessibilityHidden(true)
 
             // File info
             VStack(alignment: .leading, spacing: 1) {
@@ -48,10 +49,12 @@ package struct FileAttachmentChip: View {
                     if attachment.uploadStatus == .uploading {
                         ProgressView()
                             .controlSize(.mini)
+                            .accessibilityLabel("Uploading")
                     } else if attachment.uploadStatus == .failed {
                         Image(systemName: "exclamationmark.triangle.fill")
                             .font(.system(size: 9))
                             .foregroundStyle(.red)
+                            .accessibilityLabel("Upload failed")
                     }
                 }
             }
@@ -64,6 +67,8 @@ package struct FileAttachmentChip: View {
                         .foregroundStyle(.tertiary)
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel("Remove \(attachment.filename)")
+                .accessibilityIdentifier("attachment.remove")
             }
         }
         .padding(.horizontal, 10)
@@ -75,6 +80,9 @@ package struct FileAttachmentChip: View {
             darkBorderOpacity: 0.14,
             lightBorderOpacity: 0.08
         )
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(attachment.filename), \(attachment.fileType.uppercased()), \(attachment.fileSizeString)")
+        .accessibilityIdentifier("attachment.chip")
     }
 }
 

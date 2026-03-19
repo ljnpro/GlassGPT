@@ -12,12 +12,16 @@ extension MessageBubble {
         } label: {
             Label("Copy Text", systemImage: "doc.on.doc")
         }
+        .accessibilityLabel("Copy message text")
+        .accessibilityIdentifier("chat.message.copy")
     }
 
     var shareButton: some View {
         ShareLink(item: displayedContent) {
             Label("Share", systemImage: "square.and.arrow.up")
         }
+        .accessibilityLabel("Share message")
+        .accessibilityIdentifier("chat.message.share")
     }
 }
 

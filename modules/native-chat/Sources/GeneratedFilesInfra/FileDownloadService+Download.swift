@@ -1,5 +1,8 @@
 import Foundation
 import GeneratedFilesCore
+import os
+
+private let fileDownloadSignposter = OSSignposter(subsystem: "GlassGPT", category: "files")
 
 extension FileDownloadService {
     func performDownload(
@@ -8,6 +11,10 @@ extension FileDownloadService {
         suggestedFilename: String?,
         apiKey: String
     ) async throws -> URL {
+        let signpostID = fileDownloadSignposter.makeSignpostID()
+        let signpostState = fileDownloadSignposter.beginInterval("PerformDownload", id: signpostID)
+        defer { fileDownloadSignposter.endInterval("PerformDownload", signpostState) }
+
         let (data, response) = try await downloadClient.downloadFromAPI(
             fileId: fileId,
             containerId: containerId,

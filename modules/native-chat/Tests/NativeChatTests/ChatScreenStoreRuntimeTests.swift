@@ -656,7 +656,7 @@ private actor SlowGeneratedFileDownloadTransport: OpenAIDataTransport {
     private var requestsSeen = 0
     private var cancellationsSeen = 0
 
-    func data(for request: URLRequest) async throws -> (Data, URLResponse) {
+    func data(for request: URLRequest) async throws(OpenAIServiceError) -> (Data, URLResponse) {
         requestsSeen += 1
         do {
             try await Task.sleep(nanoseconds: 60_000_000_000)
@@ -669,11 +669,11 @@ private actor SlowGeneratedFileDownloadTransport: OpenAIDataTransport {
             // swiftlint:disable:next force_unwrapping
             )!
             return (Data("%PDF".utf8), response)
+        } catch is CancellationError {
+            cancellationsSeen += 1
+            throw .cancelled
         } catch {
-            if Task.isCancelled {
-                cancellationsSeen += 1
-            }
-            throw error
+            throw .requestFailed(error.localizedDescription)
         }
     }
 

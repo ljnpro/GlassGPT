@@ -1,6 +1,9 @@
 import ChatDomain
 import ChatRuntimeModel
 import Foundation
+import os
+
+private let runtimeSignposter = OSSignposter(subsystem: "GlassGPT", category: "runtime")
 
 extension ReplySessionActor {
     /// Applies a transition to the session state and returns the updated state.
@@ -12,6 +15,10 @@ extension ReplySessionActor {
     @discardableResult
     // swiftlint:disable:next cyclomatic_complexity function_body_length
     public func apply(_ transition: ReplyRuntimeTransition) -> ReplyRuntimeState {
+        let signpostID = runtimeSignposter.makeSignpostID()
+        let signpostState = runtimeSignposter.beginInterval("ApplyTransition", id: signpostID)
+        defer { runtimeSignposter.endInterval("ApplyTransition", signpostState) }
+
         switch transition {
         case .beginSubmitting:
             state.lifecycle = .preparingInput

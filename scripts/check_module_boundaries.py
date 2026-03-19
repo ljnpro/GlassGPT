@@ -54,7 +54,7 @@ TARGET_RULES: dict[str, TargetRule] = {
         ),
     ),
     "ChatPersistenceCore": TargetRule(
-        allowed_imports=frozenset({"Foundation", "ChatDomain", "Security", "OSLog"}),
+        allowed_imports=frozenset({"Foundation", "ChatDomain", "Security", "OSLog", "MetricKit"}),
         forbidden_patterns=(
             ("Bundle.main", "ChatPersistenceCore must not reach app bundle state"),
             ("ProcessInfo.processInfo", "ChatPersistenceCore must not read process environment"),
@@ -65,6 +65,7 @@ TARGET_RULES: dict[str, TargetRule] = {
         allowed_imports=frozenset({
             "Foundation", "SwiftData", "CryptoKit", "ChatDomain",
             "ChatPersistenceContracts", "ChatPersistenceCore", "OpenAITransport",
+            "os",
         }),
         forbidden_patterns=(
             ("Bundle.main", "ChatPersistenceSwiftData must not reach app bundle state"),
@@ -73,7 +74,7 @@ TARGET_RULES: dict[str, TargetRule] = {
         ),
     ),
     "OpenAITransport": TargetRule(
-        allowed_imports=frozenset({"Foundation", "ChatDomain", "Synchronization"}),
+        allowed_imports=frozenset({"Foundation", "ChatDomain", "Synchronization", "os"}),
         forbidden_patterns=(
             ("Bundle.main", "OpenAITransport must not reach app bundle state directly"),
             ("ProcessInfo.processInfo", "OpenAITransport configuration must flow through providers"),
@@ -89,7 +90,7 @@ TARGET_RULES: dict[str, TargetRule] = {
         ),
     ),
     "GeneratedFilesInfra": TargetRule(
-        allowed_imports=frozenset({"Foundation", "OSLog", "ImageIO", "PDFKit", "ChatDomain", "GeneratedFilesCore", "OpenAITransport"}),
+        allowed_imports=frozenset({"Foundation", "OSLog", "ImageIO", "PDFKit", "ChatDomain", "GeneratedFilesCore", "OpenAITransport", "os"}),
         forbidden_patterns=(
             ("Bundle.main", "GeneratedFilesInfra must not reach app bundle state"),
             ("ProcessInfo.processInfo", "GeneratedFilesInfra must not read process environment"),
@@ -113,7 +114,7 @@ TARGET_RULES: dict[str, TargetRule] = {
         ),
     ),
     "ChatRuntimeWorkflows": TargetRule(
-        allowed_imports=frozenset({"Foundation", "ChatDomain", "ChatRuntimeModel", "ChatRuntimePorts"}),
+        allowed_imports=frozenset({"Foundation", "ChatDomain", "ChatRuntimeModel", "ChatRuntimePorts", "os"}),
         forbidden_patterns=(
             ("Bundle.main", "ChatRuntimeWorkflows must not reach app bundle state"),
             ("ProcessInfo.processInfo", "ChatRuntimeWorkflows must not read process environment"),
@@ -124,6 +125,7 @@ TARGET_RULES: dict[str, TargetRule] = {
     "ChatApplication": TargetRule(
         allowed_imports=frozenset({
             "Foundation", "ChatDomain", "ChatPersistenceContracts",
+            "ChatPersistenceCore",
             "ChatRuntimeModel", "ChatRuntimePorts", "ChatRuntimeWorkflows",
         }),
         forbidden_patterns=(
@@ -134,7 +136,7 @@ TARGET_RULES: dict[str, TargetRule] = {
         ),
     ),
     "ChatPresentation": TargetRule(
-        allowed_imports=frozenset({"Foundation", "Observation", "ChatDomain", "GeneratedFilesCore", "ChatApplication"}),
+        allowed_imports=frozenset({"Foundation", "Observation", "ChatDomain", "GeneratedFilesCore", "ChatApplication", "os"}),
         forbidden_patterns=(
             ("Bundle.main", "ChatPresentation must not reach app bundle state"),
             ("ProcessInfo.processInfo", "ChatPresentation must not read process environment"),
@@ -185,6 +187,7 @@ TARGET_RULES: dict[str, TargetRule] = {
             "UIKit",
             "PhotosUI",
             "OSLog",
+            "os",
         }),
     ),
     "NativeChat": TargetRule(

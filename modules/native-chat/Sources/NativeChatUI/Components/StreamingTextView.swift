@@ -26,6 +26,8 @@ public struct StreamingTextView: View {
                 view.textSelection(.enabled)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
+            .accessibilityLabel(sanitisedText)
+            .accessibilityIdentifier("chat.streamingText")
     }
 
     /// Strip LaTeX delimiters and fenced code-block markers so the

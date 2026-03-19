@@ -7,8 +7,8 @@ public extension OpenAIRequestBuilder {
     ///   - filename: The filename for the upload.
     ///   - apiKey: The API key for authentication.
     /// - Returns: A configured URL request for file upload.
-    /// - Throws: If URL construction fails.
-    func uploadRequest(data: Data, filename: String, apiKey: String) throws -> URLRequest {
+    /// - Throws: ``OpenAIServiceError`` if URL construction fails.
+    func uploadRequest(data: Data, filename: String, apiKey: String) throws(OpenAIServiceError) -> URLRequest {
         try requestFactory.uploadRequest(
             fileData: data,
             filename: filename,

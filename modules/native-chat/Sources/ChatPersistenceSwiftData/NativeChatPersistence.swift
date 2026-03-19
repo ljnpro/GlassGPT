@@ -1,6 +1,7 @@
 import ChatPersistenceCore
 import Foundation
 import SwiftData
+import os
 
 /// Result of bootstrapping the persistent store, including the container and any recovery status.
 public struct NativeChatPersistenceBootstrap {
@@ -62,7 +63,13 @@ public enum NativeChatPersistence {
         makeSharedBootstrap(bundleIdentifier: bundleIdentifier).container
     }
 
+    private static let persistenceSignposter = OSSignposter(subsystem: "GlassGPT", category: "persistence")
+
     private static func createPersistentContainer(bundleIdentifier: String?) -> NativeChatPersistenceBootstrap {
+        let signpostID = persistenceSignposter.makeSignpostID()
+        let signpostState = persistenceSignposter.beginInterval("CreatePersistentContainer", id: signpostID)
+        defer { persistenceSignposter.endInterval("CreatePersistentContainer", signpostState) }
+
         _ = ReleaseResetCoordinator.performIfNeeded(bundleIdentifier: bundleIdentifier)
 
         do {

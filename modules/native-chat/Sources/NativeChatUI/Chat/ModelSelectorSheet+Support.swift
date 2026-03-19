@@ -41,6 +41,7 @@ package struct ModelBadge: View {
             )
         }
         .buttonStyle(GlassPressButtonStyle())
+        .accessibilityLabel("Model: \(badgeText). Tap to change")
         .accessibilityIdentifier("chat.modelBadge")
     }
 

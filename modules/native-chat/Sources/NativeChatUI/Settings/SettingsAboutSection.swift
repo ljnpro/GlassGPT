@@ -16,8 +16,14 @@ public struct SettingsAboutSection: View {
     public var body: some View {
         Section("About") {
             LabeledContent("Version", value: appVersionString)
+                .accessibilityLabel("App version: \(appVersionString)")
+                .accessibilityIdentifier("settings.about.version")
             LabeledContent("Platform", value: platformString)
+                .accessibilityLabel("Platform: \(platformString)")
+                .accessibilityIdentifier("settings.about.platform")
             LabeledContent("Engine", value: "SwiftUI")
+                .accessibilityLabel("Engine: SwiftUI")
+                .accessibilityIdentifier("settings.about.engine")
 
             if let supportURL = URL(string: "https://ljnpro.github.io/liquid-glass-chat-support/") {
                 Link(destination: supportURL) {
@@ -26,8 +32,11 @@ public struct SettingsAboutSection: View {
                         Spacer()
                         Image(systemName: "safari")
                             .foregroundStyle(.secondary)
+                            .accessibilityHidden(true)
                     }
                 }
+                .accessibilityLabel("Open support website")
+                .accessibilityIdentifier("settings.about.support")
             }
         }
     }

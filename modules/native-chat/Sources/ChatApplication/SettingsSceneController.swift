@@ -1,4 +1,5 @@
 import ChatDomain
+import ChatPersistenceCore
 import Foundation
 
 /// Represents the current health status of the Cloudflare AI gateway.
@@ -45,7 +46,7 @@ public final class SettingsSceneController {
     }
 
     /// Persists the given API key.
-    public func saveAPIKey(_ apiKey: String) throws {
+    public func saveAPIKey(_ apiKey: String) throws(PersistenceError) {
         try credentialHandler.saveAPIKey(apiKey)
     }
 

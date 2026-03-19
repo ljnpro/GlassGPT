@@ -21,12 +21,15 @@ extension FilePreviewSheet {
                     Image(systemName: "photo.badge.exclamationmark")
                         .font(.system(size: 40, weight: .regular))
                         .foregroundStyle(viewerSecondaryColor)
+                        .accessibilityHidden(true)
 
                     Text(message)
                         .font(.body)
                         .foregroundStyle(viewerSecondaryColor)
                         .multilineTextAlignment(.center)
                         .padding(.horizontal, 32)
+                        .accessibilityLabel("Image load error: \(message)")
+                        .accessibilityIdentifier("filePreview.imageError")
                 }
             }
         }
@@ -49,12 +52,15 @@ extension FilePreviewSheet {
                     Image(systemName: "doc.richtext")
                         .font(.system(size: 40, weight: .regular))
                         .foregroundStyle(viewerSecondaryColor)
+                        .accessibilityHidden(true)
 
                     Text(message)
                         .font(.body)
                         .foregroundStyle(viewerSecondaryColor)
                         .multilineTextAlignment(.center)
                         .padding(.horizontal, 32)
+                        .accessibilityLabel("PDF load error: \(message)")
+                        .accessibilityIdentifier("filePreview.pdfError")
                 }
             }
         }
@@ -143,6 +149,8 @@ extension FilePreviewSheet {
             .minimumScaleFactor(0.7)
             .allowsTightening(true)
             .truncationMode(.middle)
+            .accessibilityLabel("File: \(previewItem.viewerFilename)")
+            .accessibilityIdentifier("filePreview.title")
     }
 
     var imageBottomBar: some View {
@@ -231,6 +239,8 @@ extension FilePreviewSheet {
                 darkBorderOpacity: 0.14,
                 lightBorderOpacity: 0.08
             )
+            .accessibilityLabel("Image saved to Photos")
+            .accessibilityIdentifier("filePreview.saveSuccess")
     }
 
     var saveErrorBinding: Binding<Bool> {

@@ -62,7 +62,7 @@ public struct OpenAIRequestFactory {
     /// - Parameter useDirectBaseURL: Whether to force the direct OpenAI endpoint.
     /// - Returns: The responses endpoint URL.
     /// - Throws: ``OpenAIServiceError/invalidURL`` if the URL cannot be constructed.
-    public func responsesURL(useDirectBaseURL: Bool = false) throws -> URL {
+    public func responsesURL(useDirectBaseURL: Bool = false) throws(OpenAIServiceError) -> URL {
         try url(
             for: OpenAIRequestDescriptor(path: "/responses", method: "GET"),
             useDirectBaseURL: useDirectBaseURL
@@ -84,7 +84,7 @@ public struct OpenAIRequestFactory {
         startingAfter: Int? = nil,
         include: [String]? = nil,
         useDirectBaseURL: Bool = false
-    ) throws -> URL {
+    ) throws(OpenAIServiceError) -> URL {
         var queryItems: [URLQueryItem] = []
 
         if stream {
@@ -122,7 +122,7 @@ public struct OpenAIRequestFactory {
         apiKey: String,
         body: Data? = nil,
         useDirectBaseURL: Bool = false
-    ) throws -> URLRequest {
+    ) throws(OpenAIServiceError) -> URLRequest {
         let endpoint = configuration.resolvedEndpoint(useDirectBaseURL: useDirectBaseURL)
         let url = try url(for: descriptor, useDirectBaseURL: useDirectBaseURL)
         var request = URLRequest(url: url)
@@ -154,7 +154,7 @@ public struct OpenAIRequestFactory {
     public func url(
         for descriptor: OpenAIRequestDescriptor,
         useDirectBaseURL: Bool = false
-    ) throws -> URL {
+    ) throws(OpenAIServiceError) -> URL {
         let endpoint = configuration.resolvedEndpoint(useDirectBaseURL: useDirectBaseURL)
         guard var components = URLComponents(string: endpoint.baseURL) else {
             throw OpenAIServiceError.invalidURL

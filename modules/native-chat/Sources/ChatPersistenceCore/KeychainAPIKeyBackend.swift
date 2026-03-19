@@ -27,8 +27,8 @@ public struct KeychainAPIKeyBackend: Sendable {
     }
 
     /// Saves or updates the API key in the keychain.
-    /// - Throws: ``KeychainError/unexpectedStatus(_:)`` if the keychain operation fails.
-    public func saveAPIKey(_ apiKey: String) throws {
+    /// - Throws: ``PersistenceError/keychainFailure(_:)`` if the keychain operation fails.
+    public func saveAPIKey(_ apiKey: String) throws(PersistenceError) {
         guard let data = apiKey.data(using: .utf8) else { return }
 
         let query: [CFString: Any] = [
@@ -52,10 +52,10 @@ public struct KeychainAPIKeyBackend: Sendable {
             addQuery[kSecAttrAccessible] = Self.apiKeyAccessibility
             let addStatus = SecItemAdd(addQuery as CFDictionary, nil)
             guard addStatus == errSecSuccess else {
-                throw KeychainError.unexpectedStatus(addStatus)
+                throw .keychainFailure(addStatus)
             }
         default:
-            throw KeychainError.unexpectedStatus(updateStatus)
+            throw .keychainFailure(updateStatus)
         }
     }
 

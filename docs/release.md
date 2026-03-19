@@ -12,7 +12,7 @@
 ## Tracked Release Command
 
 ```bash
-./scripts/release_testflight.sh 4.8.0 <build-number> --branch codex/stable-4.8
+./scripts/release_testflight.sh 4.8.1 <build-number> --branch codex/stable-4.8
 ```
 
 The wrapper runs release-readiness, full CI gates, archive/export, IPA verification, TestFlight upload, and release commit/tag creation.
@@ -25,7 +25,7 @@ The wrapper runs release-readiness, full CI gates, archive/export, IPA verificat
 4. manual parity checklist from `docs/parity-baseline.md`
 5. clean worktree
 6. branch is `codex/stable-4.8`
-7. version/build match the intended 4.8.0 candidate
+7. version/build match the intended 4.8.1 candidate
 
 ## Output Artifacts
 
@@ -39,6 +39,6 @@ The wrapper runs release-readiness, full CI gates, archive/export, IPA verificat
 
 1. capture the TestFlight Delivery UUID
 2. verify `codex/stable-4.8` points to the release commit
-3. verify `v4.8.0` points to the same commit
+3. verify `v4.8.1` points to the same commit
 4. verify `git ls-remote` shows `codex/stable-4.8`, `main`, and `v<marketing-version>` aligned
 5. preserve the backup tag and source bundle

@@ -51,7 +51,7 @@ public final class OpenAIService {
     ///   - apiKey: The API key for authentication.
     /// - Returns: The API-assigned file identifier.
     /// - Throws: ``OpenAIServiceError`` if the upload fails.
-    public func uploadFile(data: Data, filename: String, apiKey: String) async throws -> String {
+    public func uploadFile(data: Data, filename: String, apiKey: String) async throws(OpenAIServiceError) -> String {
         let request = try requestBuilder.uploadRequest(
             data: data,
             filename: filename,

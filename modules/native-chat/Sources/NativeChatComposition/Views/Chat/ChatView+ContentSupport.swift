@@ -5,6 +5,7 @@ import ChatDomain
 
 /// Encapsulates UIKit keyboard dismissal so the legacy `sendAction` pattern
 /// is isolated to a single call-site and easy to replace later.
+@MainActor
 enum KeyboardDismisser {
     static func dismiss() {
         UIApplication.shared.sendAction(

@@ -88,6 +88,8 @@ enum SnapshotTestThemeVariant: CaseIterable {
     }
 }
 
+private let snapshotAppVersionString = "9.9.9 (99999)"
+
 @MainActor
 func assertViewSnapshots<V: View>(
     named baseName: String,
@@ -260,7 +262,7 @@ func makeSettingsSnapshotViewModel() -> SettingsPresenter {
         transport: transport,
         configurationProvider: configurationProvider,
         fileDownloadService: GeneratedFilesInfra.FileDownloadService(configurationProvider: configurationProvider),
-        appVersionString: currentReleaseVersionString(),
+        appVersionString: snapshotAppVersionString,
         platformString: "iOS 26.0 · Liquid Glass"
     )
 }
