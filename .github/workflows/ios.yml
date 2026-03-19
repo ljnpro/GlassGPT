@@ -12,6 +12,11 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  DEVELOPER_DIR: /Applications/Xcode_26.3.app/Contents/Developer
+  EXPECTED_XCODE_VERSION: "26.3"
+  EXPECTED_SWIFT_DRIVER_VERSION: "1.127.15"
+
 jobs:
   lint:
     name: Lint & Format
@@ -21,7 +26,7 @@ jobs:
         uses: actions/checkout@v6
 
       - name: Select Xcode
-        run: sudo xcode-select -s /Applications/Xcode.app
+        run: sudo xcode-select -s /Applications/Xcode_26.3.app
 
       - name: Print toolchain versions
         run: |
@@ -67,7 +72,7 @@ jobs:
         uses: actions/checkout@v6
 
       - name: Select Xcode
-        run: sudo xcode-select -s /Applications/Xcode.app
+        run: sudo xcode-select -s /Applications/Xcode_26.3.app
 
       - name: Print toolchain versions
         run: |
@@ -109,7 +114,7 @@ jobs:
         uses: actions/checkout@v6
 
       - name: Select Xcode
-        run: sudo xcode-select -s /Applications/Xcode.app
+        run: sudo xcode-select -s /Applications/Xcode_26.3.app
 
       - name: Print toolchain versions
         run: |
@@ -146,7 +151,7 @@ jobs:
         uses: actions/checkout@v6
 
       - name: Select Xcode
-        run: sudo xcode-select -s /Applications/Xcode.app
+        run: sudo xcode-select -s /Applications/Xcode_26.3.app
 
       - name: Print toolchain versions
         run: |
@@ -199,7 +204,7 @@ jobs:
         uses: actions/checkout@v6
 
       - name: Select Xcode
-        run: sudo xcode-select -s /Applications/Xcode.app
+        run: sudo xcode-select -s /Applications/Xcode_26.3.app
 
       - name: Print toolchain versions
         run: |
