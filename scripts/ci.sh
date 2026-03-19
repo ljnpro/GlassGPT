@@ -79,6 +79,7 @@ REINSTALL_UI_TEST_CASES=(
   testFreshInstallWithoutPersistedAPIKeyKeepsShellUsable
 )
 UI_TEST_FILTER="${UI_TEST_FILTER:-}"
+UI_TEST_SHARD_COUNT="${UI_TEST_SHARD_COUNT:-3}"
 UI_TEST_XCTESTRUN_RESOLVED_PATH=""
 
 cd "$ROOT_DIR"
@@ -517,11 +518,24 @@ function gate_core_tests() {
   gate_package_tests
 }
 
+function gate_ui_build_for_testing() {
+  log "Building UI test bundle"
+  force_remove_path "$CI_DERIVED_DATA_DIR"
+  ensure_ui_test_xctestrun_path
+  echo "Prepared UI test bundle: $UI_TEST_XCTESTRUN_RESOLVED_PATH"
+}
+
 function ensure_ui_test_xctestrun_path() {
   local xctestrun_path
 
   if [[ -n "${UI_TEST_XCTESTRUN_PATH:-}" ]]; then
     xctestrun_path="$UI_TEST_XCTESTRUN_PATH"
+  elif [[ -n "${UI_TEST_XCTESTRUN_ROOT:-}" ]]; then
+    xctestrun_path="$(find_xctestrun_path "$UI_TEST_XCTESTRUN_ROOT")"
+    if [[ -z "$xctestrun_path" ]]; then
+      echo "Unable to locate .xctestrun in $UI_TEST_XCTESTRUN_ROOT" >&2
+      exit 1
+    fi
   else
     if [[ "${UI_TEST_RESET_DERIVED_DATA:-0}" == "1" ]]; then
       force_remove_path "$CI_DERIVED_DATA_DIR"
@@ -585,10 +599,38 @@ function run_ui_test_case() {
 
 function gate_ui_tests() {
   log "Running UI tests"
-  local -a selected_ui_cases=("${UI_TEST_CASES[@]}")
+  local -a selected_ui_cases=()
 
-  if [[ -n "$UI_TEST_FILTER" ]]; then
+  if [[ -z "$UI_TEST_FILTER" ]]; then
+    selected_ui_cases=("${UI_TEST_CASES[@]}")
+  elif [[ "$UI_TEST_FILTER" == shard-* ]]; then
+    local shard_label="${UI_TEST_FILTER#shard-}"
+    if ! [[ "$shard_label" =~ ^[0-9]+$ ]]; then
+      echo "Invalid UI test shard label: $UI_TEST_FILTER" >&2
+      exit 1
+    fi
+
+    local shard_index="$shard_label"
+    if (( shard_index < 1 || shard_index > UI_TEST_SHARD_COUNT )); then
+      echo "UI test shard $shard_index out of range 1..$UI_TEST_SHARD_COUNT" >&2
+      exit 1
+    fi
+
+    local ui_case
+    local ui_case_position=0
+    for ui_case in "${UI_TEST_CASES[@]}"; do
+      if (( ui_case_position % UI_TEST_SHARD_COUNT == shard_index - 1 )); then
+        selected_ui_cases+=("$ui_case")
+      fi
+      (( ui_case_position += 1 ))
+    done
+  else
     IFS=',' read -ra selected_ui_cases <<< "$UI_TEST_FILTER"
+  fi
+
+  if (( ${#selected_ui_cases[@]} == 0 )); then
+    echo "No UI tests selected for filter: ${UI_TEST_FILTER:-<all>}" >&2
+    exit 1
   fi
 
   ensure_ui_test_xctestrun_path
@@ -843,6 +885,7 @@ function run_gate() {
     ci-health) gate_ci_health ;;
     lint) gate_lint ;;
     build) gate_build ;;
+    ui-build-for-testing) gate_ui_build_for_testing ;;
     architecture-tests) gate_architecture_tests ;;
     app-tests) gate_app_tests ;;
     snapshot-tests) gate_snapshot_tests ;;
@@ -863,7 +906,7 @@ function run_gate() {
     release-readiness) assert_release_readiness ;;
     *)
       echo "Unknown gate: $gate" >&2
-      echo "Valid gates: ci-health, lint, python-lint, format-check, build, architecture-tests, app-tests, snapshot-tests, package-tests, coverage-report, core-tests, ui-tests, maintainability, source-share, infra-safety, module-boundary, doc-build, doc-completeness, performance-tests, localization-check, release-readiness" >&2
+      echo "Valid gates: ci-health, lint, python-lint, format-check, build, ui-build-for-testing, architecture-tests, app-tests, snapshot-tests, package-tests, coverage-report, core-tests, ui-tests, maintainability, source-share, infra-safety, module-boundary, doc-build, doc-completeness, performance-tests, localization-check, release-readiness" >&2
       exit 1
       ;;
   esac
@@ -872,7 +915,7 @@ function run_gate() {
 function usage() {
   cat <<'EOF'
 Usage:
-  ./scripts/ci.sh [all|ci-health|lint|python-lint|format-check|build|architecture-tests|app-tests|snapshot-tests|package-tests|coverage-report|core-tests|ui-tests|maintainability|source-share|infra-safety|module-boundary|doc-build|doc-completeness|performance-tests|localization-check|release-readiness|comma-separated list]
+  ./scripts/ci.sh [all|ci-health|lint|python-lint|format-check|build|ui-build-for-testing|architecture-tests|app-tests|snapshot-tests|package-tests|coverage-report|core-tests|ui-tests|maintainability|source-share|infra-safety|module-boundary|doc-build|doc-completeness|performance-tests|localization-check|release-readiness|comma-separated list]
 
 Examples:
   ./scripts/ci.sh
