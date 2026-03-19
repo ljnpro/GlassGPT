@@ -39,7 +39,6 @@ extension ChatView {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 24)
-        .accessibilityElement(children: .combine)
         .accessibilityIdentifier("chat.emptyState")
     }
 

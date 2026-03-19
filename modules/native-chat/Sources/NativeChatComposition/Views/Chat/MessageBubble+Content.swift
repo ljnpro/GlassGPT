@@ -172,7 +172,6 @@ extension MessageBubble {
             .padding(12)
             .foregroundStyle(.white)
             .background(.blue.gradient, in: RoundedRectangle(cornerRadius: 20))
-            .accessibilityLabel("You said: \(displayedContent)")
             .accessibilityIdentifier("chat.user.bubble")
             .contextMenu {
                 copyButton
