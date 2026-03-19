@@ -15,13 +15,18 @@ concurrency:
 jobs:
   lint:
     name: Lint & Format
-    runs-on: macos-15
+    runs-on: macos-26
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
       - name: Select Xcode
         run: sudo xcode-select -s /Applications/Xcode.app
+
+      - name: Print toolchain versions
+        run: |
+          xcodebuild -version
+          swift --version
 
       - name: Install SwiftLint
         run: |
@@ -33,6 +38,12 @@ jobs:
         run: |
           if ! command -v swiftformat >/dev/null 2>&1; then
             HOMEBREW_NO_AUTO_UPDATE=1 brew install swiftformat
+          fi
+
+      - name: Install ripgrep
+        run: |
+          if ! command -v rg >/dev/null 2>&1; then
+            HOMEBREW_NO_AUTO_UPDATE=1 brew install ripgrep
           fi
 
       - name: CI Health Gate
@@ -49,7 +60,7 @@ jobs:
 
   build:
     name: Build
-    runs-on: macos-15
+    runs-on: macos-26
     needs: lint
     steps:
       - name: Checkout
@@ -57,6 +68,11 @@ jobs:
 
       - name: Select Xcode
         run: sudo xcode-select -s /Applications/Xcode.app
+
+      - name: Print toolchain versions
+        run: |
+          xcodebuild -version
+          swift --version
 
       - name: Cache SPM packages
         uses: actions/cache@v4
@@ -71,7 +87,7 @@ jobs:
 
   test:
     name: Tests
-    runs-on: macos-15
+    runs-on: macos-26
     needs: build
     strategy:
       fail-fast: false
@@ -94,6 +110,11 @@ jobs:
 
       - name: Select Xcode
         run: sudo xcode-select -s /Applications/Xcode.app
+
+      - name: Print toolchain versions
+        run: |
+          xcodebuild -version
+          swift --version
 
       - name: Cache SPM packages
         uses: actions/cache@v4
@@ -118,7 +139,7 @@ jobs:
 
   quality:
     name: Quality Gates
-    runs-on: macos-15
+    runs-on: macos-26
     needs: build
     steps:
       - name: Checkout
@@ -126,6 +147,11 @@ jobs:
 
       - name: Select Xcode
         run: sudo xcode-select -s /Applications/Xcode.app
+
+      - name: Print toolchain versions
+        run: |
+          xcodebuild -version
+          swift --version
 
       - name: Maintainability Gate
         run: ./scripts/ci.sh maintainability
@@ -165,7 +191,7 @@ jobs:
 
   release-readiness:
     name: Release Readiness
-    runs-on: macos-15
+    runs-on: macos-26
     needs: [test, quality]
     if: github.ref == 'refs/heads/codex/stable-4.9' || github.ref == 'refs/heads/main'
     steps:
@@ -174,6 +200,11 @@ jobs:
 
       - name: Select Xcode
         run: sudo xcode-select -s /Applications/Xcode.app
+
+      - name: Print toolchain versions
+        run: |
+          xcodebuild -version
+          swift --version
 
       - name: Cache SPM packages
         uses: actions/cache@v4

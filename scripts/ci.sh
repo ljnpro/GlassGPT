@@ -72,6 +72,17 @@ function log() {
   echo "==> $1"
 }
 
+function search_quiet() {
+  local pattern="$1"
+  shift
+
+  if command -v rg >/dev/null 2>&1; then
+    rg -q -- "$pattern" "$@"
+  else
+    grep -Eq -- "$pattern" "$@"
+  fi
+}
+
 function clean_stale_xctestrun() {
   local derived_data="${DERIVED_DATA_PATH:-$HOME/Library/Developer/Xcode/DerivedData}"
   local stale_count
@@ -141,26 +152,8 @@ function is_transient_xcodebuild_failure() {
     return 1
   fi
 
-  rg -q \
-    -e 'Application failed preflight checks' \
-    -e 'reason: Busy \("Application failed preflight checks"\)' \
-    -e 'Simulator device failed to launch' \
-    -e 'Lost connection to test runner' \
-    -e 'Unable to boot device in current state' \
-    -e 'Failed to background test runner' \
-    -e 'Invalid device state' \
-    -e 'Failed to launch app with identifier' \
-    -e 'server died' \
-    -e 'mkstemp: No such file or directory' \
-    -e 'database is locked' \
-    -e 'Early unexpected exit, operation never finished bootstrapping' \
-    -e 'Test crashed with signal kill before establishing connection' \
-    -e 'Application info provider \(FBSApplicationLibrary\) returned nil' \
-    -e 'CoreSimulatorService connection interrupted' \
-    -e 'Connection interrupted' \
-    -e 'Restarting after unexpected exit, crash, or test timeout' \
-    -e 'There are no test bundles available to test' \
-    -e 'killed' \
+  search_quiet \
+    'Application failed preflight checks|reason: Busy \("Application failed preflight checks"\)|Simulator device failed to launch|Lost connection to test runner|Unable to boot device in current state|Failed to background test runner|Invalid device state|Failed to launch app with identifier|server died|mkstemp: No such file or directory|database is locked|Early unexpected exit, operation never finished bootstrapping|Test crashed with signal kill before establishing connection|Application info provider \(FBSApplicationLibrary\) returned nil|CoreSimulatorService connection interrupted|Connection interrupted|Restarting after unexpected exit, crash, or test timeout|There are no test bundles available to test|killed' \
     "$log_file"
 }
 
@@ -287,10 +280,7 @@ function is_transient_xcresult_failure() {
     return 1
   fi
 
-  printf '%s\n' "$summary" | rg -q \
-    -e 'Early unexpected exit' \
-    -e 'signal kill' \
-    -e 'encountered an error'
+  printf '%s\n' "$summary" | search_quiet 'Early unexpected exit|signal kill|encountered an error'
 }
 
 function find_xctestrun_path() {
@@ -690,32 +680,32 @@ function assert_release_readiness() {
       ;;
   esac
 
-  if ! rg -q "codex/stable-4.9" "$ROOT_DIR/docs/branch-strategy.md"; then
+  if ! search_quiet "codex/stable-4.9" "$ROOT_DIR/docs/branch-strategy.md"; then
     echo "branch-strategy.md does not include codex/stable-4.9." >&2
     exit 1
   fi
 
-  if ! rg -q "4.8.2" "$ROOT_DIR/docs/parity-baseline.md"; then
+  if ! search_quiet "4.8.2" "$ROOT_DIR/docs/parity-baseline.md"; then
     echo "parity-baseline.md must include the active 4.8.2 baseline marker." >&2
     exit 1
   fi
 
-  if ! rg -q "codex/stable-4.9" "$ROOT_DIR/docs/release.md"; then
+  if ! search_quiet "codex/stable-4.9" "$ROOT_DIR/docs/release.md"; then
     echo "release.md must describe the codex/stable-4.9 release line." >&2
     exit 1
   fi
 
-  if ! rg -q "release_testflight|release-testflight|tracked wrapper" "$ROOT_DIR/docs/release.md"; then
+  if ! search_quiet "release_testflight|release-testflight|tracked wrapper" "$ROOT_DIR/docs/release.md"; then
     echo "release.md must describe the tracked release entrypoint." >&2
     exit 1
   fi
 
-  if ! rg -q "codex/stable-4.9" "$ROOT_DIR/.github/workflows/ios.yml"; then
+  if ! search_quiet "codex/stable-4.9" "$ROOT_DIR/.github/workflows/ios.yml"; then
     echo "ios.yml must include codex/stable-4.9." >&2
     exit 1
   fi
 
-  if rg -q -- '--skip-ci|--skip-readiness' "$ROOT_DIR/scripts/release_testflight.sh"; then
+  if search_quiet '--skip-ci|--skip-readiness' "$ROOT_DIR/scripts/release_testflight.sh"; then
     echo "release_testflight.sh must not advertise CI bypass flags." >&2
     exit 1
   fi
