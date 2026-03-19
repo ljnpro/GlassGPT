@@ -18,7 +18,7 @@ jobs:
     runs-on: macos-26
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Select Xcode
         run: sudo xcode-select -s /Applications/Xcode.app
@@ -64,7 +64,7 @@ jobs:
     needs: lint
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Select Xcode
         run: sudo xcode-select -s /Applications/Xcode.app
@@ -75,7 +75,7 @@ jobs:
           swift --version
 
       - name: Cache SPM packages
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: .local/build/ci/SourcePackages
           key: ${{ runner.os }}-spm-${{ hashFiles('modules/native-chat/Package.resolved') }}
@@ -106,7 +106,7 @@ jobs:
             ui-tests-shard: 3
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Select Xcode
         run: sudo xcode-select -s /Applications/Xcode.app
@@ -117,7 +117,7 @@ jobs:
           swift --version
 
       - name: Cache SPM packages
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: .local/build/ci/SourcePackages
           key: ${{ runner.os }}-spm-${{ hashFiles('modules/native-chat/Package.resolved') }}
@@ -131,7 +131,7 @@ jobs:
 
       - name: Upload test results
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: test-results-${{ matrix.gate }}${{ matrix.ui-tests-shard && format('-shard-{0}', matrix.ui-tests-shard) || '' }}
           path: .local/build/ci/*.xcresult
@@ -143,7 +143,7 @@ jobs:
     needs: build
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Select Xcode
         run: sudo xcode-select -s /Applications/Xcode.app
@@ -176,7 +176,7 @@ jobs:
 
       - name: Upload quality reports
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: quality-reports
           path: |
@@ -196,7 +196,7 @@ jobs:
     if: github.ref == 'refs/heads/codex/stable-4.9' || github.ref == 'refs/heads/main'
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Select Xcode
         run: sudo xcode-select -s /Applications/Xcode.app
@@ -207,7 +207,7 @@ jobs:
           swift --version
 
       - name: Cache SPM packages
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: .local/build/ci/SourcePackages
           key: ${{ runner.os }}-spm-${{ hashFiles('modules/native-chat/Package.resolved') }}
