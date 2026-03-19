@@ -100,8 +100,8 @@ final class UITestScenarioLoaderTests: XCTestCase {
         let seededConversations = try context.fetch(FetchDescriptor<Conversation>())
 
         XCTAssertEqual(bootstrap.initialTab, 2)
-        XCTAssertTrue(bootstrap.settingsPresenter.cloudflareEnabled)
-        XCTAssertTrue(bootstrap.settingsPresenter.apiKey.isEmpty)
+        XCTAssertTrue(bootstrap.settingsPresenter.defaults.cloudflareEnabled)
+        XCTAssertTrue(bootstrap.settingsPresenter.credentials.apiKey.isEmpty)
         XCTAssertTrue(seededConversations.isEmpty)
         XCTAssertNil(bootstrap.chatController.currentConversation)
     }

@@ -9,11 +9,11 @@ public enum ChatScrollLayoutMode: Equatable {
     case bottomAnchored
 }
 
-@MainActor
 /// UIKit view controller that manages a scroll view containing chat messages and a pinned composer.
 ///
 /// Handles bottom-anchored auto-scrolling during streaming, keyboard avoidance,
 /// and layout transitions between centered and bottom-anchored modes.
+@MainActor
 public final class ChatScrollContainerController: UIViewController, UIScrollViewDelegate, UIGestureRecognizerDelegate {
     let scrollView = UIScrollView()
     let contentHostingController = UIHostingController(rootView: AnyView(EmptyView()))
@@ -46,7 +46,7 @@ public final class ChatScrollContainerController: UIViewController, UIScrollView
     }
 
     @available(*, unavailable)
-    public required init?(coder: NSCoder) {
+    public required init?(coder _: NSCoder) {
         fatalError("init(coder:) has not been implemented")
     }
 
@@ -107,7 +107,7 @@ public final class ChatScrollContainerController: UIViewController, UIScrollView
 
         if lastLiveBottomAnchorKey != liveBottomAnchorKey {
             lastLiveBottomAnchorKey = liveBottomAnchorKey
-            if layoutMode == .bottomAnchored && shouldFollowBottom {
+            if layoutMode == .bottomAnchored, shouldFollowBottom {
                 shouldPinToBottomOnNextLayout = true
             }
         }
@@ -132,8 +132,8 @@ public final class ChatScrollContainerController: UIViewController, UIScrollView
 
     /// Allows the background tap gesture to work alongside the scroll view's own gestures.
     public func gestureRecognizer(
-        _ gestureRecognizer: UIGestureRecognizer,
-        shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer
+        _: UIGestureRecognizer,
+        shouldRecognizeSimultaneouslyWith _: UIGestureRecognizer
     ) -> Bool {
         true
     }

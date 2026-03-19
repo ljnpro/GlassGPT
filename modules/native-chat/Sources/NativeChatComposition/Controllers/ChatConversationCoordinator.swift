@@ -6,156 +6,191 @@ import ChatUIComponents
 import Foundation
 import OpenAITransport
 
-@MainActor
 /// Coordinator responsible for conversation lifecycle: starting new chats, loading, restoring, and regenerating messages.
+@MainActor
 package final class ChatConversationCoordinator {
-    unowned let controller: ChatController
+    unowned let state: any (
+        ChatConversationSelectionAccess &
+            ChatMessageListAccess &
+            ChatStreamingProjectionAccess &
+            ChatAttachmentStateAccess &
+            ChatConfigurationSelectionAccess &
+            ChatPreviewStateAccess &
+            ChatReplyFeedbackAccess
+    )
+    unowned let services: any (
+        ChatPersistenceAccess &
+            ChatTransportServiceAccess &
+            ChatGeneratedFileServiceAccess &
+            ChatBackgroundTaskAccess
+    )
+    unowned var sessions: (any ChatSessionManaging)!
+    unowned var recoveryMaintenance: (any ChatRecoveryMaintenanceManaging)!
+    unowned var drafts: (any ChatDraftPreparing)!
+    unowned var streaming: (any ChatStreamingRequestStarting)!
 
-    /// Creates a coordinator bound to the given chat controller.
-    package init(controller: ChatController) {
-        self.controller = controller
+    /// Creates a coordinator with the given state and service surfaces.
+    init(
+        state: any(
+            ChatConversationSelectionAccess &
+                ChatMessageListAccess &
+                ChatStreamingProjectionAccess &
+                ChatAttachmentStateAccess &
+                ChatConfigurationSelectionAccess &
+                ChatPreviewStateAccess &
+                ChatReplyFeedbackAccess
+        ),
+        services: any(
+            ChatPersistenceAccess &
+                ChatTransportServiceAccess &
+                ChatGeneratedFileServiceAccess &
+                ChatBackgroundTaskAccess
+        )
+    ) {
+        self.state = state
+        self.services = services
     }
 
-    /// Resets the controller to a blank conversation, saving any active session first.
+    /// Resets the active conversation state, saving any visible session first.
     package func startNewChat() {
-        if let session = controller.currentVisibleSession {
-            controller.sessionCoordinator.saveSessionNow(session)
+        if let session = sessions.currentVisibleSession {
+            sessions.saveSessionNow(session)
         }
 
-        controller.cancelGeneratedFilePrefetches(controller.generatedFilePrefetchRegistry.cancelAll())
-        controller.sessionCoordinator.detachVisibleSessionBinding()
-        controller.currentConversation = nil
-        controller.messages = []
-        controller.currentStreamingText = ""
-        controller.currentThinkingText = ""
-        controller.errorMessage = nil
-        controller.selectedImageData = nil
-        controller.pendingAttachments = []
-        controller.isThinking = false
-        controller.draftMessage = nil
-        controller.activeToolCalls = []
-        controller.liveCitations = []
-        controller.liveFilePathAnnotations = []
-        controller.lastSequenceNumber = nil
-        controller.activeRequestUsesBackgroundMode = false
-        controller.filePreviewItem = nil
-        controller.sharedGeneratedFileItem = nil
-        controller.fileDownloadError = nil
+        services.cancelGeneratedFilePrefetches(services.generatedFilePrefetchRegistry.cancelAll())
+        sessions.detachVisibleSessionBinding()
+        state.currentConversation = nil
+        state.messages = []
+        state.currentStreamingText = ""
+        state.currentThinkingText = ""
+        state.errorMessage = nil
+        state.selectedImageData = nil
+        state.pendingAttachments = []
+        state.isThinking = false
+        state.draftMessage = nil
+        state.activeToolCalls = []
+        state.liveCitations = []
+        state.liveFilePathAnnotations = []
+        state.lastSequenceNumber = nil
+        state.activeRequestUsesBackgroundMode = false
+        state.filePreviewItem = nil
+        state.sharedGeneratedFileItem = nil
+        state.fileDownloadError = nil
         loadDefaultsFromSettings()
-        controller.syncConversationProjection()
-        controller.hapticService.selection(isEnabled: controller.hapticsEnabled)
+        state.syncConversationProjection()
+        state.hapticService.selection(isEnabled: state.hapticsEnabled)
     }
 
     /// Deletes the given assistant message and re-submits a fresh request for it.
     package func regenerateMessage(_ message: Message) {
-        guard !controller.isStreaming else { return }
+        guard !state.isStreaming else { return }
         guard message.role == .assistant else { return }
-        guard !controller.apiKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-            controller.errorMessage = "Please add your OpenAI API key in Settings."
+        guard !drafts.apiKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            state.errorMessage = "Please add your OpenAI API key in Settings."
             return
         }
 
-        if let index = controller.messages.firstIndex(where: { $0.id == message.id }) {
-            controller.messages.remove(at: index)
+        if let index = state.messages.firstIndex(where: { $0.id == message.id }) {
+            state.messages.remove(at: index)
         }
 
-        if let conversation = controller.currentConversation,
+        if let conversation = state.currentConversation,
            let idx = conversation.messages.firstIndex(where: { $0.id == message.id }) {
             conversation.messages.remove(at: idx)
         }
 
-        controller.conversationRepository.delete(message)
+        services.conversationRepository.delete(message)
         saveContextIfPossible("regenerateMessage.deleteOriginal")
 
-        controller.errorMessage = nil
+        state.errorMessage = nil
 
         let draft = Message(
             role: .assistant,
             content: "",
             thinking: nil,
             lastSequenceNumber: nil,
-            usedBackgroundMode: controller.backgroundModeEnabled,
+            usedBackgroundMode: state.backgroundModeEnabled,
             isComplete: false
         )
-        draft.conversation = controller.currentConversation
-        controller.currentConversation?.messages.append(draft)
+        draft.conversation = state.currentConversation
+        state.currentConversation?.messages.append(draft)
         saveContextIfPossible("regenerateMessage.insertDraft")
 
         let preparedReply: PreparedAssistantReply
         do {
-            preparedReply = try controller.prepareExistingDraft(draft)
+            preparedReply = try drafts.prepareExistingDraft(draft)
         } catch SendMessagePreparationError.missingAPIKey {
-            controller.errorMessage = "Please add your OpenAI API key in Settings."
+            state.errorMessage = "Please add your OpenAI API key in Settings."
             return
         } catch {
-            controller.errorMessage = "Failed to start response session."
+            state.errorMessage = "Failed to start response session."
             return
         }
 
         let session = ReplySession(preparedReply: preparedReply)
-        controller.sessionCoordinator.registerSession(
+        sessions.registerSession(
             session,
-            execution: SessionExecutionState(service: controller.serviceFactory()),
+            execution: SessionExecutionState(service: services.serviceFactory()),
             visible: true
         )
-        let controller = controller
-        Task { @MainActor in
-            _ = await controller.sessionCoordinator.applyRuntimeTransition(.beginSubmitting, to: session)
-            controller.sessionCoordinator.syncVisibleState(from: session)
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            _ = await sessions.applyRuntimeTransition(.beginSubmitting, to: session)
+            sessions.syncVisibleState(from: session)
         }
 
-        controller.hapticService.impact(.medium, isEnabled: controller.hapticsEnabled)
-        controller.startStreamingRequest(for: session)
+        state.hapticService.impact(.medium, isEnabled: state.hapticsEnabled)
+        streaming.startStreamingRequest(for: session, reconnectAttempt: 0)
     }
 
     /// Loads an existing conversation from persistence, replacing the current session.
     package func loadConversation(_ conversation: Conversation) {
-        if let session = controller.currentVisibleSession {
-            controller.sessionCoordinator.saveSessionNow(session)
+        if let session = sessions.currentVisibleSession {
+            sessions.saveSessionNow(session)
         }
 
-        controller.cancelGeneratedFilePrefetches(controller.generatedFilePrefetchRegistry.cancelAll())
-        controller.sessionCoordinator.detachVisibleSessionBinding()
-        controller.currentConversation = conversation
-        controller.messages = visibleMessages(for: conversation)
-        controller.syncConversationProjection()
+        services.cancelGeneratedFilePrefetches(services.generatedFilePrefetchRegistry.cancelAll())
+        sessions.detachVisibleSessionBinding()
+        state.currentConversation = conversation
+        state.messages = visibleMessages(for: conversation)
+        state.syncConversationProjection()
 
         applyConversationConfiguration(from: conversation)
 
-        controller.currentStreamingText = ""
-        controller.currentThinkingText = ""
-        controller.errorMessage = nil
-        controller.isThinking = false
-        controller.draftMessage = nil
-        controller.activeToolCalls = []
-        controller.liveCitations = []
-        controller.liveFilePathAnnotations = []
-        controller.lastSequenceNumber = nil
-        controller.activeRequestUsesBackgroundMode = false
-        controller.pendingAttachments = []
-        controller.filePreviewItem = nil
-        controller.sharedGeneratedFileItem = nil
-        controller.fileDownloadError = nil
+        state.currentStreamingText = ""
+        state.currentThinkingText = ""
+        state.errorMessage = nil
+        state.isThinking = false
+        state.draftMessage = nil
+        state.activeToolCalls = []
+        state.liveCitations = []
+        state.liveFilePathAnnotations = []
+        state.lastSequenceNumber = nil
+        state.activeRequestUsesBackgroundMode = false
+        state.pendingAttachments = []
+        state.filePreviewItem = nil
+        state.sharedGeneratedFileItem = nil
+        state.fileDownloadError = nil
 
-        controller.sessionCoordinator.refreshVisibleBindingForCurrentConversation()
+        sessions.refreshVisibleBindingForCurrentConversation()
 
-        let controller = controller
-        Task { @MainActor in
-            await controller.recoverIncompleteMessagesInCurrentConversation()
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            await recoveryMaintenance.recoverIncompleteMessagesInCurrentConversation()
         }
     }
 
     /// Attempts to restore the most recent conversation from persistence on app launch.
     package func restoreLastConversationIfAvailable() {
         do {
-            if let lastConversation = try controller.conversationRepository.fetchMostRecentConversationWithMessages() {
-                controller.currentConversation = lastConversation
-                controller.messages = visibleMessages(for: lastConversation)
+            if let lastConversation = try services.conversationRepository.fetchMostRecentConversationWithMessages() {
+                state.currentConversation = lastConversation
+                state.messages = visibleMessages(for: lastConversation)
 
                 applyConversationConfiguration(from: lastConversation)
 
                 #if DEBUG
-                Loggers.chat.debug("[Restore] Loaded last conversation: \(lastConversation.title) (\(controller.messages.count) messages)")
+                Loggers.chat.debug("[Restore] Loaded last conversation: \(lastConversation.title) (\(state.messages.count) messages)")
                 #endif
             }
         } catch {
@@ -165,11 +200,11 @@ package final class ChatConversationCoordinator {
 
     /// Returns the current incomplete assistant draft message, if one exists.
     package func activeIncompleteAssistantDraft() -> Message? {
-        if let draft = controller.draftMessage, !draft.isComplete, draft.role == .assistant {
+        if let draft = state.draftMessage, !draft.isComplete, draft.role == .assistant {
             return draft
         }
 
-        return controller.currentConversation?.messages
+        return state.currentConversation?.messages
             .filter { $0.role == .assistant && !$0.isComplete }
             .sorted { $0.createdAt < $1.createdAt }
             .last

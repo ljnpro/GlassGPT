@@ -42,9 +42,9 @@ public actor FileDownloadService {
         self.requestAuthorizer = authorizer
         self.transport = resolvedTransport
         self.fileManager = fileManager
-        self.cacheStore = GeneratedFileCacheStore(fileManager: fileManager)
-        self.namingResolver = resolvedNamingResolver
-        self.downloadClient = GeneratedFileDownloadClient(
+        cacheStore = GeneratedFileCacheStore(fileManager: fileManager)
+        namingResolver = resolvedNamingResolver
+        downloadClient = GeneratedFileDownloadClient(
             configurationProvider: configurationProvider,
             requestAuthorizer: authorizer,
             transport: resolvedTransport,
@@ -58,7 +58,7 @@ public actor FileDownloadService {
         containerId: String?,
         suggestedFilename: String?,
         apiKey: String
-    ) async throws(any Error) -> URL {
+    ) async throws -> URL {
         let key = namingResolver.downloadKey(fileId: fileId, containerId: containerId)
 
         if let existingTask = inFlightDownloads[key] {
@@ -85,7 +85,7 @@ public actor FileDownloadService {
         containerId: String?,
         suggestedFilename: String?,
         apiKey: String
-    ) async throws(any Error) -> GeneratedFileLocalResource {
+    ) async throws -> GeneratedFileLocalResource {
         let key = namingResolver.downloadKey(fileId: fileId, containerId: containerId)
 
         if let cached = cachedGeneratedFile(

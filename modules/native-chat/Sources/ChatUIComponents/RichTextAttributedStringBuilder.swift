@@ -102,10 +102,12 @@ public enum RichTextAttributedStringBuilder {
         while index < count {
             if chars[index] == "`" {
                 var end = index + 1
-                while end < count && chars[end] != "`" { end += 1 }
+                while end < count, chars[end] != "`" {
+                    end += 1
+                }
                 if end < count {
                     flushCurrent()
-                    let codeContent = String(chars[(index + 1)..<end])
+                    let codeContent = String(chars[(index + 1) ..< end])
                     var chunk = AttributedString(codeContent)
                     chunk.font = style.codeFont
                     if let codeBackgroundColor = style.codeBackgroundColor {
@@ -120,12 +122,12 @@ public enum RichTextAttributedStringBuilder {
             if index + 2 < count && chars[index] == "*" && chars[index + 1] == "*" && chars[index + 2] == "*" {
                 var end = index + 3
                 while end + 2 < count {
-                    if chars[end] == "*" && chars[end + 1] == "*" && chars[end + 2] == "*" { break }
+                    if chars[end] == "*", chars[end + 1] == "*", chars[end + 2] == "*" { break }
                     end += 1
                 }
                 if end + 2 < count {
                     flushCurrent()
-                    let content = String(chars[(index + 3)..<end])
+                    let content = String(chars[(index + 3) ..< end])
                     var chunk = AttributedString(content)
                     chunk.font = style.boldItalicFont
                     result += chunk
@@ -137,12 +139,12 @@ public enum RichTextAttributedStringBuilder {
             if index + 1 < count && chars[index] == "*" && chars[index + 1] == "*" {
                 var end = index + 2
                 while end + 1 < count {
-                    if chars[end] == "*" && chars[end + 1] == "*" { break }
+                    if chars[end] == "*", chars[end + 1] == "*" { break }
                     end += 1
                 }
                 if end + 1 < count {
                     flushCurrent()
-                    let content = String(chars[(index + 2)..<end])
+                    let content = String(chars[(index + 2) ..< end])
                     var chunk = AttributedString(content)
                     chunk.font = style.boldFont
                     result += chunk
@@ -156,12 +158,12 @@ public enum RichTextAttributedStringBuilder {
                chars[index] == "_" && chars[index + 1] == "_" {
                 var end = index + 2
                 while end + 1 < count {
-                    if chars[end] == "_" && chars[end + 1] == "_" { break }
+                    if chars[end] == "_", chars[end + 1] == "_" { break }
                     end += 1
                 }
                 if end + 1 < count {
                     flushCurrent()
-                    let content = String(chars[(index + 2)..<end])
+                    let content = String(chars[(index + 2) ..< end])
                     var chunk = AttributedString(content)
                     chunk.font = style.boldFont
                     result += chunk
@@ -172,15 +174,15 @@ public enum RichTextAttributedStringBuilder {
 
             if chars[index] == "*" || chars[index] == "_" {
                 let marker = chars[index]
-                if index + 1 < count && chars[index + 1] != marker {
+                if index + 1 < count, chars[index + 1] != marker {
                     var end = index + 1
                     while end < count {
-                        if chars[end] == marker && (end + 1 >= count || chars[end + 1] != marker) { break }
+                        if chars[end] == marker, end + 1 >= count || chars[end + 1] != marker { break }
                         end += 1
                     }
                     if end < count {
                         flushCurrent()
-                        let content = String(chars[(index + 1)..<end])
+                        let content = String(chars[(index + 1) ..< end])
                         var chunk = AttributedString(content)
                         chunk.font = style.italicFont
                         result += chunk

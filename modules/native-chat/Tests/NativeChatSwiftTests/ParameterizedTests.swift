@@ -5,11 +5,10 @@ import Testing
 
 @Suite(.tags(.parsing))
 struct ParameterizedTests {
-
     // MARK: - Model Display Names
 
     @Test(arguments: ModelType.allCases)
-    func modelHasDisplayName(model: ModelType) {
+    func `model has display name`(model: ModelType) {
         #expect(!model.displayName.isEmpty)
         #expect(!model.id.isEmpty)
         #expect(!model.rawValue.isEmpty)
@@ -18,7 +17,7 @@ struct ParameterizedTests {
     // MARK: - Reasoning Efforts
 
     @Test(arguments: ReasoningEffort.allCases)
-    func reasoningEffortHasDisplayName(effort: ReasoningEffort) {
+    func `reasoning effort has display name`(effort: ReasoningEffort) {
         #expect(!effort.displayName.isEmpty)
         #expect(!effort.apiValue.isEmpty)
         #expect(!effort.id.isEmpty)
@@ -27,7 +26,7 @@ struct ParameterizedTests {
     // MARK: - Service Tiers
 
     @Test(arguments: ServiceTier.allCases)
-    func serviceTierHasDisplayName(tier: ServiceTier) {
+    func `service tier has display name`(tier: ServiceTier) {
         #expect(!tier.displayName.isEmpty)
         #expect(!tier.id.isEmpty)
         #expect(!tier.rawValue.isEmpty)
@@ -36,7 +35,7 @@ struct ParameterizedTests {
     // MARK: - Message Roles
 
     @Test(arguments: MessageRole.allCases)
-    func messageRoleHasStableRawValue(role: MessageRole) {
+    func `message role has stable raw value`(role: MessageRole) {
         #expect(!role.rawValue.isEmpty)
         #expect(!role.id.isEmpty)
         let decoded = try? JSONDecoder().decode(
@@ -56,7 +55,7 @@ struct ParameterizedTests {
         OpenAIServiceError.requestFailed("timeout"),
         OpenAIServiceError.cancelled
     ])
-    func errorHasLocalizedDescription(error: OpenAIServiceError) throws {
+    func `error has localized description`(error: OpenAIServiceError) throws {
         let description = try #require(error.errorDescription)
         #expect(!description.isEmpty)
         #expect(!error.localizedDescription.isEmpty)
@@ -65,7 +64,7 @@ struct ParameterizedTests {
     // MARK: - Model Available Efforts
 
     @Test(arguments: ModelType.allCases)
-    func modelHasValidDefaultEffort(model: ModelType) {
+    func `model has valid default effort`(model: ModelType) {
         let efforts = model.availableEfforts
         #expect(!efforts.isEmpty)
         #expect(efforts.contains(model.defaultEffort))

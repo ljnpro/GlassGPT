@@ -41,7 +41,7 @@ extension KaTeXProvider {
 
     private static func encodedLatexString(_ latex: String) -> String {
         let encodedResult = Result { try JSONEncoder().encode(latex) }
-        if case .success(let data) = encodedResult,
+        if case let .success(data) = encodedResult,
            let json = String(data: data, encoding: .utf8) {
             return json
         }

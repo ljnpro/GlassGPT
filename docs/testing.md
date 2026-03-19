@@ -2,54 +2,68 @@
 
 ## Principle
 
-`4.7.0` proves the real ownership boundaries:
+`4.9.0` testing exists to verify real ownership boundaries and release
+integrity:
 
-- actor-owned runtime behavior
-- composition-root assembly
-- final persistence behavior
-- generated-file and UI parity paths
-- maintainability and governance gates
+- runtime transitions belong to runtime owners
+- composition assembles, but does not secretly re-own policy
+- application and presentation layers earn their abstractions
+- documentation, localization, and release-readiness are enforced in CI
 
 ## Coverage
 
-- unit tests
-  - runtime decision policy
-  - `ReplySessionActor` lifecycle and buffer transitions
-  - repositories and persistence adapters
-  - request builder, parser, and transport behavior
-  - settings/defaults persistence
-- integration tests
-  - package-facing chat flows
-  - composition-root and app-store assembly
-- snapshot tests
-  - chat, history, settings, model selector, file preview
-- UI tests
-  - launch reachability
-  - history open/search/delete
-  - settings save/clear and gateway feedback
-  - streaming indicators and generated-file presentation
+- unit and workflow tests
+  - `ReplySessionActor`, `ReplyRecoveryPlanner`, and runtime transition logic
+  - request building, SSE decoding, parser behavior, and transport configuration
+  - SwiftData repositories, adapters, reset flows, and keychain persistence
+  - settings/history/application handlers and presenter/store projection
+- architecture and boundary tests
+  - package/module dependency rules
+  - controller/coordinator ownership checks
+  - source-target and package-surface assertions
+- presentation and UI tests
+  - view-hosting coverage for presentation/views budgets
+  - snapshot coverage for chat, history, settings, model selector, and file preview surfaces
+  - UI flows for launch, history, settings, recovery, streaming, and generated files
+- stress and randomized tests
+  - property tests
+  - fuzz tests
+  - `withTaskGroup` concurrency stress tests for actor-owned systems
 
 ## CI Gates
 
+Default hard CI path:
+
 ```bash
-./scripts/ci.sh lint
-./scripts/ci.sh build
-./scripts/ci.sh architecture-tests
-./scripts/ci.sh core-tests
-./scripts/ci.sh ui-tests
-./scripts/ci.sh coverage-report
-./scripts/ci.sh maintainability
-./scripts/ci.sh source-share
-./scripts/ci.sh infra-safety
-./scripts/ci.sh module-boundary
-./scripts/ci.sh release-readiness
+./scripts/ci.sh
 ```
+
+This currently runs:
+
+- `ci-health`
+- `lint`
+- `python-lint`
+- `format-check`
+- `build`
+- `architecture-tests`
+- `core-tests`
+- `ui-tests`
+- `coverage-report`
+- `maintainability`
+- `source-share`
+- `infra-safety`
+- `module-boundary`
+- `doc-build`
+- `doc-completeness`
+- `localization-check`
+- `release-readiness`
+
+Tracked release-plan gates:
+
+- `performance-tests` when deterministic on the active toolchain
 
 ## Maintainability
 
-- non-UI files: `<= 220 LOC`
-- UI files: `<= 280 LOC`
-- ScreenStore files: `<= 180 LOC`
-- type families are checked in aggregate so extension-split monoliths still fail
-- non-UI type families: `<= 500 LOC`
-- UI type families: `<= 700 LOC`
+- file-level size budgets remain enforced for UI, non-UI, and ScreenStore surfaces
+- type families are checked in aggregate so extension splits cannot hide oversized ownership clusters
+- controller/coordinator cluster size, controller-backed coordinator anti-patterns, and `swiftlint:disable` usage are part of the gate output

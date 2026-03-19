@@ -6,12 +6,12 @@ import Testing
 @testable import NativeChatComposition
 
 extension OpenAIStreamEventTranslatorTests {
-    @Test func translateRecognizesWebSearchLifecycleEvents() throws {
+    @Test func `translate recognizes web search lifecycle events`() {
         assertTranslation(
             eventType: "response.web_search_call.in_progress",
             envelope: makeEnvelope(itemID: "ws_1")
         ) { event in
-            guard case .webSearchStarted(let itemID) = event else {
+            guard case let .webSearchStarted(itemID) = event else {
                 Issue.record("Expected web search started event")
                 return
             }
@@ -22,7 +22,7 @@ extension OpenAIStreamEventTranslatorTests {
             eventType: "response.web_search_call.searching",
             envelope: makeEnvelope(itemID: "ws_1")
         ) { event in
-            guard case .webSearchSearching(let itemID) = event else {
+            guard case let .webSearchSearching(itemID) = event else {
                 Issue.record("Expected web search searching event")
                 return
             }
@@ -33,7 +33,7 @@ extension OpenAIStreamEventTranslatorTests {
             eventType: "response.web_search_call.completed",
             envelope: makeEnvelope(itemID: "ws_1")
         ) { event in
-            guard case .webSearchCompleted(let itemID) = event else {
+            guard case let .webSearchCompleted(itemID) = event else {
                 Issue.record("Expected web search completed event")
                 return
             }
@@ -41,12 +41,12 @@ extension OpenAIStreamEventTranslatorTests {
         }
     }
 
-    @Test func translateRecognizesCodeInterpreterStartAndInterpretEvents() throws {
+    @Test func `translate recognizes code interpreter start and interpret events`() {
         assertTranslation(
             eventType: "response.code_interpreter_call.in_progress",
             envelope: makeEnvelope(itemID: "ci_1")
         ) { event in
-            guard case .codeInterpreterStarted(let itemID) = event else {
+            guard case let .codeInterpreterStarted(itemID) = event else {
                 Issue.record("Expected code interpreter started event")
                 return
             }
@@ -57,7 +57,7 @@ extension OpenAIStreamEventTranslatorTests {
             eventType: "response.code_interpreter_call.interpreting",
             envelope: makeEnvelope(itemID: "ci_1")
         ) { event in
-            guard case .codeInterpreterInterpreting(let itemID) = event else {
+            guard case let .codeInterpreterInterpreting(itemID) = event else {
                 Issue.record("Expected code interpreter interpreting event")
                 return
             }
@@ -65,12 +65,12 @@ extension OpenAIStreamEventTranslatorTests {
         }
     }
 
-    @Test func translateRecognizesCodeInterpreterCodeAndCompletionEvents() throws {
+    @Test func `translate recognizes code interpreter code and completion events`() {
         assertTranslation(
             eventType: "response.code_interpreter_call_code.delta",
             envelope: makeEnvelope(delta: "print", itemID: "ci_1")
         ) { event in
-            guard case .codeInterpreterCodeDelta(let itemID, let delta) = event else {
+            guard case let .codeInterpreterCodeDelta(itemID, delta) = event else {
                 Issue.record("Expected code interpreter code delta event")
                 return
             }
@@ -82,7 +82,7 @@ extension OpenAIStreamEventTranslatorTests {
             eventType: "response.code_interpreter_call_code.done",
             envelope: makeEnvelope(itemID: "ci_1", code: "print(1)")
         ) { event in
-            guard case .codeInterpreterCodeDone(let itemID, let code) = event else {
+            guard case let .codeInterpreterCodeDone(itemID, code) = event else {
                 Issue.record("Expected code interpreter code done event")
                 return
             }
@@ -94,7 +94,7 @@ extension OpenAIStreamEventTranslatorTests {
             eventType: "response.code_interpreter_call.completed",
             envelope: makeEnvelope(itemID: "ci_1")
         ) { event in
-            guard case .codeInterpreterCompleted(let itemID) = event else {
+            guard case let .codeInterpreterCompleted(itemID) = event else {
                 Issue.record("Expected code interpreter completed event")
                 return
             }
@@ -102,12 +102,12 @@ extension OpenAIStreamEventTranslatorTests {
         }
     }
 
-    @Test func translateRecognizesFileSearchLifecycleEvents() throws {
+    @Test func `translate recognizes file search lifecycle events`() {
         assertTranslation(
             eventType: "response.file_search_call.in_progress",
             envelope: makeEnvelope(itemID: "fs_1")
         ) { event in
-            guard case .fileSearchStarted(let itemID) = event else {
+            guard case let .fileSearchStarted(itemID) = event else {
                 Issue.record("Expected file search started event")
                 return
             }
@@ -118,7 +118,7 @@ extension OpenAIStreamEventTranslatorTests {
             eventType: "response.file_search_call.searching",
             envelope: makeEnvelope(itemID: "fs_1")
         ) { event in
-            guard case .fileSearchSearching(let itemID) = event else {
+            guard case let .fileSearchSearching(itemID) = event else {
                 Issue.record("Expected file search searching event")
                 return
             }
@@ -129,7 +129,7 @@ extension OpenAIStreamEventTranslatorTests {
             eventType: "response.file_search_call.completed",
             envelope: makeEnvelope(itemID: "fs_1")
         ) { event in
-            guard case .fileSearchCompleted(let itemID) = event else {
+            guard case let .fileSearchCompleted(itemID) = event else {
                 Issue.record("Expected file search completed event")
                 return
             }
@@ -137,14 +137,14 @@ extension OpenAIStreamEventTranslatorTests {
         }
     }
 
-    @Test func translateHandlesCompletedTerminalEvent() throws {
+    @Test func `translate handles completed terminal event`() {
         let terminalResponse = makeTerminalResponse()
 
         assertTranslation(
             eventType: "response.completed",
             envelope: makeEnvelope(response: terminalResponse)
         ) { event in
-            guard case .completed(let text, let thinking, let annotations) = event else {
+            guard case let .completed(text, thinking, annotations) = event else {
                 Issue.record("Expected completed event")
                 return
             }
@@ -154,14 +154,14 @@ extension OpenAIStreamEventTranslatorTests {
         }
     }
 
-    @Test func translateHandlesIncompleteTerminalEvent() throws {
+    @Test func `translate handles incomplete terminal event`() {
         let terminalResponse = makeTerminalResponse()
 
         assertTranslation(
             eventType: "response.incomplete",
             envelope: makeEnvelope(response: terminalResponse)
         ) { event in
-            guard case .incomplete(let text, let thinking, let annotations, let message) = event else {
+            guard case let .incomplete(text, thinking, annotations, message) = event else {
                 Issue.record("Expected incomplete event")
                 return
             }
@@ -172,12 +172,12 @@ extension OpenAIStreamEventTranslatorTests {
         }
     }
 
-    @Test func translateHandlesStreamAndResponseErrorEvents() throws {
+    @Test func `translate handles stream and response error events`() {
         assertTranslation(
             eventType: "error",
             envelope: makeEnvelope(message: "stream exploded")
         ) { event in
-            guard case .error(let error) = event else {
+            guard case let .error(error) = event else {
                 Issue.record("Expected error event")
                 return
             }
@@ -188,7 +188,7 @@ extension OpenAIStreamEventTranslatorTests {
             eventType: "response.failed",
             envelope: makeEnvelope()
         ) { event in
-            guard case .error(let error) = event else {
+            guard case let .error(error) = event else {
                 Issue.record("Expected failed event to map to error")
                 return
             }
@@ -196,7 +196,7 @@ extension OpenAIStreamEventTranslatorTests {
         }
     }
 
-    @Test func extractionHelpersPreferStructuredContent() {
+    @Test func `extraction helpers prefer structured content`() {
         let response = makeStructuredExtractionResponse()
 
         #expect(OpenAIStreamEventTranslator.extractOutputText(from: response) == "top level text")
@@ -207,7 +207,7 @@ extension OpenAIStreamEventTranslatorTests {
         #expect(OpenAIStreamEventTranslator.extractErrorMessage(from: response) == "structured")
     }
 
-    @Test func extractionHelpersGracefullyHandleEdgeCases() {
+    @Test func `extraction helpers gracefully handle edge cases`() {
         let response = makeStructuredExtractionResponse()
 
         let annotations = OpenAIStreamEventTranslator.extractFilePathAnnotations(from: response)
@@ -215,7 +215,7 @@ extension OpenAIStreamEventTranslatorTests {
         #expect(annotations.first?.sandboxPath == "body")
     }
 
-    @Test func annotationHelpersValidateURLPayloads() {
+    @Test func `annotation helpers validate URL payloads`() {
         let urlAnnotation = ResponsesAnnotationDTO(
             type: "url_citation",
             url: "https://example.com",
@@ -227,7 +227,7 @@ extension OpenAIStreamEventTranslatorTests {
             filename: nil
         )
 
-        guard case .annotationAdded(let citation) = OpenAIStreamEventTranslator.annotationEvent(
+        guard case let .annotationAdded(citation) = OpenAIStreamEventTranslator.annotationEvent(
             from: urlAnnotation
         ) else {
             Issue.record("Expected URL citation event")
@@ -237,7 +237,7 @@ extension OpenAIStreamEventTranslatorTests {
         #expect(citation.endIndex == 4)
     }
 
-    @Test func annotationHelpersValidateFilePayloads() {
+    @Test func `annotation helpers validate file payloads`() {
         let fileAnnotation = ResponsesAnnotationDTO(
             type: "container_file_citation",
             url: nil,
@@ -249,7 +249,7 @@ extension OpenAIStreamEventTranslatorTests {
             filename: "note.txt"
         )
 
-        guard case .filePathAnnotationAdded(let pathAnnotation) = OpenAIStreamEventTranslator.annotationEvent(
+        guard case let .filePathAnnotationAdded(pathAnnotation) = OpenAIStreamEventTranslator.annotationEvent(
             from: fileAnnotation
         ) else {
             Issue.record("Expected file path annotation event")
@@ -259,7 +259,7 @@ extension OpenAIStreamEventTranslatorTests {
         #expect(pathAnnotation.filename == "note.txt")
     }
 
-    @Test func annotationHelpersRejectInvalidPayloads() {
+    @Test func `annotation helpers reject invalid payloads`() {
         #expect(
             OpenAIStreamEventTranslator.annotationEvent(
                 from: ResponsesAnnotationDTO(
@@ -290,7 +290,7 @@ extension OpenAIStreamEventTranslatorTests {
         )
     }
 
-    @Test func annotationTypeClassificationAndSubstringExtraction() {
+    @Test func `annotation type classification and substring extraction`() {
         #expect(OpenAIStreamEventTranslator.isFileCitationAnnotationType("file_path"))
         #expect(OpenAIStreamEventTranslator.isFileCitationAnnotationType("container_file_citation"))
         #expect(!OpenAIStreamEventTranslator.isFileCitationAnnotationType("url_citation"))

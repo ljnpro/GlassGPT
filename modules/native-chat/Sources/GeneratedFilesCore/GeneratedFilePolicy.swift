@@ -12,9 +12,9 @@ public enum GeneratedFileCacheBucket: String, CaseIterable, Sendable {
     public var directoryName: String {
         switch self {
         case .image:
-            return "generated-images"
+            "generated-images"
         case .document:
-            return "generated-documents"
+            "generated-documents"
         }
     }
 }

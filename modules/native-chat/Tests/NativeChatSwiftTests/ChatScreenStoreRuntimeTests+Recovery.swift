@@ -13,7 +13,7 @@ import Testing
 // MARK: - Recovery and Prefetch Tests
 
 extension ChatScreenStoreRuntimeTests {
-    @Test func recoverResponseVisibleSessionResumesStreamingAndFinalizesThroughStoreAPI() async throws {
+    @Test func `recover response visible session resumes streaming and finalizes through store API`() async throws {
         let streamClient = QueuedOpenAIStreamClient(
             scriptedStreams: [[
                 .sequenceUpdate(8),
@@ -25,8 +25,8 @@ extension ChatScreenStoreRuntimeTests {
         let resumeURL = try #require(
             URL(string: "https://api.test.openai.local/v1/responses/resp_stream_resume")
         )
-        await transport.enqueue(
-            data: try makeFetchResponseData(status: .inProgress, text: ""),
+        try await transport.enqueue(
+            data: makeFetchResponseData(status: .inProgress, text: ""),
             url: resumeURL
         )
 
@@ -63,7 +63,7 @@ extension ChatScreenStoreRuntimeTests {
         #expect(streamClient.recordedRequests.count == 1)
     }
 
-    @Test func recoverResponse404UsesFallbackAndClearsVisibleRuntimeState() async throws {
+    @Test func `recover response404 uses fallback and clears visible runtime state`() async throws {
         let streamClient = QueuedOpenAIStreamClient(scriptedStreams: [])
         let transport = StubOpenAITransport()
         let missingURL = try #require(
@@ -110,7 +110,7 @@ extension ChatScreenStoreRuntimeTests {
         #expect(requestedPaths == ["/v1/responses/resp_missing"])
     }
 
-    @Test func startNewChatCancelsTrackedGeneratedFilePrefetch() async throws {
+    @Test func `start new chat cancels tracked generated file prefetch`() async throws {
         let fileDownloadTransport = SlowGeneratedFileDownloadTransport()
         let configurationProvider = RuntimeTestOpenAIConfigurationProvider()
         let fileDownloadService = FileDownloadService(
@@ -159,14 +159,14 @@ extension ChatScreenStoreRuntimeTests {
         }
     }
 
-    @Test func recoverResponseInvisiblePollingFinalizesMessageWithoutBindingVisibleSession() async throws {
+    @Test func `recover response invisible polling finalizes message without binding visible session`() async throws {
         let streamClient = QueuedOpenAIStreamClient(scriptedStreams: [])
         let transport = StubOpenAITransport()
         let hiddenResumeURL = try #require(
             URL(string: "https://api.test.openai.local/v1/responses/resp_hidden_resume")
         )
-        await transport.enqueue(
-            data: try makeFetchResponseData(
+        try await transport.enqueue(
+            data: makeFetchResponseData(
                 status: .completed,
                 text: "Recovered via polling",
                 thinking: "Recovered hidden reasoning"

@@ -1,15 +1,15 @@
-import ChatPersistenceSwiftData
 import ChatPersistenceCore
+import ChatPersistenceSwiftData
 import Foundation
 
 @MainActor
 extension ChatLifecycleCoordinator {
     func generateTitlesForUntitledConversations() async {
-        guard !controller.apiKey.isEmpty else { return }
+        guard !apiKey.isEmpty else { return }
 
         let untitled: [Conversation]
         do {
-            untitled = try controller.conversationRepository.fetchUntitledConversations()
+            untitled = try services.conversationRepository.fetchUntitledConversations()
         } catch {
             Loggers.chat.error("[Title] Failed to fetch untitled conversations: \(error.localizedDescription)")
             return
@@ -19,15 +19,15 @@ extension ChatLifecycleCoordinator {
             guard conversation.messages.count >= 2 else { continue }
 
             do {
-                let title = try await controller.openAIService.generateTitle(
+                let title = try await services.openAIService.generateTitle(
                     for: titlePreview(for: conversation),
-                    apiKey: controller.apiKey
+                    apiKey: apiKey
                 )
                 conversation.title = title
-                controller.conversationCoordinator.saveContextIfPossible("generateTitlesForUntitledConversations")
+                conversations.saveContextIfPossible("generateTitlesForUntitledConversations")
 
-                if conversation.id == controller.currentConversation?.id {
-                    controller.currentConversation?.title = title
+                if conversation.id == state.currentConversation?.id {
+                    state.currentConversation?.title = title
                 }
 
                 #if DEBUG
@@ -42,16 +42,16 @@ extension ChatLifecycleCoordinator {
     }
 
     func generateTitleIfNeeded(for conversation: Conversation) async {
-        guard !controller.apiKey.isEmpty else { return }
+        guard !apiKey.isEmpty else { return }
         guard conversation.title == "New Chat", conversation.messages.count >= 2 else { return }
 
         do {
-            let title = try await controller.openAIService.generateTitle(
+            let title = try await services.openAIService.generateTitle(
                 for: titlePreview(for: conversation),
-                apiKey: controller.apiKey
+                apiKey: apiKey
             )
             conversation.title = title
-            controller.conversationCoordinator.saveContextIfPossible("generateTitleIfNeeded")
+            conversations.saveContextIfPossible("generateTitleIfNeeded")
         } catch {
             #if DEBUG
             Loggers.chat.debug("[Title] Failed to generate title: \(error.localizedDescription)")
@@ -60,15 +60,15 @@ extension ChatLifecycleCoordinator {
     }
 
     func generateTitle() async {
-        guard let conversation = controller.currentConversation else { return }
+        guard let conversation = state.currentConversation else { return }
 
         do {
-            let title = try await controller.openAIService.generateTitle(
-                for: titlePreview(for: conversation, fallbackMessages: controller.messages),
-                apiKey: controller.apiKey
+            let title = try await services.openAIService.generateTitle(
+                for: titlePreview(for: conversation, fallbackMessages: state.messages),
+                apiKey: apiKey
             )
             conversation.title = title
-            controller.conversationCoordinator.saveContextIfPossible("generateTitle")
+            conversations.saveContextIfPossible("generateTitle")
         } catch {
             #if DEBUG
             Loggers.chat.debug("[Title] Failed to generate title: \(error.localizedDescription)")
@@ -83,5 +83,9 @@ extension ChatLifecycleCoordinator {
             .prefix(4)
             .map { "\($0.roleRawValue): \($0.content.prefix(200))" }
             .joined(separator: "\n")
+    }
+
+    private var apiKey: String {
+        services.apiKeyStore.loadAPIKey()?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
     }
 }

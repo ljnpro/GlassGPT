@@ -31,8 +31,8 @@ public struct MessageComposerTextView: UIViewRepresentable {
         maxHeight: CGFloat,
         textInsets: UIEdgeInsets
     ) {
-        self._text = text
-        self._measuredHeight = measuredHeight
+        _text = text
+        _measuredHeight = measuredHeight
         self.placeholder = placeholder
         self.minHeight = minHeight
         self.maxHeight = maxHeight

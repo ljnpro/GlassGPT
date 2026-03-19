@@ -1,7 +1,7 @@
+import ChatDomain
 import ChatPersistenceSwiftData
 import ChatUIComponents
 import SwiftUI
-import ChatDomain
 
 // MARK: - Message Bubble
 
@@ -15,7 +15,7 @@ struct MessageBubble: View {
     var activeToolCalls: [ToolCallInfo] = []
     var liveCitations: [URLCitation] = []
     var liveFilePathAnnotations: [FilePathAnnotation] = []
-    var showsRecoveryIndicator: Bool = false
+    var showsRecoveryIndicator = false
 
     // File preview handler
     var onSandboxLinkTap: ((String, FilePathAnnotation?) -> Void)?
@@ -46,7 +46,7 @@ struct MessageBubble: View {
         self.liveFilePathAnnotations = liveFilePathAnnotations
         self.showsRecoveryIndicator = showsRecoveryIndicator
         self.onSandboxLinkTap = onSandboxLinkTap
-        self.renderKey = RenderKey(
+        renderKey = RenderKey(
             messageID: message.id,
             roleRawValue: message.roleRawValue,
             content: message.content,

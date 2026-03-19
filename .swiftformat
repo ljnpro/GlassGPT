@@ -2,7 +2,8 @@
 --indentcase false
 --trimwhitespace always
 --importgrouping testable-bottom
---commas always
+--trailing-commas never
+--disable wrapMultilineStatementBraces
 --decimalgrouping 3,6
 --header strip
 --ifdef no-indent

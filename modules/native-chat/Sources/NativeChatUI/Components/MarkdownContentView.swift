@@ -1,10 +1,10 @@
 import ChatDomain
-import SwiftUI
 import Foundation
+import SwiftUI
 @preconcurrency import WebKit
 
 /// A segment of inline content, either plain text or an inline LaTeX expression.
-package enum InlineSegment: Sendable {
+package enum InlineSegment {
     /// A plain text segment.
     case text(String)
     /// An inline LaTeX expression.
@@ -12,7 +12,7 @@ package enum InlineSegment: Sendable {
 }
 
 /// A block-level part of parsed Markdown content.
-package enum BlockPart: Identifiable, Sendable {
+package enum BlockPart: Identifiable {
     case richText(id: Int, segments: [InlineSegment])
     case heading(id: Int, level: Int, text: String)
     case horizontalRule(id: Int)
@@ -23,15 +23,15 @@ package enum BlockPart: Identifiable, Sendable {
     package var id: Int {
         switch self {
         case let .richText(id, _):
-            return id
+            id
         case let .heading(id, _, _):
-            return id
+            id
         case let .horizontalRule(id):
-            return id
+            id
         case let .latexBlock(id, _):
-            return id
+            id
         case let .codeBlock(id, _, _):
-            return id
+            id
         }
     }
 }
@@ -70,6 +70,7 @@ package struct MarkdownContentView: View {
         parseBlocks(text)
     }
 
+    /// The rendered Markdown block stack for the supplied text.
     package var body: some View {
         switch surfaceStyle {
         case .plain:
@@ -78,7 +79,7 @@ package struct MarkdownContentView: View {
                 codeBlockSurfaceStyle: .standalone
             )
 
-        case .assistant(let isLive):
+        case let .assistant(isLive):
             blockStack(
                 for: blockParts,
                 codeBlockSurfaceStyle: .embedded
@@ -115,7 +116,7 @@ package struct MarkdownContentView: View {
                 code: code,
                 surfaceStyle: codeBlockSurfaceStyle
             )
-                .id(id)
+            .id(id)
 
         case let .horizontalRule(id: id):
             HorizontalRuleView()

@@ -8,13 +8,13 @@ import GeneratedFilesInfra
 import NativeChatUI
 #endif
 import OpenAITransport
-import SwiftData
 import os
+import SwiftData
 
 private let compositionSignposter = OSSignposter(subsystem: "GlassGPT", category: "composition")
 
-@MainActor
 /// Composition root that wires up all dependencies and creates the ``NativeChatAppStore``.
+@MainActor
 package struct NativeChatCompositionRoot {
     let modelContext: ModelContext
     let bootstrapPolicy: FeatureBootstrapPolicy
@@ -29,14 +29,57 @@ package struct NativeChatCompositionRoot {
     }
 
     /// Assembles all services, controllers, and coordinators and returns a fully configured ``NativeChatAppStore``.
-    // swiftlint:disable:next function_body_length
+    /// Builds the production app store and wires the concrete presenters and controllers.
     package func makeAppStore() -> NativeChatAppStore {
         let signpostID = compositionSignposter.makeSignpostID()
         let signpostState = compositionSignposter.beginInterval("MakeAppStore", id: signpostID)
         defer { compositionSignposter.endInterval("MakeAppStore", signpostState) }
 
         let settingsStore = SettingsStore()
+        let services = makeCompositionServices(settingsStore: settingsStore)
 
+        let chatController = ChatController(
+            modelContext: modelContext,
+            settingsStore: settingsStore,
+            apiKeyStore: services.apiKeyStore,
+            configurationProvider: services.configurationProvider,
+            transport: services.transport,
+            serviceFactory: services.serviceFactory,
+            bootstrapPolicy: bootstrapPolicy
+        )
+        let settingsPresenter = makeSettingsPresenter(
+            settingsStore: settingsStore,
+            apiKeyStore: services.apiKeyStore,
+            openAIService: services.openAIService,
+            requestBuilder: services.requestBuilder,
+            transport: services.transport,
+            configurationProvider: services.configurationProvider,
+            fileDownloadService: services.fileDownloadService
+        )
+        let store = NativeChatAppStore(
+            chatController: chatController,
+            settingsPresenter: settingsPresenter,
+            historyPresenter: HistoryPresenter(
+                loadConversations: { [] },
+                selectConversation: { _ in },
+                deleteConversation: { _ in },
+                deleteAllConversations: {}
+            )
+        )
+        store.historyPresenter = NativeChatHistoryPresenterFactory.makePresenter(
+            modelContext: modelContext,
+            chatController: chatController,
+            showChatTab: { store.selectedTab = 0 }
+        )
+
+        #if DEBUG
+        startDebugMemoryMonitor()
+        #endif
+
+        return store
+    }
+
+    private func makeCompositionServices(settingsStore: SettingsStore) -> CompositionServices {
         let apiKeyStore = PersistedAPIKeyStore(
             backend: KeychainAPIKeyBackend(
                 service: KeychainAPIKeyBackend.defaultServiceIdentifier(bundleIdentifier: Bundle.main.bundleIdentifier)
@@ -56,49 +99,16 @@ package struct NativeChatCompositionRoot {
                 transport: transport
             )
         }
-        let openAIService = serviceFactory()
-        let fileDownloadService = FileDownloadService(configurationProvider: configurationProvider)
 
-        let chatController = ChatController(
-            modelContext: modelContext,
-            settingsStore: settingsStore,
+        return CompositionServices(
             apiKeyStore: apiKeyStore,
             configurationProvider: configurationProvider,
-            transport: transport,
-            serviceFactory: serviceFactory,
-            bootstrapPolicy: bootstrapPolicy
-        )
-        let settingsPresenter = makeSettingsPresenter(
-            settingsStore: settingsStore,
-            apiKeyStore: apiKeyStore,
-            openAIService: openAIService,
             requestBuilder: requestBuilder,
             transport: transport,
-            configurationProvider: configurationProvider,
-            fileDownloadService: fileDownloadService
+            serviceFactory: serviceFactory,
+            openAIService: serviceFactory(),
+            fileDownloadService: FileDownloadService(configurationProvider: configurationProvider)
         )
-        let store = NativeChatAppStore(
-            chatController: chatController,
-            settingsPresenter: settingsPresenter,
-            historyPresenter: HistoryPresenter(
-                loadConversations: { [] },
-                selectConversation: { _ in },
-                deleteConversation: { _ in },
-                deleteAllConversations: {}
-            )
-        )
-        let historyCoordinator = NativeChatHistoryCoordinator(
-            modelContext: modelContext,
-            chatController: chatController,
-            showChatTab: { store.selectedTab = 0 }
-        )
-        store.historyPresenter = historyCoordinator.makePresenter()
-
-        #if DEBUG
-        startDebugMemoryMonitor()
-        #endif
-
-        return store
     }
 
     #if DEBUG
@@ -157,4 +167,14 @@ package struct NativeChatCompositionRoot {
 
         return fallback
     }
+}
+
+private struct CompositionServices {
+    let apiKeyStore: PersistedAPIKeyStore
+    let configurationProvider: DefaultOpenAIConfigurationProvider
+    let requestBuilder: OpenAIRequestBuilder
+    let transport: OpenAIURLSessionTransport
+    let serviceFactory: @MainActor () -> OpenAIService
+    let openAIService: OpenAIService
+    let fileDownloadService: FileDownloadService
 }

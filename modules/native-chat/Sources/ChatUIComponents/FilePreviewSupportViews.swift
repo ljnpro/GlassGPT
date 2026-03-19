@@ -6,8 +6,11 @@ import UIKit
 /// Utility for saving image data to the user's photo library.
 public enum PhotoLibraryImageSaver {
     /// Saves raw image data to the Photos library using the given original filename.
-    public static func saveImageData(_ data: Data, originalFilename: String) async throws(any Error) {
-        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+    public static func saveImageData(
+        _ data: Data,
+        originalFilename: String
+    ) async throws(PhotoLibrarySaveError) {
+        let result: Result<Void, PhotoLibrarySaveError> = await withCheckedContinuation { continuation in
             PHPhotoLibrary.shared().performChanges({
                 let request = PHAssetCreationRequest.forAsset()
                 let options = PHAssetResourceCreationOptions()
@@ -15,16 +18,27 @@ public enum PhotoLibraryImageSaver {
                 request.addResource(with: .photo, data: data, options: options)
             }) { success, error in
                 if let error {
-                    continuation.resume(throwing: error)
+                    continuation.resume(
+                        returning: .failure(
+                            .photoLibraryFailure(error.localizedDescription)
+                        )
+                    )
                     return
                 }
 
                 if success {
-                    continuation.resume(returning: ())
+                    continuation.resume(returning: .success(()))
                 } else {
-                    continuation.resume(throwing: PhotoLibrarySaveError.unknown)
+                    continuation.resume(returning: .failure(.unknown))
                 }
             }
+        }
+
+        switch result {
+        case .success:
+            return
+        case let .failure(error):
+            throw error
         }
     }
 }
@@ -40,12 +54,12 @@ public struct ActivityViewController: UIViewControllerRepresentable {
     }
 
     /// Creates the system share sheet.
-    public func makeUIViewController(context: Context) -> UIActivityViewController {
+    public func makeUIViewController(context _: Context) -> UIActivityViewController {
         UIActivityViewController(activityItems: activityItems, applicationActivities: nil)
     }
 
     /// No-op; the activity view controller does not support incremental updates.
-    public func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
+    public func updateUIViewController(_: UIActivityViewController, context _: Context) {}
 }
 
 /// SwiftUI wrapper that displays a `PDFDocument` using `PDFView` from PDFKit.
@@ -62,7 +76,7 @@ public struct GeneratedPDFView: UIViewRepresentable {
     }
 
     /// Creates and configures a continuous-scroll PDF view.
-    public func makeUIView(context: Context) -> PDFView {
+    public func makeUIView(context _: Context) -> PDFView {
         let pdfView = PDFView()
         pdfView.displayMode = .singlePageContinuous
         pdfView.displayDirection = .vertical
@@ -75,7 +89,7 @@ public struct GeneratedPDFView: UIViewRepresentable {
     }
 
     /// Updates the document and background color when state changes.
-    public func updateUIView(_ pdfView: PDFView, context: Context) {
+    public func updateUIView(_ pdfView: PDFView, context _: Context) {
         if pdfView.document !== document {
             pdfView.document = document
         }
@@ -87,12 +101,16 @@ public struct GeneratedPDFView: UIViewRepresentable {
 public enum PhotoLibrarySaveError: LocalizedError {
     /// The save operation failed for an unknown reason.
     case unknown
+    /// The save operation failed with a system-provided message.
+    case photoLibraryFailure(String)
 
     /// A user-facing description of the error.
     public var errorDescription: String? {
         switch self {
         case .unknown:
-            return "Unable to save this image to Photos."
+            "Unable to save this image to Photos."
+        case let .photoLibraryFailure(message):
+            message
         }
     }
 }

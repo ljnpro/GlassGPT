@@ -8,7 +8,9 @@ public enum AppTheme: String, CaseIterable, Identifiable, Codable, Sendable {
     case dark
 
     /// Stable identifier derived from the raw value.
-    public var id: String { rawValue }
+    public var id: String {
+        rawValue
+    }
 
     /// Human-readable name suitable for display in settings UI.
     public var displayName: String {

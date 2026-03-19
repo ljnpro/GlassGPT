@@ -20,13 +20,13 @@ public enum FileDownloadError: Error, LocalizedError, Sendable {
     /// A human-readable description of the error.
     public var errorDescription: String? {
         switch self {
-        case .invalidURL: return "Invalid file download URL."
-        case .invalidResponse: return "Invalid response from server."
-        case .httpError(let code, let msg): return "File download error (\(code)): \(msg)"
-        case .fileNotFound: return "File not found."
-        case .invalidImageData: return "The generated image could not be rendered."
-        case .invalidPDFData: return "The generated PDF could not be rendered."
-        case .invalidGeneratedFileData: return "The generated file could not be downloaded."
+        case .invalidURL: "Invalid file download URL."
+        case .invalidResponse: "Invalid response from server."
+        case let .httpError(code, msg): "File download error (\(code)): \(msg)"
+        case .fileNotFound: "File not found."
+        case .invalidImageData: "The generated image could not be rendered."
+        case .invalidPDFData: "The generated PDF could not be rendered."
+        case .invalidGeneratedFileData: "The generated file could not be downloaded."
         }
     }
 }

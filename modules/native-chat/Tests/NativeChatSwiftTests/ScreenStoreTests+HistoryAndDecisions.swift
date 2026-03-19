@@ -6,14 +6,14 @@ import ChatRuntimeModel
 import Foundation
 import GeneratedFilesCore
 import NativeChatUI
-import Testing
 import SwiftData
+import Testing
 @testable import NativeChatComposition
 
 // MARK: - Decision Policy Tests
 
 extension ScreenStoreTests {
-    @Test func chatSessionDecisionsReturnExpectedRecoveryChoices() throws {
+    @Test func `chat session decisions return expected recovery choices`() {
         #expect(
             RuntimeSessionDecisionPolicy.recoveryResumeMode(
                 preferStreamingResume: true,
@@ -52,7 +52,7 @@ extension ScreenStoreTests {
         )
     }
 
-    @Test func chatSessionDecisionsReturnExpectedDetachmentChoices() throws {
+    @Test func `chat session decisions return expected detachment choices`() throws {
         let messageID = try #require(
             UUID(uuidString: "00000000-0000-0000-0000-000000000001")
         )
@@ -85,7 +85,7 @@ extension ScreenStoreTests {
 // MARK: - History and App Store Tests
 
 extension ScreenStoreTests {
-    @Test func historyPresenterInvokesSelectionAndDeletionCallbacks() {
+    @Test func `history presenter invokes selection and deletion callbacks`() {
         let conversation = Conversation(title: "Selected Conversation")
         var selectedConversationID: UUID?
         var deletedConversationID: UUID?
@@ -109,7 +109,7 @@ extension ScreenStoreTests {
         #expect(deleteAllCount == 1)
     }
 
-    @Test func historyPresenterDeleteAllDoesNotDisturbSearchState() {
+    @Test func `history presenter delete all does not disturb search state`() {
         var deleteAllCount = 0
         let store = HistoryPresenter(
             loadConversations: { [] },
@@ -127,7 +127,7 @@ extension ScreenStoreTests {
         #expect(store.searchText == "Archive")
     }
 
-    @Test func appStoreHistoryCallbacksLoadSelectionAndReset() throws {
+    @Test func `app store history callbacks load selection and reset`() throws {
         let container = try makeInMemoryModelContainer()
         let modelContext = ModelContext(container)
         let appStore = NativeChatCompositionRoot(
@@ -167,7 +167,7 @@ extension ScreenStoreTests {
         #expect(appStore.historyPresenter.conversations.isEmpty)
     }
 
-    @Test func appStoreDismissesUITestPreviewState() throws {
+    @Test func `app store dismisses UI test preview state`() throws {
         let container = try makeInMemoryModelContainer()
         let appStore = NativeChatCompositionRoot(
             modelContext: ModelContext(container),
@@ -189,7 +189,7 @@ extension ScreenStoreTests {
         #expect(appStore.chatController.filePreviewItem == nil)
     }
 
-    @Test func filePreviewStoreClearResetsTransientPresentationState() {
+    @Test func `file preview store clear resets transient presentation state`() {
         let store = FilePreviewStore()
         store.filePreviewItem = FilePreviewItem(
             url: URL(fileURLWithPath: "/tmp/chart.png"),
@@ -212,7 +212,7 @@ extension ScreenStoreTests {
         #expect(store.fileDownloadError == nil)
     }
 
-    @Test func filePreviewStoreClearIsIdempotentWhenAlreadyEmpty() {
+    @Test func `file preview store clear is idempotent when already empty`() {
         let store = FilePreviewStore()
 
         store.clear()

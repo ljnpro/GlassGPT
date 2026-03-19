@@ -10,7 +10,7 @@ extension ReplySessionActor {
     // swiftlint:disable:next cyclomatic_complexity function_body_length
     func applyLifecycleTransition(_ transition: ReplyRuntimeTransition) -> ReplyRuntimeState {
         switch transition {
-        case .beginRecoveryStatus(let responseID, let lastSequenceNumber, let usedBackgroundMode, let route):
+        case let .beginRecoveryStatus(responseID, lastSequenceNumber, usedBackgroundMode, route):
             activeStreamID = nil
             state.lifecycle = .recoveringStatus(
                 DetachedRecoveryTicket(
@@ -25,7 +25,7 @@ extension ReplySessionActor {
             )
             state.isThinking = false
 
-        case .beginRecoveryStream(let streamID):
+        case let .beginRecoveryStream(streamID):
             activeStreamID = streamID
             let cursor = state.cursor ?? StreamCursor(
                 responseID: "",
@@ -37,12 +37,11 @@ extension ReplySessionActor {
 
         case .beginRecoveryPoll:
             activeStreamID = nil
-            let usedBackgroundMode: Bool
-            switch state.lifecycle {
-            case .recoveringStatus(let ticket), .recoveringPoll(let ticket), .detached(let ticket):
-                usedBackgroundMode = ticket.usedBackgroundMode
+            let usedBackgroundMode: Bool = switch state.lifecycle {
+            case let .recoveringStatus(ticket), let .recoveringPoll(ticket), let .detached(ticket):
+                ticket.usedBackgroundMode
             case .idle, .preparingInput, .uploadingAttachments, .streaming, .recoveringStream, .finalizing, .completed, .failed:
-                usedBackgroundMode = false
+                false
             }
             if let cursor = state.cursor {
                 state.lifecycle = .recoveringPoll(
@@ -59,7 +58,7 @@ extension ReplySessionActor {
             }
             state.isThinking = false
 
-        case .detachForBackground(let usedBackgroundMode):
+        case let .detachForBackground(usedBackgroundMode):
             activeStreamID = nil
             if let cursor = state.cursor {
                 state.lifecycle = .detached(
@@ -91,7 +90,7 @@ extension ReplySessionActor {
             state.lifecycle = .completed
             state.isThinking = false
 
-        case .markFailed(let message):
+        case let .markFailed(message):
             activeStreamID = nil
             state.lifecycle = .failed(message)
             state.isThinking = false
@@ -115,11 +114,10 @@ extension ReplySessionActor {
             return
         }
 
-        let nextSequence: Int
-        if let currentSequence = cursor.lastSequenceNumber {
-            nextSequence = max(currentSequence, sequence)
+        let nextSequence: Int = if let currentSequence = cursor.lastSequenceNumber {
+            max(currentSequence, sequence)
         } else {
-            nextSequence = sequence
+            sequence
         }
 
         let updatedCursor = StreamCursor(
@@ -133,7 +131,7 @@ extension ReplySessionActor {
             state.lifecycle = .streaming(updatedCursor)
         case .recoveringStream:
             state.lifecycle = .recoveringStream(updatedCursor)
-        case .recoveringStatus(let ticket):
+        case let .recoveringStatus(ticket):
             state.lifecycle = .recoveringStatus(
                 DetachedRecoveryTicket(
                     assistantReplyID: ticket.assistantReplyID,
@@ -145,7 +143,7 @@ extension ReplySessionActor {
                     route: ticket.route
                 )
             )
-        case .recoveringPoll(let ticket):
+        case let .recoveringPoll(ticket):
             state.lifecycle = .recoveringPoll(
                 DetachedRecoveryTicket(
                     assistantReplyID: ticket.assistantReplyID,
@@ -157,7 +155,7 @@ extension ReplySessionActor {
                     route: ticket.route
                 )
             )
-        case .detached(let ticket):
+        case let .detached(ticket):
             state.lifecycle = .detached(
                 DetachedRecoveryTicket(
                     assistantReplyID: ticket.assistantReplyID,

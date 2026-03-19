@@ -12,7 +12,7 @@ import Testing
 // MARK: - Generated File Policy Tests
 
 extension SourceTargetBoundaryTests {
-    @Test func generatedFilePolicyResolvesFilenameAndOpenBehavior() {
+    @Test func `generated file policy resolves filename and open behavior`() {
         let descriptor = GeneratedFileDescriptor(
             fileID: "file_123",
             filename: nil,
@@ -33,11 +33,11 @@ extension SourceTargetBoundaryTests {
         #expect(GeneratedFilePolicy.openBehavior(for: descriptor) == .pdfPreview)
         #expect(
             GeneratedFilePolicy.cacheKey(for: descriptor) ==
-            GeneratedFileCacheKey(identity: "file_123", bucket: .document)
+                GeneratedFileCacheKey(identity: "file_123", bucket: .document)
         )
     }
 
-    @Test func generatedFilePolicyFallsBackToFileIdentifier() {
+    @Test func `generated file policy falls back to file identifier`() {
         let descriptor = GeneratedFileDescriptor(fileID: "file_abc")
 
         #expect(
@@ -46,11 +46,11 @@ extension SourceTargetBoundaryTests {
                 responseMetadata: .init(),
                 inferredExtension: "bin"
             ) ==
-            "file_abc.bin"
+                "file_abc.bin"
         )
     }
 
-    @Test func generatedFileAnnotationMatcherPrefersFallbackAndFilenameHeuristics() {
+    @Test func `generated file annotation matcher prefers fallback and filename heuristics`() {
         let matcher = GeneratedFileAnnotationMatcher()
         let fallback = FilePathAnnotation(
             fileId: "file_1",
@@ -75,14 +75,14 @@ extension SourceTargetBoundaryTests {
                 sandboxURL: "sandbox:/tmp/report.pdf",
                 fallback: fallback
             ) ==
-            fallback
+                fallback
         )
         #expect(
             matcher.requestedFilename(
                 for: "sandbox:/tmp/chart.png",
                 annotation: alternative
             ) ==
-            "chart.png"
+                "chart.png"
         )
         #expect(matcher.annotationCanDownloadDirectly(alternative))
     }
@@ -91,7 +91,7 @@ extension SourceTargetBoundaryTests {
 // MARK: - Persistence and Configuration Tests
 
 extension SourceTargetBoundaryTests {
-    @Test func storedConversationSnapshotNormalizesTitleAndDetectsCustomConfiguration() {
+    @Test func `stored conversation snapshot normalizes title and detects custom configuration`() {
         let snapshot = StoredConversationSnapshot(
             id: UUID(),
             title: "  Weekly planning  ",
@@ -106,8 +106,8 @@ extension SourceTargetBoundaryTests {
         #expect(snapshot.hasCustomConfiguration)
     }
 
-    @Test func storedDraftSnapshotComputesRecoveryDisposition() {
-        let referenceDate = Date(timeIntervalSince1970: 10_000)
+    @Test func `stored draft snapshot computes recovery disposition`() {
+        let referenceDate = Date(timeIntervalSince1970: 10000)
         let staleAfter: TimeInterval = 60 * 60
         let recoverable = StoredDraftSnapshot(
             messageID: UUID(),
@@ -132,26 +132,26 @@ extension SourceTargetBoundaryTests {
             conversationID: UUID(),
             responseID: "resp_old",
             lastSequenceNumber: 1,
-            createdAt: referenceDate.addingTimeInterval(-10_000),
-            updatedAt: referenceDate.addingTimeInterval(-5_000),
+            createdAt: referenceDate.addingTimeInterval(-10000),
+            updatedAt: referenceDate.addingTimeInterval(-5000),
             usedBackgroundMode: false
         )
 
         #expect(
             recoverable.recoveryDisposition(referenceDate: referenceDate, staleAfter: staleAfter) ==
-            .recoverable
+                .recoverable
         )
         #expect(
             orphaned.recoveryDisposition(referenceDate: referenceDate, staleAfter: staleAfter) ==
-            .orphaned
+                .orphaned
         )
         #expect(
             stale.recoveryDisposition(referenceDate: referenceDate, staleAfter: staleAfter) ==
-            .stale
+                .stale
         )
     }
 
-    @Test func storeMigrationPlanBuildsBackupLocationAndSupportsVersions() {
+    @Test func `store migration plan builds backup location and supports versions`() {
         let plan = StoreMigrationPlan(
             targetVersion: "4.4.1",
             supportedSourceVersions: ["4.4.0"],
@@ -167,14 +167,25 @@ extension SourceTargetBoundaryTests {
         #expect(backupURL.pathExtension == "sqlite")
     }
 
-    @Test func chatPersistenceSettingsStoreKeepsDefaultSelectionContract() {
+    @Test func `chat persistence settings store keeps default selection contract`() {
         final class MemoryStore: SettingsValueStore {
             var values: [String: Any] = [:]
 
-            func object(forKey defaultName: String) -> Any? { values[defaultName] }
-            func string(forKey defaultName: String) -> String? { values[defaultName] as? String }
-            func bool(forKey defaultName: String) -> Bool { values[defaultName] as? Bool ?? false }
-            func set(_ value: Any?, forKey defaultName: String) { values[defaultName] = value }
+            func object(forKey defaultName: String) -> Any? {
+                values[defaultName]
+            }
+
+            func string(forKey defaultName: String) -> String? {
+                values[defaultName] as? String
+            }
+
+            func bool(forKey defaultName: String) -> Bool {
+                values[defaultName] as? Bool ?? false
+            }
+
+            func set(_ value: Any?, forKey defaultName: String) {
+                values[defaultName] = value
+            }
         }
 
         let valueStore = MemoryStore()
@@ -191,22 +202,22 @@ extension SourceTargetBoundaryTests {
         #expect(store.defaultConversationConfiguration.reasoningEffort == ModelType.gpt5_4_pro.defaultEffort)
     }
 
-    @Test func keychainBackendDerivesStableServiceIdentifierWithoutBundleDependency() {
+    @Test func `keychain backend derives stable service identifier without bundle dependency`() {
         #expect(
             KeychainAPIKeyBackend.defaultServiceIdentifier(bundleIdentifier: "space.manus.liquid.glass.chat.t20260308214621") ==
-            "space.manus.liquid.glass.chat.t20260308214621"
+                "space.manus.liquid.glass.chat.t20260308214621"
         )
         #expect(
             KeychainAPIKeyBackend.defaultServiceIdentifier(bundleIdentifier: nil) ==
-            KeychainAPIKeyBackend.fallbackServiceIdentifier
+                KeychainAPIKeyBackend.fallbackServiceIdentifier
         )
         #expect(
             KeychainAPIKeyBackend.defaultServiceIdentifier(bundleIdentifier: "   ") ==
-            KeychainAPIKeyBackend.fallbackServiceIdentifier
+                KeychainAPIKeyBackend.fallbackServiceIdentifier
         )
     }
 
-    @Test func runtimeSessionDecisionPolicyCoversRecoveryAndBackgroundDetachment() {
+    @Test func `runtime session decision policy covers recovery and background detachment`() {
         let messageID = UUID()
 
         #expect(
@@ -215,7 +226,7 @@ extension SourceTargetBoundaryTests {
                 usedBackgroundMode: true,
                 lastSequenceNumber: 7
             ) ==
-            .stream(lastSequenceNumber: 7)
+                .stream(lastSequenceNumber: 7)
         )
         #expect(
             RuntimeSessionDecisionPolicy.recoveryResumeMode(
@@ -223,7 +234,7 @@ extension SourceTargetBoundaryTests {
                 usedBackgroundMode: false,
                 lastSequenceNumber: 7
             ) ==
-            .poll
+                .poll
         )
         #expect(
             RuntimeSessionDecisionPolicy.shouldFallbackToDirectRecoveryStream(
@@ -239,7 +250,7 @@ extension SourceTargetBoundaryTests {
                 responseId: "resp_123",
                 messageId: messageID
             ) ==
-            RuntimePendingBackgroundCancellation(responseId: "resp_123", messageId: messageID)
+                RuntimePendingBackgroundCancellation(responseId: "resp_123", messageId: messageID)
         )
         #expect(
             RuntimeSessionDecisionPolicy.canDetachBackgroundResponse(
@@ -250,7 +261,7 @@ extension SourceTargetBoundaryTests {
         )
     }
 
-    @Test func featureBootstrapPolicyProfilesMatchRuntimeExpectations() {
+    @Test func `feature bootstrap policy profiles match runtime expectations`() {
         #expect(FeatureBootstrapPolicy.live.restoreLastConversation)
         #expect(FeatureBootstrapPolicy.live.setupLifecycleObservers)
         #expect(FeatureBootstrapPolicy.live.runLaunchTasks)
@@ -260,7 +271,7 @@ extension SourceTargetBoundaryTests {
         #expect(!FeatureBootstrapPolicy.testing.runLaunchTasks)
     }
 
-    @Test func openAIRequestFactoryBuildsGatewayAndDirectRequests() throws {
+    @Test func `open AI request factory builds gateway and direct requests`() throws {
         let configuration = SourceTargetTransportConfigurationFixture(
             directOpenAIBaseURL: "https://api.openai.com/v1",
             cloudflareGatewayBaseURL: "https://gateway.example/v1",
@@ -291,11 +302,11 @@ extension SourceTargetBoundaryTests {
         #expect(gatewayRequest.value(forHTTPHeaderField: "Authorization") == "Bearer sk-test")
         #expect(
             gatewayRequest.value(forHTTPHeaderField: "cf-aig-authorization") ==
-            "Bearer gateway-token"
+                "Bearer gateway-token"
         )
         #expect(
             directResponseURL.absoluteString ==
-            "https://api.openai.com/v1/responses/resp_123?stream=true&starting_after=9&include%5B%5D=output_text"
+                "https://api.openai.com/v1/responses/resp_123?stream=true&starting_after=9&include%5B%5D=output_text"
         )
     }
 }

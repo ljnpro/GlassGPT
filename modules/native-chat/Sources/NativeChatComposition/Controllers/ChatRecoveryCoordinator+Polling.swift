@@ -1,5 +1,5 @@
-import ChatPersistenceSwiftData
 import ChatPersistenceCore
+import ChatPersistenceSwiftData
 import ChatUIComponents
 import Foundation
 import OpenAITransport
@@ -10,18 +10,18 @@ extension ChatRecoveryCoordinator {
     func pollResponseUntilTerminal(session: ReplySession, responseId: String) async {
         let key = resultApplier.activeAPIKey(for: session)
         guard !key.isEmpty else { return }
-        _ = await controller.sessionCoordinator.applyRuntimeTransition(.beginRecoveryPoll, to: session)
-        controller.sessionCoordinator.syncVisibleState(from: session)
+        _ = await sessions.applyRuntimeTransition(.beginRecoveryPoll, to: session)
+        sessions.syncVisibleState(from: session)
         var attempts = 0
         let maxAttempts = 180
         var lastResult: OpenAIResponseFetchResult?
         var lastError: String?
 
-        while !Task.isCancelled && attempts < maxAttempts {
+        while !Task.isCancelled, attempts < maxAttempts {
             attempts += 1
 
             do {
-                guard let execution = controller.sessionRegistry.execution(for: session.messageID) else { return }
+                guard let execution = services.sessionRegistry.execution(for: session.messageID) else { return }
                 let result = try await execution.service.fetchResponse(responseId: responseId, apiKey: key)
                 lastResult = result
 
@@ -39,10 +39,10 @@ extension ChatRecoveryCoordinator {
                     }
 
                 case .completed, .incomplete, .failed, .unknown:
-                    if let message = controller.conversationCoordinator.findMessage(byId: session.messageID) {
+                    if let message = conversations.findMessage(byId: session.messageID) {
                         if result.status == .failed || result.status == .incomplete,
-                           controller.visibleSessionMessageID == session.messageID {
-                            controller.errorMessage = result.errorMessage ?? "Response did not complete."
+                           sessions.visibleSessionMessageID == session.messageID {
+                            state.errorMessage = result.errorMessage ?? "Response did not complete."
                         }
                         resultApplier.finishRecovery(
                             for: message,
@@ -55,13 +55,13 @@ extension ChatRecoveryCoordinator {
                     return
                 }
             } catch {
-                if let message = controller.conversationCoordinator.findMessage(byId: session.messageID),
+                if let message = conversations.findMessage(byId: session.messageID),
                    resultApplier.handleUnrecoverableRecoveryError(
-                    error,
-                    for: message,
-                    responseId: responseId,
-                    session: session,
-                    visible: controller.visibleSessionMessageID == session.messageID
+                       error,
+                       for: message,
+                       responseId: responseId,
+                       session: session,
+                       visible: sessions.visibleSessionMessageID == session.messageID
                    ) {
                     return
                 }
@@ -79,12 +79,12 @@ extension ChatRecoveryCoordinator {
             }
         }
 
-        guard !Task.isCancelled, let message = controller.conversationCoordinator.findMessage(byId: session.messageID) else { return }
+        guard !Task.isCancelled, let message = conversations.findMessage(byId: session.messageID) else { return }
 
-        if controller.visibleSessionMessageID == session.messageID,
+        if sessions.visibleSessionMessageID == session.messageID,
            let lastError,
            !lastError.isEmpty {
-            controller.errorMessage = lastError
+            state.errorMessage = lastError
         }
         resultApplier.finishRecovery(
             for: message,
@@ -100,10 +100,11 @@ extension ChatRecoveryCoordinator {
     }
 
     func cancelBackgroundResponseAndSync(responseId: String, messageId: UUID) async {
-        guard !controller.apiKey.isEmpty else { return }
+        let apiKey = services.apiKeyStore.loadAPIKey()?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        guard !apiKey.isEmpty else { return }
 
         do {
-            try await controller.openAIService.cancelResponse(responseId: responseId, apiKey: controller.apiKey)
+            try await services.openAIService.cancelResponse(responseId: responseId, apiKey: apiKey)
         } catch {
             #if DEBUG
             Loggers.chat.debug("[Stop] Background cancel failed for \(responseId): \(error.localizedDescription)")
@@ -111,31 +112,31 @@ extension ChatRecoveryCoordinator {
         }
 
         do {
-            let result = try await controller.openAIService.fetchResponse(responseId: responseId, apiKey: controller.apiKey)
+            let result = try await services.openAIService.fetchResponse(responseId: responseId, apiKey: apiKey)
 
             switch result.status {
             case .queued, .inProgress:
-                if let message = controller.conversationCoordinator.findMessage(byId: messageId),
-                   let session = controller.sessionCoordinator.makeRecoverySession(for: message) {
-                    controller.sessionCoordinator.registerSession(
+                if let message = conversations.findMessage(byId: messageId),
+                   let session = sessions.makeRecoverySession(for: message) {
+                    sessions.registerSession(
                         session,
-                        execution: SessionExecutionState(service: controller.serviceFactory()),
+                        execution: SessionExecutionState(service: services.serviceFactory()),
                         visible: false
                     )
                     await pollResponseUntilTerminal(session: session, responseId: responseId)
                 }
 
             case .completed, .incomplete, .failed, .unknown:
-                guard let message = controller.conversationCoordinator.findMessage(byId: messageId) else { return }
+                guard let message = conversations.findMessage(byId: messageId) else { return }
                 resultApplier.applyRecoveredResult(
                     result,
                     to: message,
                     fallbackText: message.content,
                     fallbackThinking: message.thinking
                 )
-                controller.conversationCoordinator.saveContextIfPossible("cancelBackgroundResponseAndSync")
-                controller.conversationCoordinator.upsertMessage(message)
-                controller.fileInteractionCoordinator.prefetchGeneratedFilesIfNeeded(for: message)
+                conversations.saveContextIfPossible("cancelBackgroundResponseAndSync")
+                conversations.upsertMessage(message)
+                files.prefetchGeneratedFilesIfNeeded(for: message)
             }
         } catch {
             #if DEBUG

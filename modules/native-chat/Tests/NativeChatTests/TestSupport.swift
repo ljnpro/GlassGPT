@@ -2,15 +2,16 @@
 import ChatApplication
 import ChatDomain
 import ChatPersistenceCore
-import ChatPresentation
 import ChatPersistenceSwiftData
+import ChatPresentation
 import ChatUIComponents
-import GeneratedFilesInfra
 import Foundation
+import GeneratedFilesInfra
 import OpenAITransport
 import SwiftData
 import XCTest
 @testable import NativeChatComposition
+
 final class RuntimeTestOpenAIConfigurationProvider: OpenAIConfigurationProvider, @unchecked Sendable {
     var directOpenAIBaseURL: String
     var cloudflareGatewayBaseURL: String
@@ -188,7 +189,7 @@ actor StubOpenAITransport: OpenAIDataTransport {
             statusCode: statusCode,
             httpVersion: nil,
             headerFields: nil
-        // swiftlint:disable:next force_unwrapping
+            // swiftlint:disable:next force_unwrapping
         )!
         queuedResponses.append(.success((data, response)))
     }

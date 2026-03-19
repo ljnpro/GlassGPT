@@ -1,5 +1,5 @@
-import ChatPersistenceSwiftData
 import ChatDomain
+import ChatPersistenceSwiftData
 import ChatUIComponents
 import SwiftUI
 import UIKit
@@ -10,17 +10,17 @@ extension MessageBubble {
             UIPasteboard.general.string = displayedContent
             hapticService.impact(.light, isEnabled: hapticsEnabled)
         } label: {
-            Label("Copy Text", systemImage: "doc.on.doc")
+            Label(String(localized: "Copy Text"), systemImage: "doc.on.doc")
         }
-        .accessibilityLabel("Copy message text")
+        .accessibilityLabel(String(localized: "Copy message text"))
         .accessibilityIdentifier("chat.message.copy")
     }
 
     var shareButton: some View {
         ShareLink(item: displayedContent) {
-            Label("Share", systemImage: "square.and.arrow.up")
+            Label(String(localized: "Share"), systemImage: "square.and.arrow.up")
         }
-        .accessibilityLabel("Share message")
+        .accessibilityLabel(String(localized: "Share message"))
         .accessibilityIdentifier("chat.message.share")
     }
 }

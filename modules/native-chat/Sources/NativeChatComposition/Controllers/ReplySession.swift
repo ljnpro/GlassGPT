@@ -1,7 +1,7 @@
-import ChatPersistenceSwiftData
-import Foundation
 import ChatDomain
+import ChatPersistenceSwiftData
 import ChatRuntimeModel
+import Foundation
 import OpenAITransport
 
 @MainActor
@@ -20,7 +20,7 @@ final class ReplySession {
         request: ResponseRequestContext
     ) {
         self.assistantReplyID = assistantReplyID ?? AssistantReplyID(rawValue: message.id)
-        self.messageID = message.id
+        messageID = message.id
         self.conversationID = conversationID
         self.request = request
     }

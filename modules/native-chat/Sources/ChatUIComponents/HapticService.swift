@@ -9,36 +9,41 @@ public struct HapticService: Sendable {
     /// Triggers an impact haptic of the given style when haptics are enabled.
     public func impact(_ style: UIImpactFeedbackGenerator.FeedbackStyle = .medium, isEnabled: Bool) {
         guard isEnabled else { return }
-        let generator = UIImpactFeedbackGenerator(style: style)
-        generator.prepare()
-        generator.impactOccurred()
+        runOnMainActor {
+            let generator = UIImpactFeedbackGenerator(style: style)
+            generator.prepare()
+            generator.impactOccurred()
+        }
     }
 
     /// Triggers a notification haptic (success, warning, or error) when haptics are enabled.
     public func notify(_ type: UINotificationFeedbackGenerator.FeedbackType, isEnabled: Bool) {
         guard isEnabled else { return }
-        let generator = UINotificationFeedbackGenerator()
-        generator.prepare()
-        generator.notificationOccurred(type)
+        runOnMainActor {
+            let generator = UINotificationFeedbackGenerator()
+            generator.prepare()
+            generator.notificationOccurred(type)
+        }
     }
 
     /// Triggers a selection-change haptic tap when haptics are enabled.
     public func selection(isEnabled: Bool) {
         guard isEnabled else { return }
-        let generator = UISelectionFeedbackGenerator()
-        generator.prepare()
-        generator.selectionChanged()
+        runOnMainActor {
+            let generator = UISelectionFeedbackGenerator()
+            generator.prepare()
+            generator.selectionChanged()
+        }
     }
-}
 
-private struct HapticsEnabledKey: EnvironmentKey {
-    static let defaultValue = false
+    private func runOnMainActor(_ operation: @escaping @MainActor () -> Void) {
+        Task { @MainActor in
+            operation()
+        }
+    }
 }
 
 public extension EnvironmentValues {
     /// Whether haptic feedback is enabled for the current view hierarchy.
-    var hapticsEnabled: Bool {
-        get { self[HapticsEnabledKey.self] }
-        set { self[HapticsEnabledKey.self] = newValue }
-    }
+    @Entry var hapticsEnabled = false
 }

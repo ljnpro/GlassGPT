@@ -12,6 +12,7 @@ public struct HistoryRow: View {
         self.conversation = conversation
     }
 
+    /// The rendered row content for one conversation summary.
     public var body: some View {
         HStack(spacing: 14) {
             VStack(alignment: .leading, spacing: 4) {

@@ -1,17 +1,17 @@
-import Foundation
-import Testing
-import SwiftUI
 import ChatDomain
 import ChatPersistenceSwiftData
+import Foundation
 import GeneratedFilesCore
 import PDFKit
+import SwiftUI
+import Testing
 import UIKit
 @testable import NativeChatComposition
 @testable import NativeChatUI
 
 @MainActor
 struct PresentationHelperTests {
-    @Test func messageBubblePrefersLiveAssistantOverrides() {
+    @Test func `message bubble prefers live assistant overrides`() {
         let message = Message(
             role: .assistant,
             content: "Stored content",
@@ -57,7 +57,7 @@ struct PresentationHelperTests {
         #expect(bubble.isDisplayingLiveAssistantState)
     }
 
-    @Test func messageBubbleIgnoresLiveStateForUserMessages() {
+    @Test func `message bubble ignores live state for user messages`() {
         let message = Message(role: .user, content: "Prompt")
         let bubble = MessageBubble(
             message: message,
@@ -72,7 +72,7 @@ struct PresentationHelperTests {
         #expect(bubble.displayedContent == "Ignored live content")
     }
 
-    @Test func modelSelectorMetricsAndShortLabelsStayStableAcrossIdioms() {
+    @Test func `model selector metrics and short labels stay stable across idioms`() {
         let padMetrics = ModelSelectorSheet.Metrics(idiom: .pad)
         let phoneMetrics = ModelSelectorSheet.Metrics(idiom: .phone)
         let sheet = ModelSelectorSheet(
@@ -92,7 +92,7 @@ struct PresentationHelperTests {
         #expect(sheet.effortShortLabel(.xhigh) == "Max")
     }
 
-    @Test func streamingTextSanitiserReplacesLatexDelimitersWithoutTouchingPlainText() {
+    @Test func `streaming text sanitiser replaces latex delimiters without touching plain text`() {
         let text = """
         Intro $$x^2$$ and \\(y\\) then \\[z\\]
         ```swift
@@ -109,16 +109,16 @@ struct PresentationHelperTests {
         #expect(sanitised.contains("print(1)"))
     }
 
-    @Test func appThemeColorSchemeMappingMatchesStoredTheme() {
+    @Test func `app theme color scheme mapping matches stored theme`() {
         #expect(AppTheme.system.colorScheme == nil)
         #expect(AppTheme.light.colorScheme == .light)
         #expect(AppTheme.dark.colorScheme == .dark)
     }
 
-    @Test func filePreviewSheetComputesStableViewerMetrics() throws {
-        let sheet = FilePreviewSheet(
+    @Test func `file preview sheet computes stable viewer metrics`() throws {
+        let sheet = try FilePreviewSheet(
             previewItem: FilePreviewItem(
-                url: try makeSnapshotImageFile(),
+                url: makeSnapshotImageFile(),
                 kind: .generatedImage,
                 displayName: "Generated Chart",
                 viewerFilename: "chart.png"
@@ -132,7 +132,7 @@ struct PresentationHelperTests {
         #expect(sheet.actionIconSize > 0)
     }
 
-    @Test func loadGeneratedImagePreviewReturnsUnavailableForMissingFile() {
+    @Test func `load generated image preview returns unavailable for missing file`() {
         let missingURL = URL(fileURLWithPath: "/tmp/missing-generated-image.png")
         switch FilePreviewLoadingModel.loadGeneratedImagePreview(from: missingURL) {
         case .unavailable:
@@ -142,32 +142,32 @@ struct PresentationHelperTests {
         }
     }
 
-    @Test func loadGeneratedImagePreviewRejectsNonImageFilename() throws {
+    @Test func `load generated image preview rejects non image filename`() throws {
         let url = try makeSnapshotPDFFile()
         let renamed = url.deletingPathExtension().appendingPathExtension("txt")
         try? FileManager.default.removeItem(at: renamed)
         try FileManager.default.copyItem(at: url, to: renamed)
 
         switch FilePreviewLoadingModel.loadGeneratedImagePreview(from: renamed) {
-        case .error(let message):
+        case let .error(message):
             #expect(message == "This file is no longer recognized as an image.")
         default:
             Issue.record("Expected image filename validation failure")
         }
     }
 
-    @Test func loadGeneratedImagePreviewLoadsValidImage() throws {
+    @Test func `load generated image preview loads valid image`() throws {
         let url = try makeSnapshotImageFile()
 
         switch FilePreviewLoadingModel.loadGeneratedImagePreview(from: url) {
-        case .image(let payload):
+        case let .image(payload):
             #expect(!payload.data.isEmpty)
         default:
             Issue.record("Expected valid generated image preview")
         }
     }
 
-    @Test func loadGeneratedPDFPreviewReturnsUnavailableForMissingFile() {
+    @Test func `load generated PDF preview returns unavailable for missing file`() {
         let missingURL = URL(fileURLWithPath: "/tmp/missing-generated-document.pdf")
         switch FilePreviewLoadingModel.loadGeneratedPDFPreview(from: missingURL) {
         case .unavailable:
@@ -177,23 +177,23 @@ struct PresentationHelperTests {
         }
     }
 
-    @Test func loadGeneratedPDFPreviewRejectsNonPDFFilename() throws {
+    @Test func `load generated PDF preview rejects non PDF filename`() throws {
         let url = try makeSnapshotImageFile()
         let renamed = url.deletingPathExtension().appendingPathExtension("png")
 
         switch FilePreviewLoadingModel.loadGeneratedPDFPreview(from: renamed) {
-        case .error(let message):
+        case let .error(message):
             #expect(message == "This file is no longer recognized as a PDF.")
         default:
             Issue.record("Expected PDF filename validation failure")
         }
     }
 
-    @Test func loadGeneratedPDFPreviewLoadsValidPDF() throws {
+    @Test func `load generated PDF preview loads valid PDF`() throws {
         let url = try makeSnapshotPDFFile()
 
         switch FilePreviewLoadingModel.loadGeneratedPDFPreview(from: url) {
-        case .document(let document):
+        case let .document(document):
             #expect(document.pageCount > 0)
         default:
             Issue.record("Expected valid generated PDF preview")

@@ -1,11 +1,11 @@
-import Foundation
 import ChatPersistenceCore
+import Foundation
 import Security
 import Testing
 @testable import NativeChatComposition
 
 struct APIKeyStoreTests {
-    @Test func loadReturnsPreexistingBackendValueForReinstallCompatibility() {
+    @Test func `load returns preexisting backend value for reinstall compatibility`() {
         let backend = InMemoryAPIKeyBackend()
         backend.storedKey = "sk-existing-keychain"
         let store = PersistedAPIKeyStore(backend: backend)
@@ -13,7 +13,7 @@ struct APIKeyStoreTests {
         #expect(store.loadAPIKey() == "sk-existing-keychain")
     }
 
-    @Test func saveLoadAndDeleteDelegateToBackend() throws {
+    @Test func `save load and delete delegate to backend`() throws {
         let backend = InMemoryAPIKeyBackend()
         let store = PersistedAPIKeyStore(backend: backend)
 
@@ -28,7 +28,7 @@ struct APIKeyStoreTests {
         #expect(backend.didDelete)
     }
 
-    @Test func savePropagatesBackendError() {
+    @Test func `save propagates backend error`() {
         let backend = InMemoryAPIKeyBackend()
         backend.saveError = NativeChatTestError.saveFailed
         let store = PersistedAPIKeyStore(backend: backend)
@@ -38,7 +38,7 @@ struct APIKeyStoreTests {
         }
     }
 
-    @Test func deleteClearsPreexistingBackendValue() {
+    @Test func `delete clears preexisting backend value`() {
         let backend = InMemoryAPIKeyBackend()
         backend.storedKey = "sk-existing-keychain"
         let store = PersistedAPIKeyStore(backend: backend)
@@ -49,7 +49,7 @@ struct APIKeyStoreTests {
         #expect(backend.didDelete)
     }
 
-    @Test func keychainServiceRetainsStableReinstallContract() {
+    @Test func `keychain service retains stable reinstall contract`() {
         #expect(KeychainAPIKeyBackend.apiKeyAccount == "openai_api_key")
         #expect(
             KeychainAPIKeyBackend.apiKeyAccessibility
@@ -61,7 +61,7 @@ struct APIKeyStoreTests {
         )
     }
 
-    @Test func keychainServiceFallsBackWhenBundleIdentifierIsMissing() {
+    @Test func `keychain service falls back when bundle identifier is missing`() {
         #expect(
             KeychainAPIKeyBackend.defaultServiceIdentifier(bundleIdentifier: nil)
                 == KeychainAPIKeyBackend.fallbackServiceIdentifier

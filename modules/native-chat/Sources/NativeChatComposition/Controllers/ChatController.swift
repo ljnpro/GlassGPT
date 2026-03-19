@@ -1,6 +1,3 @@
-import SwiftUI
-import SwiftData
-import UIKit
 import ChatApplication
 import ChatDomain
 import ChatPersistenceCore
@@ -11,59 +8,65 @@ import ChatRuntimePorts
 import ChatRuntimeWorkflows
 import GeneratedFilesInfra
 import OpenAITransport
+import SwiftData
+import SwiftUI
+import UIKit
 
-@Observable
-@MainActor
 /// Central controller managing the active chat session, message state, streaming, and recovery.
 ///
 /// Owns a set of single-responsibility coordinators that handle conversation management,
 /// session lifecycle, file interactions, streaming, and recovery.
+@Observable
+@MainActor
 package final class ChatController {
-
     // MARK: - State
 
     var messages: [Message] = []
     /// The text being streamed from the assistant's current response.
-    package var currentStreamingText: String = ""
+    package var currentStreamingText = ""
     /// The reasoning/thinking text being emitted by the model.
-    package var currentThinkingText: String = ""
+    package var currentThinkingText = ""
     /// Whether the assistant is actively streaming a response.
-    package var isStreaming: Bool = false
+    package var isStreaming = false
     /// Whether the model is actively in a reasoning phase.
-    package var isThinking: Bool = false
-    var isRecovering: Bool = false
-    var isRestoringConversation: Bool = false
+    package var isThinking = false
+    var isRecovering = false
+    var isRestoringConversation = false
     var selectedModel: ModelType = .gpt5_4 {
         didSet {
             if !selectedModel.availableEfforts.contains(reasoningEffort) {
                 reasoningEffort = selectedModel.defaultEffort
             }
-            guard !isApplyingStoredConversationConfiguration && !isApplyingConversationConfigurationBatch else { return }
+            guard !isApplyingStoredConversationConfiguration, !isApplyingConversationConfigurationBatch else { return }
             conversationCoordinator.syncConversationConfiguration()
         }
     }
+
     var reasoningEffort: ReasoningEffort = .high {
         didSet {
             guard selectedModel.availableEfforts.contains(reasoningEffort) else {
                 reasoningEffort = selectedModel.defaultEffort
                 return
             }
-            guard !isApplyingStoredConversationConfiguration && !isApplyingConversationConfigurationBatch else { return }
+            guard !isApplyingStoredConversationConfiguration, !isApplyingConversationConfigurationBatch else { return }
             conversationCoordinator.syncConversationConfiguration()
         }
     }
-    var backgroundModeEnabled: Bool = false {
+
+    var backgroundModeEnabled = false {
         didSet {
-            guard !isApplyingStoredConversationConfiguration && !isApplyingConversationConfigurationBatch else { return }
+            guard !isApplyingStoredConversationConfiguration, !isApplyingConversationConfigurationBatch else { return }
             conversationCoordinator.syncConversationConfiguration()
         }
     }
+
     var serviceTier: ServiceTier = .standard {
         didSet {
-            guard !isApplyingStoredConversationConfiguration && !isApplyingConversationConfigurationBatch else { return }
+            guard !isApplyingStoredConversationConfiguration, !isApplyingConversationConfigurationBatch else { return }
             conversationCoordinator.syncConversationConfiguration()
         }
     }
+
     /// The currently loaded conversation, if any.
     package var currentConversation: ChatPersistenceSwiftData.Conversation?
     var errorMessage: String?
@@ -75,16 +78,44 @@ package final class ChatController {
     var liveCitations: [URLCitation] = []
     var liveFilePathAnnotations: [FilePathAnnotation] = []
 
-    // File attachments pending send
+    /// File attachments pending send
     var pendingAttachments: [FileAttachment] = []
 
-    // File preview state
+    /// File preview state
     let filePreviewStore = ChatPresentation.FilePreviewStore()
 
     // MARK: - Dependencies
 
     @ObservationIgnored
-    let services: ChatControllerServices
+    let modelContext: ModelContext
+    @ObservationIgnored
+    let settingsStore: SettingsStore
+    @ObservationIgnored
+    let apiKeyStore: PersistedAPIKeyStore
+    @ObservationIgnored
+    let configurationProvider: OpenAIConfigurationProvider
+    @ObservationIgnored
+    let requestBuilder: OpenAIRequestBuilder
+    @ObservationIgnored
+    let responseParser: OpenAIResponseParser
+    @ObservationIgnored
+    let transport: OpenAIDataTransport
+    @ObservationIgnored
+    let openAIService: OpenAIService
+    @ObservationIgnored
+    let conversationRepository: ConversationRepository
+    @ObservationIgnored
+    let draftRepository: DraftRepository
+    @ObservationIgnored
+    let generatedFileCoordinator: GeneratedFileCoordinator
+    @ObservationIgnored
+    let messagePersistence: MessagePersistenceAdapter
+    @ObservationIgnored
+    let backgroundTaskCoordinator: BackgroundTaskCoordinator
+    @ObservationIgnored
+    let fileDownloadService: FileDownloadService
+    @ObservationIgnored
+    let serviceFactory: @MainActor () -> OpenAIService
 
     // Visible live session state
     var draftMessage: Message?
@@ -101,26 +132,10 @@ package final class ChatController {
     @ObservationIgnored
     lazy var runtimeRegistry = RuntimeRegistryActor()
     @ObservationIgnored
-    lazy var sendCoordinator = ChatSendCoordinator(controller: self)
-    @ObservationIgnored
-    /// Coordinator managing conversation CRUD, configuration sync, and message projection.
-    package lazy var conversationCoordinator = ChatConversationCoordinator(controller: self)
-    @ObservationIgnored
-    lazy var sessionCoordinator = ChatSessionCoordinator(controller: self)
-    @ObservationIgnored
-    lazy var fileInteractionCoordinator = ChatFileInteractionCoordinator(controller: self)
-    @ObservationIgnored
-    lazy var lifecycleCoordinator = ChatLifecycleCoordinator(controller: self)
-    @ObservationIgnored
-    lazy var streamingCoordinator = ChatStreamingCoordinator(controller: self)
-    @ObservationIgnored
-    lazy var recoveryCoordinator = ChatRecoveryCoordinator(controller: self)
-    @ObservationIgnored
-    lazy var recoveryResultApplier = ChatRecoveryResultApplier(controller: self)
-    @ObservationIgnored
-    lazy var recoveryMaintenanceCoordinator = ChatRecoveryMaintenanceCoordinator(controller: self)
+    let coordinatorBox = ChatControllerCoordinatorBox()
     @ObservationIgnored
     let generatedFilePrefetchRegistry = GeneratedFilePrefetchRegistry()
+
     // MARK: - Init
 
     /// Creates a chat controller with the given persistence context, stores, and transport layer.
@@ -146,19 +161,22 @@ package final class ChatController {
         }
         let resolvedOpenAIService = resolvedServiceFactory()
 
-        self.services = ChatControllerServices(
-            modelContext: modelContext,
-            settingsStore: settingsStore,
-            apiKeyStore: apiKeyStore,
-            configurationProvider: configurationProvider,
-            requestBuilder: resolvedRequestBuilder,
-            responseParser: resolvedResponseParser,
-            transport: transport,
-            openAIService: resolvedOpenAIService,
-            fileDownloadService: fileDownloadService,
-            serviceFactory: resolvedServiceFactory
-        )
-        self.didCompleteLaunchBootstrap = !bootstrapPolicy.runLaunchTasks
+        self.modelContext = modelContext
+        self.settingsStore = settingsStore
+        self.apiKeyStore = apiKeyStore
+        self.configurationProvider = configurationProvider
+        requestBuilder = resolvedRequestBuilder
+        responseParser = resolvedResponseParser
+        self.transport = transport
+        openAIService = resolvedOpenAIService
+        conversationRepository = ConversationRepository(modelContext: modelContext)
+        draftRepository = DraftRepository(modelContext: modelContext)
+        generatedFileCoordinator = GeneratedFileCoordinator()
+        messagePersistence = MessagePersistenceAdapter()
+        backgroundTaskCoordinator = BackgroundTaskCoordinator()
+        self.fileDownloadService = fileDownloadService ?? FileDownloadService(configurationProvider: configurationProvider)
+        self.serviceFactory = resolvedServiceFactory
+        didCompleteLaunchBootstrap = !bootstrapPolicy.runLaunchTasks
         conversationCoordinator.loadDefaultsFromSettings()
         if bootstrapPolicy.restoreLastConversation {
             conversationCoordinator.restoreLastConversationIfAvailable()
@@ -166,17 +184,33 @@ package final class ChatController {
         syncConversationProjection()
 
         if bootstrapPolicy.setupLifecycleObservers {
-            setupLifecycleObservers()
+            lifecycleCoordinator.setupLifecycleObservers()
         }
 
         if bootstrapPolicy.runLaunchTasks {
-            Task { @MainActor in
-                await recoverIncompleteMessagesInCurrentConversation()
-                await recoverIncompleteMessages()
-                await resendOrphanedDrafts()
-                self.didCompleteLaunchBootstrap = true
-                await generateTitlesForUntitledConversations()
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                await recoveryMaintenanceCoordinator.recoverIncompleteMessagesInCurrentConversation()
+                await recoveryMaintenanceCoordinator.recoverIncompleteMessages()
+                await recoveryMaintenanceCoordinator.resendOrphanedDrafts()
+                didCompleteLaunchBootstrap = true
+                await lifecycleCoordinator.generateTitlesForUntitledConversations()
             }
+        }
+    }
+
+    deinit {
+        let backgroundTaskCoordinator = backgroundTaskCoordinator
+        let sessionRegistry = sessionRegistry
+        let generatedFilePrefetchRegistry = generatedFilePrefetchRegistry
+
+        Task { @MainActor in
+            backgroundTaskCoordinator.endBackgroundTask()
+            sessionRegistry.removeAll { execution in
+                execution.task?.cancel()
+                execution.service.cancelStream()
+            }
+            generatedFilePrefetchRegistry.cancelAll()
         }
     }
 
@@ -186,11 +220,45 @@ package final class ChatController {
         sessionCoordinator.stopGeneration(savePartial: savePartial)
     }
 
+    func uploadAttachments(_ attachments: [FileAttachment]) async -> [FileAttachment] {
+        await sendCoordinator.uploadAttachments(attachments)
+    }
+
+    func recoverResponse(
+        messageId: UUID,
+        responseId: String,
+        preferStreamingResume: Bool,
+        visible: Bool
+    ) {
+        recoveryCoordinator.recoverResponse(
+            messageId: messageId,
+            responseId: responseId,
+            preferStreamingResume: preferStreamingResume,
+            visible: visible
+        )
+    }
+
+    func handleEnterBackground() {
+        lifecycleCoordinator.handleEnterBackground()
+    }
+
+    func handleDidEnterBackground() {
+        lifecycleCoordinator.handleDidEnterBackground()
+    }
+
+    func handleReturnToForeground() {
+        lifecycleCoordinator.handleReturnToForeground()
+    }
+
+    func endBackgroundTask() {
+        backgroundTaskCoordinator.endBackgroundTask()
+    }
+
     func suspendActiveSessionsForAppBackground() {
         sessionCoordinator.suspendActiveSessionsForAppBackground()
     }
 
-    func cancelGeneratedFilePrefetches(_ requests: some Sequence<GeneratedFilePrefetchRequest>) {
+    func cancelGeneratedFilePrefetches(_ requests: Set<GeneratedFilePrefetchRequest>) {
         Task {
             for request in requests {
                 await fileDownloadService.cancelGeneratedFilePrefetch(

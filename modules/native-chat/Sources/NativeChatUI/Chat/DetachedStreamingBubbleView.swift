@@ -40,9 +40,9 @@ package struct DetachedStreamingBubbleView: View, Equatable {
         self.isThinking = isThinking
         self.isStreaming = isStreaming
         self.liveCitations = liveCitations
-        self._streamingThinkingExpanded = streamingThinkingExpanded
+        _streamingThinkingExpanded = streamingThinkingExpanded
         self.assistantBubbleMaxWidth = assistantBubbleMaxWidth
-        self.renderKey = RenderKey(
+        renderKey = RenderKey(
             activeToolCalls: activeToolCalls,
             currentThinkingText: currentThinkingText,
             currentStreamingText: currentStreamingText,
@@ -53,10 +53,11 @@ package struct DetachedStreamingBubbleView: View, Equatable {
         )
     }
 
-    nonisolated package static func == (lhs: DetachedStreamingBubbleView, rhs: DetachedStreamingBubbleView) -> Bool {
+    package nonisolated static func == (lhs: DetachedStreamingBubbleView, rhs: DetachedStreamingBubbleView) -> Bool {
         lhs.renderKey == rhs.renderKey
     }
 
+    /// The detached assistant bubble used while a response is still streaming.
     package var body: some View {
         HStack(alignment: .top) {
             VStack(alignment: .leading, spacing: 8) {
@@ -111,8 +112,8 @@ package struct DetachedStreamingBubbleView: View, Equatable {
                         text: currentStreamingText,
                         allowsSelection: false
                     )
-                } else if !isThinking && currentThinkingText.isEmpty
-                            && activeToolCalls.allSatisfy({ $0.status == .completed }) {
+                } else if !isThinking, currentThinkingText.isEmpty,
+                          activeToolCalls.allSatisfy({ $0.status == .completed }) {
                     TypingIndicator()
                 }
 
@@ -130,7 +131,7 @@ package struct DetachedStreamingBubbleView: View, Equatable {
                 lightBorderOpacity: 0.09
             )
             .accessibilityElement(children: .contain)
-            .accessibilityLabel("Assistant response in progress")
+            .accessibilityLabel(String(localized: "Assistant response in progress"))
             .accessibilityIdentifier("chat.assistant.detachedSurface")
             .frame(maxWidth: assistantBubbleMaxWidth, alignment: .leading)
 

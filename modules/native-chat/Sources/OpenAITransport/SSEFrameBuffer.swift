@@ -55,7 +55,7 @@ public struct SSEFrameBuffer {
         var frames: [SSEFrame] = []
 
         while let newlineRange = lineBuffer.range(of: "\n") {
-            let line = String(lineBuffer[lineBuffer.startIndex..<newlineRange.lowerBound])
+            let line = String(lineBuffer[lineBuffer.startIndex ..< newlineRange.lowerBound])
             lineBuffer = String(lineBuffer[newlineRange.upperBound...])
 
             let trimmedLine = line.hasSuffix("\r") ? String(line.dropLast()) : line

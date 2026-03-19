@@ -37,7 +37,8 @@ public struct OpenAIResponseParser {
     /// - Throws: ``OpenAIServiceError`` if the response indicates an HTTP error.
     public func parseGeneratedTitle(data: Data, response: URLResponse) throws(OpenAIServiceError) -> String {
         guard let httpResponse = response as? HTTPURLResponse,
-              (200...299).contains(httpResponse.statusCode) else {
+              (200 ... 299).contains(httpResponse.statusCode)
+        else {
             throw OpenAIServiceError.requestFailed("Title generation failed")
         }
 

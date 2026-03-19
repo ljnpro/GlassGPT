@@ -11,8 +11,10 @@ package struct WebSearchIndicator: View {
     /// Timeout duration in seconds before auto-dismissing
     private let timeoutSeconds: Double = 60
 
+    /// Creates a web-search activity indicator.
     package init() {}
 
+    /// The indicator shown while the model is performing a web search.
     package var body: some View {
         if !timedOut {
             HStack(spacing: 8) {
@@ -22,7 +24,7 @@ package struct WebSearchIndicator: View {
                     .symbolEffect(.pulse, options: .repeating)
                     .accessibilityHidden(true)
 
-                Text("Searching the web…")
+                Text(String(localized: "Searching the web…"))
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             }

@@ -58,7 +58,9 @@ public struct FilePreviewItem: Identifiable, Sendable, Equatable {
     }
 
     /// Stable identifier combining the preview kind and file path.
-    public var id: String { "\(kind.rawValue):\(url.path)" }
+    public var id: String {
+        "\(kind.rawValue):\(url.path)"
+    }
 }
 
 /// Model for sharing a generated file via the system share sheet.
@@ -75,5 +77,7 @@ public struct SharedGeneratedFileItem: Identifiable, Sendable, Equatable {
     }
 
     /// Stable identifier derived from the file path.
-    public var id: String { url.path }
+    public var id: String {
+        url.path
+    }
 }

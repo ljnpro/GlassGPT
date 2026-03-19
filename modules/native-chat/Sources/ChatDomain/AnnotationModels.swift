@@ -3,7 +3,10 @@ import Foundation
 /// A citation referencing a URL source within assistant-generated text.
 public struct URLCitation: PayloadCodable, Identifiable, Equatable {
     /// A composite identifier derived from the character range and URL.
-    public var id: String { "\(startIndex)-\(endIndex)-\(url)" }
+    public var id: String {
+        "\(startIndex)-\(endIndex)-\(url)"
+    }
+
     /// The source URL being cited.
     public var url: String
     /// The title of the cited source.
@@ -30,13 +33,15 @@ public struct URLCitation: PayloadCodable, Identifiable, Equatable {
         self.startIndex = startIndex
         self.endIndex = endIndex
     }
-
 }
 
 /// An annotation referencing a file path generated in a sandbox environment.
 public struct FilePathAnnotation: PayloadCodable, Identifiable, Equatable {
     /// A composite identifier derived from the character range and file ID.
-    public var id: String { "\(startIndex)-\(endIndex)-\(fileId)" }
+    public var id: String {
+        "\(startIndex)-\(endIndex)-\(fileId)"
+    }
+
     /// The API-assigned file identifier.
     public var fileId: String
     /// The optional container (sandbox) identifier that owns this file.
@@ -73,5 +78,4 @@ public struct FilePathAnnotation: PayloadCodable, Identifiable, Equatable {
         self.startIndex = startIndex
         self.endIndex = endIndex
     }
-
 }

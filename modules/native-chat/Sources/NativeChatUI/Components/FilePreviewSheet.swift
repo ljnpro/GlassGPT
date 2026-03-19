@@ -1,16 +1,16 @@
+import ChatDomain
+import ChatUIComponents
 import GeneratedFilesCore
 import ImageIO
 import PDFKit
 import Photos
-import ChatUIComponents
 import SwiftUI
 import UIKit
-import ChatDomain
 
 /// Full-screen preview sheet for generated images and PDFs, with save-to-photos and share actions.
 public struct FilePreviewSheet: View {
     let previewItem: FilePreviewItem
-    var isDismissPending: Bool = false
+    var isDismissPending = false
     var onBeginDismissInteraction: () -> Void = {}
     var onRequestDismiss: () -> Void = {}
 
@@ -39,7 +39,7 @@ public struct FilePreviewSheet: View {
     }
 
     var imagePreviewPayload: ImagePreviewPayload? {
-        if case .image(let payload) = imagePreviewState {
+        if case let .image(payload) = imagePreviewState {
             return payload
         }
         return nil
@@ -93,6 +93,7 @@ public struct FilePreviewSheet: View {
         isPad ? 176 : 156
     }
 
+    /// The full-screen preview content for the current generated file.
     public var body: some View {
         content
             .accessibilityElement(children: .contain)
@@ -107,12 +108,12 @@ public struct FilePreviewSheet: View {
             .sheet(isPresented: $isShowingShareSheet) {
                 ActivityViewController(activityItems: [fileURL])
             }
-            .alert("Save Failed", isPresented: saveErrorBinding) {
-                Button("OK", role: .cancel) {
+            .alert(String(localized: "Save Failed"), isPresented: saveErrorBinding) {
+                Button(String(localized: "OK"), role: .cancel) {
                     saveError = nil
                 }
             } message: {
-                Text(saveError ?? "Unable to save this image to Photos.")
+                Text(saveError ?? String(localized: "Unable to save this image to Photos."))
             }
             .overlay {
                 if isDismissPending {

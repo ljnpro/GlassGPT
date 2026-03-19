@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.9.0] - 2026-03-19
+
+### Added
+
+- UI-surface localization enforcement that fails on hardcoded user-visible literals in `NativeChat`, `NativeChatComposition`, and `NativeChatUI`
+- Default CI doc-completeness enforcement with full `public` and `package` API documentation coverage
+- Stronger release-readiness checks for the `codex/stable-4.9` line and tracked release wrapper integrity
+
+### Changed
+
+- Composition coordinators now operate on narrow collaborator state and services instead of depending on the full `ChatController`
+- Runtime transition and recovery ownership moved deeper into runtime/workflow types so composition remains an orchestration adapter
+- Settings and history ownership were tightened across application/presentation/composition boundaries, including a smaller `NativeChatCompositionRoot`
+- SwiftFormat and SwiftLint are aligned so the formatter no longer reintroduces lint failures on the tracked CI path
+- Governance docs, workflow triggers, and release scripts now describe the `4.9.0` / `codex/stable-4.9` release line
+
 ## [4.8.2] - 2026-03-19
 
 ### Added
@@ -114,7 +130,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - Migrated from React Native / Expo to fully native Swift and SwiftUI
 
-[Unreleased]: https://github.com/ljnpro/GlassGPT/compare/v4.7.0...HEAD
+[Unreleased]: https://github.com/ljnpro/GlassGPT/compare/v4.8.2...HEAD
+[4.9.0]: https://github.com/ljnpro/GlassGPT/compare/v4.8.2...HEAD
+[4.8.2]: https://github.com/ljnpro/GlassGPT/compare/v4.8.1...v4.8.2
 [4.7.0]: https://github.com/ljnpro/GlassGPT/compare/v4.6.0...v4.7.0
 [4.6.0]: https://github.com/ljnpro/GlassGPT/compare/v4.5.0...v4.6.0
 [4.5.0]: https://github.com/ljnpro/GlassGPT/releases/tag/v4.5.0

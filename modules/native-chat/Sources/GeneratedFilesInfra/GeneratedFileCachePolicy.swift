@@ -7,20 +7,20 @@ enum GeneratedFileCachePolicy {
     static func openBehavior(for filename: String?) -> GeneratedFileOpenBehavior {
         switch URL(fileURLWithPath: filename ?? "").pathExtension.lowercased() {
         case "png", "jpg", "jpeg":
-            return .imagePreview
+            .imagePreview
         case "pdf":
-            return .pdfPreview
+            .pdfPreview
         default:
-            return .directShare
+            .directShare
         }
     }
 
     static func cacheBucket(for filename: String?) -> GeneratedFileCacheBucket {
         switch URL(fileURLWithPath: filename ?? "").pathExtension.lowercased() {
         case "png", "jpg", "jpeg":
-            return .image
+            .image
         default:
-            return .document
+            .document
         }
     }
 
@@ -42,7 +42,8 @@ enum GeneratedFileCachePolicy {
 
     static func isRenderableImageData(_ data: Data) -> Bool {
         guard !data.isEmpty,
-              let imageSource = CGImageSourceCreateWithData(data as CFData, nil) else {
+              let imageSource = CGImageSourceCreateWithData(data as CFData, nil)
+        else {
             return false
         }
 

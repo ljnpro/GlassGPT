@@ -14,24 +14,27 @@ package struct ContentView: View {
         self.appStore = appStore
     }
 
+    /// The root tab layout for chat, history, settings, and UI-test preview presentation.
     package var body: some View {
+        @Bindable var settingsDefaults = appStore.settingsPresenter.defaults
+
         TabView(selection: selectedTabBinding) {
-            Tab("Chat", systemImage: "bubble.left.and.bubble.right.fill", value: 0) {
+            Tab(String(localized: "Chat"), systemImage: "bubble.left.and.bubble.right.fill", value: 0) {
                 ChatView(viewModel: appStore.chatController)
             }
             .accessibilityIdentifier("tab.chat")
 
-            Tab("History", systemImage: "clock.fill", value: 1) {
+            Tab(String(localized: "History"), systemImage: "clock.fill", value: 1) {
                 NativeChatUI.HistoryView(store: appStore.historyPresenter)
             }
             .accessibilityIdentifier("tab.history")
 
-            Tab("Settings", systemImage: "gearshape.fill", value: 2) {
+            Tab(String(localized: "Settings"), systemImage: "gearshape.fill", value: 2) {
                 NativeChatUI.SettingsView(viewModel: appStore.settingsPresenter)
             }
             .accessibilityIdentifier("tab.settings")
         }
-        .environment(\.hapticsEnabled, appStore.settingsPresenter.hapticEnabled)
+        .environment(\.hapticsEnabled, settingsDefaults.hapticEnabled)
         .tabBarMinimizeBehavior(.never)
         .fullScreenCover(item: uiTestPreviewItemBinding, onDismiss: handleUITestPreviewDismiss) { previewItem in
             if appStore.isUITestPreviewMode {

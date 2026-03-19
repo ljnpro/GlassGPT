@@ -4,22 +4,22 @@ import Foundation
 @MainActor
 extension ChatSessionCoordinator {
     func persistToolCallsAndCitations() {
-        guard let session = controller.currentVisibleSession else { return }
+        guard let session = currentVisibleSession else { return }
         saveSessionNow(session)
     }
 
     func saveDraftIfNeeded() {
-        guard let session = controller.currentVisibleSession else { return }
+        guard let session = currentVisibleSession else { return }
         saveSessionIfNeeded(session)
     }
 
     func saveDraftNow() {
-        guard let session = controller.currentVisibleSession else { return }
+        guard let session = currentVisibleSession else { return }
         saveSessionNow(session)
     }
 
     func finalizeDraft() {
-        guard let session = controller.currentVisibleSession else {
+        guard let session = currentVisibleSession else {
             clearLiveGenerationState(clearDraft: true)
             return
         }
@@ -27,17 +27,17 @@ extension ChatSessionCoordinator {
     }
 
     func finalizeDraftAsPartial() {
-        guard let session = controller.currentVisibleSession else { return }
+        guard let session = currentVisibleSession else { return }
         finalizeSessionAsPartial(session)
     }
 
     func removeEmptyDraft() {
-        guard let session = controller.currentVisibleSession, let draft = controller.draftMessage else { return }
+        guard let session = currentVisibleSession, let draft = state.draftMessage else { return }
         removeEmptyMessage(draft, for: session)
     }
 
     func stopGeneration(savePartial: Bool = true) {
-        guard let session = controller.currentVisibleSession else { return }
+        guard let session = currentVisibleSession else { return }
         let runtimeState = cachedRuntimeState(for: session)
 
         let pendingBackgroundCancellation = RuntimeSessionDecisionPolicy.pendingBackgroundCancellation(
@@ -46,19 +46,20 @@ extension ChatSessionCoordinator {
             messageId: session.messageID
         )
 
-        Task { @MainActor in
+        Task { @MainActor [weak self] in
+            guard let self else { return }
             _ = await applyRuntimeTransition(.cancelStreaming, to: session)
         }
-        if let execution = controller.sessionRegistry.execution(for: session.messageID) {
+        if let execution = services.sessionRegistry.execution(for: session.messageID) {
             execution.service.cancelStream()
             execution.task?.cancel()
         }
-        controller.errorMessage = nil
+        state.errorMessage = nil
 
-        if savePartial && !(runtimeState?.buffer.text.isEmpty ?? true) {
+        if savePartial, !(runtimeState?.buffer.text.isEmpty ?? true) {
             persistToolCallsAndCitations()
             finalizeSession(session)
-        } else if let draft = controller.conversationCoordinator.findMessage(byId: session.messageID) {
+        } else if let draft = conversations.findMessage(byId: session.messageID) {
             if let runtimeState, !runtimeState.buffer.text.isEmpty {
                 draft.content = runtimeState.buffer.text
             }
@@ -68,20 +69,21 @@ extension ChatSessionCoordinator {
             if !draft.content.isEmpty {
                 draft.isComplete = true
                 draft.lastSequenceNumber = nil
-                controller.conversationCoordinator.saveContextIfPossible("stopGeneration.persistPartialDraft")
-                controller.conversationCoordinator.upsertMessage(draft)
+                conversations.saveContextIfPossible("stopGeneration.persistPartialDraft")
+                conversations.upsertMessage(draft)
                 removeSession(session)
             } else {
                 removeEmptyMessage(draft, for: session)
             }
         }
 
-        controller.endBackgroundTask()
-        controller.hapticService.impact(.medium, isEnabled: controller.hapticsEnabled)
+        services.endBackgroundTask()
+        state.hapticService.impact(.medium, isEnabled: state.hapticsEnabled)
 
         if let pendingBackgroundCancellation {
-            Task { @MainActor in
-                await self.controller.cancelBackgroundResponseAndSync(
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                await recovery.cancelBackgroundResponseAndSync(
                     responseId: pendingBackgroundCancellation.responseId,
                     messageId: pendingBackgroundCancellation.messageId
                 )

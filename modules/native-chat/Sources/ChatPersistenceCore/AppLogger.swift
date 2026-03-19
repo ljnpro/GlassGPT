@@ -7,7 +7,7 @@ public struct AppLogger: Sendable {
 
     /// Creates a logger under the `GlassGPT` subsystem with the given category.
     public init(category: String) {
-        self.logger = Logger(
+        logger = Logger(
             subsystem: "GlassGPT",
             category: category
         )

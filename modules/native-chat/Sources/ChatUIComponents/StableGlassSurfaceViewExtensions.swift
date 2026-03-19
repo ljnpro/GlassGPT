@@ -3,9 +3,9 @@ import SwiftUI
 public extension View {
     /// Conditionally applies a transform to the view, returning the original view when the condition is false.
     @ViewBuilder
-    func applyingIf<Transformed: View>(
+    func applyingIf(
         _ condition: Bool,
-        transform: (Self) -> Transformed
+        transform: (Self) -> some View
     ) -> some View {
         if condition {
             transform(self)

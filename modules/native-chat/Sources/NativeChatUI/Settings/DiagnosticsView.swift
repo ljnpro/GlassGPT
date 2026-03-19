@@ -5,20 +5,20 @@ import SwiftUI
 struct DiagnosticsView: View {
     var body: some View {
         List {
-            Section("Launch Timing") {
-                LabeledContent("Launch Time", value: LaunchTimingStore.shared.formattedLaunchDuration)
-                LabeledContent("Time to Interactive", value: LaunchTimingStore.shared.formattedTimeToInteractive)
+            Section(String(localized: "Launch Timing")) {
+                LabeledContent(String(localized: "Launch Time"), value: LaunchTimingStore.shared.formattedLaunchDuration)
+                LabeledContent(String(localized: "Time to Interactive"), value: LaunchTimingStore.shared.formattedTimeToInteractive)
             }
 
-            Section("Memory") {
-                LabeledContent("Available", value: LaunchTimingStore.shared.formattedAvailableMemory)
+            Section(String(localized: "Memory")) {
+                LabeledContent(String(localized: "Available"), value: LaunchTimingStore.shared.formattedAvailableMemory)
             }
 
-            Section("MetricKit") {
-                LabeledContent("Payloads Received", value: "\(LaunchTimingStore.shared.metricPayloadCount)")
+            Section(String(localized: "MetricKit")) {
+                LabeledContent(String(localized: "Payloads Received"), value: "\(LaunchTimingStore.shared.metricPayloadCount)")
             }
         }
-        .navigationTitle("Diagnostics")
+        .navigationTitle(String(localized: "Diagnostics"))
     }
 }
 
@@ -26,12 +26,17 @@ struct DiagnosticsView: View {
 @MainActor
 @Observable
 public final class LaunchTimingStore {
+    /// Shared diagnostics store updated by launch instrumentation.
     public static let shared = LaunchTimingStore()
 
+    /// Recorded launch duration in seconds.
     public var launchDuration: TimeInterval = 0
+    /// Recorded time-to-interactive interval in seconds.
     public var timeToInteractive: TimeInterval = 0
+    /// Last known available memory in bytes.
     public var availableMemoryBytes: UInt64 = 0
-    public var metricPayloadCount: Int = 0
+    /// Number of MetricKit payloads received during the session.
+    public var metricPayloadCount = 0
 
     var formattedLaunchDuration: String {
         String(format: "%.1f ms", launchDuration * 1000)

@@ -36,10 +36,11 @@ public struct SettingsCacheSection: View {
         self.clearAction = clearAction
     }
 
+    /// The cache usage and clear-action controls for this cache type.
     public var body: some View {
         Section {
-            LabeledContent("Used", value: usedValue)
-                .accessibilityLabel("\(title) used: \(usedValue)")
+            LabeledContent(String(localized: "Used"), value: usedValue)
+                .accessibilityLabel(title + ", " + String(localized: "Used") + ": \(usedValue)")
                 .accessibilityIdentifier("settings.cache.\(title.lowercased().replacingOccurrences(of: " ", with: "")).used")
 
             Button(role: .destructive) {
@@ -51,7 +52,7 @@ public struct SettingsCacheSection: View {
                     if isClearing {
                         ProgressView()
                             .controlSize(.small)
-                            .accessibilityLabel("Clearing cache")
+                            .accessibilityLabel(String(localized: "Clearing cache"))
                     }
                     Text(clearLabel)
                 }

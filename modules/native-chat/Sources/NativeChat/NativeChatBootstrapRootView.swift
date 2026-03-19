@@ -1,5 +1,5 @@
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 /// Entry-point view that initializes the SwiftData model container and presents the native chat root.
 ///
@@ -17,16 +17,17 @@ public struct NativeChatBootstrapRootView: View {
         self.rootOverrideFactory = rootOverrideFactory
     }
 
+    /// The bootstrapped root content or a storage-unavailable fallback.
     public var body: some View {
         if let modelContainer = bootstrap.container {
             bootstrapContent(modelContainer: modelContainer)
         } else {
             ContentUnavailableView(
-                "Storage Unavailable",
+                String(localized: "Storage Unavailable"),
                 systemImage: "externaldrive.badge.xmark",
                 description: Text(
                     bootstrap.startupErrorDescription
-                        ?? "Local storage could not be initialized."
+                        ?? String(localized: "Local storage could not be initialized.")
                 )
             )
             .padding()

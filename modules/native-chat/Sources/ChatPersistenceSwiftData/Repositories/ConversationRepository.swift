@@ -1,8 +1,8 @@
 import ChatDomain
 import ChatPersistenceCore
 import Foundation
-import SwiftData
 import os
+import SwiftData
 
 /// Repository for creating, querying, and deleting ``Conversation`` and ``Message`` entities.
 ///

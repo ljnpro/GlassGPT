@@ -3,100 +3,94 @@ import SwiftUI
 
 /// Main settings screen with API key, Cloudflare gateway, chat defaults, appearance, and cache management.
 public struct SettingsView: View {
-    @State private var viewModel: SettingsPresenter
+    @State private var credentials: SettingsCredentialsStore
+    @State private var defaults: SettingsDefaultsStore
+    @State private var cache: SettingsCacheStore
+    private let about: SettingsAboutInfo
 
-    @MainActor
     /// Creates a settings view backed by the given presenter.
+    @MainActor
     public init(viewModel: SettingsPresenter) {
-        _viewModel = State(initialValue: viewModel)
+        _credentials = State(initialValue: viewModel.credentials)
+        _defaults = State(initialValue: viewModel.defaults)
+        _cache = State(initialValue: viewModel.cache)
+        about = viewModel.about
     }
 
-    private var cloudflareStatusColor: Color {
-        switch viewModel.cloudflareHealthStatus {
-        case .connected:
-            return .green
-        case .checking:
-            return .yellow
-        case .missingAPIKey:
-            return .orange
-        case .gatewayUnavailable:
-            return .gray
-        case .invalidGatewayURL, .remoteError:
-            return .red
-        case .unknown:
-            return .gray
-        }
-    }
-
-    private var cloudflareStatusText: String {
-        switch viewModel.cloudflareHealthStatus {
-        case .connected:
-            return String(localized: "Connected")
-        case .checking:
-            return String(localized: "Checking connection…")
-        case .gatewayUnavailable:
-            return String(localized: "Gateway unavailable in this build")
-        case .missingAPIKey:
-            return String(localized: "No API key configured")
-        case .invalidGatewayURL:
-            return String(localized: "Invalid gateway URL")
-        case .remoteError(let message):
-            return message
-        case .unknown:
-            return String(localized: "Not checked")
-        }
-    }
-
+    /// The settings form content and confirmation alerts for the settings flow.
     public var body: some View {
+        let imageCacheFooter = cacheFooterText(
+            description: String(
+                localized: "Generated images are cached automatically so old download links still open later. Maximum cache size"
+            ),
+            limit: cache.generatedImageCacheLimitString
+        )
+        let documentCacheFooter = cacheFooterText(
+            description: String(
+                localized: """
+                Generated PDFs and other files are cached automatically so old download links still open \
+                or share later. Maximum cache size
+                """
+            ),
+            limit: cache.generatedDocumentCacheLimitString
+        )
+
         NavigationStack {
             Form {
-                SettingsAPIConfigurationSection(viewModel: viewModel)
+                SettingsAPIConfigurationSection(viewModel: credentials)
                 SettingsCloudflareSection(
-                    viewModel: viewModel,
-                    statusColor: cloudflareStatusColor,
-                    statusText: cloudflareStatusText
+                    credentials: credentials,
+                    defaults: defaults
                 )
-                SettingsChatDefaultsSection(viewModel: viewModel)
-                SettingsAppearanceSection(viewModel: viewModel)
+                SettingsChatDefaultsSection(viewModel: defaults)
+                SettingsAppearanceSection(viewModel: defaults)
                 SettingsCacheSection(
-                    title: "Image Cache",
-                    usedValue: viewModel.generatedImageCacheSizeString,
-                    // swiftlint:disable:next line_length
-                    footerText: "Generated images are cached automatically so old download links still open later. Maximum cache size: \(viewModel.generatedImageCacheLimitString).",
-                    isClearing: viewModel.isClearingImageCache,
-                    hasCachedContent: viewModel.generatedImageCacheSizeBytes > 0,
-                    clearLabel: "Clear Image Cache",
+                    title: String(localized: "Image Cache"),
+                    usedValue: cache.generatedImageCacheSizeString,
+                    footerText: imageCacheFooter,
+                    isClearing: cache.isClearingImageCache,
+                    hasCachedContent: cache.generatedImageCacheSizeBytes > 0,
+                    clearLabel: String(localized: "Clear Image Cache"),
                     clearAction: {
-                        await viewModel.clearGeneratedImageCache()
+                        await cache.clearGeneratedImageCache()
                     }
                 )
                 SettingsCacheSection(
-                    title: "Document Cache",
-                    usedValue: viewModel.generatedDocumentCacheSizeString,
-                    // swiftlint:disable:next line_length
-                    footerText: "Generated PDFs and other files are cached automatically so old download links still open or share later. Maximum cache size: \(viewModel.generatedDocumentCacheLimitString).",
-                    isClearing: viewModel.isClearingDocumentCache,
-                    hasCachedContent: viewModel.generatedDocumentCacheSizeBytes > 0,
-                    clearLabel: "Clear Document Cache",
+                    title: String(localized: "Document Cache"),
+                    usedValue: cache.generatedDocumentCacheSizeString,
+                    footerText: documentCacheFooter,
+                    isClearing: cache.isClearingDocumentCache,
+                    hasCachedContent: cache.generatedDocumentCacheSizeBytes > 0,
+                    clearLabel: String(localized: "Clear Document Cache"),
                     clearAction: {
-                        await viewModel.clearGeneratedDocumentCache()
+                        await cache.clearGeneratedDocumentCache()
                     }
                 )
                 SettingsAboutSection(
-                    appVersionString: viewModel.appVersionString,
-                    platformString: viewModel.platformString
+                    appVersionString: about.appVersionString,
+                    platformString: about.platformString
                 )
             }
-            .navigationTitle("Settings")
+            .navigationTitle(String(localized: "Settings"))
             .task {
-                await viewModel.refreshGeneratedImageCacheSize()
-                await viewModel.refreshGeneratedDocumentCacheSize()
+                await cache.refreshAll()
             }
-            .alert("API Key Saved", isPresented: $viewModel.saveConfirmation) {
-                Button("OK", role: .cancel) {}
+            .alert(String(localized: "API Key Saved"), isPresented: saveConfirmationBinding) {
+                Button(String(localized: "OK"), role: .cancel) {}
             } message: {
-                Text("Your OpenAI API key has been saved to Keychain.")
+                Text(String(localized: "Your OpenAI API key has been saved to Keychain."))
             }
         }
+    }
+
+    private func cacheFooterText(description: String, limit: String) -> String {
+        "\(description): \(limit)."
+    }
+
+    private var saveConfirmationBinding: Binding<Bool> {
+        Binding(
+            get: { credentials.saveConfirmation },
+            set: { credentials.saveConfirmation = $0 }
+        )
     }
 }

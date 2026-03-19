@@ -1,6 +1,5 @@
-import ChatRuntimeModel
 import ChatPersistenceCore
-import ChatUIComponents
+import ChatRuntimeWorkflows
 import Foundation
 
 @MainActor
@@ -14,9 +13,9 @@ extension ChatRecoveryCoordinator {
         useDirectEndpoint: Bool = false
     ) async {
         let streamID = UUID()
-        _ = await controller.sessionCoordinator.applyRuntimeTransition(.beginRecoveryStream(streamID: streamID), to: session)
-        controller.sessionCoordinator.syncVisibleState(from: session)
-        guard let execution = controller.sessionRegistry.execution(for: session.messageID) else { return }
+        _ = await sessions.applyRuntimeTransition(.beginRecoveryStream(streamID: streamID), to: session)
+        sessions.syncVisibleState(from: session)
+        guard let execution = services.sessionRegistry.execution(for: session.messageID) else { return }
 
         let stream = execution.service.streamRecovery(
             responseId: responseId,
@@ -29,23 +28,24 @@ extension ChatRecoveryCoordinator {
         var encounteredRecoverableFailure = false
         var receivedAnyRecoveryEvent = false
         var gatewayResumeTimedOut = false
-        let controller = controller
         let gatewayFallbackTask: Task<Void, Never>? = {
             guard execution.service.configurationProvider.useCloudflareGateway, !useDirectEndpoint else {
                 return nil
             }
 
-            return Task { @MainActor in
+            return Task { @MainActor [weak self] in
+                guard let self else { return }
                 do {
                     try await Task.sleep(nanoseconds: 4_000_000_000)
                 } catch {
                     return
                 }
 
-                guard self.controller.sessionCoordinator.isSessionActive(session),
-                      let runtimeActor = await self.controller.sessionCoordinator.runtimeSession(for: session),
+                guard sessions.isSessionActive(session),
+                      let runtimeActor = await sessions.runtimeSession(for: session),
                       await runtimeActor.isActiveStream(streamID),
-                      !receivedAnyRecoveryEvent else {
+                      !receivedAnyRecoveryEvent
+                else {
                     return
                 }
 
@@ -56,56 +56,58 @@ extension ChatRecoveryCoordinator {
         defer { gatewayFallbackTask?.cancel() }
 
         for await event in stream {
-            guard controller.sessionCoordinator.isSessionActive(session),
-                  let runtimeActor = await controller.sessionCoordinator.runtimeSession(for: session),
-                  await runtimeActor.isActiveStream(streamID) else {
+            guard sessions.isSessionActive(session),
+                  let runtimeActor = await sessions.runtimeSession(for: session),
+                  await runtimeActor.isActiveStream(streamID)
+            else {
                 return
             }
             receivedAnyRecoveryEvent = true
             gatewayFallbackTask?.cancel()
 
-            let isVisible = controller.visibleSessionMessageID == session.messageID
-            switch await controller.applyStreamEvent(event, to: session, animated: isVisible) {
+            let isVisible = sessions.visibleSessionMessageID == session.messageID
+            switch await streaming.applyStreamEvent(event, to: session, animated: isVisible) {
             case .continued:
                 break
             case .terminalCompleted:
                 finishedFromStream = true
-                controller.sessionCoordinator.finalizeSession(session)
-            case .terminalIncomplete(let message):
-                if controller.visibleSessionMessageID == session.messageID {
-                    controller.errorMessage = message ?? "Response did not complete."
+                sessions.finalizeSession(session)
+            case let .terminalIncomplete(message):
+                if sessions.visibleSessionMessageID == session.messageID {
+                    state.errorMessage = message ?? "Response did not complete."
                 }
-                controller.sessionCoordinator.saveSessionNow(session)
+                sessions.saveSessionNow(session)
                 encounteredRecoverableFailure = true
             case .connectionLost:
-                controller.sessionCoordinator.saveSessionNow(session)
+                sessions.saveSessionNow(session)
                 encounteredRecoverableFailure = true
-            case .error(let error):
-                if controller.visibleSessionMessageID == session.messageID {
-                    controller.errorMessage = error.localizedDescription
+            case let .terminalFailure(message):
+                if sessions.visibleSessionMessageID == session.messageID {
+                    state.errorMessage = message
                 }
-                controller.sessionCoordinator.saveSessionNow(session)
+                sessions.saveSessionNow(session)
                 encounteredRecoverableFailure = true
             }
         }
 
-        guard controller.sessionCoordinator.isSessionActive(session),
-              let runtimeActor = await controller.sessionCoordinator.runtimeSession(for: session),
+        guard sessions.isSessionActive(session),
+              let runtimeActor = await sessions.runtimeSession(for: session),
               await runtimeActor.isActiveStream(streamID),
               !finishedFromStream,
-              !Task.isCancelled else {
+              !Task.isCancelled
+        else {
             return
         }
 
-        _ = await controller.sessionCoordinator.applyRuntimeTransition(.beginRecoveryPoll, to: session)
-        controller.sessionCoordinator.syncVisibleState(from: session)
-
-        if RuntimeSessionDecisionPolicy.shouldFallbackToDirectRecoveryStream(
+        switch ReplyRecoveryPlanner.streamNextStep(
             cloudflareGatewayEnabled: execution.service.configurationProvider.useCloudflareGateway,
             useDirectEndpoint: useDirectEndpoint,
             gatewayResumeTimedOut: gatewayResumeTimedOut,
-            receivedAnyRecoveryEvent: receivedAnyRecoveryEvent
+            receivedAnyRecoveryEvent: receivedAnyRecoveryEvent,
+            encounteredRecoverableFailure: encounteredRecoverableFailure,
+            responseId: sessions.cachedRuntimeState(for: session)?.responseID
         ) {
+        case .retryDirectStream:
             #if DEBUG
             Loggers.recovery.debug("[Recovery] Gateway resume stalled for \(responseId); retrying direct")
             #endif
@@ -117,13 +119,14 @@ extension ChatRecoveryCoordinator {
                 useDirectEndpoint: true
             )
             return
-        }
 
-        if RuntimeSessionDecisionPolicy.shouldPollAfterRecoveryStream(
-            encounteredRecoverableFailure: encounteredRecoverableFailure,
-            responseId: controller.sessionCoordinator.cachedRuntimeState(for: session)?.responseID
-        ) {
+        case .poll:
+            _ = await sessions.applyRuntimeTransition(.beginRecoveryPoll, to: session)
+            sessions.syncVisibleState(from: session)
             await pollResponseUntilTerminal(session: session, responseId: responseId)
+
+        case .none:
+            return
         }
     }
 }

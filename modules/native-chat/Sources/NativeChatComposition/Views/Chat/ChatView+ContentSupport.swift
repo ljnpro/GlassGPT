@@ -1,7 +1,7 @@
+import ChatDomain
 import ChatPersistenceSwiftData
 import SwiftUI
 import UIKit
-import ChatDomain
 
 /// Encapsulates UIKit keyboard dismissal so the legacy `sendAction` pattern
 /// is isolated to a single call-site and easy to replace later.

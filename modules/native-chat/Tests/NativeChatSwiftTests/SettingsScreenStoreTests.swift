@@ -1,155 +1,166 @@
-import Foundation
 import ChatDomain
-import ChatPersistenceSwiftData
 import ChatPersistenceCore
-import Testing
+import ChatPersistenceSwiftData
+import Foundation
 import GeneratedFilesCore
+import Testing
 @testable import NativeChatComposition
 
 @Suite(.serialized)
 @MainActor
 struct SettingsScreenStoreTests {
-    @Test func saveAPIKeyIgnoresWhitespaceOnlyInput() {
+    @Test func `save API key ignores whitespace only input`() {
         let harness = makeTestSettingsScreenStoreHarness()
         let store = harness.store
+        let credentials = store.credentials
 
-        store.apiKey = "   \n  "
-        store.saveAPIKey()
+        credentials.apiKey = "   \n  "
+        credentials.saveAPIKey()
 
-        #expect(store.apiKey == "   \n  ")
+        #expect(credentials.apiKey == "   \n  ")
         #expect(!harness.apiKeyBackend.didDelete)
         #expect(harness.apiKeyBackend.storedKey == nil)
-        #expect(!store.saveConfirmation)
+        #expect(!credentials.saveConfirmation)
     }
 
-    @Test func initializerLoadsPreexistingAPIKeyForReinstallCompatibility() {
+    @Test func `initializer loads preexisting API key for reinstall compatibility`() {
         let store = makeTestSettingsScreenStore(apiKey: "sk-restored")
 
-        #expect(store.apiKey == "sk-restored")
-        #expect(store.isAPIKeyValid == nil)
-        #expect(!store.saveConfirmation)
+        #expect(store.credentials.apiKey == "sk-restored")
+        #expect(store.credentials.isAPIKeyValid == nil)
+        #expect(!store.credentials.saveConfirmation)
     }
 
-    @Test func initializerLeavesAPIKeyEmptyForFreshInstall() {
+    @Test func `initializer leaves API key empty for fresh install`() {
         let store = makeTestSettingsScreenStore(apiKey: nil)
 
-        #expect(store.apiKey == "")
-        #expect(store.isAPIKeyValid == nil)
-        #expect(!store.saveConfirmation)
+        #expect(store.credentials.apiKey == "")
+        #expect(store.credentials.isAPIKeyValid == nil)
+        #expect(!store.credentials.saveConfirmation)
     }
 
-    @Test func saveAPIKeyTrimsWhitespaceAndShowsConfirmation() {
+    @Test func `save API key trims whitespace and shows confirmation`() {
         let harness = makeTestSettingsScreenStoreHarness()
         let store = harness.store
+        let credentials = store.credentials
 
-        store.apiKey = "  sk-test-trimmed  "
-        store.saveAPIKey()
+        credentials.apiKey = "  sk-test-trimmed  "
+        credentials.saveAPIKey()
 
-        #expect(store.apiKey == "sk-test-trimmed")
+        #expect(credentials.apiKey == "sk-test-trimmed")
         #expect(harness.apiKeyBackend.storedKey == "sk-test-trimmed")
-        #expect(store.isAPIKeyValid == nil)
-        #expect(store.saveConfirmation)
+        #expect(credentials.isAPIKeyValid == nil)
+        #expect(credentials.saveConfirmation)
     }
 
-    @Test func saveAPIKeyFailureLeavesTypedValueUntouchedAndSkipsConfirmation() {
+    @Test func `save API key failure leaves typed value untouched and skips confirmation`() {
         let harness = makeTestSettingsScreenStoreHarness()
         let store = harness.store
+        let credentials = store.credentials
         harness.apiKeyBackend.saveError = NativeChatTestError.saveFailed
 
-        store.apiKey = "  sk-save-error  "
-        store.saveAPIKey()
+        credentials.apiKey = "  sk-save-error  "
+        credentials.saveAPIKey()
 
-        #expect(store.apiKey == "  sk-save-error  ")
-        #expect(!store.saveConfirmation)
+        #expect(credentials.apiKey == "  sk-save-error  ")
+        #expect(!credentials.saveConfirmation)
         #expect(harness.apiKeyBackend.storedKey == nil)
         #expect(!harness.apiKeyBackend.didDelete)
     }
 
-    @Test func clearAPIKeyRemovesStoredValueAndResetsValidationState() {
+    @Test func `clear API key removes stored value and resets validation state`() {
         let store = makeTestSettingsScreenStore(apiKey: "sk-stored")
-        store.apiKey = "sk-stored"
-        store.isAPIKeyValid = true
-        store.cloudflareHealthStatus = .connected
-        store.cloudflareEnabled = true
+        let credentials = store.credentials
+        let defaults = store.defaults
+        credentials.apiKey = "sk-stored"
+        credentials.isAPIKeyValid = true
+        credentials.cloudflareHealthStatus = .connected
+        defaults.cloudflareEnabled = true
 
-        store.clearAPIKey()
+        credentials.clearAPIKey()
 
-        #expect(store.apiKey == "")
-        #expect(store.isAPIKeyValid == nil)
-        #expect(store.cloudflareHealthStatus == .missingAPIKey)
+        #expect(credentials.apiKey == "")
+        #expect(credentials.isAPIKeyValid == nil)
+        #expect(credentials.cloudflareHealthStatus == .missingAPIKey)
     }
 
-    @Test func cloudflareToggleTracksConfigurationProviderAndResetsHealthWhenDisabled() {
+    @Test func `cloudflare toggle tracks configuration provider and resets health when disabled`() {
         let configurationProvider = RuntimeTestOpenAIConfigurationProvider(useCloudflareGateway: false)
         let store = makeTestSettingsScreenStore(configurationProvider: configurationProvider)
+        let credentials = store.credentials
+        let defaults = store.defaults
 
-        store.cloudflareEnabled = true
+        defaults.cloudflareEnabled = true
         #expect(configurationProvider.useCloudflareGateway)
 
-        store.cloudflareHealthStatus = .connected
-        store.cloudflareEnabled = false
+        credentials.cloudflareHealthStatus = .connected
+        defaults.cloudflareEnabled = false
 
         #expect(!configurationProvider.useCloudflareGateway)
-        #expect(store.cloudflareHealthStatus == .unknown)
-        #expect(!store.isCheckingCloudflareHealth)
+        #expect(credentials.cloudflareHealthStatus == .unknown)
+        #expect(!credentials.isCheckingCloudflareHealth)
     }
 
-    @Test func defaultModelTogglePersistsAndNormalizesUnsupportedEffort() {
+    @Test func `default model toggle persists and normalizes unsupported effort`() {
         let harness = makeTestSettingsScreenStoreHarness()
         let store = harness.store
+        let defaults = store.defaults
 
-        store.defaultEffort = .none
-        store.defaultProModeEnabled = true
+        defaults.defaultEffort = .none
+        defaults.defaultProModeEnabled = true
 
-        #expect(store.defaultProModeEnabled)
-        #expect(store.defaultEffort == .xhigh)
+        #expect(defaults.defaultProModeEnabled)
+        #expect(defaults.defaultEffort == .xhigh)
         #expect(
             harness.settingsValueStore.string(forKey: SettingsStore.Keys.defaultModel)
-            == ModelType.gpt5_4_pro.rawValue
+                == ModelType.gpt5_4_pro.rawValue
         )
         #expect(
             harness.settingsValueStore.string(forKey: SettingsStore.Keys.defaultEffort)
-            == ReasoningEffort.xhigh.rawValue
+                == ReasoningEffort.xhigh.rawValue
         )
     }
 
-    @Test func themeHapticsAndFlexSelectionsPersistImmediately() {
+    @Test func `theme haptics and flex selections persist immediately`() {
         let harness = makeTestSettingsScreenStoreHarness()
         let store = harness.store
+        let defaults = store.defaults
 
-        store.appTheme = .dark
-        store.hapticEnabled = false
-        store.defaultFlexModeEnabled = true
-        store.defaultBackgroundModeEnabled = true
+        defaults.appTheme = .dark
+        defaults.hapticEnabled = false
+        defaults.defaultFlexModeEnabled = true
+        defaults.defaultBackgroundModeEnabled = true
 
         #expect(harness.settingsValueStore.string(forKey: SettingsStore.Keys.appTheme) == AppTheme.dark.rawValue)
         #expect(harness.settingsValueStore.bool(forKey: SettingsStore.Keys.hapticEnabled) == false)
         #expect(
             harness.settingsValueStore.string(forKey: SettingsStore.Keys.defaultServiceTier)
-            == ServiceTier.flex.rawValue
+                == ServiceTier.flex.rawValue
         )
         #expect(
             harness.settingsValueStore.bool(forKey: SettingsStore.Keys.defaultBackgroundModeEnabled)
-            == true
+                == true
         )
     }
 
-    @Test func checkCloudflareHealthRequiresConfiguredAPIKey() async {
+    @Test func `check cloudflare health requires configured API key`() async {
         let configurationProvider = RuntimeTestOpenAIConfigurationProvider(useCloudflareGateway: true)
         let store = makeTestSettingsScreenStore(configurationProvider: configurationProvider)
-        store.cloudflareEnabled = true
+        let credentials = store.credentials
+        let defaults = store.defaults
+        defaults.cloudflareEnabled = true
 
-        await store.checkCloudflareHealth()
+        await credentials.checkCloudflareHealth()
 
-        #expect(store.cloudflareHealthStatus == .missingAPIKey)
-        #expect(!store.isCheckingCloudflareHealth)
+        #expect(credentials.cloudflareHealthStatus == .missingAPIKey)
+        #expect(!credentials.isCheckingCloudflareHealth)
     }
 }
 
 // MARK: - Cloudflare and Validation Tests
 
 extension SettingsScreenStoreTests {
-    @Test func checkCloudflareHealthUsesGatewayModelsEndpointAndReportsConnected() async throws {
+    @Test func `check cloudflare health uses gateway models endpoint and reports connected`() async throws {
         let configurationProvider = RuntimeTestOpenAIConfigurationProvider(
             directOpenAIBaseURL: "https://api.test.openai.local/v1",
             cloudflareGatewayBaseURL: "https://gateway.test.openai.local/v1",
@@ -169,12 +180,13 @@ extension SettingsScreenStoreTests {
             configurationProvider: configurationProvider,
             transport: transport
         )
-        store.cloudflareEnabled = true
+        let credentials = store.credentials
+        store.defaults.cloudflareEnabled = true
 
-        await store.checkCloudflareHealth()
+        await credentials.checkCloudflareHealth()
 
-        #expect(store.cloudflareHealthStatus == .connected)
-        #expect(!store.isCheckingCloudflareHealth)
+        #expect(credentials.cloudflareHealthStatus == .connected)
+        #expect(!credentials.isCheckingCloudflareHealth)
 
         let requests = await transport.requests()
         #expect(requests.count == 1)
@@ -183,7 +195,7 @@ extension SettingsScreenStoreTests {
         #expect(requests.first?.value(forHTTPHeaderField: "cf-aig-authorization") == "Bearer cf-test-token")
     }
 
-    @Test func checkCloudflareHealthPrefersTypedKeyOverStoredKey() async throws {
+    @Test func `check cloudflare health prefers typed key over stored key`() async throws {
         let configurationProvider = RuntimeTestOpenAIConfigurationProvider(useCloudflareGateway: false)
         let transport = StubOpenAITransport()
         let modelsURL = try #require(URL(string: "https://gateway.test.openai.local/v1/models"))
@@ -198,18 +210,18 @@ extension SettingsScreenStoreTests {
             configurationProvider: configurationProvider,
             transport: transport
         )
-        let store = harness.store
-        store.apiKey = " sk-typed "
-        store.cloudflareEnabled = true
+        let credentials = harness.store.credentials
+        harness.store.defaults.cloudflareEnabled = true
+        credentials.apiKey = " sk-typed "
 
-        await store.checkCloudflareHealth()
+        await credentials.checkCloudflareHealth()
 
         let requests = await transport.requests()
         let request = try #require(requests.first)
         #expect(request.value(forHTTPHeaderField: "Authorization") == "Bearer sk-typed")
     }
 
-    @Test func checkCloudflareHealthSurfacesTransportFailure() async {
+    @Test func `check cloudflare health surfaces transport failure`() async {
         let configurationProvider = RuntimeTestOpenAIConfigurationProvider(useCloudflareGateway: false)
         let transport = StubOpenAITransport()
         let timeoutError = URLError(.timedOut)
@@ -220,15 +232,16 @@ extension SettingsScreenStoreTests {
             configurationProvider: configurationProvider,
             transport: transport
         )
-        store.cloudflareEnabled = true
+        let credentials = store.credentials
+        store.defaults.cloudflareEnabled = true
 
-        await store.checkCloudflareHealth()
+        await credentials.checkCloudflareHealth()
 
-        #expect(store.cloudflareHealthStatus == .remoteError(timeoutError.localizedDescription))
-        #expect(!store.isCheckingCloudflareHealth)
+        #expect(credentials.cloudflareHealthStatus == .remoteError(timeoutError.localizedDescription))
+        #expect(!credentials.isCheckingCloudflareHealth)
     }
 
-    @Test func validateAPIKeyUsesInjectedTransportAndUpdatesValidity() async throws {
+    @Test func `validate API key uses injected transport and updates validity`() async throws {
         let transport = StubOpenAITransport()
         let modelsURL = try #require(URL(string: "https://api.test.openai.local/v1/models"))
         await transport.enqueue(
@@ -238,12 +251,13 @@ extension SettingsScreenStoreTests {
         )
 
         let store = makeTestSettingsScreenStore(transport: transport)
-        store.apiKey = "sk-runtime"
+        let credentials = store.credentials
+        credentials.apiKey = "sk-runtime"
 
-        await store.validateAPIKey()
+        await credentials.validateAPIKey()
 
-        #expect(store.isAPIKeyValid == true)
-        #expect(!store.isValidating)
+        #expect(credentials.isAPIKeyValid == true)
+        #expect(!credentials.isValidating)
 
         let requests = await transport.requests()
         #expect(requests.count == 1)
@@ -251,35 +265,37 @@ extension SettingsScreenStoreTests {
         #expect(requests.first?.value(forHTTPHeaderField: "Authorization") == "Bearer sk-runtime")
     }
 
-    @Test func validateAPIKeyMarksEmptyFieldInvalidWithoutNetworkRequest() async {
+    @Test func `validate API key marks empty field invalid without network request`() async {
         let transport = StubOpenAITransport()
         let store = makeTestSettingsScreenStore(transport: transport)
-        store.apiKey = "  "
+        let credentials = store.credentials
+        credentials.apiKey = "  "
 
-        await store.validateAPIKey()
+        await credentials.validateAPIKey()
 
-        #expect(store.isAPIKeyValid == false)
-        #expect(!store.isValidating)
+        #expect(credentials.isAPIKeyValid == false)
+        #expect(!credentials.isValidating)
         let requests = await transport.requests()
         #expect(requests.isEmpty)
     }
 
-    @Test func validateAPIKeyMarksCredentialInvalidWhenTransportFails() async {
+    @Test func `validate API key marks credential invalid when transport fails`() async {
         let transport = StubOpenAITransport()
         await transport.enqueue(error: NativeChatTestError.timeout)
 
         let store = makeTestSettingsScreenStore(transport: transport)
-        store.apiKey = "sk-runtime"
+        let credentials = store.credentials
+        credentials.apiKey = "sk-runtime"
 
-        await store.validateAPIKey()
+        await credentials.validateAPIKey()
 
-        #expect(store.isAPIKeyValid == false)
-        #expect(!store.isValidating)
+        #expect(credentials.isAPIKeyValid == false)
+        #expect(!credentials.isValidating)
         let requests = await transport.requests()
         #expect(requests.count == 1)
     }
 
-    @Test func checkCloudflareHealthSurfacesHTTPErrorMessage() async throws {
+    @Test func `check cloudflare health surfaces HTTP error message`() async throws {
         let configurationProvider = RuntimeTestOpenAIConfigurationProvider(useCloudflareGateway: false)
         let transport = StubOpenAITransport()
         let modelsURL = try #require(URL(string: "https://gateway.test.openai.local/v1/models"))
@@ -294,27 +310,29 @@ extension SettingsScreenStoreTests {
             configurationProvider: configurationProvider,
             transport: transport
         )
-        store.cloudflareEnabled = true
+        let credentials = store.credentials
+        store.defaults.cloudflareEnabled = true
 
-        await store.checkCloudflareHealth()
+        await credentials.checkCloudflareHealth()
 
-        #expect(store.cloudflareHealthStatus == .remoteError("Gateway unavailable"))
-        #expect(!store.isCheckingCloudflareHealth)
+        #expect(credentials.cloudflareHealthStatus == .remoteError("Gateway unavailable"))
+        #expect(!credentials.isCheckingCloudflareHealth)
     }
 
-    @Test func enablingCloudflareShowsGatewayUnavailableWhenBuildLacksGatewayCapability() {
+    @Test func `enabling cloudflare shows gateway unavailable when build lacks gateway capability`() {
         let configurationProvider = RuntimeTestOpenAIConfigurationProvider(
             cloudflareAIGToken: "",
             useCloudflareGateway: false
         )
         let store = makeTestSettingsScreenStore(configurationProvider: configurationProvider)
+        let credentials = store.credentials
 
-        store.cloudflareEnabled = true
+        store.defaults.cloudflareEnabled = true
 
-        #expect(store.cloudflareHealthStatus == .gatewayUnavailable)
+        #expect(credentials.cloudflareHealthStatus == .gatewayUnavailable)
     }
 
-    @Test func checkCloudflareHealthSurfacesInvalidGatewayURLWithoutNetworkRequest() async {
+    @Test func `check cloudflare health surfaces invalid gateway URL without network request`() async {
         let configurationProvider = RuntimeTestOpenAIConfigurationProvider(
             cloudflareGatewayBaseURL: "not a url",
             cloudflareAIGToken: "cf-test-token",
@@ -326,14 +344,14 @@ extension SettingsScreenStoreTests {
             configurationProvider: configurationProvider,
             transport: transport
         )
-        store.cloudflareEnabled = true
+        let credentials = store.credentials
+        store.defaults.cloudflareEnabled = true
 
-        await store.checkCloudflareHealth()
+        await credentials.checkCloudflareHealth()
 
-        #expect(store.cloudflareHealthStatus == .invalidGatewayURL)
-        #expect(!store.isCheckingCloudflareHealth)
+        #expect(credentials.cloudflareHealthStatus == .invalidGatewayURL)
+        #expect(!credentials.isCheckingCloudflareHealth)
         let requests = await transport.requests()
         #expect(requests.isEmpty)
     }
-
 }

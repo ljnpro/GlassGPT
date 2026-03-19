@@ -5,7 +5,7 @@ import os
 
 private let runtimeSignposter = OSSignposter(subsystem: "GlassGPT", category: "runtime")
 
-extension ReplySessionActor {
+public extension ReplySessionActor {
     /// Applies a transition to the session state and returns the updated state.
     ///
     /// Content transitions (text, thinking, tool calls, citations) are handled inline.
@@ -14,7 +14,7 @@ extension ReplySessionActor {
     /// - Returns: The updated runtime state.
     @discardableResult
     // swiftlint:disable:next cyclomatic_complexity function_body_length
-    public func apply(_ transition: ReplyRuntimeTransition) -> ReplyRuntimeState {
+    func apply(_ transition: ReplyRuntimeTransition) -> ReplyRuntimeState {
         let signpostID = runtimeSignposter.makeSignpostID()
         let signpostState = runtimeSignposter.beginInterval("ApplyTransition", id: signpostID)
         defer { runtimeSignposter.endInterval("ApplyTransition", signpostState) }
@@ -30,7 +30,7 @@ extension ReplySessionActor {
             state.isThinking = false
             activeStreamID = nil
 
-        case .beginStreaming(let streamID, let route):
+        case let .beginStreaming(streamID, route):
             activeStreamID = streamID
             if let cursor = state.cursor {
                 state.lifecycle = .streaming(
@@ -45,7 +45,7 @@ extension ReplySessionActor {
             }
             state.isThinking = false
 
-        case .recordResponseCreated(let responseID, let route):
+        case let .recordResponseCreated(responseID, route):
             let cursor = StreamCursor(
                 responseID: responseID,
                 lastSequenceNumber: state.lastSequenceNumber,
@@ -54,7 +54,7 @@ extension ReplySessionActor {
             switch state.lifecycle {
             case .recoveringStream:
                 state.lifecycle = .recoveringStream(cursor)
-            case .recoveringStatus(let ticket):
+            case let .recoveringStatus(ticket):
                 state.lifecycle = .recoveringStatus(
                     DetachedRecoveryTicket(
                         assistantReplyID: ticket.assistantReplyID,
@@ -66,7 +66,7 @@ extension ReplySessionActor {
                         route: route
                     )
                 )
-            case .recoveringPoll(let ticket):
+            case let .recoveringPoll(ticket):
                 state.lifecycle = .recoveringPoll(
                     DetachedRecoveryTicket(
                         assistantReplyID: ticket.assistantReplyID,
@@ -82,20 +82,20 @@ extension ReplySessionActor {
                 state.lifecycle = .streaming(cursor)
             }
 
-        case .recordSequenceUpdate(let sequence):
+        case let .recordSequenceUpdate(sequence):
             updateCursor(lastSequenceNumber: sequence)
 
-        case .appendText(let delta):
+        case let .appendText(delta):
             state.buffer.text += delta
             state.isThinking = false
 
-        case .appendThinking(let delta):
+        case let .appendThinking(delta):
             state.buffer.thinking += delta
 
-        case .setThinking(let isThinking):
+        case let .setThinking(isThinking):
             state.isThinking = isThinking
 
-        case .startToolCall(let id, let type):
+        case let .startToolCall(id, type):
             guard !state.buffer.toolCalls.contains(where: { $0.id == id }) else {
                 return state
             }
@@ -107,38 +107,38 @@ extension ReplySessionActor {
                 )
             )
 
-        case .setToolCallStatus(let id, let status):
+        case let .setToolCallStatus(id, status):
             guard let index = state.buffer.toolCalls.firstIndex(where: { $0.id == id }) else {
                 return state
             }
             state.buffer.toolCalls[index].status = status
 
-        case .appendToolCode(let id, let delta):
+        case let .appendToolCode(id, delta):
             guard let index = state.buffer.toolCalls.firstIndex(where: { $0.id == id }) else {
                 return state
             }
             let existing = state.buffer.toolCalls[index].code ?? ""
             state.buffer.toolCalls[index].code = existing + delta
 
-        case .setToolCode(let id, let code):
+        case let .setToolCode(id, code):
             guard let index = state.buffer.toolCalls.firstIndex(where: { $0.id == id }) else {
                 return state
             }
             state.buffer.toolCalls[index].code = code
 
-        case .addCitation(let citation):
+        case let .addCitation(citation):
             guard !state.buffer.citations.contains(where: { $0.id == citation.id }) else {
                 return state
             }
             state.buffer.citations.append(citation)
 
-        case .addFilePathAnnotation(let annotation):
+        case let .addFilePathAnnotation(annotation):
             guard !state.buffer.filePathAnnotations.contains(where: { $0.fileId == annotation.fileId }) else {
                 return state
             }
             state.buffer.filePathAnnotations.append(annotation)
 
-        case .mergeTerminalPayload(let text, let thinking, let filePathAnnotations):
+        case let .mergeTerminalPayload(text, thinking, filePathAnnotations):
             if !text.isEmpty {
                 state.buffer.text = text
             }

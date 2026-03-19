@@ -1,26 +1,27 @@
-import ChatPersistenceSwiftData
 import ChatDomain
 import ChatPersistenceCore
-import Foundation
+import ChatPersistenceSwiftData
 import ChatRuntimeModel
+import Foundation
 
 @MainActor
 extension ChatRecoveryMaintenanceCoordinator {
     func recoverIncompleteMessages() async {
-        guard !controller.apiKey.isEmpty else { return }
+        let apiKey = services.apiKeyStore.loadAPIKey()?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        guard !apiKey.isEmpty else { return }
 
         await cleanupStaleDrafts()
 
         let fetchedMessages: [Message]
         do {
-            fetchedMessages = try controller.draftRepository.fetchRecoverableDrafts()
+            fetchedMessages = try services.draftRepository.fetchRecoverableDrafts()
         } catch {
             Loggers.recovery.error("[Recovery] Failed to fetch recoverable drafts: \(error.localizedDescription)")
             return
         }
 
-        let activeDraftID = controller.conversationCoordinator.activeIncompleteAssistantDraft()?.id
-        let currentConversationID = controller.currentConversation?.id
+        let activeDraftID = conversations.activeIncompleteAssistantDraft()?.id
+        let currentConversationID = state.currentConversation?.id
         let incompleteMessages = fetchedMessages.filter {
             $0.id != activeDraftID && $0.conversation?.id != currentConversationID
         }
@@ -32,7 +33,7 @@ extension ChatRecoveryMaintenanceCoordinator {
 
         for message in incompleteMessages {
             guard let responseId = message.responseId else { continue }
-            controller.recoverSingleMessage(message: message, responseId: responseId, visible: false)
+            recoverSingleMessage(message: message, responseId: responseId, visible: false)
         }
     }
 
@@ -41,7 +42,7 @@ extension ChatRecoveryMaintenanceCoordinator {
         let staleMessages: [Message]
 
         do {
-            staleMessages = try controller.draftRepository.fetchIncompleteDrafts()
+            staleMessages = try services.draftRepository.fetchIncompleteDrafts()
         } catch {
             Loggers.recovery.error("[Recovery] Failed to fetch stale drafts: \(error.localizedDescription)")
             return
@@ -52,8 +53,8 @@ extension ChatRecoveryMaintenanceCoordinator {
         for message in staleMessages {
             guard message.createdAt < staleThreshold else { continue }
 
-            if message.content.isEmpty && message.responseId == nil {
-                controller.conversationRepository.delete(message)
+            if message.content.isEmpty, message.responseId == nil {
+                services.conversationRepository.delete(message)
                 cleanedCount += 1
             } else {
                 message.isComplete = true
@@ -65,7 +66,7 @@ extension ChatRecoveryMaintenanceCoordinator {
         }
 
         if cleanedCount > 0 {
-            controller.conversationCoordinator.saveContextIfPossible("cleanupStaleDrafts")
+            conversations.saveContextIfPossible("cleanupStaleDrafts")
             #if DEBUG
             Loggers.recovery.debug("[Recovery] Cleaned up \(cleanedCount) stale draft(s)")
             #endif
@@ -74,11 +75,12 @@ extension ChatRecoveryMaintenanceCoordinator {
 
     // swiftlint:disable:next function_body_length
     func resendOrphanedDrafts() async {
-        guard !controller.apiKey.isEmpty else { return }
+        let apiKey = services.apiKeyStore.loadAPIKey()?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        guard !apiKey.isEmpty else { return }
 
         let orphanedDrafts: [Message]
         do {
-            orphanedDrafts = try controller.draftRepository.fetchOrphanedDrafts()
+            orphanedDrafts = try services.draftRepository.fetchOrphanedDrafts()
         } catch {
             Loggers.recovery.error("[Recovery] Failed to fetch orphaned drafts: \(error.localizedDescription)")
             return
@@ -92,91 +94,121 @@ extension ChatRecoveryMaintenanceCoordinator {
         }
         #endif
 
-        let currentConversationID = controller.currentConversation?.id
+        let currentConversationID = state.currentConversation?.id
 
         for draft in draftsToResend {
-            guard let conversation = draft.conversation else {
-                controller.conversationRepository.delete(draft)
-                controller.conversationCoordinator.saveContextIfPossible("resendOrphanedDrafts.deleteDetachedDraft")
-                continue
-            }
-
-            if let currentConversationID, conversation.id != currentConversationID {
-                continue
-            }
-
-            let userMessages = conversation.messages
-                .filter { $0.role == .user }
-                .sorted { $0.createdAt < $1.createdAt }
-
-            guard userMessages.last != nil else {
-                controller.conversationRepository.delete(draft)
-                controller.conversationCoordinator.saveContextIfPossible("resendOrphanedDrafts.deleteDraftWithoutUserMessage")
-                continue
-            }
-
-            #if DEBUG
-            Loggers.recovery.debug("[Recovery] Resending request for orphaned draft in conversation: \(conversation.title)")
-            #endif
-
-            controller.currentConversation = conversation
-            controller.messages = controller.conversationCoordinator.visibleMessages(for: conversation)
-                .filter { $0.id != draft.id }
-
-            controller.conversationCoordinator.applyConversationConfiguration(from: conversation)
-
-            if let idx = conversation.messages.firstIndex(where: { $0.id == draft.id }) {
-                conversation.messages.remove(at: idx)
-            }
-
-            controller.conversationRepository.delete(draft)
-            controller.conversationCoordinator.saveContextIfPossible("resendOrphanedDrafts.deleteBeforeRestart")
-
-            let newDraft = Message(
-                role: .assistant,
-                content: "",
-                thinking: nil,
-                lastSequenceNumber: nil,
-                usedBackgroundMode: controller.backgroundModeEnabled,
-                isComplete: false
-            )
-            newDraft.conversation = controller.currentConversation
-            controller.currentConversation?.messages.append(newDraft)
-            controller.conversationCoordinator.saveContextIfPossible("resendOrphanedDrafts.insertReplacementDraft")
-
-            let preparedReply: PreparedAssistantReply
-            do {
-                preparedReply = try controller.prepareExistingDraft(newDraft)
-            } catch SendMessagePreparationError.missingAPIKey {
-                controller.errorMessage = "Please add your OpenAI API key in Settings."
-                return
-            } catch {
-                controller.errorMessage = "Failed to restart orphaned draft."
+            if restartOrphanedDraftIfEligible(draft, currentConversationID: currentConversationID) {
                 return
             }
-
-            let session = ReplySession(preparedReply: preparedReply)
-
-            controller.sessionCoordinator.registerSession(
-                session,
-                execution: SessionExecutionState(service: controller.serviceFactory()),
-                visible: true
-            )
-            let controller = controller
-            Task { @MainActor in
-                _ = await controller.sessionCoordinator.applyRuntimeTransition(.beginSubmitting, to: session)
-                _ = await controller.sessionCoordinator.applyRuntimeTransition(.setThinking(true), to: session)
-                controller.sessionCoordinator.syncVisibleState(from: session)
-            }
-            controller.errorMessage = nil
-
-            #if DEBUG
-            // swiftlint:disable:next line_length
-            Loggers.recovery.debug("[Recovery] Starting resend stream for conversation: \(conversation.title), messages count: \(controller.messages.count)")
-            #endif
-
-            controller.startStreamingRequest(for: session)
-            return
         }
+    }
+
+    private func restartOrphanedDraftIfEligible(
+        _ draft: Message,
+        currentConversationID: UUID?
+    ) -> Bool {
+        guard let conversation = resendableConversation(for: draft, currentConversationID: currentConversationID) else {
+            return false
+        }
+
+        let newDraft = replaceOrphanedDraft(draft, in: conversation)
+        guard let preparedReply = prepareRestartReply(for: newDraft) else {
+            return true
+        }
+
+        startResentDraftSession(preparedReply, conversation: conversation)
+        return true
+    }
+
+    private func resendableConversation(
+        for draft: Message,
+        currentConversationID: UUID?
+    ) -> Conversation? {
+        guard let conversation = draft.conversation else {
+            services.conversationRepository.delete(draft)
+            conversations.saveContextIfPossible("resendOrphanedDrafts.deleteDetachedDraft")
+            return nil
+        }
+
+        if let currentConversationID, conversation.id != currentConversationID {
+            return nil
+        }
+
+        let hasUserMessage = conversation.messages.contains { $0.role == .user }
+        guard hasUserMessage else {
+            services.conversationRepository.delete(draft)
+            conversations.saveContextIfPossible("resendOrphanedDrafts.deleteDraftWithoutUserMessage")
+            return nil
+        }
+
+        #if DEBUG
+        Loggers.recovery.debug("[Recovery] Resending request for orphaned draft in conversation: \(conversation.title)")
+        #endif
+        return conversation
+    }
+
+    private func replaceOrphanedDraft(_ draft: Message, in conversation: Conversation) -> Message {
+        state.currentConversation = conversation
+        state.messages = conversations.visibleMessages(for: conversation)
+            .filter { $0.id != draft.id }
+        conversations.applyConversationConfiguration(from: conversation)
+
+        if let idx = conversation.messages.firstIndex(where: { $0.id == draft.id }) {
+            conversation.messages.remove(at: idx)
+        }
+
+        services.conversationRepository.delete(draft)
+        conversations.saveContextIfPossible("resendOrphanedDrafts.deleteBeforeRestart")
+
+        let newDraft = Message(
+            role: .assistant,
+            content: "",
+            thinking: nil,
+            lastSequenceNumber: nil,
+            usedBackgroundMode: state.backgroundModeEnabled,
+            isComplete: false
+        )
+        newDraft.conversation = state.currentConversation
+        state.currentConversation?.messages.append(newDraft)
+        conversations.saveContextIfPossible("resendOrphanedDrafts.insertReplacementDraft")
+        return newDraft
+    }
+
+    private func prepareRestartReply(for draft: Message) -> PreparedAssistantReply? {
+        do {
+            return try drafts.prepareExistingDraft(draft)
+        } catch SendMessagePreparationError.missingAPIKey {
+            state.errorMessage = "Please add your OpenAI API key in Settings."
+            return nil
+        } catch {
+            state.errorMessage = "Failed to restart orphaned draft."
+            return nil
+        }
+    }
+
+    private func startResentDraftSession(
+        _ preparedReply: PreparedAssistantReply,
+        conversation: Conversation
+    ) {
+        let session = ReplySession(preparedReply: preparedReply)
+        sessions.registerSession(
+            session,
+            execution: SessionExecutionState(service: services.serviceFactory()),
+            visible: true
+        )
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            _ = await sessions.applyRuntimeTransition(.beginSubmitting, to: session)
+            _ = await sessions.applyRuntimeTransition(.setThinking(true), to: session)
+            sessions.syncVisibleState(from: session)
+        }
+        state.errorMessage = nil
+
+        #if DEBUG
+        // swiftlint:disable:next line_length
+        Loggers.recovery.debug("[Recovery] Starting resend stream for conversation: \(conversation.title), messages count: \(state.messages.count)")
+        #endif
+
+        streaming.startStreamingRequest(for: session, reconnectAttempt: 0)
     }
 }

@@ -7,12 +7,13 @@ public struct HistoryView: View {
     @State private var showDeleteConfirmation = false
     @State private var viewModel: HistoryPresenter
 
-    @MainActor
     /// Creates a history view backed by the given presenter.
+    @MainActor
     public init(store: HistoryPresenter) {
         _viewModel = State(initialValue: store)
     }
 
+    /// The view hierarchy for the searchable history list and delete affordances.
     public var body: some View {
         NavigationStack {
             Group {
@@ -34,15 +35,15 @@ public struct HistoryView: View {
                     .listStyle(.plain)
                 }
             }
-            .navigationTitle("History")
-            .searchable(text: $viewModel.searchText, prompt: "Search conversations")
+            .navigationTitle(String(localized: "History"))
+            .searchable(text: $viewModel.searchText, prompt: String(localized: "Search conversations"))
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     if !viewModel.conversations.isEmpty {
                         Button(role: .destructive) {
                             showDeleteConfirmation = true
                         } label: {
-                            Label("Delete All", systemImage: "trash")
+                            Label(String(localized: "Delete All"), systemImage: "trash")
                                 .font(.subheadline.weight(.semibold))
                                 .foregroundStyle(.red)
                                 .padding(.horizontal, 12)
@@ -60,13 +61,13 @@ public struct HistoryView: View {
                     }
                 }
             }
-            .alert("Delete All Conversations?", isPresented: $showDeleteConfirmation) {
-                Button("Delete All", role: .destructive) {
+            .alert(String(localized: "Delete All Conversations?"), isPresented: $showDeleteConfirmation) {
+                Button(String(localized: "Delete All"), role: .destructive) {
                     viewModel.deleteAllConversations()
                 }
-                Button("Cancel", role: .cancel) {}
+                Button(String(localized: "Cancel"), role: .cancel) {}
             } message: {
-                Text("This action cannot be undone.")
+                Text(String(localized: "This action cannot be undone."))
             }
         }
         .onAppear {
@@ -76,9 +77,9 @@ public struct HistoryView: View {
 
     private var emptyState: some View {
         ContentUnavailableView(
-            "No Conversations Yet",
+            String(localized: "No Conversations Yet"),
             systemImage: "clock.badge.questionmark",
-            description: Text("Your chat history will appear here.")
+            description: Text(String(localized: "Your chat history will appear here."))
         )
         .accessibilityIdentifier("history.emptyState")
     }

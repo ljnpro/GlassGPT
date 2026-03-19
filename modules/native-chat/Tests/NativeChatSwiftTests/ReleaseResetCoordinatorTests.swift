@@ -1,6 +1,6 @@
+import ChatPersistenceCore
 import Foundation
 import Testing
-import ChatPersistenceCore
 
 struct ReleaseResetCoordinatorTests {
     private var tempRoot: URL
@@ -11,7 +11,7 @@ struct ReleaseResetCoordinatorTests {
         try FileManager.default.createDirectory(at: tempRoot, withIntermediateDirectories: true)
     }
 
-    @Test func performIfNeededDeletesStoreAndRecoveredStores() throws {
+    @Test func `perform if needed deletes store and recovered stores`() throws {
         defer { try? FileManager.default.removeItem(at: tempRoot) }
 
         let directories = try makeResetDirectories()
@@ -36,7 +36,7 @@ struct ReleaseResetCoordinatorTests {
         #expect(!FileManager.default.fileExists(atPath: directories.recoveredStores.path))
     }
 
-    @Test func performIfNeededDeletesCachesAndPreviewDirectories() throws {
+    @Test func `perform if needed deletes caches and preview directories`() throws {
         defer { try? FileManager.default.removeItem(at: tempRoot) }
 
         let directories = try makeResetDirectories()
@@ -57,7 +57,7 @@ struct ReleaseResetCoordinatorTests {
         #expect(!FileManager.default.fileExists(atPath: directories.previewDirectory.path))
     }
 
-    @Test func performIfNeededIsIdempotentForTargetVersion() throws {
+    @Test func `perform if needed is idempotent for target version`() throws {
         defer { try? FileManager.default.removeItem(at: tempRoot) }
 
         let defaultsSuite = "release.reset.tests.\(UUID().uuidString)"

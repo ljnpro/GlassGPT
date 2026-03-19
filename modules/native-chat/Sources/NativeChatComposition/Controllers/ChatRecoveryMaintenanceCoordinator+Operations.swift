@@ -4,8 +4,9 @@ import Foundation
 @MainActor
 extension ChatRecoveryMaintenanceCoordinator {
     func recoverIncompleteMessagesInCurrentConversation() async {
-        guard !controller.apiKey.isEmpty else { return }
-        guard let conversation = controller.currentConversation else { return }
+        let apiKey = services.apiKeyStore.loadAPIKey()?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        guard !apiKey.isEmpty else { return }
+        guard let conversation = state.currentConversation else { return }
 
         let incompleteMessages = conversation.messages.filter {
             $0.role == .assistant && !$0.isComplete && $0.responseId != nil
@@ -17,7 +18,7 @@ extension ChatRecoveryMaintenanceCoordinator {
 
         if let activeMessage = sortedMessages.last,
            let responseId = activeMessage.responseId {
-            controller.recoverResponse(
+            recovery.recoverResponse(
                 messageId: activeMessage.id,
                 responseId: responseId,
                 preferStreamingResume: activeMessage.usedBackgroundMode,
@@ -32,7 +33,7 @@ extension ChatRecoveryMaintenanceCoordinator {
     }
 
     func recoverSingleMessage(message: Message, responseId: String, visible: Bool) {
-        controller.recoverResponse(
+        recovery.recoverResponse(
             messageId: message.id,
             responseId: responseId,
             preferStreamingResume: message.usedBackgroundMode,

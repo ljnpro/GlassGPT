@@ -1,8 +1,8 @@
 import ChatDomain
 import ChatPersistenceSwiftData
+import GeneratedFilesCore
 import SnapshotTesting
 import SwiftUI
-import GeneratedFilesCore
 import XCTest
 @testable import NativeChatComposition
 @testable import NativeChatUI
@@ -120,20 +120,20 @@ final class SnapshotViewTests: XCTestCase {
         }
 
         let gatewayViewModel = makeSettingsSnapshotViewModel()
-        gatewayViewModel.apiKey = "sk-gateway"
-        gatewayViewModel.cloudflareEnabled = true
-        gatewayViewModel.cloudflareHealthStatus = .connected
-        gatewayViewModel.generatedImageCacheSizeBytes = 12_800
-        gatewayViewModel.generatedDocumentCacheSizeBytes = 65_536
+        gatewayViewModel.credentials.apiKey = "sk-gateway"
+        gatewayViewModel.defaults.cloudflareEnabled = true
+        gatewayViewModel.credentials.cloudflareHealthStatus = .connected
+        gatewayViewModel.cache.generatedImageCacheSizeBytes = 12800
+        gatewayViewModel.cache.generatedDocumentCacheSizeBytes = 65536
         assertViewSnapshots(named: "settings-gateway") {
             SettingsView(viewModel: gatewayViewModel)
         }
 
         let unavailableGatewayViewModel = makeSettingsSnapshotViewModel()
-        unavailableGatewayViewModel.cloudflareEnabled = true
-        unavailableGatewayViewModel.cloudflareHealthStatus = .gatewayUnavailable
-        unavailableGatewayViewModel.generatedImageCacheSizeBytes = 1_024
-        unavailableGatewayViewModel.generatedDocumentCacheSizeBytes = 0
+        unavailableGatewayViewModel.defaults.cloudflareEnabled = true
+        unavailableGatewayViewModel.credentials.cloudflareHealthStatus = .gatewayUnavailable
+        unavailableGatewayViewModel.cache.generatedImageCacheSizeBytes = 1024
+        unavailableGatewayViewModel.cache.generatedDocumentCacheSizeBytes = 0
         assertViewSnapshots(named: "settings-gateway-unavailable") {
             SettingsView(viewModel: unavailableGatewayViewModel)
         }
@@ -232,13 +232,13 @@ final class SnapshotViewTests: XCTestCase {
                 attachments: [
                     FileAttachment(
                         filename: "report.pdf",
-                        fileSize: 12_800,
+                        fileSize: 12800,
                         fileType: "pdf",
                         uploadStatus: .uploaded
                     ),
                     FileAttachment(
                         filename: "chart.png",
-                        fileSize: 8_192,
+                        fileSize: 8192,
                         fileType: "png",
                         uploadStatus: .uploading
                     ),
@@ -329,9 +329,9 @@ private struct SnapshotModelSelectorHost: View {
     private var backgroundColor: Color {
         switch variant.appTheme {
         case .dark:
-            return .black
+            .black
         default:
-            return Color(.systemBackground)
+            Color(.systemBackground)
         }
     }
 }

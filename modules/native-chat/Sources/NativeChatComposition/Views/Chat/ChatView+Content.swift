@@ -1,12 +1,11 @@
-import ChatUIComponents
+import ChatDomain
 import ChatPersistenceSwiftData
+import ChatUIComponents
 import NativeChatUI
 import SwiftUI
-import ChatDomain
 import UIKit
 
 extension ChatView {
-    @ViewBuilder
     var chatContent: some View {
         ChatScrollContainer(
             content: AnyView(chatMessagesContent),

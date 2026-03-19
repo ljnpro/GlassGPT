@@ -94,65 +94,92 @@ final class BackgroundTaskCoordinator: NSObject {
 
 @MainActor
 final class ChatLifecycleCoordinator {
-    unowned let controller: ChatController
+    unowned let state: any (
+        ChatConversationSelectionAccess &
+            ChatMessageListAccess &
+            ChatBootstrapStateAccess
+    )
+    unowned let services: any (
+        ChatPersistenceAccess &
+            ChatTransportServiceAccess &
+            ChatBackgroundTaskAccess &
+            ChatRuntimeRegistryAccess
+    )
+    unowned var sessions: (any ChatSessionManaging)!
+    unowned var recoveryMaintenance: (any ChatRecoveryMaintenanceManaging)!
+    unowned var conversations: (any ChatConversationManaging)!
 
-    init(controller: ChatController) {
-        self.controller = controller
+    init(
+        state: any(
+            ChatConversationSelectionAccess &
+                ChatMessageListAccess &
+                ChatBootstrapStateAccess
+        ),
+        services: any(
+            ChatPersistenceAccess &
+                ChatTransportServiceAccess &
+                ChatBackgroundTaskAccess &
+                ChatRuntimeRegistryAccess
+        )
+    ) {
+        self.state = state
+        self.services = services
     }
 
     func setupLifecycleObservers() {
-        controller.backgroundTaskCoordinator.startObservingLifecycle { [weak controller] in
-            controller?.handleEnterBackground()
-        } onDidEnterBackground: { [weak controller] in
-            controller?.handleDidEnterBackground()
-        } onDidBecomeActive: { [weak controller] in
-            controller?.handleReturnToForeground()
+        services.backgroundTaskCoordinator.startObservingLifecycle { [weak self] in
+            self?.handleEnterBackground()
+        } onDidEnterBackground: { [weak self] in
+            self?.handleDidEnterBackground()
+        } onDidBecomeActive: { [weak self] in
+            self?.handleReturnToForeground()
         }
     }
 
     func handleEnterBackground() {
-        if !controller.sessionRegistry.allSessions.isEmpty {
-            for session in controller.sessionRegistry.allSessions {
-                controller.sessionCoordinator.saveSessionNow(session)
+        if !services.sessionRegistry.allSessions.isEmpty {
+            for session in services.sessionRegistry.allSessions {
+                sessions.saveSessionNow(session)
             }
 
-            controller.backgroundTaskCoordinator.beginLongRunningTask(named: "StreamCompletion") { [weak controller] in
-                guard let controller else { return }
-                controller.sessionCoordinator.suspendActiveSessionsForAppBackground()
-                controller.endBackgroundTask()
+            services.backgroundTaskCoordinator.beginLongRunningTask(named: "StreamCompletion") { [weak self] in
+                guard let self else { return }
+                sessions.suspendActiveSessionsForAppBackground()
+                endBackgroundTask()
             }
         }
 
-        if let conversation = controller.currentConversation,
+        if let conversation = state.currentConversation,
            conversation.title == "New Chat",
-           controller.messages.count >= 2 {
-            controller.backgroundTaskCoordinator.runTransientTask(named: "TitleGeneration") { [weak controller] in
-                guard let controller else { return }
-                await controller.generateTitle()
+           state.messages.count >= 2 {
+            services.backgroundTaskCoordinator.runTransientTask(named: "TitleGeneration") { [weak self] in
+                guard let self else { return }
+                await generateTitle()
             }
         }
     }
 
     func handleDidEnterBackground() {
-        guard !controller.sessionRegistry.allSessions.isEmpty else { return }
-        for session in controller.sessionRegistry.allSessions {
-            controller.sessionCoordinator.saveSessionNow(session)
+        guard !services.sessionRegistry.allSessions.isEmpty else { return }
+        for session in services.sessionRegistry.allSessions {
+            sessions.saveSessionNow(session)
         }
     }
 
     func handleReturnToForeground() {
-        guard controller.didCompleteLaunchBootstrap else { return }
+        guard state.didCompleteLaunchBootstrap else { return }
 
         endBackgroundTask()
-        controller.sessionCoordinator.refreshVisibleBindingForCurrentConversation()
+        sessions.refreshVisibleBindingForCurrentConversation()
 
-        Task { @MainActor in
-            await controller.recoverIncompleteMessagesInCurrentConversation()
-            await controller.recoverIncompleteMessages()
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            await recoveryMaintenance.recoverIncompleteMessagesInCurrentConversation()
+            await recoveryMaintenance.recoverIncompleteMessages()
         }
     }
 
     func endBackgroundTask() {
-        controller.backgroundTaskCoordinator.endBackgroundTask()
+        services.backgroundTaskCoordinator.endBackgroundTask()
     }
 }

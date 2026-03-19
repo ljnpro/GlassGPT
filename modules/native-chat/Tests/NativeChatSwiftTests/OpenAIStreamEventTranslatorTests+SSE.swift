@@ -8,7 +8,7 @@ import Testing
 // MARK: - SSE Event Decoder Tests
 
 extension OpenAIStreamEventTranslatorTests {
-    @Test func sseDecoderTracksThinkingDeltaAndSequence() async throws {
+    @Test func `sse decoder tracks thinking delta and sequence`() async {
         var decoder = SSEEventDecoder()
         let continuation = makeTestAsyncStream() as (
             stream: AsyncStream<StreamEvent>,
@@ -41,19 +41,19 @@ extension OpenAIStreamEventTranslatorTests {
         if case .thinkingStarted = emitted[0] {} else {
             Issue.record("Expected thinkingStarted as first emitted event")
         }
-        if case .thinkingDelta(let delta) = emitted[1] {
+        if case let .thinkingDelta(delta) = emitted[1] {
             #expect(delta == "plan")
         } else {
             Issue.record("Expected thinkingDelta as second emitted event")
         }
-        if case .sequenceUpdate(let sequence) = emitted[2] {
+        if case let .sequenceUpdate(sequence) = emitted[2] {
             #expect(sequence == 3)
         } else {
             Issue.record("Expected sequenceUpdate as third emitted event")
         }
     }
 
-    @Test func sseDecoderHandlesTerminalCompletedPayload() async throws {
+    @Test func `sse decoder handles terminal completed payload`() throws {
         var decoder = SSEEventDecoder()
         let continuation = makeTestAsyncStream() as (
             stream: AsyncStream<StreamEvent>,
@@ -80,7 +80,7 @@ extension OpenAIStreamEventTranslatorTests {
         #expect(decoder.sawTerminalEvent)
     }
 
-    @Test func sseDecoderHandlesOutputDoneAndIncompleteTerminal() async throws {
+    @Test func `sse decoder handles output done and incomplete terminal`() async throws {
         var decoder = SSEEventDecoder()
         let continuation = makeTestAsyncStream() as (
             stream: AsyncStream<StreamEvent>,
@@ -114,7 +114,7 @@ extension OpenAIStreamEventTranslatorTests {
         if case .continued = outputDoneResult {} else {
             Issue.record("Expected output_text.done to continue")
         }
-        if case .terminalIncomplete(let message) = incompleteResult {
+        if case let .terminalIncomplete(message) = incompleteResult {
             #expect(message == "needs recovery")
         } else {
             Issue.record("Expected incomplete terminal result")
@@ -128,7 +128,7 @@ extension OpenAIStreamEventTranslatorTests {
         )
     }
 
-    @Test func sseDecoderEmitsResponseIdentifierFromInProgressFrames() async throws {
+    @Test func `sse decoder emits response identifier from in progress frames`() async throws {
         var decoder = SSEEventDecoder()
         let continuation = makeTestAsyncStream() as (
             stream: AsyncStream<StreamEvent>,
@@ -165,7 +165,7 @@ extension OpenAIStreamEventTranslatorTests {
         #expect(decoder.emittedResponseID == "resp_in_progress")
     }
 
-    @Test func sseDecoderDoesNotDuplicateResponseIdentifier() async throws {
+    @Test func `sse decoder does not duplicate response identifier`() async throws {
         var decoder = SSEEventDecoder()
         let continuation = makeTestAsyncStream() as (
             stream: AsyncStream<StreamEvent>,
@@ -204,7 +204,7 @@ extension OpenAIStreamEventTranslatorTests {
         )
     }
 
-    @Test func sseFrameBufferReassemblesChunkedFrames() {
+    @Test func `sse frame buffer reassembles chunked frames`() {
         var buffer = SSEFrameBuffer()
 
         #expect(
