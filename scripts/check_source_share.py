@@ -1,13 +1,10 @@
 #!/usr/bin/env python3
 
-from __future__ import annotations
-
 import json
 import os
 import sys
 from dataclasses import dataclass
 from pathlib import Path
-
 
 ROOT = Path(__file__).resolve().parent.parent
 SOURCES_ROOT = ROOT / "modules" / "native-chat" / "Sources"
@@ -88,7 +85,7 @@ def main() -> int:
         if summary.loc == 0:
             failures.append(f"{summary.name} contains no production Swift code")
 
-    report = {
+    report: dict[str, object] = {
         "sources_total_loc": sources_total_loc,
         "sources_non_boundary_loc": sources_total_loc,
         "ios_loc": ios_loc,

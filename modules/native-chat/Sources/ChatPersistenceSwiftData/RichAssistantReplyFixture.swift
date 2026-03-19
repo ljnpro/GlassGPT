@@ -2,11 +2,16 @@ import ChatDomain
 import Foundation
 import SwiftData
 
+/// Test fixture that provides sample conversation data with rich Markdown content.
 public enum RichAssistantReplyFixture {
+    /// Sample user prompt text (Chinese).
     public static let userPrompt = "写个1000词抒情文章"
+    /// Default conversation title for prose fixtures.
     public static let conversationTitle = "Rich Markdown Sample"
+    /// Default conversation title for code-block fixtures.
     public static let codeConversationTitle = "Rich Markdown Code Sample"
 
+    /// Sample assistant reply containing multi-paragraph prose.
     public static let assistantReply = """
     当然。下面是一篇中文抒情短文，题目自拟，风格偏细腻温柔。
 
@@ -21,6 +26,7 @@ public enum RichAssistantReplyFixture {
     人也许就是靠着这些光，学会与自己和解。后来我们才慢慢明白，真正让人坚定下来的，不是喧腾的胜利，而是在疲惫与沉默里，依然愿意替自己留下一点温柔和希望。
     """
 
+    /// Sample assistant reply containing an embedded Swift code block.
     public static let assistantReplyWithCodeBlock = """
     当然。下面是一段带有代码示例的说明，外层依然应该保持为同一个 assistant 气泡。
 
@@ -43,6 +49,7 @@ public enum RichAssistantReplyFixture {
     当代码块结束后，后面的段落也应该继续留在同一个消息里，而不是被切成新的外层卡片。这样用户看到的仍然是一条完整答复。
     """
 
+    /// Creates a ``Conversation`` populated with a user message and an assistant reply.
     public static func makeConversation(
         title: String = conversationTitle,
         userPrompt: String = userPrompt,
@@ -76,6 +83,7 @@ public enum RichAssistantReplyFixture {
         return conversation
     }
 
+    /// Inserts the conversation and all its messages into the given model context and saves.
     public static func insertConversation(
         _ conversation: Conversation,
         into modelContext: ModelContext

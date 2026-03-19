@@ -2,6 +2,18 @@ import ChatDomain
 import Foundation
 
 public extension OpenAIRequestFactory {
+    /// Builds a streaming chat completion request with tools enabled.
+    /// - Parameters:
+    ///   - apiKey: The API key for authentication.
+    ///   - messages: The conversation message history.
+    ///   - model: The model to use.
+    ///   - reasoningEffort: The reasoning effort level.
+    ///   - backgroundModeEnabled: Whether background mode is enabled.
+    ///   - serviceTier: The service tier for the request.
+    ///   - vectorStoreIds: Optional vector store IDs for file search.
+    ///   - useDirectBaseURL: Whether to force the direct OpenAI endpoint.
+    /// - Returns: A configured URL request for streaming.
+    /// - Throws: If URL or body encoding fails.
     func streamingRequest(
         apiKey: String,
         messages: [APIMessage],
@@ -60,6 +72,14 @@ public extension OpenAIRequestFactory {
         )
     }
 
+    /// Builds a streaming recovery request to resume from a given sequence number.
+    /// - Parameters:
+    ///   - responseID: The API response identifier to resume.
+    ///   - startingAfter: The sequence number to resume after.
+    ///   - apiKey: The API key for authentication.
+    ///   - useDirectBaseURL: Whether to force the direct OpenAI endpoint.
+    /// - Returns: A configured URL request for stream recovery.
+    /// - Throws: If URL construction fails.
     func recoveryRequest(
         responseID: String,
         startingAfter: Int,
@@ -93,6 +113,14 @@ public extension OpenAIRequestFactory {
         return request
     }
 
+    /// Builds a non-streaming request for generating a conversation title.
+    /// - Parameters:
+    ///   - conversationPreview: A preview of the conversation text.
+    ///   - apiKey: The API key for authentication.
+    ///   - modelIdentifier: The model to use. Defaults to "gpt-5.4".
+    ///   - useDirectBaseURL: Whether to force the direct OpenAI endpoint.
+    /// - Returns: A configured URL request for title generation.
+    /// - Throws: If URL or body encoding fails.
     func titleRequest(
         conversationPreview: String,
         apiKey: String,
@@ -102,6 +130,7 @@ public extension OpenAIRequestFactory {
         let body = try JSONCoding.encode(
             ResponsesTitleRequestDTO(
                 model: modelIdentifier,
+                // swiftlint:disable:next line_length
                 instructions: "Generate a very short title (2-4 words max) for this conversation. Return only the title, no quotes, no punctuation at the end.",
                 input: [
                     ResponsesInputMessageDTO(
@@ -127,6 +156,11 @@ public extension OpenAIRequestFactory {
         )
     }
 
+    /// Converts API messages into the DTO format expected by the Responses API.
+    ///
+    /// Multi-modal messages (images, file attachments) are encoded as item arrays.
+    /// - Parameter messages: The messages to convert.
+    /// - Returns: An array of input message DTOs.
     static func buildInputMessages(messages: [APIMessage]) -> [ResponsesInputMessageDTO] {
         var input: [ResponsesInputMessageDTO] = []
 

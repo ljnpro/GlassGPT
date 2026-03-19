@@ -1,6 +1,8 @@
 import Foundation
 
 extension FileDownloadService {
+    /// Prefetches a generated image and validates it can be rendered, returning its local URL.
+    /// - Throws: ``FileDownloadError/invalidImageData`` if the downloaded file is not a valid image.
     public func prefetchGeneratedImage(
         fileId: String,
         containerId: String?,
@@ -21,6 +23,7 @@ extension FileDownloadService {
         return resource.localURL
     }
 
+    /// Returns the local URL of a cached generated image, or `nil` if not cached or not an image.
     public func cachedGeneratedImageURL(
         fileId: String,
         containerId: String?,

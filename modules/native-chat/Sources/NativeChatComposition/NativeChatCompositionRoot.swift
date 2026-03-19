@@ -8,10 +8,12 @@ import OpenAITransport
 import SwiftData
 
 @MainActor
+/// Composition root that wires up all dependencies and creates the ``NativeChatAppStore``.
 package struct NativeChatCompositionRoot {
     let modelContext: ModelContext
     let bootstrapPolicy: FeatureBootstrapPolicy
 
+    /// Creates the composition root with the given SwiftData model context and bootstrap policy.
     package init(
         modelContext: ModelContext,
         bootstrapPolicy: FeatureBootstrapPolicy = .live
@@ -20,6 +22,8 @@ package struct NativeChatCompositionRoot {
         self.bootstrapPolicy = bootstrapPolicy
     }
 
+    /// Assembles all services, controllers, and coordinators and returns a fully configured ``NativeChatAppStore``.
+    // swiftlint:disable:next function_body_length
     package func makeAppStore() -> NativeChatAppStore {
         let settingsStore = SettingsStore()
 

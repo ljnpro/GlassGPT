@@ -1,6 +1,7 @@
 import SwiftUI
 
 public extension View {
+    /// Conditionally applies a transform to the view, returning the original view when the condition is false.
     @ViewBuilder
     func applyingIf<Transformed: View>(
         _ condition: Bool,
@@ -13,6 +14,7 @@ public extension View {
         }
     }
 
+    /// Applies a ``StableRoundedGlassModifier`` with the given parameters.
     func stableRoundedGlass(
         cornerRadius: CGFloat,
         interactive: Bool = false,
@@ -27,6 +29,7 @@ public extension View {
         ))
     }
 
+    /// Applies a ``StaticRoundedGlassShellModifier`` with the given parameters.
     func staticRoundedGlassShell(
         cornerRadius: CGFloat,
         innerInset: CGFloat = 1

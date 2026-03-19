@@ -1,7 +1,10 @@
 import UIKit
 
 @MainActor
+/// UIKit container that hosts a ``PlaceholderTextView`` over a glass background,
+/// adjusting corner radius dynamically as the text field grows from single-line to multi-line.
 public final class ComposerHostingView: UIView {
+    /// The editable text view displayed inside this composer.
     public let textView = PlaceholderTextView()
 
     private let glassBackgroundView: GlassBackgroundHostingView
@@ -13,6 +16,7 @@ public final class ComposerHostingView: UIView {
     private let textViewMaskLayer = CAShapeLayer()
     private var currentCornerRadius: CGFloat
 
+    /// Creates a composer hosting view with the given corner radius and opacity configuration.
     public init(
         singleLineCornerRadius: CGFloat,
         multilineCornerRadius: CGFloat,
@@ -56,6 +60,7 @@ public final class ComposerHostingView: UIView {
         textView.applyTransparentCanvasStyleIfNeeded()
     }
 
+    /// Updates the text content, placeholder string, and insets of the inner text view.
     public func configure(text: String, placeholder: String, textInsets: UIEdgeInsets) {
         if textView.text != text {
             textView.text = text
@@ -72,6 +77,7 @@ public final class ComposerHostingView: UIView {
         textView.updatePlaceholderVisibility()
     }
 
+    /// Transitions the glass background corner radius based on the given content height.
     public func applyHeight(_ height: CGFloat) {
         let nextCornerRadius = preferredCornerRadius(for: height)
         guard abs(nextCornerRadius - currentCornerRadius) > 0.5 || height == 0 else { return }

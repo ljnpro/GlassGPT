@@ -3,11 +3,15 @@ import SwiftUI
 import Foundation
 @preconcurrency import WebKit
 
+/// A segment of inline content, either plain text or an inline LaTeX expression.
 package enum InlineSegment: Sendable {
+    /// A plain text segment.
     case text(String)
+    /// An inline LaTeX expression.
     case latexInline(String)
 }
 
+/// A block-level part of parsed Markdown content.
 package enum BlockPart: Identifiable, Sendable {
     case richText(id: Int, segments: [InlineSegment])
     case heading(id: Int, level: Int, text: String)
@@ -15,6 +19,7 @@ package enum BlockPart: Identifiable, Sendable {
     case latexBlock(id: Int, content: String)
     case codeBlock(id: Int, language: String?, code: String)
 
+    /// Stable identifier for this block part.
     package var id: Int {
         switch self {
         case let .richText(id, _):
@@ -33,9 +38,13 @@ package enum BlockPart: Identifiable, Sendable {
 
 // MARK: - Markdown Content View
 
+/// Renders Markdown text with support for headings, code blocks, LaTeX, and inline formatting.
 package struct MarkdownContentView: View {
+    /// Controls whether the view renders with a glass bubble or as plain content.
     package enum SurfaceStyle {
+        /// Renders without a surrounding bubble.
         case plain
+        /// Renders inside an assistant glass bubble, with streaming-aware styling.
         case assistant(isLive: Bool)
     }
 
@@ -44,6 +53,7 @@ package struct MarkdownContentView: View {
     var onSandboxLinkTap: ((String, FilePathAnnotation?) -> Void)?
     var surfaceStyle: SurfaceStyle = .plain
 
+    /// Creates a Markdown content view with the given text and optional annotations.
     package init(
         text: String,
         filePathAnnotations: [FilePathAnnotation] = [],

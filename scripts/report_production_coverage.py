@@ -1,16 +1,17 @@
 #!/usr/bin/env python3
 
-from __future__ import annotations
-
 import argparse
 import json
 import os
 import subprocess
 import sys
 import tempfile
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
+from typing import TYPE_CHECKING, Any
 
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -20,20 +21,12 @@ class CoverageGroup:
     name: str
     threshold: float
     prefixes: list[str]
-    exact_paths: list[str] | None = None
-    exclude_prefixes: list[str] | None = None
+    exact_paths: list[str] = field(default_factory=list)
+    exclude_prefixes: list[str] = field(default_factory=list)
     required: bool = True
     covered: int = 0
     executable: int = 0
-    files: list[str] | None = None
-
-    def __post_init__(self) -> None:
-        if self.files is None:
-            self.files = []
-        if self.exact_paths is None:
-            self.exact_paths = []
-        if self.exclude_prefixes is None:
-            self.exclude_prefixes = []
+    files: list[str] = field(default_factory=list)
 
     @property
     def coverage(self) -> float:
@@ -49,9 +42,13 @@ class CoverageGroup:
 
     @property
     def status(self) -> str:
-        if not self.required:
-            return "INFO"
-        return "PASS" if self.ok else "FAIL"
+        match (self.required, self.ok):
+            case (False, _):
+                return "INFO"
+            case (_, True):
+                return "PASS"
+            case _:
+                return "FAIL"
 
 
 def run_command(args: list[str]) -> str:
@@ -92,7 +89,7 @@ def materialize_xccov_path(source: Path, destination: Path) -> Path:
     return destination
 
 
-def with_merged_report(sources: list[Path], handler):
+def with_merged_report[T](sources: list[Path], handler: Callable[[Path], T]) -> T:
     if not sources:
         raise RuntimeError("At least one coverage source is required.")
 
@@ -127,8 +124,8 @@ def with_merged_report(sources: list[Path], handler):
         return handler(merged_report)
 
 
-def load_xccov_json(sources: list[Path]) -> dict:
-    def _load(report_path: Path) -> dict:
+def load_xccov_json(sources: list[Path]) -> dict[str, Any]:
+    def _load(report_path: Path) -> dict[str, Any]:
         output = run_command(["xcrun", "xccov", "view", "--json", str(report_path)])
         return json.loads(output)
 
@@ -143,8 +140,8 @@ def write_raw_report(sources: list[Path], output: Path) -> None:
     output.write_text(text, encoding="utf-8")
 
 
-def iter_files(payload: dict) -> list[dict]:
-    items_by_path: dict[str, dict] = {}
+def iter_files(payload: dict[str, Any]) -> list[dict[str, Any]]:
+    items_by_path: dict[str, dict[str, Any]] = {}
     for target in payload.get("targets", []):
         for file in target.get("files", []) or []:
             path = file.get("path")
@@ -247,15 +244,15 @@ def build_groups() -> list[CoverageGroup]:
     ]
 
 
-def apply_coverage(groups: list[CoverageGroup], file_entries: list[dict]) -> None:
-    exact_path_sets = [set(group.exact_paths or []) for group in groups]
+def apply_coverage(groups: list[CoverageGroup], file_entries: list[dict[str, Any]]) -> None:
+    exact_path_sets = [set(group.exact_paths) for group in groups]
     for file in file_entries:
         path = file.get("path")
         covered = int(file.get("coveredLines", 0))
         executable = int(file.get("executableLines", 0))
         if not path or executable == 0:
             continue
-        for group, exact_paths in zip(groups, exact_path_sets):
+        for group, exact_paths in zip(groups, exact_path_sets, strict=True):
             matched = path in exact_paths
             if not matched and group.prefixes:
                 matched = any(path.startswith(prefix) for prefix in group.prefixes)
@@ -274,7 +271,7 @@ def validate_group_file_membership(groups: list[CoverageGroup]) -> list[str]:
     for group in groups:
         if not group.required:
             continue
-        for path in sorted(set(group.files or [])):
+        for path in sorted(set(group.files)):
             if any(segment in path for segment in forbidden_segments):
                 failures.append(f"Coverage group {group.name} matched non-production path: {path}")
 
@@ -291,14 +288,14 @@ def write_report(groups: list[CoverageGroup], output: Path) -> None:
         if group.executable == 0:
             lines.append("  no matching production files were present in the xccov report")
         else:
-            unique_files = len(set(group.files or []))
+            unique_files = len(set(group.files))
             lines.append(f"  matched files: {unique_files}")
         lines.append("")
     output.write_text("\n".join(lines), encoding="utf-8")
 
 
 def write_summary(groups: list[CoverageGroup], output: Path) -> None:
-    payload = {
+    payload: dict[str, Any] = {
         "groups": [
             {
                 "name": group.name,
@@ -307,7 +304,7 @@ def write_summary(groups: list[CoverageGroup], output: Path) -> None:
                 "executableLines": group.executable,
                 "coverage": group.coverage,
                 "ok": group.ok,
-                "matchedFiles": sorted(set(group.files or [])),
+                "matchedFiles": sorted(set(group.files)),
                 "required": group.required,
                 "status": group.status,
             }

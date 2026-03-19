@@ -18,6 +18,7 @@ final class ReleaseResetCoordinatorTests: XCTestCase {
         super.tearDown()
     }
 
+    // swiftlint:disable:next function_body_length
     func testPerformIfNeededDeletesStoreCachePreviewAndClearsDefaults() throws {
         let appSupport = tempRoot.appendingPathComponent("Application Support", isDirectory: true)
         let caches = tempRoot.appendingPathComponent("Caches", isDirectory: true)

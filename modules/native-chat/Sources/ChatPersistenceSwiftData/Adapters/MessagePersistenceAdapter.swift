@@ -2,10 +2,15 @@ import ChatDomain
 import Foundation
 import OpenAITransport
 
+/// Applies streaming reply session data to a SwiftData ``Message`` entity.
+///
+/// All methods are `@MainActor`-isolated because they mutate SwiftData model objects.
 @MainActor
 public struct MessagePersistenceAdapter {
+    /// Creates a new adapter.
     public init() {}
 
+    /// Persists the current streaming state as an incomplete draft on the message.
     public func saveDraftState(from session: ReplySessionSnapshot, to message: Message) {
         applySessionPayload(session, to: message)
         message.lastSequenceNumber = session.lastSequenceNumber
@@ -15,6 +20,7 @@ public struct MessagePersistenceAdapter {
         message.conversation?.updatedAt = .now
     }
 
+    /// Marks the message as complete using the final session snapshot data.
     public func finalizeCompletedSession(from session: ReplySessionSnapshot, to message: Message) {
         applySessionPayload(session, to: message)
         message.isComplete = true
@@ -23,6 +29,7 @@ public struct MessagePersistenceAdapter {
         message.conversation?.updatedAt = .now
     }
 
+    /// Finalizes a session that was interrupted, preserving whatever content is available.
     public func finalizePartialSession(from session: ReplySessionSnapshot, to message: Message) {
         let content = session.currentText.isEmpty ? message.content : session.currentText
         let thinking = session.currentThinking.isEmpty ? message.thinking : session.currentThinking
@@ -37,6 +44,7 @@ public struct MessagePersistenceAdapter {
         message.conversation?.updatedAt = .now
     }
 
+    /// Applies a recovered API response result to a draft message, using fallback text if the result is empty.
     public func applyRecoveredResult(
         _ result: OpenAIResponseFetchResult?,
         to message: Message,
@@ -76,10 +84,12 @@ public struct MessagePersistenceAdapter {
         message.conversation?.updatedAt = .now
     }
 
+    /// Replaces the file-path annotations on a message with an updated set.
     public func refreshFileAnnotations(_ annotations: [FilePathAnnotation], on message: Message) {
         MessagePayloadStore.setFilePathAnnotations(annotations, on: message)
     }
 
+    /// Replaces the file attachments on a message.
     public func setFileAttachments(_ attachments: [FileAttachment], on message: Message) {
         MessagePayloadStore.setFileAttachments(attachments, on: message)
     }
@@ -93,16 +103,26 @@ public struct MessagePersistenceAdapter {
     }
 }
 
+/// Immutable snapshot of a streaming reply session's state, used to persist draft or final content.
 public struct ReplySessionSnapshot: Sendable {
+    /// The accumulated assistant reply text so far.
     public let currentText: String
+    /// The accumulated reasoning/thinking text so far.
     public let currentThinking: String
+    /// Tool calls emitted during the session.
     public let toolCalls: [ToolCallInfo]
+    /// URL citations referenced in the reply.
     public let citations: [URLCitation]
+    /// File-path annotations referenced in the reply.
     public let filePathAnnotations: [FilePathAnnotation]
+    /// The last SSE sequence number received, used for resumption.
     public let lastSequenceNumber: Int?
+    /// The OpenAI response identifier, used for recovery.
     public let responseId: String?
+    /// Whether the request was sent with background mode enabled.
     public let requestUsesBackgroundMode: Bool
 
+    /// Creates a session snapshot.
     public init(
         currentText: String,
         currentThinking: String,

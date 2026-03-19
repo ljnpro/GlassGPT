@@ -1,0 +1,16 @@
+--indent 4
+--indentcase false
+--trimwhitespace always
+--importgrouping testable-bottom
+--commas always
+--decimalgrouping 3,6
+--header strip
+--ifdef no-indent
+--redundanttype inferred
+--self remove
+--semicolons never
+--wraparguments before-first
+--wrapparameters before-first
+--wrapcollections before-first
+--maxwidth 200
+--swiftversion 6.2

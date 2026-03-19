@@ -1,10 +1,16 @@
 import Foundation
 
 public extension OpenAIService {
+    /// Cancels the currently active streaming session, if any.
     func cancelStream() {
         streamClient.cancel()
     }
 
+    /// Cancels an in-progress response on the API, with gateway fallback.
+    /// - Parameters:
+    ///   - responseId: The API response identifier to cancel.
+    ///   - apiKey: The API key for authentication.
+    /// - Throws: ``OpenAIServiceError`` if cancellation fails on all routes.
     func cancelResponse(responseId: String, apiKey: String) async throws {
         do {
             try await cancelResponse(
@@ -25,6 +31,12 @@ public extension OpenAIService {
         }
     }
 
+    /// Generates a short conversation title from a preview of the conversation text.
+    /// - Parameters:
+    ///   - conversationPreview: A preview of the conversation text.
+    ///   - apiKey: The API key for authentication.
+    /// - Returns: The generated title string.
+    /// - Throws: ``OpenAIServiceError`` if title generation fails.
     func generateTitle(for conversationPreview: String, apiKey: String) async throws -> String {
         let request = try requestBuilder.titleRequest(
             conversationPreview: conversationPreview,
@@ -34,6 +46,12 @@ public extension OpenAIService {
         return try responseParser.parseGeneratedTitle(data: data, response: response)
     }
 
+    /// Fetches a completed response by ID, with gateway fallback.
+    /// - Parameters:
+    ///   - responseId: The API response identifier to fetch.
+    ///   - apiKey: The API key for authentication.
+    /// - Returns: The structured fetch result.
+    /// - Throws: ``OpenAIServiceError`` if fetching fails on all routes.
     func fetchResponse(responseId: String, apiKey: String) async throws -> OpenAIResponseFetchResult {
         do {
             return try await fetchResponse(
@@ -54,6 +72,9 @@ public extension OpenAIService {
         }
     }
 
+    /// Validates an API key by attempting to list models.
+    /// - Parameter apiKey: The API key to validate.
+    /// - Returns: `true` if the key is valid (returns HTTP 200).
     func validateAPIKey(_ apiKey: String) async -> Bool {
         let request: URLRequest
         do {
@@ -70,6 +91,9 @@ public extension OpenAIService {
         }
     }
 
+    /// Returns a URL request for listing models, or `nil` if construction fails.
+    /// - Parameter apiKey: The API key for authentication.
+    /// - Returns: A configured URL request, or `nil`.
     func modelsRequest(apiKey: String) -> URLRequest? {
         do {
             return try requestBuilder.modelsRequest(apiKey: apiKey)

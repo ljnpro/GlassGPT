@@ -1,13 +1,19 @@
 import SwiftUI
 
+/// View modifier that applies a rounded glass material background with a stable fill overlay.
 public struct StableRoundedGlassModifier: ViewModifier {
+    /// Corner radius of the glass shape.
     public let cornerRadius: CGFloat
+    /// Whether the glass effect responds to touch interactions.
     public var interactive: Bool
+    /// Inset between the outer material shape and the inner fill shape.
     public var innerInset: CGFloat
+    /// Opacity of the stable solid fill overlaid on the material.
     public var stableFillOpacity: Double
 
     @Environment(\.colorScheme) private var colorScheme
 
+    /// Creates a stable rounded glass modifier with the given visual parameters.
     public init(
         cornerRadius: CGFloat,
         interactive: Bool = false,
@@ -20,6 +26,7 @@ public struct StableRoundedGlassModifier: ViewModifier {
         self.stableFillOpacity = stableFillOpacity
     }
 
+    /// Wraps the content in a rounded glass material with a stable solid fill.
     public func body(content: Content) -> some View {
         let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
 
@@ -44,17 +51,22 @@ public struct StableRoundedGlassModifier: ViewModifier {
     }
 }
 
+/// View modifier that applies a non-interactive rounded glass shell with gradient highlights, suitable for static containers.
 public struct StaticRoundedGlassShellModifier: ViewModifier {
+    /// Corner radius of the shell shape.
     public let cornerRadius: CGFloat
+    /// Inset between the outer border and the inner highlighted fill.
     public var innerInset: CGFloat
 
     @Environment(\.colorScheme) private var colorScheme
 
+    /// Creates a static glass shell modifier with the given corner radius and inset.
     public init(cornerRadius: CGFloat, innerInset: CGFloat = 1) {
         self.cornerRadius = cornerRadius
         self.innerInset = innerInset
     }
 
+    /// Wraps the content in a rounded shell with base fill, inner fill, and top-to-bottom highlight gradient.
     public func body(content: Content) -> some View {
         let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
 

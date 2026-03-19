@@ -3,7 +3,14 @@ import ChatRuntimeModel
 import Foundation
 
 extension ReplySessionActor {
+    /// Applies a transition to the session state and returns the updated state.
+    ///
+    /// Content transitions (text, thinking, tool calls, citations) are handled inline.
+    /// Lifecycle transitions are delegated to ``applyLifecycleTransition(_:)``.
+    /// - Parameter transition: The transition to apply.
+    /// - Returns: The updated runtime state.
     @discardableResult
+    // swiftlint:disable:next cyclomatic_complexity function_body_length
     public func apply(_ transition: ReplyRuntimeTransition) -> ReplyRuntimeState {
         switch transition {
         case .beginSubmitting:

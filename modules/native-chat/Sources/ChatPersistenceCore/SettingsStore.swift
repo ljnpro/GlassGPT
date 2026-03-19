@@ -1,54 +1,76 @@
 import ChatDomain
 import Foundation
 
+/// Abstraction over `UserDefaults` for reading and writing settings values.
 public protocol SettingsValueStore: AnyObject {
+    /// Returns the object associated with the given key, or `nil`.
     func object(forKey defaultName: String) -> Any?
+    /// Returns the string associated with the given key, or `nil`.
     func string(forKey defaultName: String) -> String?
+    /// Returns the Boolean value associated with the given key.
     func bool(forKey defaultName: String) -> Bool
+    /// Sets the value for the given key.
     func set(_ value: Any?, forKey defaultName: String)
 }
 
+/// Concrete ``SettingsValueStore`` backed by `UserDefaults`.
 public final class UserDefaultsSettingsValueStore: SettingsValueStore {
     private let defaults: UserDefaults
 
+    /// Creates a value store wrapping the given `UserDefaults` instance.
     public init(defaults: UserDefaults) {
         self.defaults = defaults
     }
 
+    /// Returns the object for the given key from `UserDefaults`.
     public func object(forKey defaultName: String) -> Any? {
         defaults.object(forKey: defaultName)
     }
 
+    /// Returns the string for the given key from `UserDefaults`.
     public func string(forKey defaultName: String) -> String? {
         defaults.string(forKey: defaultName)
     }
 
+    /// Returns the Boolean value for the given key from `UserDefaults`.
     public func bool(forKey defaultName: String) -> Bool {
         defaults.bool(forKey: defaultName)
     }
 
+    /// Sets the value for the given key in `UserDefaults`.
     public func set(_ value: Any?, forKey defaultName: String) {
         defaults.set(value, forKey: defaultName)
     }
 }
 
+/// Reads and writes user-facing settings, backed by a ``SettingsValueStore``.
 public final class SettingsStore {
+    /// `UserDefaults` keys for all persisted settings.
     public enum Keys {
+        /// Key for the default model preference.
         public static let defaultModel = "defaultModel"
+        /// Key for the default reasoning effort preference.
         public static let defaultEffort = "defaultEffort"
+        /// Key for the background mode toggle.
         public static let defaultBackgroundModeEnabled = "defaultBackgroundModeEnabled"
+        /// Key for the default service tier preference.
         public static let defaultServiceTier = "defaultServiceTier"
+        /// Key for the selected app theme.
         public static let appTheme = "appTheme"
+        /// Key for the haptic feedback toggle.
         public static let hapticEnabled = "hapticEnabled"
+        /// Key for the Cloudflare gateway toggle.
         public static let cloudflareGatewayEnabled = "cloudflareGatewayEnabled"
     }
 
     private let valueStore: any SettingsValueStore
 
+    /// Creates a settings store backed by the given value store.
     public init(valueStore: any SettingsValueStore = UserDefaultsSettingsValueStore(defaults: .standard)) {
         self.valueStore = valueStore
     }
 
+    /// The user's preferred default model. Falls back to `.gpt5_4_pro` if unset.
     public var defaultModel: ModelType {
         get {
             guard let raw = valueStore.string(forKey: Keys.defaultModel),
@@ -63,6 +85,7 @@ public final class SettingsStore {
         }
     }
 
+    /// The user's preferred reasoning effort, clamped to the current model's available efforts.
     public var defaultEffort: ReasoningEffort {
         get {
             guard let raw = valueStore.string(forKey: Keys.defaultEffort),
@@ -79,6 +102,7 @@ public final class SettingsStore {
         }
     }
 
+    /// Whether background mode is enabled by default for new conversations.
     public var defaultBackgroundModeEnabled: Bool {
         get {
             valueStore.object(forKey: Keys.defaultBackgroundModeEnabled) as? Bool ?? false
@@ -88,6 +112,7 @@ public final class SettingsStore {
         }
     }
 
+    /// The user's preferred OpenAI service tier. Falls back to `.standard` if unset.
     public var defaultServiceTier: ServiceTier {
         get {
             guard let raw = valueStore.string(forKey: Keys.defaultServiceTier),
@@ -102,6 +127,7 @@ public final class SettingsStore {
         }
     }
 
+    /// The selected appearance theme. Falls back to `.system` if unset.
     public var appTheme: AppTheme {
         get {
             guard let raw = valueStore.string(forKey: Keys.appTheme),
@@ -116,6 +142,7 @@ public final class SettingsStore {
         }
     }
 
+    /// Whether haptic feedback is enabled. Defaults to `true` if unset.
     public var hapticEnabled: Bool {
         get {
             valueStore.object(forKey: Keys.hapticEnabled) as? Bool ?? true
@@ -125,6 +152,7 @@ public final class SettingsStore {
         }
     }
 
+    /// Whether the Cloudflare AI gateway is enabled. Defaults to `false` if unset.
     public var cloudflareGatewayEnabled: Bool {
         get {
             valueStore.object(forKey: Keys.cloudflareGatewayEnabled) as? Bool ?? false
@@ -134,6 +162,7 @@ public final class SettingsStore {
         }
     }
 
+    /// Builds a ``ConversationConfiguration`` from the current default settings.
     public var defaultConversationConfiguration: ConversationConfiguration {
         let model = defaultModel
         let resolvedEffort = model.availableEfforts.contains(defaultEffort) ? defaultEffort : model.defaultEffort

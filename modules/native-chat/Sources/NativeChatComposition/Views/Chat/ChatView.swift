@@ -8,6 +8,7 @@ import UIKit
 import ChatUIComponents
 import ChatDomain
 
+/// Main chat screen displaying the message list, composer bar, model selector, and generated file previews.
 package struct ChatView: View {
     @Bindable var viewModel: ChatController
     @AppStorage("appTheme") private var appThemeRawValue: String = AppTheme.system.rawValue
@@ -188,6 +189,7 @@ package struct ChatView: View {
         }
     }
 
+    /// Creates a chat view driven by the given chat controller.
     package init(viewModel: ChatController) {
         self.viewModel = viewModel
     }

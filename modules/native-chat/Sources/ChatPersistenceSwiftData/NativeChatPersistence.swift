@@ -2,11 +2,16 @@ import ChatPersistenceCore
 import Foundation
 import SwiftData
 
+/// Result of bootstrapping the persistent store, including the container and any recovery status.
 public struct NativeChatPersistenceBootstrap {
+    /// The SwiftData model container, or `nil` if all creation attempts failed.
     public let container: ModelContainer?
+    /// `true` if the store was recovered from a corrupted state during bootstrap.
     public let didRecoverPersistentStore: Bool
+    /// A user-facing error description if the store could not be created.
     public let startupErrorDescription: String?
 
+    /// Creates a bootstrap result.
     public init(
         container: ModelContainer?,
         didRecoverPersistentStore: Bool,
@@ -18,6 +23,10 @@ public struct NativeChatPersistenceBootstrap {
     }
 }
 
+/// Factory that creates and configures the SwiftData `ModelContainer` for chat persistence.
+///
+/// On first failure the existing store is preserved for recovery and a fresh container
+/// is attempted. If that also fails an in-memory fallback is used.
 public enum NativeChatPersistence {
     private static let schema = Schema([
         Conversation.self,
@@ -43,10 +52,12 @@ public enum NativeChatPersistence {
         }
     }
 
+    /// Creates a ``NativeChatPersistenceBootstrap`` with the full recovery pipeline.
     public static func makeSharedBootstrap(bundleIdentifier: String?) -> NativeChatPersistenceBootstrap {
         createPersistentContainer(bundleIdentifier: bundleIdentifier)
     }
 
+    /// Convenience that returns only the `ModelContainer` from the bootstrap result.
     public static func makeSharedContainer(bundleIdentifier: String?) -> ModelContainer? {
         makeSharedBootstrap(bundleIdentifier: bundleIdentifier).container
     }
@@ -106,6 +117,7 @@ public enum NativeChatPersistence {
             let configuration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
             return try ModelContainer(for: schema, configurations: [configuration])
         } catch {
+            // swiftlint:disable:next line_length
             Loggers.persistence.error("[NativeChatPersistence] Cannot create fallback in-memory ModelContainer: \(error.localizedDescription)")
             return nil
         }

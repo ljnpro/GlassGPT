@@ -72,6 +72,7 @@ extension ChatRecoveryMaintenanceCoordinator {
         }
     }
 
+    // swiftlint:disable:next function_body_length
     func resendOrphanedDrafts() async {
         guard !controller.apiKey.isEmpty else { return }
 
@@ -170,6 +171,7 @@ extension ChatRecoveryMaintenanceCoordinator {
             controller.errorMessage = nil
 
             #if DEBUG
+            // swiftlint:disable:next line_length
             Loggers.recovery.debug("[Recovery] Starting resend stream for conversation: \(conversation.title), messages count: \(controller.messages.count)")
             #endif
 

@@ -3,6 +3,7 @@ import UIKit
 
 @MainActor
 extension ChatScrollContainerController {
+    // swiftlint:disable:next function_body_length
     func configureViewHierarchy() {
         view.backgroundColor = .clear
 

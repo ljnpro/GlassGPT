@@ -1,6 +1,7 @@
 import Foundation
 
 extension GeneratedFileCacheStore {
+    /// Builds a ``CachedEntry`` from a file URL if the file exists and has valid attributes.
     package func cachedEntry(
         fileURL: URL,
         directoryURL: URL
@@ -19,6 +20,7 @@ extension GeneratedFileCacheStore {
         )
     }
 
+    /// Sanitizes a candidate filename, optionally appending an inferred extension if none is present.
     package func normalizedFilename(_ candidate: String?, inferredExtension: String?) -> String? {
         guard let candidate else { return nil }
 
@@ -39,6 +41,7 @@ extension GeneratedFileCacheStore {
         return sanitized
     }
 
+    /// Removes the item at the given URL if it exists, logging errors with the provided context.
     package func removeItemIfExists(at url: URL, logContext: String) {
         guard fileManager.fileExists(atPath: url.path) else { return }
 
@@ -49,6 +52,7 @@ extension GeneratedFileCacheStore {
         }
     }
 
+    /// Returns the contents of the directory at the given URL, or an empty array on failure.
     package func directoryContents(at url: URL, logContext: String) -> [URL] {
         guard fileManager.fileExists(atPath: url.path) else {
             return []
@@ -62,6 +66,7 @@ extension GeneratedFileCacheStore {
         }
     }
 
+    /// Returns the file attributes at the given path, or `nil` on failure.
     package func itemAttributes(atPath path: String, logContext: String) -> [FileAttributeKey: Any]? {
         do {
             return try fileManager.attributesOfItem(atPath: path)
@@ -71,6 +76,7 @@ extension GeneratedFileCacheStore {
         }
     }
 
+    /// Sets the modification date for the item at the given path.
     package func setItemModificationDate(_ date: Date, atPath path: String, logContext: String) {
         do {
             try fileManager.setAttributes([.modificationDate: date], ofItemAtPath: path)

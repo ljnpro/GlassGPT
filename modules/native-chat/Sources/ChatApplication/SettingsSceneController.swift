@@ -1,139 +1,126 @@
 import ChatDomain
 import Foundation
 
+/// Represents the current health status of the Cloudflare AI gateway.
 public enum CloudflareHealthStatus: Equatable, Sendable {
+    /// Health has not been checked yet.
     case unknown
+    /// A health check is currently in progress.
     case checking
+    /// The gateway is reachable and functioning.
     case connected
+    /// The gateway endpoint is unreachable.
     case gatewayUnavailable
+    /// No API key is configured, so the check cannot proceed.
     case missingAPIKey
+    /// The configured gateway URL is malformed.
     case invalidGatewayURL
+    /// The gateway returned an error with the given description.
     case remoteError(String)
 }
 
+/// Orchestrates settings scene operations by delegating to credential, cache, and persistence handlers.
+///
+/// All methods are `@MainActor`-isolated.
 @MainActor
 public final class SettingsSceneController {
-    private let loadAPIKeyHandler: () -> String?
-    private let saveAPIKeyHandler: (String) throws -> Void
-    private let clearAPIKeyHandler: () -> Void
-    private let validateAPIKeyHandler: (String) async -> Bool
-    private let resolveCloudflareHealthHandler: (_ typedAPIKey: String, _ gatewayEnabled: Bool) -> CloudflareHealthStatus
-    private let checkCloudflareHealthHandler: (_ typedAPIKey: String, _ gatewayEnabled: Bool) async -> CloudflareHealthStatus
-    private let refreshGeneratedImageCacheSizeHandler: () async -> Int64
-    private let refreshGeneratedDocumentCacheSizeHandler: () async -> Int64
-    private let clearGeneratedImageCacheHandler: () async -> Int64
-    private let clearGeneratedDocumentCacheHandler: () async -> Int64
-    private let persistDefaultModelHandler: (ModelType) -> Void
-    private let persistDefaultEffortHandler: (ReasoningEffort) -> Void
-    private let persistDefaultBackgroundModeHandler: (Bool) -> Void
-    private let persistDefaultServiceTierHandler: (ServiceTier) -> Void
-    private let persistAppThemeHandler: (AppTheme) -> Void
-    private let persistHapticEnabledHandler: (Bool) -> Void
-    private let persistCloudflareEnabledHandler: (Bool) -> Void
+    private let credentialHandler: any SettingsCredentialHandler
+    private let cacheHandler: any SettingsCacheHandler
+    private let persistenceHandler: any SettingsPersistenceHandler
 
+    /// Creates a controller with the given handler implementations.
     public init(
-        loadAPIKey: @escaping () -> String?,
-        saveAPIKey: @escaping (String) throws -> Void,
-        clearAPIKey: @escaping () -> Void,
-        validateAPIKey: @escaping (String) async -> Bool,
-        resolveCloudflareHealth: @escaping (_ typedAPIKey: String, _ gatewayEnabled: Bool) -> CloudflareHealthStatus,
-        checkCloudflareHealth: @escaping (_ typedAPIKey: String, _ gatewayEnabled: Bool) async -> CloudflareHealthStatus,
-        refreshGeneratedImageCacheSize: @escaping () async -> Int64,
-        refreshGeneratedDocumentCacheSize: @escaping () async -> Int64,
-        clearGeneratedImageCache: @escaping () async -> Int64,
-        clearGeneratedDocumentCache: @escaping () async -> Int64,
-        persistDefaultModel: @escaping (ModelType) -> Void,
-        persistDefaultEffort: @escaping (ReasoningEffort) -> Void,
-        persistDefaultBackgroundModeEnabled: @escaping (Bool) -> Void,
-        persistDefaultServiceTier: @escaping (ServiceTier) -> Void,
-        persistAppTheme: @escaping (AppTheme) -> Void,
-        persistHapticEnabled: @escaping (Bool) -> Void,
-        persistCloudflareEnabled: @escaping (Bool) -> Void
+        credentialHandler: any SettingsCredentialHandler,
+        cacheHandler: any SettingsCacheHandler,
+        persistenceHandler: any SettingsPersistenceHandler
     ) {
-        self.loadAPIKeyHandler = loadAPIKey
-        self.saveAPIKeyHandler = saveAPIKey
-        self.clearAPIKeyHandler = clearAPIKey
-        self.validateAPIKeyHandler = validateAPIKey
-        self.resolveCloudflareHealthHandler = resolveCloudflareHealth
-        self.checkCloudflareHealthHandler = checkCloudflareHealth
-        self.refreshGeneratedImageCacheSizeHandler = refreshGeneratedImageCacheSize
-        self.refreshGeneratedDocumentCacheSizeHandler = refreshGeneratedDocumentCacheSize
-        self.clearGeneratedImageCacheHandler = clearGeneratedImageCache
-        self.clearGeneratedDocumentCacheHandler = clearGeneratedDocumentCache
-        self.persistDefaultModelHandler = persistDefaultModel
-        self.persistDefaultEffortHandler = persistDefaultEffort
-        self.persistDefaultBackgroundModeHandler = persistDefaultBackgroundModeEnabled
-        self.persistDefaultServiceTierHandler = persistDefaultServiceTier
-        self.persistAppThemeHandler = persistAppTheme
-        self.persistHapticEnabledHandler = persistHapticEnabled
-        self.persistCloudflareEnabledHandler = persistCloudflareEnabled
+        self.credentialHandler = credentialHandler
+        self.cacheHandler = cacheHandler
+        self.persistenceHandler = persistenceHandler
     }
 
+    /// Loads the stored API key.
     public func loadAPIKey() -> String? {
-        loadAPIKeyHandler()
+        credentialHandler.loadAPIKey()
     }
 
+    /// Persists the given API key.
     public func saveAPIKey(_ apiKey: String) throws {
-        try saveAPIKeyHandler(apiKey)
+        try credentialHandler.saveAPIKey(apiKey)
     }
 
+    /// Removes the stored API key.
     public func clearAPIKey() {
-        clearAPIKeyHandler()
+        credentialHandler.clearAPIKey()
     }
 
+    /// Validates the API key against the OpenAI API.
     public func validateAPIKey(_ apiKey: String) async -> Bool {
-        await validateAPIKeyHandler(apiKey)
+        await credentialHandler.validateAPIKey(apiKey)
     }
 
+    /// Synchronously resolves the Cloudflare gateway health from local state.
     public func resolveCloudflareHealth(typedAPIKey: String, gatewayEnabled: Bool) -> CloudflareHealthStatus {
-        resolveCloudflareHealthHandler(typedAPIKey, gatewayEnabled)
+        credentialHandler.resolveCloudflareHealth(typedAPIKey: typedAPIKey, gatewayEnabled: gatewayEnabled)
     }
 
+    /// Performs an async health check against the Cloudflare gateway.
     public func checkCloudflareHealth(typedAPIKey: String, gatewayEnabled: Bool) async -> CloudflareHealthStatus {
-        await checkCloudflareHealthHandler(typedAPIKey, gatewayEnabled)
+        await credentialHandler.checkCloudflareHealth(typedAPIKey: typedAPIKey, gatewayEnabled: gatewayEnabled)
     }
 
+    /// Returns the current generated image cache size in bytes.
     public func refreshGeneratedImageCacheSize() async -> Int64 {
-        await refreshGeneratedImageCacheSizeHandler()
+        await cacheHandler.refreshGeneratedImageCacheSize()
     }
 
+    /// Returns the current generated document cache size in bytes.
     public func refreshGeneratedDocumentCacheSize() async -> Int64 {
-        await refreshGeneratedDocumentCacheSizeHandler()
+        await cacheHandler.refreshGeneratedDocumentCacheSize()
     }
 
+    /// Clears the generated image cache and returns the new size (should be zero).
     public func clearGeneratedImageCache() async -> Int64 {
-        await clearGeneratedImageCacheHandler()
+        await cacheHandler.clearGeneratedImageCache()
     }
 
+    /// Clears the generated document cache and returns the new size (should be zero).
     public func clearGeneratedDocumentCache() async -> Int64 {
-        await clearGeneratedDocumentCacheHandler()
+        await cacheHandler.clearGeneratedDocumentCache()
     }
 
+    /// Persists the default model preference.
     public func persistDefaultModel(_ model: ModelType) {
-        persistDefaultModelHandler(model)
+        persistenceHandler.persistDefaultModel(model)
     }
 
+    /// Persists the default reasoning effort preference.
     public func persistDefaultEffort(_ effort: ReasoningEffort) {
-        persistDefaultEffortHandler(effort)
+        persistenceHandler.persistDefaultEffort(effort)
     }
 
+    /// Persists the background mode toggle state.
     public func persistDefaultBackgroundModeEnabled(_ enabled: Bool) {
-        persistDefaultBackgroundModeHandler(enabled)
+        persistenceHandler.persistDefaultBackgroundModeEnabled(enabled)
     }
 
+    /// Persists the default service tier preference.
     public func persistDefaultServiceTier(_ serviceTier: ServiceTier) {
-        persistDefaultServiceTierHandler(serviceTier)
+        persistenceHandler.persistDefaultServiceTier(serviceTier)
     }
 
+    /// Persists the selected app theme.
     public func persistAppTheme(_ theme: AppTheme) {
-        persistAppThemeHandler(theme)
+        persistenceHandler.persistAppTheme(theme)
     }
 
+    /// Persists the haptic feedback toggle state.
     public func persistHapticEnabled(_ enabled: Bool) {
-        persistHapticEnabledHandler(enabled)
+        persistenceHandler.persistHapticEnabled(enabled)
     }
 
+    /// Persists the Cloudflare gateway toggle state.
     public func persistCloudflareEnabled(_ enabled: Bool) {
-        persistCloudflareEnabledHandler(enabled)
+        persistenceHandler.persistCloudflareEnabled(enabled)
     }
 }

@@ -3,16 +3,24 @@ import SwiftUI
 import UIKit
 
 @MainActor
+/// Renders a fenced code block with a language header, copy button, and syntax highlighting.
 package struct CodeBlockView: View {
+    /// Controls whether the code block renders its own glass surface or relies on a parent container.
     package enum SurfaceStyle {
+        /// Renders with its own rounded glass border.
         case standalone
+        /// Renders without a border, intended for embedding inside another surface.
         case embedded
     }
 
+    /// The programming language label, if specified.
     let language: String?
+    /// The raw code string to display.
     let code: String
+    /// The surface rendering style.
     var surfaceStyle: SurfaceStyle = .standalone
 
+    /// Creates a code block view for the given language and code.
     package init(
         language: String?,
         code: String,

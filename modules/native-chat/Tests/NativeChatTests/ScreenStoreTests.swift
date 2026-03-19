@@ -1,3 +1,4 @@
+// swiftlint:disable file_length
 import ChatApplication
 import ChatDomain
 import ChatPersistenceSwiftData
@@ -8,8 +9,8 @@ import NativeChatUI
 import XCTest
 import SwiftData
 @testable import NativeChatComposition
-
 @MainActor
+// swiftlint:disable:next type_body_length
 final class ScreenStoreTests: XCTestCase {
     func testChatScreenStoreFreshInstallStartsEmptyButUsableWithoutAPIKey() throws {
         let store = try makeTestChatScreenStore(
@@ -62,6 +63,7 @@ final class ScreenStoreTests: XCTestCase {
         XCTAssertFalse(emptyStore.hasAPIKey)
     }
 
+    // swiftlint:disable:next function_body_length
     func testChatScreenStoreStartNewChatClearsTransientStateAndRestoresDefaults() throws {
         let store = try makeTestChatScreenStore(streamClient: QueuedOpenAIStreamClient(scriptedStreams: []))
         let expectedDefaultModel = store.selectedModel
@@ -155,6 +157,7 @@ final class ScreenStoreTests: XCTestCase {
         XCTAssertEqual(store.serviceTier, expectedDefaultServiceTier)
     }
 
+    // swiftlint:disable:next function_body_length
     func testChatScreenStoreLoadConversationAppliesStoredConfigurationAndClearsTransientState() throws {
         let store = try makeTestChatScreenStore(streamClient: QueuedOpenAIStreamClient(scriptedStreams: []))
         let conversation = try seedConversation(
@@ -468,11 +471,13 @@ final class ScreenStoreTests: XCTestCase {
         await transport.enqueue(
             data: Data(#"{"id":"file_uploaded_1"}"#.utf8),
             statusCode: 200,
+            // swiftlint:disable:next force_unwrapping
             url: URL(string: "https://api.test.openai.local/v1/files")!
         )
         await transport.enqueue(
             data: Data("upload failed".utf8),
             statusCode: 500,
+            // swiftlint:disable:next force_unwrapping
             url: URL(string: "https://api.test.openai.local/v1/files")!
         )
         let store = try makeTestChatScreenStore(
@@ -538,6 +543,7 @@ final class ScreenStoreTests: XCTestCase {
         XCTAssertEqual(store.conversationCoordinator.activeIncompleteAssistantDraft()?.id, boundDraft.id)
     }
 
+    // swiftlint:disable:next function_body_length
     func testChatSessionDecisionsReturnExpectedRecoveryAndDetachmentChoices() {
         XCTAssertEqual(
             RuntimeSessionDecisionPolicy.recoveryResumeMode(
@@ -578,6 +584,7 @@ final class ScreenStoreTests: XCTestCase {
             )
         )
 
+        // swiftlint:disable:next force_unwrapping
         let messageID = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
         XCTAssertEqual(
             RuntimeSessionDecisionPolicy.pendingBackgroundCancellation(

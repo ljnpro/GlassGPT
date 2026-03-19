@@ -1,9 +1,11 @@
 import ChatUIComponents
 import SwiftUI
 
+/// Placeholder root tab view displaying a title inside a glass shell.
 public struct NativeChatRootTabsView: View {
     private let title: String
 
+    /// Creates a root tabs view with the given title string.
     public init(title: String = "Native Chat") {
         self.title = title
     }

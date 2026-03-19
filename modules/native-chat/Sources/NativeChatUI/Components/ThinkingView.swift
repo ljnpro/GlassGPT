@@ -3,7 +3,9 @@ import SwiftUI
 
 // MARK: - Thinking Indicator (capsule shown while model is actively reasoning, before text arrives)
 
+/// Animated capsule indicator shown while the model is actively reasoning, before thinking text arrives.
 package struct ThinkingIndicator: View {
+    /// Creates a new thinking indicator.
     package init() {}
 
     package var body: some View {
@@ -26,12 +28,16 @@ package struct ThinkingIndicator: View {
             darkBorderOpacity: 0.14,
             lightBorderOpacity: 0.08
         )
+        .accessibilityLabel("Reasoning in progress")
+        .accessibilityIdentifier("indicator.thinking")
     }
 }
 
 // MARK: - Thinking View (card-style, collapsible reasoning text with Markdown rendering)
 
+/// Collapsible card that displays the model's reasoning text with Markdown rendering.
 package struct ThinkingView: View {
+    /// The reasoning text emitted by the model.
     let text: String
     /// Whether the thinking is still in progress (streaming). When true, starts expanded.
     var isLive: Bool = false
@@ -54,6 +60,7 @@ package struct ThinkingView: View {
         }
     }
 
+    /// Creates a thinking view with the given text and optional external expanded-state binding.
     package init(text: String, isLive: Bool = false, externalIsExpanded: Binding<Bool?> = .constant(nil)) {
         self.text = text
         self.isLive = isLive
@@ -83,6 +90,9 @@ package struct ThinkingView: View {
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
             .contentShape(Rectangle())
+            .accessibilityLabel(isLive ? "Reasoning in progress" : "Reasoning completed")
+            .accessibilityHint(isExpanded ? "Double-tap to collapse" : "Double-tap to expand")
+            .accessibilityAddTraits(.isButton)
             .onTapGesture {
                 withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
                     setExpanded(!isExpanded)
@@ -159,6 +169,7 @@ private struct ThinkingMarkdownText: View {
 
 // MARK: - Typing Indicator
 
+/// Animated three-dot typing indicator shown while awaiting the first token.
 package struct TypingIndicator: View {
     @State private var animating = false
 
@@ -181,6 +192,8 @@ package struct TypingIndicator: View {
             }
         }
         .padding(8)
+        .accessibilityLabel("Waiting for response")
+        .accessibilityIdentifier("indicator.typing")
         .onAppear { animating = true }
     }
 }

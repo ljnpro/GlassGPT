@@ -39,6 +39,7 @@ final class ChatFileInteractionCoordinator {
         controller.pendingAttachments.removeAll { $0.id == attachment.id }
     }
 
+    // swiftlint:disable:next function_body_length
     func handleSandboxLinkTap(message: Message, sandboxURL: String, annotation: FilePathAnnotation?) {
         guard !controller.apiKey.isEmpty else {
             controller.fileDownloadError = "No API key configured."

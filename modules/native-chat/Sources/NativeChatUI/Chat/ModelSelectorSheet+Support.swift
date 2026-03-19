@@ -3,11 +3,16 @@ import SwiftUI
 import UIKit
 import ChatUIComponents
 
+/// Compact capsule badge displaying the current model name and reasoning effort, tappable to open the model selector.
 package struct ModelBadge: View {
+    /// The currently selected model.
     let model: ModelType
+    /// The currently selected reasoning effort level.
     let effort: ReasoningEffort
+    /// Callback invoked when the badge is tapped.
     let onTap: () -> Void
 
+    /// Creates a model badge for the given model and effort.
     package init(model: ModelType, effort: ReasoningEffort, onTap: @escaping () -> Void) {
         self.model = model
         self.effort = effort
@@ -48,18 +53,30 @@ package struct ModelBadge: View {
 }
 
 extension ModelSelectorSheet {
+    /// Layout metrics for the model selector sheet, adapted for phone and iPad idioms.
     public struct Metrics {
+        /// Horizontal padding applied to the sheet content.
         public let contentHorizontalPadding: CGFloat
+        /// Vertical padding applied to the sheet content.
         public let contentVerticalPadding: CGFloat
+        /// Corner radius of inner cards (toggle group, reasoning control).
         public let cardCornerRadius: CGFloat
+        /// Corner radius of the outer panel.
         public let panelCornerRadius: CGFloat
+        /// Maximum width of the sheet, nil for phone.
         public let sheetMaxWidth: CGFloat?
+        /// Vertical padding inside each toggle row.
         public let rowVerticalPadding: CGFloat
+        /// Horizontal padding inside each toggle row.
         public let rowHorizontalPadding: CGFloat
+        /// Spacing between major sections of the sheet.
         public let sectionSpacing: CGFloat
+        /// Spacing between columns in two-column layout.
         public let columnSpacing: CGFloat
+        /// Fixed width for the reasoning control column on iPad.
         public let reasoningColumnWidth: CGFloat?
 
+        /// Creates metrics appropriate for the given user interface idiom.
         public init(idiom: UIUserInterfaceIdiom) {
             switch idiom {
             case .pad:
@@ -88,6 +105,7 @@ extension ModelSelectorSheet {
         }
     }
 
+    /// Returns an abbreviated label for the given reasoning effort level.
     public func effortShortLabel(_ effort: ReasoningEffort) -> String {
         switch effort {
         case .none: return "Off"

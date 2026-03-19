@@ -2,17 +2,28 @@ import ChatDomain
 import ChatUIComponents
 import SwiftUI
 
+/// Displays the live assistant response bubble during streaming, including tool-call indicators,
+/// thinking text, streaming text, and citation links.
 package struct DetachedStreamingBubbleView: View, Equatable {
+    /// Active tool calls being executed by the model.
     let activeToolCalls: [ToolCallInfo]
+    /// The current reasoning/thinking text emitted by the model.
     let currentThinkingText: String
+    /// The current response text being streamed.
     let currentStreamingText: String
+    /// Whether the model is actively reasoning.
     let isThinking: Bool
+    /// Whether content is actively being streamed.
     let isStreaming: Bool
+    /// Citations collected during web search tool calls.
     let liveCitations: [URLCitation]
+    /// External binding controlling the thinking disclosure expanded state.
     @Binding var streamingThinkingExpanded: Bool?
+    /// Maximum width for the assistant bubble.
     let assistantBubbleMaxWidth: CGFloat
     private let renderKey: RenderKey
 
+    /// Creates a detached streaming bubble with the given streaming state.
     package init(
         activeToolCalls: [ToolCallInfo],
         currentThinkingText: String,

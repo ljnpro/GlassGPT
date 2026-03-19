@@ -1,9 +1,17 @@
 import ChatDomain
 import Foundation
 
+/// Parses raw API response data into typed domain results.
 public struct OpenAIResponseParser {
+    /// Creates a new response parser.
     public init() {}
 
+    /// Extracts the uploaded file identifier from a file upload response.
+    /// - Parameters:
+    ///   - responseData: The raw response data.
+    ///   - response: The URL response metadata.
+    /// - Returns: The API-assigned file identifier.
+    /// - Throws: ``OpenAIServiceError`` if the response indicates an error or cannot be parsed.
     public func parseUploadedFileID(responseData: Data, response: URLResponse) throws -> String {
         guard let httpResponse = response as? HTTPURLResponse else {
             throw OpenAIServiceError.requestFailed("Invalid response")
@@ -21,6 +29,12 @@ public struct OpenAIResponseParser {
         }
     }
 
+    /// Parses a generated title from a title generation response.
+    /// - Parameters:
+    ///   - data: The raw response data.
+    ///   - response: The URL response metadata.
+    /// - Returns: The generated title, or "New Chat" as a fallback.
+    /// - Throws: ``OpenAIServiceError`` if the response indicates an HTTP error.
     public func parseGeneratedTitle(data: Data, response: URLResponse) throws -> String {
         guard let httpResponse = response as? HTTPURLResponse,
               (200...299).contains(httpResponse.statusCode) else {
@@ -48,6 +62,12 @@ public struct OpenAIResponseParser {
         return "New Chat"
     }
 
+    /// Parses a fetched response into a structured fetch result.
+    /// - Parameters:
+    ///   - data: The raw response data.
+    ///   - response: The URL response metadata.
+    /// - Returns: A structured fetch result with status, text, and annotations.
+    /// - Throws: ``OpenAIServiceError`` if the response indicates an error or cannot be parsed.
     public func parseFetchedResponse(data: Data, response: URLResponse) throws -> OpenAIResponseFetchResult {
         guard let httpResponse = response as? HTTPURLResponse else {
             throw OpenAIServiceError.requestFailed("Invalid response")

@@ -32,6 +32,7 @@ final class SnapshotViewTests: XCTestCase {
         super.tearDown()
     }
 
+    // swiftlint:disable:next function_body_length
     func testChatSnapshots() throws {
         let emptyViewModel = try makeSnapshotChatScreenStore(hasAPIKey: false)
         assertViewSnapshots(named: "chat-empty") {
@@ -180,6 +181,7 @@ final class SnapshotViewTests: XCTestCase {
         }
     }
 
+    // swiftlint:disable:next function_body_length
     func testPresentationComponentSnapshots() {
         assertViewSnapshots(named: "thinking-view", variants: [.phoneLight, .phoneDark]) {
             ThinkingView(

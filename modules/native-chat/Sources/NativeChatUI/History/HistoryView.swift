@@ -2,11 +2,13 @@ import ChatPresentation
 import ChatUIComponents
 import SwiftUI
 
+/// Displays a searchable, deletable list of past conversations.
 public struct HistoryView: View {
     @State private var showDeleteConfirmation = false
     @State private var viewModel: HistoryPresenter
 
     @MainActor
+    /// Creates a history view backed by the given presenter.
     public init(store: HistoryPresenter) {
         _viewModel = State(initialValue: store)
     }

@@ -1,3 +1,4 @@
+// swiftlint:disable file_length
 import ChatDomain
 import ChatPersistenceSwiftData
 import ChatPersistenceCore
@@ -6,6 +7,7 @@ import GeneratedFilesCore
 @testable import NativeChatComposition
 
 @MainActor
+// swiftlint:disable:next type_body_length
 final class SettingsScreenStoreTests: XCTestCase {
     override func tearDown() {
         Self.clearGeneratedCacheRoots()
@@ -159,6 +161,7 @@ final class SettingsScreenStoreTests: XCTestCase {
         await transport.enqueue(
             data: Data("{}".utf8),
             statusCode: 200,
+            // swiftlint:disable:next force_unwrapping
             url: URL(string: "https://gateway.test.openai.local/v1/models")!
         )
 
@@ -187,6 +190,7 @@ final class SettingsScreenStoreTests: XCTestCase {
         await transport.enqueue(
             data: Data("{}".utf8),
             statusCode: 200,
+            // swiftlint:disable:next force_unwrapping
             url: URL(string: "https://gateway.test.openai.local/v1/models")!
         )
 
@@ -230,6 +234,7 @@ final class SettingsScreenStoreTests: XCTestCase {
         await transport.enqueue(
             data: Data("{}".utf8),
             statusCode: 200,
+            // swiftlint:disable:next force_unwrapping
             url: URL(string: "https://api.test.openai.local/v1/models")!
         )
 
@@ -281,6 +286,7 @@ final class SettingsScreenStoreTests: XCTestCase {
         await transport.enqueue(
             data: Data(#"{"message":"Gateway unavailable"}"#.utf8),
             statusCode: 503,
+            // swiftlint:disable:next force_unwrapping
             url: URL(string: "https://gateway.test.openai.local/v1/models")!
         )
 

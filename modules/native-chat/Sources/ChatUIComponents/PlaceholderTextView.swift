@@ -1,14 +1,17 @@
 import UIKit
 
+/// A `UITextView` subclass that displays a placeholder label when the text is empty.
 public final class PlaceholderTextView: UITextView {
     private let placeholderLabel = UILabel()
 
+    /// The placeholder string shown when the text view is empty.
     public var placeholderText: String = "" {
         didSet {
             placeholderLabel.text = placeholderText
         }
     }
 
+    /// The color of the placeholder text.
     public var placeholderColor: UIColor = .secondaryLabel {
         didSet {
             placeholderLabel.textColor = placeholderColor
@@ -41,12 +44,12 @@ public final class PlaceholderTextView: UITextView {
         super.layoutSubviews()
         applyTransparentCanvasStyleIfNeeded()
         let inset = textContainerInset
-        let x = inset.left + textContainer.lineFragmentPadding
-        let y = inset.top
+        let xPos = inset.left + textContainer.lineFragmentPadding
+        let yPos = inset.top
         let width = bounds.width - inset.left - inset.right - (textContainer.lineFragmentPadding * 2)
         placeholderLabel.frame = CGRect(
-            x: x,
-            y: y,
+            x: xPos,
+            y: yPos,
             width: max(width, 0),
             height: placeholderLabel.sizeThatFits(
                 CGSize(width: max(width, 0), height: .greatestFiniteMagnitude)
@@ -54,10 +57,12 @@ public final class PlaceholderTextView: UITextView {
         )
     }
 
+    /// Recursively clears opaque backdrop views added by UIKit's text editing system.
     public func applyTransparentCanvasStyleIfNeeded() {
         clearEditingBackdrop(in: self)
     }
 
+    /// Shows or hides the placeholder label based on whether the text view has content.
     public func updatePlaceholderVisibility() {
         placeholderLabel.isHidden = !text.isEmpty
     }

@@ -67,6 +67,7 @@ private struct CitationCard: View {
     }
 
     var body: some View {
+        // swiftlint:disable:next force_unwrapping — fallback URL is a compile-time constant
         Link(destination: URL(string: citation.url) ?? URL(string: "https://google.com")!) {
             HStack(spacing: 8) {
                 // Index badge
