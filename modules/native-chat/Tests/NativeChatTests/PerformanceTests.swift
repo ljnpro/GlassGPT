@@ -1,31 +1,29 @@
 import Foundation
 import XCTest
-
 @testable import ChatUIComponents
 @testable import OpenAITransport
 
 // MARK: - PerformanceTests
 
 final class PerformanceTests: XCTestCase {
-
     // MARK: - SSE Frame Buffer Throughput
 
     func testSSEFrameBufferThroughput() {
-        let sseChunk = (0..<1_000).map { iteration in
+        let sseChunk = (0 ..< 1000).map { iteration in
             "event: response.output_text.delta\ndata: {\"delta\":\"token_\(iteration)\",\"sequence_number\":\(iteration)}\n\n"
         }.joined()
 
         measure {
             var buffer = SSEFrameBuffer()
             let frames = buffer.append(sseChunk)
-            XCTAssertEqual(frames.count, 1_000)
+            XCTAssertEqual(frames.count, 1000)
         }
     }
 
     // MARK: - SSE Frame Buffer Incremental Append
 
     func testSSEFrameBufferIncrementalAppend() {
-        let chunks: [String] = (0..<1_000).map { iteration in
+        let chunks: [String] = (0 ..< 1000).map { iteration in
             "event: response.output_text.delta\ndata: {\"delta\":\"t\(iteration)\"}\n\n"
         }
 
@@ -35,7 +33,7 @@ final class PerformanceTests: XCTestCase {
             for chunk in chunks {
                 totalFrames += buffer.append(chunk).count
             }
-            XCTAssertEqual(totalFrames, 1_000)
+            XCTAssertEqual(totalFrames, 1000)
         }
     }
 
@@ -50,9 +48,9 @@ final class PerformanceTests: XCTestCase {
         """
 
         // Build a ~5,000 character string by repeating the block
-        let repetitions = 5_000 / markdownBlock.count + 1
+        let repetitions = 5000 / markdownBlock.count + 1
         let longMarkdown = String(repeating: markdownBlock, count: repetitions)
-        precondition(longMarkdown.count >= 5_000)
+        precondition(longMarkdown.count >= 5000)
 
         measure {
             let result = RichTextAttributedStringBuilder.parseRichText(longMarkdown)
@@ -77,7 +75,7 @@ final class PerformanceTests: XCTestCase {
 
     // MARK: - JSON Payload Decoding
 
-    func testStreamEnvelopeDTODecodingThroughput() throws {
+    func testStreamEnvelopeDTODecodingThroughput() {
         let jsonPayload = """
         {
             "delta": "Hello world token",
@@ -88,7 +86,7 @@ final class PerformanceTests: XCTestCase {
         let jsonData = Data(jsonPayload.utf8)
 
         measure {
-            for _ in 0..<1_000 {
+            for _ in 0 ..< 1000 {
                 do {
                     let envelope = try JSONCoding.decode(
                         ResponsesStreamEnvelopeDTO.self,
@@ -112,7 +110,7 @@ final class PerformanceTests: XCTestCase {
         let jsonData = Data(jsonPayload.utf8)
 
         measure {
-            for _ in 0..<1_000 {
+            for _ in 0 ..< 1000 {
                 let event = OpenAIStreamEventTranslator.translate(
                     eventType: "response.output_text.delta",
                     data: jsonData
@@ -125,8 +123,8 @@ final class PerformanceTests: XCTestCase {
     // MARK: - ByteCountFormatter
 
     func testByteCountFormatterThroughput() {
-        let byteCounts: [Int64] = (0..<1_000).map { frameIndex in
-            Int64(frameIndex) * 1_024 * Int64.random(in: 1...1_024)
+        let byteCounts: [Int64] = (0 ..< 1000).map { frameIndex in
+            Int64(frameIndex) * 1024 * Int64.random(in: 1 ... 1024)
         }
 
         measure {
@@ -142,7 +140,7 @@ final class PerformanceTests: XCTestCase {
 
     func testSSEFrameBufferFinishPendingThroughput() {
         measure {
-            for _ in 0..<1_000 {
+            for _ in 0 ..< 1000 {
                 var buffer = SSEFrameBuffer()
                 _ = buffer.append("event: response.output_text.delta\ndata: {\"delta\":\"hello\"}")
                 let pending = buffer.finishPendingFrames()

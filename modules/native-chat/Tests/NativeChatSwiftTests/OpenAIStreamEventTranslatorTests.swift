@@ -1,15 +1,15 @@
-import Foundation
 import ChatDomain
 import ChatPersistenceSwiftData
+import Foundation
 import OpenAITransport
 import Testing
 @testable import NativeChatComposition
 
 struct OpenAIStreamEventTranslatorTests {
-    @Test func translateRecognizesResponseCreatedAndTextDelta() throws {
-        let created = OpenAIStreamEventTranslator.translate(
+    @Test func `translate recognizes response created and text delta`() throws {
+        let created = try OpenAIStreamEventTranslator.translate(
             eventType: "response.created",
-            data: try JSONCoding.encode(
+            data: JSONCoding.encode(
                 ResponsesStreamEnvelopeDTO(
                     delta: nil,
                     itemID: nil,
@@ -23,9 +23,9 @@ struct OpenAIStreamEventTranslatorTests {
                 )
             )
         )
-        let delta = OpenAIStreamEventTranslator.translate(
+        let delta = try OpenAIStreamEventTranslator.translate(
             eventType: "response.output_text.delta",
-            data: try JSONCoding.encode(
+            data: JSONCoding.encode(
                 ResponsesStreamEnvelopeDTO(
                     delta: "Hi",
                     itemID: nil,
@@ -41,24 +41,24 @@ struct OpenAIStreamEventTranslatorTests {
         )
 
         switch created {
-        case .responseCreated(let id):
+        case let .responseCreated(id):
             #expect(id == "resp_123")
         default:
             Issue.record("Expected response.created to translate to .responseCreated")
         }
 
         switch delta {
-        case .textDelta(let text):
+        case let .textDelta(text):
             #expect(text == "Hi")
         default:
             Issue.record("Expected response.output_text.delta to translate to .textDelta")
         }
     }
 
-    @Test func translateRecognizesFailureEvents() throws {
-        let errorEvent = OpenAIStreamEventTranslator.translate(
+    @Test func `translate recognizes failure events`() throws {
+        let errorEvent = try OpenAIStreamEventTranslator.translate(
             eventType: "response.failed",
-            data: try JSONCoding.encode(
+            data: JSONCoding.encode(
                 ResponsesStreamEnvelopeDTO(
                     delta: nil,
                     itemID: nil,
@@ -76,17 +76,17 @@ struct OpenAIStreamEventTranslatorTests {
         )
 
         switch errorEvent {
-        case .error(let error):
+        case let .error(error):
             #expect(error.errorDescription == "backend failed")
         default:
             Issue.record("Expected response.failed to translate to .error")
         }
     }
 
-    @Test func translateRecognizesAnnotationEvents() throws {
-        let annotationEvent = OpenAIStreamEventTranslator.translate(
+    @Test func `translate recognizes annotation events`() throws {
+        let annotationEvent = try OpenAIStreamEventTranslator.translate(
             eventType: "response.output_text.annotation.added",
-            data: try JSONCoding.encode(
+            data: JSONCoding.encode(
                 ResponsesStreamEnvelopeDTO(
                     delta: nil,
                     itemID: nil,
@@ -111,7 +111,7 @@ struct OpenAIStreamEventTranslatorTests {
         )
 
         switch annotationEvent {
-        case .annotationAdded(let citation):
+        case let .annotationAdded(citation):
             #expect(citation.url == "https://example.com")
             #expect(citation.title == "Example")
         default:
@@ -119,35 +119,35 @@ struct OpenAIStreamEventTranslatorTests {
         }
     }
 
-    @Test func translateIgnoresIncompletePayloadsAndPassiveEvents() throws {
+    @Test func `translate ignores incomplete payloads and passive events`() throws {
         #expect(
-            OpenAIStreamEventTranslator.translate(
+            try OpenAIStreamEventTranslator.translate(
                 eventType: "response.created",
-                data: try JSONCoding.encode(makeEnvelope())
+                data: JSONCoding.encode(makeEnvelope())
             ) == nil
         )
         #expect(
-            OpenAIStreamEventTranslator.translate(
+            try OpenAIStreamEventTranslator.translate(
                 eventType: "response.output_text.delta",
-                data: try JSONCoding.encode(makeEnvelope(delta: ""))
+                data: JSONCoding.encode(makeEnvelope(delta: ""))
             ) == nil
         )
         #expect(
-            OpenAIStreamEventTranslator.translate(
+            try OpenAIStreamEventTranslator.translate(
                 eventType: "response.web_search_call.completed",
-                data: try JSONCoding.encode(makeEnvelope())
+                data: JSONCoding.encode(makeEnvelope())
             ) == nil
         )
         #expect(
-            OpenAIStreamEventTranslator.translate(
+            try OpenAIStreamEventTranslator.translate(
                 eventType: "response.queued",
-                data: try JSONCoding.encode(makeEnvelope())
+                data: JSONCoding.encode(makeEnvelope())
             ) == nil
         )
         #expect(
-            OpenAIStreamEventTranslator.translate(
+            try OpenAIStreamEventTranslator.translate(
                 eventType: "unknown.event",
-                data: try JSONCoding.encode(makeEnvelope())
+                data: JSONCoding.encode(makeEnvelope())
             ) == nil
         )
         #expect(
@@ -158,16 +158,16 @@ struct OpenAIStreamEventTranslatorTests {
         )
     }
 
-    @Test func extractSequenceNumberUsesEnvelopeAndResolvedResponse() throws {
+    @Test func `extract sequence number uses envelope and resolved response`() throws {
         #expect(
-            OpenAIStreamEventTranslator.extractSequenceNumber(
-                from: try JSONCoding.encode(makeEnvelope(sequenceNumber: 12))
+            try OpenAIStreamEventTranslator.extractSequenceNumber(
+                from: JSONCoding.encode(makeEnvelope(sequenceNumber: 12))
             ) == 12
         )
 
         #expect(
-            OpenAIStreamEventTranslator.extractSequenceNumber(
-                from: try JSONCoding.encode(
+            try OpenAIStreamEventTranslator.extractSequenceNumber(
+                from: JSONCoding.encode(
                     makeEnvelope(
                         response: ResponsesResponseDTO(sequenceNumber: 27)
                     )
@@ -178,18 +178,18 @@ struct OpenAIStreamEventTranslatorTests {
         #expect(OpenAIStreamEventTranslator.extractSequenceNumber(from: Data("oops".utf8)) == nil)
     }
 
-    @Test func extractResponseIdentifierUsesEnvelopeAndResolvedResponse() throws {
+    @Test func `extract response identifier uses envelope and resolved response`() throws {
         #expect(
-            OpenAIStreamEventTranslator.extractResponseIdentifier(
-                from: try JSONCoding.encode(
+            try OpenAIStreamEventTranslator.extractResponseIdentifier(
+                from: JSONCoding.encode(
                     makeEnvelope(response: ResponsesResponseDTO(id: "resp_envelope"))
                 )
             ) == "resp_envelope"
         )
 
         #expect(
-            OpenAIStreamEventTranslator.extractResponseIdentifier(
-                from: try JSONCoding.encode(
+            try OpenAIStreamEventTranslator.extractResponseIdentifier(
+                from: JSONCoding.encode(
                     ResponsesStreamEnvelopeDTO(
                         delta: nil,
                         itemID: nil,
@@ -208,7 +208,7 @@ struct OpenAIStreamEventTranslatorTests {
         #expect(OpenAIStreamEventTranslator.extractResponseIdentifier(from: Data("oops".utf8)) == nil)
     }
 
-    @Test func extractFilePathAnnotationsUsesAnnotatedSubstring() {
+    @Test func `extract file path annotations uses annotated substring`() {
         let text = "sandbox:/mnt/data/report.pdf"
         let annotations = OpenAIStreamEventTranslator.extractFilePathAnnotations(
             from: ResponsesResponseDTO(
@@ -306,12 +306,12 @@ extension OpenAIStreamEventTranslatorTests {
 
     func eventDescription(_ event: StreamEvent) -> String {
         switch event {
-        case .responseCreated(let id):
-            return "responseCreated(\(id))"
-        case .sequenceUpdate(let sequence):
-            return "sequenceUpdate(\(sequence))"
+        case let .responseCreated(id):
+            "responseCreated(\(id))"
+        case let .sequenceUpdate(sequence):
+            "sequenceUpdate(\(sequence))"
         default:
-            return String(describing: event)
+            String(describing: event)
         }
     }
 }

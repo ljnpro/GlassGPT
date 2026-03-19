@@ -1,13 +1,12 @@
 import Foundation
 
-extension MarkdownContentView {
-
+package extension MarkdownContentView {
     // MARK: - Parsing
 
     /// First pass: extract code blocks and LaTeX blocks from raw text.
     /// Returns a mix of code/latex blocks and raw text chunks.
     // swiftlint:disable:next cyclomatic_complexity function_body_length
-    package func parseBlocks(_ input: String) -> [BlockPart] {
+    func parseBlocks(_ input: String) -> [BlockPart] {
         var firstPass: [BlockPart] = []
         var inlineBuffer = ""
         let chars = Array(input)
@@ -29,21 +28,21 @@ extension MarkdownContentView {
         }
 
         while index < count {
-            if index + 2 < count && chars[index] == "`" && chars[index + 1] == "`" && chars[index + 2] == "`" {
+            if index + 2 < count, chars[index] == "`", chars[index + 1] == "`", chars[index + 2] == "`" {
                 flushInline()
                 let start = index + 3
                 var langEnd = start
-                while langEnd < count && chars[langEnd] != "\n" {
+                while langEnd < count, chars[langEnd] != "\n" {
                     langEnd += 1
                 }
 
-                let lang = String(chars[start..<langEnd]).trimmingCharacters(in: .whitespaces)
+                let lang = String(chars[start ..< langEnd]).trimmingCharacters(in: .whitespaces)
                 let codeStart = min(langEnd + 1, count)
 
                 var codeEnd = codeStart
                 var found = false
                 while codeEnd + 2 < count {
-                    if chars[codeEnd] == "`" && chars[codeEnd + 1] == "`" && chars[codeEnd + 2] == "`" {
+                    if chars[codeEnd] == "`", chars[codeEnd + 1] == "`", chars[codeEnd + 2] == "`" {
                         found = true
                         break
                     }
@@ -51,10 +50,10 @@ extension MarkdownContentView {
                 }
 
                 if found {
-                    let code = String(chars[codeStart..<codeEnd])
+                    let code = String(chars[codeStart ..< codeEnd])
                     firstPass.append(.codeBlock(id: makeID(), language: lang.isEmpty ? nil : lang, code: code))
                     index = codeEnd + 3
-                    if index < count && chars[index] == "\n" {
+                    if index < count, chars[index] == "\n" {
                         index += 1
                     }
                 } else {
@@ -64,13 +63,13 @@ extension MarkdownContentView {
                 continue
             }
 
-            if index + 1 < count && chars[index] == "\\" && chars[index + 1] == "[" {
+            if index + 1 < count, chars[index] == "\\", chars[index + 1] == "[" {
                 flushInline()
                 let start = index + 2
                 var end = start
                 var found = false
                 while end + 1 < count {
-                    if chars[end] == "\\" && chars[end + 1] == "]" {
+                    if chars[end] == "\\", chars[end + 1] == "]" {
                         found = true
                         break
                     }
@@ -78,7 +77,7 @@ extension MarkdownContentView {
                 }
 
                 if found {
-                    let latex = String(chars[start..<end]).trimmingCharacters(in: .whitespacesAndNewlines)
+                    let latex = String(chars[start ..< end]).trimmingCharacters(in: .whitespacesAndNewlines)
                     if !latex.isEmpty {
                         firstPass.append(.latexBlock(id: makeID(), content: latex))
                     }
@@ -90,13 +89,13 @@ extension MarkdownContentView {
                 continue
             }
 
-            if index + 1 < count && chars[index] == "$" && chars[index + 1] == "$" {
+            if index + 1 < count, chars[index] == "$", chars[index + 1] == "$" {
                 flushInline()
                 let start = index + 2
                 var end = start
                 var found = false
                 while end + 1 < count {
-                    if chars[end] == "$" && chars[end + 1] == "$" {
+                    if chars[end] == "$", chars[end + 1] == "$" {
                         found = true
                         break
                     }
@@ -104,7 +103,7 @@ extension MarkdownContentView {
                 }
 
                 if found {
-                    let latex = String(chars[start..<end]).trimmingCharacters(in: .whitespacesAndNewlines)
+                    let latex = String(chars[start ..< end]).trimmingCharacters(in: .whitespacesAndNewlines)
                     if !latex.isEmpty {
                         firstPass.append(.latexBlock(id: makeID(), content: latex))
                     }
@@ -132,8 +131,8 @@ extension MarkdownContentView {
             case let .richText(_, segments):
                 let rawText = segments.map { seg in
                     switch seg {
-                    case let .text(str): return str
-                    case let .latexInline(latex): return "$\(latex)$"
+                    case let .text(str): str
+                    case let .latexInline(latex): "$\(latex)$"
                     }
                 }.joined()
 

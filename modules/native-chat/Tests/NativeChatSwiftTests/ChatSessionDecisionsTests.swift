@@ -1,15 +1,15 @@
-import Foundation
 import ChatDomain
 import ChatPersistenceSwiftData
 import ChatRuntimeModel
 import ChatRuntimeWorkflows
+import Foundation
 import OpenAITransport
 import Testing
 @testable import NativeChatComposition
 
 @MainActor
 struct ChatSessionDecisionsTests {
-    @Test func recoveryResumeModeUsesStreamingWhenBackgroundModeAndSequenceExist() {
+    @Test func `recovery resume mode uses streaming when background mode and sequence exist`() {
         let mode = RuntimeSessionDecisionPolicy.recoveryResumeMode(
             preferStreamingResume: true,
             usedBackgroundMode: true,
@@ -19,7 +19,7 @@ struct ChatSessionDecisionsTests {
         #expect(mode == .stream(lastSequenceNumber: 42))
     }
 
-    @Test func recoveryResumeModeFallsBackToPollingWhenBackgroundModeIsDisabled() {
+    @Test func `recovery resume mode falls back to polling when background mode is disabled`() {
         let mode = RuntimeSessionDecisionPolicy.recoveryResumeMode(
             preferStreamingResume: true,
             usedBackgroundMode: false,
@@ -29,7 +29,7 @@ struct ChatSessionDecisionsTests {
         #expect(mode == .poll)
     }
 
-    @Test func gatewayFallbackTriggersDirectResumeWhenNoRecoveryEventsArrive() {
+    @Test func `gateway fallback triggers direct resume when no recovery events arrive`() {
         #expect(
             RuntimeSessionDecisionPolicy.shouldFallbackToDirectRecoveryStream(
                 cloudflareGatewayEnabled: true,
@@ -40,7 +40,7 @@ struct ChatSessionDecisionsTests {
         )
     }
 
-    @Test func pollAfterRecoveryStreamWhenRecoverableFailureOccursOrResponseStillTracked() {
+    @Test func `poll after recovery stream when recoverable failure occurs or response still tracked`() {
         #expect(
             RuntimeSessionDecisionPolicy.shouldPollAfterRecoveryStream(
                 encounteredRecoverableFailure: true,
@@ -61,7 +61,7 @@ struct ChatSessionDecisionsTests {
         )
     }
 
-    @Test func pendingBackgroundCancellationAndDetachOnlyApplyToBackgroundResponses() {
+    @Test func `pending background cancellation and detach only apply to background responses`() {
         let messageId = UUID()
 
         #expect(
@@ -96,7 +96,7 @@ struct ChatSessionDecisionsTests {
         )
     }
 
-    @Test func replySessionActorOwnsStreamingLifecycle() async {
+    @Test func `reply session actor owns streaming lifecycle`() async {
         let actor = ReplySessionActor(initialState: makeRuntimeState())
 
         var snapshot = await actor.apply(.beginSubmitting)
@@ -107,7 +107,7 @@ struct ChatSessionDecisionsTests {
         #expect(snapshot.lifecycle == .preparingInput)
 
         snapshot = await actor.apply(.recordResponseCreated("resp_stream", route: .gateway))
-        guard case .streaming(let cursor) = snapshot.lifecycle else {
+        guard case let .streaming(cursor) = snapshot.lifecycle else {
             Issue.record("Expected streaming lifecycle after response creation")
             return
         }
@@ -118,7 +118,7 @@ struct ChatSessionDecisionsTests {
         #expect(snapshot.lastSequenceNumber == 8)
     }
 
-    @Test func replySessionActorOwnsRecoveryLifecycleAndCompletion() async {
+    @Test func `reply session actor owns recovery lifecycle and completion`() async {
         let actor = ReplySessionActor(initialState: makeRuntimeState())
 
         _ = await actor.apply(.beginSubmitting)
@@ -133,7 +133,7 @@ struct ChatSessionDecisionsTests {
                 route: .gateway
             )
         )
-        guard case .recoveringStatus(let ticket) = snapshot.lifecycle else {
+        guard case let .recoveringStatus(ticket) = snapshot.lifecycle else {
             Issue.record("Expected recoveringStatus lifecycle")
             return
         }
@@ -142,7 +142,7 @@ struct ChatSessionDecisionsTests {
         #expect(snapshot.isRecovering)
 
         snapshot = await actor.apply(.beginRecoveryStream(streamID: UUID()))
-        guard case .recoveringStream(let recoveryCursor) = snapshot.lifecycle else {
+        guard case let .recoveringStream(recoveryCursor) = snapshot.lifecycle else {
             Issue.record("Expected recoveringStream lifecycle")
             return
         }
@@ -150,7 +150,7 @@ struct ChatSessionDecisionsTests {
         #expect(snapshot.isStreaming)
 
         snapshot = await actor.apply(.beginRecoveryPoll)
-        guard case .recoveringPoll(let pollTicket) = snapshot.lifecycle else {
+        guard case let .recoveringPoll(pollTicket) = snapshot.lifecycle else {
             Issue.record("Expected recoveringPoll lifecycle")
             return
         }
@@ -162,7 +162,7 @@ struct ChatSessionDecisionsTests {
         #expect(!snapshot.isThinking)
     }
 
-    @Test func replySessionActorAccumulatedBufferAndToolMutations() async {
+    @Test func `reply session actor accumulated buffer and tool mutations`() async {
         let actor = ReplySessionActor(initialState: makeRuntimeState())
 
         _ = await actor.apply(.recordResponseCreated("resp_tools", route: .direct))
@@ -208,8 +208,16 @@ struct ChatSessionDecisionsTests {
         #expect(snapshot.buffer.filePathAnnotations.count == 1)
     }
 
-    @Test func replySessionActorMergesTerminalPayloadAndSupportsCancellation() async {
+    @Test func `reply session actor merges terminal payload and supports cancellation`() async {
         let actor = ReplySessionActor(initialState: makeRuntimeState())
+        let finalAnnotation = FilePathAnnotation(
+            fileId: "file_final",
+            containerId: "ctr_final",
+            sandboxPath: "sandbox:/tmp/final.txt",
+            filename: "final.txt",
+            startIndex: 0,
+            endIndex: 9
+        )
 
         _ = await actor.apply(.recordResponseCreated("resp_terminal", route: .gateway))
         _ = await actor.apply(.appendText("partial"))
@@ -218,16 +226,7 @@ struct ChatSessionDecisionsTests {
             .mergeTerminalPayload(
                 text: "final",
                 thinking: "reasoning",
-                filePathAnnotations: [
-                    FilePathAnnotation(
-                        fileId: "file_final",
-                        containerId: "ctr_final",
-                        sandboxPath: "sandbox:/tmp/final.txt",
-                        filename: "final.txt",
-                        startIndex: 0,
-                        endIndex: 9
-                    )
-                ]
+                filePathAnnotations: [finalAnnotation]
             )
         )
 

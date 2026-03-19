@@ -1,12 +1,12 @@
-import Foundation
 import ChatDomain
-import ChatPersistenceSwiftData
 import ChatPersistenceCore
+import ChatPersistenceSwiftData
+import Foundation
 import Testing
 @testable import NativeChatComposition
 
 struct SettingsStoreTests {
-    @Test func defaultsMatchCurrentAppBehavior() {
+    @Test func `defaults match current app behavior`() {
         let store = SettingsStore(valueStore: InMemorySettingsValueStore())
 
         #expect(store.defaultModel == .gpt5_4_pro)
@@ -18,7 +18,7 @@ struct SettingsStoreTests {
         #expect(store.cloudflareGatewayEnabled == false)
     }
 
-    @Test func unsupportedEffortFallsBackToSelectedModelDefault() {
+    @Test func `unsupported effort falls back to selected model default`() {
         let valueStore = InMemorySettingsValueStore()
         valueStore.values[SettingsStore.Keys.defaultModel] = ModelType.gpt5_4_pro.rawValue
         valueStore.values[SettingsStore.Keys.defaultEffort] = ReasoningEffort.low.rawValue
@@ -28,7 +28,7 @@ struct SettingsStoreTests {
         #expect(store.defaultEffort == .xhigh)
     }
 
-    @Test func defaultConversationConfigurationPreservesStoredSelections() {
+    @Test func `default conversation configuration preserves stored selections`() {
         let valueStore = InMemorySettingsValueStore()
         let store = SettingsStore(valueStore: valueStore)
 

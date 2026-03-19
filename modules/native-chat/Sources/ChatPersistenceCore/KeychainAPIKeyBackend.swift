@@ -20,7 +20,8 @@ public struct KeychainAPIKeyBackend: Sendable {
     /// Returns the bundle identifier when non-empty, otherwise falls back to ``fallbackServiceIdentifier``.
     public static func defaultServiceIdentifier(bundleIdentifier: String?) -> String {
         guard let bundleIdentifier,
-              !bundleIdentifier.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+              !bundleIdentifier.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        else {
             return fallbackServiceIdentifier
         }
         return bundleIdentifier
@@ -74,7 +75,8 @@ public struct KeychainAPIKeyBackend: Sendable {
 
         guard status == errSecSuccess,
               let data = item as? Data,
-              let value = String(data: data, encoding: .utf8) else {
+              let value = String(data: data, encoding: .utf8)
+        else {
             return nil
         }
 
@@ -100,7 +102,7 @@ public struct KeychainAPIKeyBackend: Sendable {
         /// A human-readable description derived from `SecCopyErrorMessageString`.
         public var errorDescription: String? {
             switch self {
-            case .unexpectedStatus(let status):
+            case let .unexpectedStatus(status):
                 if let message = SecCopyErrorMessageString(status, nil) as String? {
                     return message
                 }

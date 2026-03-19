@@ -1,12 +1,12 @@
-import Foundation
-import Testing
-import SwiftUI
-import UIKit
 import ChatUIComponents
+import Foundation
+import SwiftUI
+import Testing
+import UIKit
 
 @MainActor
 struct ChatUISourceTargetTests {
-    @Test func richTextBuilderPreservesLinksAndRemovesMarkdownMarkers() {
+    @Test func `rich text builder preserves links and removes markdown markers`() {
         let richText = RichTextAttributedStringBuilder.parseRichText(
             "Visit [OpenAI](https://openai.com) and **ship** _cleanly_."
         )
@@ -16,14 +16,14 @@ struct ChatUISourceTargetTests {
         #expect(richText.runs.contains(where: { $0.link?.absoluteString == "https://openai.com" }))
     }
 
-    @Test func streamingRichTextBuilderResolvesInlineCode() {
+    @Test func `streaming rich text builder resolves inline code`() {
         let richText = RichTextAttributedStringBuilder.parseStreamingText("Use `swift test` for coverage.")
         let rendered = String(richText.characters)
 
         #expect(rendered == "Use swift test for coverage.")
     }
 
-    @Test func stableRoundedGlassModifierHostsWithoutCrashing() {
+    @Test func `stable rounded glass modifier hosts without crashing`() {
         let controller = UIHostingController(
             rootView: Text("Glass").modifier(
                 StableRoundedGlassModifier(
@@ -40,7 +40,7 @@ struct ChatUISourceTargetTests {
         #expect(controller.view != nil)
     }
 
-    @Test func staticRoundedGlassShellModifierHostsWithoutCrashing() {
+    @Test func `static rounded glass shell modifier hosts without crashing`() {
         let controller = UIHostingController(
             rootView: Text("Shell").modifier(
                 StaticRoundedGlassShellModifier(

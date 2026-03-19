@@ -91,7 +91,7 @@ public enum MessagePayloadStore {
         return digest.compactMap { String(format: "%02x", $0) }.joined()
     }
 
-    private static func canonicalData<T: Encodable>(for value: T) -> Data {
+    private static func canonicalData(for value: some Encodable) -> Data {
         do {
             let encoder = JSONEncoder()
             encoder.outputFormatting = [.sortedKeys]

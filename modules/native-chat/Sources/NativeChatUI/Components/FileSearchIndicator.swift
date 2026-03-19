@@ -10,8 +10,10 @@ package struct FileSearchIndicator: View {
     /// Timeout duration in seconds before auto-dismissing
     private let timeoutSeconds: Double = 60
 
+    /// Creates a file-search activity indicator.
     package init() {}
 
+    /// The indicator shown while the model is reading uploaded documents.
     package var body: some View {
         if !timedOut {
             HStack(spacing: 8) {
@@ -21,7 +23,7 @@ package struct FileSearchIndicator: View {
                     .symbolEffect(.pulse, options: .repeating)
                     .accessibilityHidden(true)
 
-                Text("Reading documents…")
+                Text(String(localized: "Reading documents…"))
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             }

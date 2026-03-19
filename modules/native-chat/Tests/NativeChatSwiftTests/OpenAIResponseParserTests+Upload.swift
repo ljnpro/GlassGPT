@@ -6,7 +6,7 @@ import Testing
 // MARK: - Upload and Error Parsing Tests
 
 extension OpenAIResponseParserTests {
-    @Test func parseUploadedFileIDThrowsRequestFailedWhenPayloadCannotBeDecoded() throws {
+    @Test func `parse uploaded file ID throws request failed when payload cannot be decoded`() throws {
         let parser = OpenAIResponseParser()
         let response = try makeHTTPResponse(
             url: "https://example.com/files",
@@ -20,7 +20,7 @@ extension OpenAIResponseParserTests {
             )
             Issue.record("Expected requestFailed error")
         } catch {
-            guard case OpenAIServiceError.requestFailed(let message) = error else {
+            guard case let OpenAIServiceError.requestFailed(message) = error else {
                 Issue.record("Expected requestFailed, got \(error)")
                 return
             }
@@ -28,7 +28,7 @@ extension OpenAIResponseParserTests {
         }
     }
 
-    @Test func parseUploadedFileIDRejectsNonHTTPResponse() throws {
+    @Test func `parse uploaded file ID rejects non HTTP response`() throws {
         let parser = OpenAIResponseParser()
 
         do {
@@ -38,7 +38,7 @@ extension OpenAIResponseParserTests {
             )
             Issue.record("Expected requestFailed error")
         } catch {
-            guard case OpenAIServiceError.requestFailed(let message) = error else {
+            guard case let OpenAIServiceError.requestFailed(message) = error else {
                 Issue.record("Expected requestFailed, got \(error)")
                 return
             }
@@ -46,7 +46,7 @@ extension OpenAIResponseParserTests {
         }
     }
 
-    @Test func parseUploadedFileIDRejectsHTTPFailures() throws {
+    @Test func `parse uploaded file ID rejects HTTP failures`() throws {
         let parser = OpenAIResponseParser()
         let response = try makeHTTPResponse(
             url: "https://example.com/files",
@@ -60,7 +60,7 @@ extension OpenAIResponseParserTests {
             )
             Issue.record("Expected httpError")
         } catch {
-            guard case OpenAIServiceError.httpError(let statusCode, let message) = error else {
+            guard case let OpenAIServiceError.httpError(statusCode, message) = error else {
                 Issue.record("Expected httpError, got \(error)")
                 return
             }
@@ -69,7 +69,7 @@ extension OpenAIResponseParserTests {
         }
     }
 
-    @Test func responsesErrorDTODecodesStringAndObjectPayloads() throws {
+    @Test func `responses error DTO decodes string and object payloads`() throws {
         #expect(
             try JSONCoding.decode(ResponsesErrorDTO.self, from: Data(#""plain failure""#.utf8))
                 == ResponsesErrorDTO(message: "plain failure")
@@ -82,7 +82,7 @@ extension OpenAIResponseParserTests {
         )
     }
 
-    @Test func responsesStreamEnvelopeResolvesSequenceAndErrorFromTopLevelFields() throws {
+    @Test func `responses stream envelope resolves sequence and error from top level fields`() throws {
         let envelope = try JSONCoding.decode(
             ResponsesStreamEnvelopeDTO.self,
             from: Data(#"{"sequence_number":17,"message":"stream failed"}"#.utf8)
@@ -93,7 +93,7 @@ extension OpenAIResponseParserTests {
         #expect(envelope.resolvedResponse.message == "stream failed")
     }
 
-    @Test func openAIServiceErrorDescriptionsMatchBehavior() {
+    @Test func `open AI service error descriptions match behavior`() {
         #expect(
             OpenAIServiceError.noAPIKey.errorDescription
                 == "No API key configured. Please add it in Settings."

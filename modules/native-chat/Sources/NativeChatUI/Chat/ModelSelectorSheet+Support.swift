@@ -1,7 +1,7 @@
 import ChatDomain
+import ChatUIComponents
 import SwiftUI
 import UIKit
-import ChatUIComponents
 
 /// Compact capsule badge displaying the current model name and reasoning effort, tappable to open the model selector.
 package struct ModelBadge: View {
@@ -19,6 +19,7 @@ package struct ModelBadge: View {
         self.onTap = onTap
     }
 
+    /// The badge surface showing the current model and reasoning effort.
     package var body: some View {
         Button(action: onTap) {
             HStack(spacing: 4) {
@@ -41,7 +42,7 @@ package struct ModelBadge: View {
             )
         }
         .buttonStyle(GlassPressButtonStyle())
-        .accessibilityLabel("Model: \(badgeText). Tap to change")
+        .accessibilityLabel(String(localized: "Model") + ": \(badgeText). " + String(localized: "Tap to change"))
         .accessibilityIdentifier("chat.modelBadge")
     }
 
@@ -53,9 +54,9 @@ package struct ModelBadge: View {
     }
 }
 
-extension ModelSelectorSheet {
+public extension ModelSelectorSheet {
     /// Layout metrics for the model selector sheet, adapted for phone and iPad idioms.
-    public struct Metrics {
+    struct Metrics {
         /// Horizontal padding applied to the sheet content.
         public let contentHorizontalPadding: CGFloat
         /// Vertical padding applied to the sheet content.
@@ -107,13 +108,13 @@ extension ModelSelectorSheet {
     }
 
     /// Returns an abbreviated label for the given reasoning effort level.
-    public func effortShortLabel(_ effort: ReasoningEffort) -> String {
+    func effortShortLabel(_ effort: ReasoningEffort) -> String {
         switch effort {
-        case .none: return "Off"
-        case .low: return "Low"
-        case .medium: return "Med"
-        case .high: return "High"
-        case .xhigh: return "Max"
+        case .none: String(localized: "Off")
+        case .low: String(localized: "Low")
+        case .medium: String(localized: "Med")
+        case .high: String(localized: "High")
+        case .xhigh: String(localized: "Max")
         }
     }
 }

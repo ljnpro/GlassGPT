@@ -4,6 +4,7 @@ set -euo pipefail
 PASS=0
 FAIL=0
 TOTAL=0
+CODABLE_WITNESS_EXCEPTIONS='(init\(from decoder: (any )?Decoder\) throws|func encode\(to encoder: (any )?Encoder\) throws)'
 
 function check() {
   local name="$1"
@@ -23,9 +24,9 @@ echo ""
 
 echo "Phase B — Typed Throws"
 check "B-1: Zero untyped public throws" \
-  '[ "$(grep -rn "public.*func.*throws[^(]" modules/native-chat/Sources/ | grep -v "throws(" | grep -v "//" | wc -l | tr -d " ")" -eq 0 ]'
+  '[ "$(grep -rnE "public.*(func|init).*throws[^(]" modules/native-chat/Sources/ | grep -v "throws(" | grep -v "//" | grep -vE "$CODABLE_WITNESS_EXCEPTIONS" | wc -l | tr -d " ")" -eq 0 ]'
 check "B-2: Zero untyped package throws" \
-  '[ "$(grep -rn "package.*func.*throws[^(]" modules/native-chat/Sources/ | grep -v "throws(" | grep -v "//" | wc -l | tr -d " ")" -eq 0 ]'
+  '[ "$(grep -rnE "package.*(func|init).*throws[^(]" modules/native-chat/Sources/ | grep -v "throws(" | grep -v "//" | grep -vE "$CODABLE_WITNESS_EXCEPTIONS" | wc -l | tr -d " ")" -eq 0 ]'
 check "B-3: >= 3 typed error enums" \
   '[ "$(grep -rn "public enum.*Error.*: Error" modules/native-chat/Sources/ | wc -l | tr -d " ")" -ge 3 ]'
 

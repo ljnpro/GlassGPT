@@ -6,7 +6,7 @@ import Testing
 // MARK: - Generated File Cache Tests
 
 extension SettingsScreenStoreTests {
-    @Test func refreshAndClearGeneratedCachesTrackFilesystemState() async throws {
+    @Test func `refresh and clear generated caches track filesystem state`() async throws {
         Self.clearGeneratedCacheRoots()
         defer { Self.clearGeneratedCacheRoots() }
 
@@ -26,22 +26,23 @@ extension SettingsScreenStoreTests {
         )
 
         let store = makeTestSettingsScreenStore()
+        let cache = store.cache
 
-        await store.refreshGeneratedImageCacheSize()
-        await store.refreshGeneratedDocumentCacheSize()
+        await cache.refreshGeneratedImageCacheSize()
+        await cache.refreshGeneratedDocumentCacheSize()
 
-        #expect(store.generatedImageCacheSizeBytes == Int64(imageBytes.count))
-        #expect(store.generatedDocumentCacheSizeBytes == Int64(documentBytes.count))
-        #expect(!store.isClearingImageCache)
-        #expect(!store.isClearingDocumentCache)
+        #expect(cache.generatedImageCacheSizeBytes == Int64(imageBytes.count))
+        #expect(cache.generatedDocumentCacheSizeBytes == Int64(documentBytes.count))
+        #expect(!cache.isClearingImageCache)
+        #expect(!cache.isClearingDocumentCache)
 
-        await store.clearGeneratedImageCache()
-        await store.clearGeneratedDocumentCache()
+        await cache.clearGeneratedImageCache()
+        await cache.clearGeneratedDocumentCache()
 
-        #expect(store.generatedImageCacheSizeBytes == 0)
-        #expect(store.generatedDocumentCacheSizeBytes == 0)
-        #expect(!store.isClearingImageCache)
-        #expect(!store.isClearingDocumentCache)
+        #expect(cache.generatedImageCacheSizeBytes == 0)
+        #expect(cache.generatedDocumentCacheSizeBytes == 0)
+        #expect(!cache.isClearingImageCache)
+        #expect(!cache.isClearingDocumentCache)
     }
 }
 

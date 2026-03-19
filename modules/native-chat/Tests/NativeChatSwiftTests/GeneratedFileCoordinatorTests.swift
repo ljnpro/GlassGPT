@@ -1,13 +1,13 @@
-import Foundation
-import Testing
 import ChatDomain
 import ChatPersistenceSwiftData
+import Foundation
 import GeneratedFilesCore
 import GeneratedFilesInfra
+import Testing
 @testable import NativeChatComposition
 
 struct GeneratedFileCoordinatorTests {
-    @Test func requestedFilenamePrefersAnnotationThenSandboxPath() {
+    @Test func `requested filename prefers annotation then sandbox path`() {
         let coordinator = GeneratedFileCoordinator()
         let annotation = FilePathAnnotation(
             fileId: "file_chart",
@@ -23,18 +23,18 @@ struct GeneratedFileCoordinatorTests {
                 for: "sandbox:/mnt/data/fallback.png",
                 annotation: annotation
             ) ==
-            "chart.png"
+                "chart.png"
         )
         #expect(
             coordinator.requestedFilename(
                 for: "sandbox:/mnt/data/fallback.png",
                 annotation: nil
             ) ==
-            "fallback.png"
+                "fallback.png"
         )
     }
 
-    @Test func findMatchingFilePathAnnotationPrefersFallbackFileIDAndExactPath() {
+    @Test func `find matching file path annotation prefers fallback file ID and exact path`() {
         let coordinator = GeneratedFileCoordinator()
         let primary = FilePathAnnotation(
             fileId: "file_primary",
@@ -66,7 +66,7 @@ struct GeneratedFileCoordinatorTests {
                     endIndex: 0
                 )
             )?.fileId ==
-            "file_secondary"
+                "file_secondary"
         )
 
         #expect(
@@ -75,11 +75,11 @@ struct GeneratedFileCoordinatorTests {
                 sandboxURL: "sandbox:/mnt/data/primary.png",
                 fallback: nil
             )?.fileId ==
-            "file_primary"
+                "file_primary"
         )
     }
 
-    @Test func presentationBuildsImagePreviewWithoutChangingNames() {
+    @Test func `presentation builds image preview without changing names`() {
         let coordinator = GeneratedFileCoordinator()
         let resource = GeneratedFileLocalResource(
             localURL: URL(fileURLWithPath: "/tmp/chart.png"),
@@ -89,7 +89,7 @@ struct GeneratedFileCoordinatorTests {
         )
 
         switch coordinator.presentation(for: resource, suggestedFilename: "ignored.png") {
-        case .preview(let item):
+        case let .preview(item):
             #expect(item.kind.rawValue == FilePreviewKind.generatedImage.rawValue)
             #expect(item.displayName == "chart")
             #expect(item.viewerFilename == "chart.png")
@@ -98,7 +98,7 @@ struct GeneratedFileCoordinatorTests {
         }
     }
 
-    @Test func userFacingDownloadErrorPreservesExistingMessages() {
+    @Test func `user facing download error preserves existing messages`() {
         let coordinator = GeneratedFileCoordinator()
 
         #expect(
@@ -106,14 +106,14 @@ struct GeneratedFileCoordinatorTests {
                 FileDownloadError.invalidPDFData,
                 openBehavior: .pdfPreview
             ) ==
-            "This generated PDF could not be rendered."
+                "This generated PDF could not be rendered."
         )
         #expect(
             coordinator.userFacingDownloadError(
                 FileDownloadError.httpError(410, "expired"),
                 openBehavior: .directShare
             ) ==
-            "This generated file has expired and can no longer be downloaded. Please regenerate it."
+                "This generated file has expired and can no longer be downloaded. Please regenerate it."
         )
     }
 }

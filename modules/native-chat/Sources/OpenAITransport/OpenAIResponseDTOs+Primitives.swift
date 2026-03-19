@@ -23,15 +23,16 @@ public struct ResponsesErrorDTO: Codable, Equatable, Sendable {
         self.message = message
     }
 
+    /// Decodes an error payload that may arrive as either a string or an object.
     public init(from decoder: Decoder) throws {
         let singleValue = try decoder.singleValueContainer()
         do {
             let stringValue = try singleValue.decode(String.self)
-            self.message = stringValue
+            message = stringValue
             return
         } catch DecodingError.typeMismatch {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            self.message = try container.decodeIfPresent(String.self, forKey: .message)
+            message = try container.decodeIfPresent(String.self, forKey: .message)
         } catch {
             throw error
         }

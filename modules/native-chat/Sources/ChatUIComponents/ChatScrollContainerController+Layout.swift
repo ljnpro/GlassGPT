@@ -24,7 +24,7 @@ extension ChatScrollContainerController {
 
         let insetsChanged =
             abs(scrollView.contentInset.top - topInset) > 0.5
-            || abs(scrollView.contentInset.bottom - bottomInset) > 0.5
+                || abs(scrollView.contentInset.bottom - bottomInset) > 0.5
         let contentHeightChanged = abs(contentHeight - lastContentHeight) > 0.5
         let viewportHeightChanged = abs(viewportHeight - lastViewportHeight) > 0.5
         let composerHeightChanged = abs(composerHeight - lastComposerHeight) > 0.5
@@ -63,7 +63,7 @@ extension ChatScrollContainerController {
     func handleObservedContentSizeChange() {
         guard scrollView.bounds.height > 1 else { return }
 
-        if layoutMode == .bottomAnchored && shouldFollowBottom {
+        if layoutMode == .bottomAnchored, shouldFollowBottom {
             shouldPinToBottomOnNextLayout = true
         }
 

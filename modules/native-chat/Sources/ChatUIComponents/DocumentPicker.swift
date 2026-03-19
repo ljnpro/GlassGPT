@@ -32,7 +32,7 @@ public struct DocumentPicker: UIViewControllerRepresentable {
     }
 
     /// No-op; the picker does not require incremental updates.
-    public func updateUIViewController(_ uiViewController: UIDocumentPickerViewController, context: Context) {}
+    public func updateUIViewController(_: UIDocumentPickerViewController, context _: Context) {}
 
     /// Creates the coordinator that acts as the document picker delegate.
     public func makeCoordinator() -> Coordinator {
@@ -48,12 +48,12 @@ public struct DocumentPicker: UIViewControllerRepresentable {
         }
 
         /// Forwards selected document URLs to the parent closure.
-        public func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
+        public func documentPicker(_: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
             onDocumentsPicked(urls)
         }
 
         /// No-op handler for user cancellation.
-        public func documentPickerWasCancelled(_ controller: UIDocumentPickerViewController) {}
+        public func documentPickerWasCancelled(_: UIDocumentPickerViewController) {}
     }
 }
 
@@ -69,10 +69,15 @@ public struct FileMetadata {
     public let data: Data
 
     /// Reads the file at the given URL and returns a populated ``FileMetadata`` instance.
-    public static func from(url: URL) throws(any Error) -> FileMetadata {
+    public static func from(url: URL) throws(FileMetadataError) -> FileMetadata {
         let filename = url.lastPathComponent
         let fileType = url.pathExtension.lowercased()
-        let data = try Data(contentsOf: url)
+        let data: Data
+        do {
+            data = try Data(contentsOf: url)
+        } catch {
+            throw .readFailed(filename: filename, reason: error.localizedDescription)
+        }
         let fileSize = Int64(data.count)
 
         return FileMetadata(
@@ -81,5 +86,19 @@ public struct FileMetadata {
             fileType: fileType,
             data: data
         )
+    }
+}
+
+/// Errors that can occur while reading file metadata from disk.
+public enum FileMetadataError: LocalizedError {
+    /// The selected file could not be loaded from disk.
+    case readFailed(filename: String, reason: String)
+
+    /// A user-facing description of the error.
+    public var errorDescription: String? {
+        switch self {
+        case let .readFailed(filename, reason):
+            "Unable to read \(filename): \(reason)"
+        }
     }
 }

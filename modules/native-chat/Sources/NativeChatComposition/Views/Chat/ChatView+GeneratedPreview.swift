@@ -1,5 +1,5 @@
-import GeneratedFilesCore
 import ChatPersistenceCore
+import GeneratedFilesCore
 import SwiftUI
 
 extension ChatView {

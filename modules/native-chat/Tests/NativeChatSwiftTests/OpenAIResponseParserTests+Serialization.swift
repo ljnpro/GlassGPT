@@ -1,5 +1,5 @@
-import ChatPersistenceSwiftData
 import ChatDomain
+import ChatPersistenceSwiftData
 import Foundation
 import OpenAITransport
 import Testing
@@ -8,7 +8,7 @@ import Testing
 // MARK: - Action Queries and Output Fallbacks
 
 extension OpenAIResponseParserTests {
-    @Test func parseFetchedResponseUsesActionQueries() throws {
+    @Test func `parse fetched response uses action queries`() throws {
         let parser = OpenAIResponseParser()
         let payload = makeActionQueriesPayload()
         let data = try JSONCoding.encode(payload)
@@ -25,7 +25,7 @@ extension OpenAIResponseParserTests {
         #expect(result.errorMessage == "still working")
     }
 
-    @Test func parseFetchedResponseUsesOutputFallbacks() throws {
+    @Test func `parse fetched response uses output fallbacks`() throws {
         let parser = OpenAIResponseParser()
         let payload = makeActionQueriesPayload()
         let data = try JSONCoding.encode(payload)
@@ -47,7 +47,7 @@ extension OpenAIResponseParserTests {
 // MARK: - Payload Store Round Trips
 
 extension OpenAIResponseParserTests {
-    @Test func payloadStoreRoundTripsAnnotationsAndToolCalls() {
+    @Test func `payload store round trips annotations and tool calls`() {
         let citations = makeTestCitations()
         let toolCalls = makeTestToolCalls()
         let filePathAnnotations = makeTestFilePathAnnotations()
@@ -67,7 +67,7 @@ extension OpenAIResponseParserTests {
         #expect(message.fileAttachments.first?.filename == fileAttachments.first?.filename)
     }
 
-    @Test func payloadStoreRoundTripsFileAttachmentDetails() {
+    @Test func `payload store round trips file attachment details`() {
         let fileAttachments = makeTestFileAttachments()
 
         let message = Message(role: .assistant, content: "initial")
@@ -78,7 +78,7 @@ extension OpenAIResponseParserTests {
         #expect(message.fileAttachments.first?.openAIFileId == fileAttachments.first?.openAIFileId)
     }
 
-    @Test func payloadStoreReconstructedMessageMatchesDigest() {
+    @Test func `payload store reconstructed message matches digest`() {
         let citations = makeTestCitations()
         let toolCalls = makeTestToolCalls()
         let filePathAnnotations = makeTestFilePathAnnotations()
@@ -105,7 +105,7 @@ extension OpenAIResponseParserTests {
         #expect(reconstructed.fileAttachments.count == 1)
     }
 
-    @Test func renderDigestMatchesExplicitPayloadComponents() {
+    @Test func `render digest matches explicit payload components`() {
         let annotations = [
             URLCitation(
                 url: "https://example.com",
@@ -159,7 +159,7 @@ extension OpenAIResponseParserTests {
         #expect(MessagePayloadStore.renderDigest(for: message) != baselineDigest)
     }
 
-    @Test func invalidPayloadDataFallsBackToEmptyCollections() {
+    @Test func `invalid payload data falls back to empty collections`() {
         let invalid = Data("not-json".utf8)
 
         #expect(MessagePayloadStore.annotations(from: invalid).isEmpty)
@@ -168,7 +168,7 @@ extension OpenAIResponseParserTests {
         #expect(MessagePayloadStore.filePathAnnotations(from: invalid).isEmpty)
     }
 
-    @Test func setEmptyPayloadStoresNilDataAndStabilizesDigest() {
+    @Test func `set empty payload stores nil data and stabilizes digest`() {
         let message = Message(role: .assistant, content: "hello")
 
         MessagePayloadStore.setAnnotations([], on: message)

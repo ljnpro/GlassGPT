@@ -8,13 +8,15 @@ public enum ModelType: String, CaseIterable, Identifiable, Codable, Sendable {
     case gpt5_4_pro = "gpt-5.4-pro"
 
     /// Stable identifier derived from the raw value.
-    public var id: String { rawValue }
+    public var id: String {
+        rawValue
+    }
 
     /// Human-readable model name for display in the UI.
     public var displayName: String {
         switch self {
-        case .gpt5_4: return "GPT-5.4"
-        case .gpt5_4_pro: return "GPT-5.4 Pro"
+        case .gpt5_4: "GPT-5.4"
+        case .gpt5_4_pro: "GPT-5.4 Pro"
         }
     }
 
@@ -22,17 +24,17 @@ public enum ModelType: String, CaseIterable, Identifiable, Codable, Sendable {
     public var availableEfforts: [ReasoningEffort] {
         switch self {
         case .gpt5_4:
-            return [.none, .low, .medium, .high, .xhigh]
+            [.none, .low, .medium, .high, .xhigh]
         case .gpt5_4_pro:
-            return [.medium, .high, .xhigh]
+            [.medium, .high, .xhigh]
         }
     }
 
     /// The default reasoning effort level for this model.
     public var defaultEffort: ReasoningEffort {
         switch self {
-        case .gpt5_4: return .high
-        case .gpt5_4_pro: return .xhigh
+        case .gpt5_4: .high
+        case .gpt5_4_pro: .xhigh
         }
     }
 }
@@ -51,16 +53,18 @@ public enum ReasoningEffort: String, CaseIterable, Identifiable, Codable, Sendab
     case xhigh
 
     /// Stable identifier derived from the raw value.
-    public var id: String { rawValue }
+    public var id: String {
+        rawValue
+    }
 
     /// Human-readable label for display in the UI.
     public var displayName: String {
         switch self {
-        case .none: return "None"
-        case .low: return "Low"
-        case .medium: return "Medium"
-        case .high: return "High"
-        case .xhigh: return "XHigh"
+        case .none: "None"
+        case .low: "Low"
+        case .medium: "Medium"
+        case .high: "High"
+        case .xhigh: "XHigh"
         }
     }
 
@@ -78,13 +82,15 @@ public enum ServiceTier: String, CaseIterable, Identifiable, Codable, Sendable {
     case flex
 
     /// Stable identifier derived from the raw value.
-    public var id: String { rawValue }
+    public var id: String {
+        rawValue
+    }
 
     /// Human-readable tier name for display in the UI.
     public var displayName: String {
         switch self {
-        case .standard: return "Standard"
-        case .flex: return "Flex"
+        case .standard: "Standard"
+        case .flex: "Flex"
         }
     }
 }
@@ -99,5 +105,7 @@ public enum MessageRole: String, Codable, CaseIterable, Identifiable, Sendable {
     case system
 
     /// Stable identifier derived from the raw value.
-    public var id: String { rawValue }
+    public var id: String {
+        rawValue
+    }
 }

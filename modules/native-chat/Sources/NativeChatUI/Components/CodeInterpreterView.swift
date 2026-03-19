@@ -4,8 +4,10 @@ import SwiftUI
 
 /// Animated indicator shown when the model is executing code via the code interpreter.
 package struct CodeInterpreterIndicator: View {
+    /// Creates a code-interpreter activity indicator.
     package init() {}
 
+    /// The indicator view shown while code execution is in progress.
     package var body: some View {
         HStack(spacing: 8) {
             Image(systemName: "terminal")
@@ -14,7 +16,7 @@ package struct CodeInterpreterIndicator: View {
                 .symbolEffect(.pulse, options: .repeating)
                 .accessibilityHidden(true)
 
-            Text("Running code…")
+            Text(String(localized: "Running code…"))
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
         }
@@ -37,10 +39,12 @@ package struct CodeInterpreterResultView: View {
     let toolCall: ToolCallInfo
     @State private var isExpanded = false
 
+    /// Creates a result view for a completed code-interpreter call.
     package init(toolCall: ToolCallInfo) {
         self.toolCall = toolCall
     }
 
+    /// The expandable card that shows code execution results and emitted output.
     package var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             // Header - always visible
@@ -55,7 +59,7 @@ package struct CodeInterpreterResultView: View {
                         .foregroundStyle(.green)
                         .accessibilityHidden(true)
 
-                    Text("Code Executed")
+                    Text(String(localized: "Code Executed"))
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(.secondary)
 
@@ -71,7 +75,11 @@ package struct CodeInterpreterResultView: View {
                 .padding(.vertical, 8)
             }
             .buttonStyle(.plain)
-            .accessibilityLabel(isExpanded ? "Collapse code execution result" : "Expand code execution result")
+            .accessibilityLabel(
+                isExpanded
+                    ? String(localized: "Collapse code execution result")
+                    : String(localized: "Expand code execution result")
+            )
             .accessibilityIdentifier("indicator.codeResult")
 
             // Expandable content
@@ -80,7 +88,7 @@ package struct CodeInterpreterResultView: View {
                     // Code block
                     if let code = toolCall.code, !code.isEmpty {
                         VStack(alignment: .leading, spacing: 4) {
-                            Text("PYTHON")
+                            Text(String(localized: "Python").uppercased())
                                 .font(.system(size: 9, weight: .bold, design: .monospaced))
                                 .foregroundStyle(.tertiary)
                                 .padding(.horizontal, 10)
@@ -108,7 +116,7 @@ package struct CodeInterpreterResultView: View {
                     // Output
                     if let results = toolCall.results, !results.isEmpty {
                         VStack(alignment: .leading, spacing: 4) {
-                            Text("OUTPUT")
+                            Text(String(localized: "Output").uppercased())
                                 .font(.system(size: 9, weight: .bold, design: .monospaced))
                                 .foregroundStyle(.tertiary)
                                 .padding(.horizontal, 10)

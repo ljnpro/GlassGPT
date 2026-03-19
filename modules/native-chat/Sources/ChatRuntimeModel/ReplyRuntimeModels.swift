@@ -179,16 +179,16 @@ public struct ReplyRuntimeState: Equatable, Sendable {
     /// The stream cursor derived from the current lifecycle state, or `nil` if not streaming.
     public var cursor: StreamCursor? {
         switch lifecycle {
-        case .streaming(let cursor), .recoveringStream(let cursor):
-            return cursor
-        case .recoveringStatus(let ticket), .recoveringPoll(let ticket), .detached(let ticket):
-            return StreamCursor(
+        case let .streaming(cursor), let .recoveringStream(cursor):
+            cursor
+        case let .recoveringStatus(ticket), let .recoveringPoll(ticket), let .detached(ticket):
+            StreamCursor(
                 responseID: ticket.responseID,
                 lastSequenceNumber: ticket.lastSequenceNumber,
                 route: ticket.route
             )
         case .idle, .preparingInput, .uploadingAttachments, .finalizing, .completed, .failed:
-            return nil
+            nil
         }
     }
 
@@ -206,9 +206,9 @@ public struct ReplyRuntimeState: Equatable, Sendable {
     public var isStreaming: Bool {
         switch lifecycle {
         case .streaming, .recoveringStream:
-            return true
+            true
         case .idle, .preparingInput, .uploadingAttachments, .detached, .recoveringStatus, .recoveringPoll, .finalizing, .completed, .failed:
-            return false
+            false
         }
     }
 
@@ -216,9 +216,9 @@ public struct ReplyRuntimeState: Equatable, Sendable {
     public var isRecovering: Bool {
         switch lifecycle {
         case .recoveringStatus, .recoveringStream, .recoveringPoll:
-            return true
+            true
         case .idle, .preparingInput, .uploadingAttachments, .streaming, .detached, .finalizing, .completed, .failed:
-            return false
+            false
         }
     }
 }

@@ -3,9 +3,9 @@ import ChatPresentation
 import Foundation
 import GeneratedFilesCore
 
+/// Observable store holding app-wide state: the selected tab, presenters, and the chat controller.
 @Observable
 @MainActor
-/// Observable store holding app-wide state: the selected tab, presenters, and the chat controller.
 package final class NativeChatAppStore {
     /// The currently selected tab index (0=Chat, 1=History, 2=Settings).
     package var selectedTab = 0

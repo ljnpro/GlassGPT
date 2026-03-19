@@ -62,7 +62,7 @@ public struct GeneratedFileDescriptor: Equatable, Hashable, Sendable {
         return Self.imageExtensions.contains(pathExtension)
     }
 
-    private static let imageExtensions: Set<String> = ["png", "jpg", "jpeg", "gif", "webp", "heic"]
+    private static let imageExtensions: Set = ["png", "jpg", "jpeg", "gif", "webp", "heic"]
 
     private static func normalizedIdentifier(_ candidate: String?) -> String? {
         guard let candidate else {

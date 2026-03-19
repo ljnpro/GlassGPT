@@ -12,7 +12,7 @@ public struct UIKitGlassBackgroundView: UIViewRepresentable {
     /// Opacity of the tint color applied to the glass effect.
     public var tintOpacity: CGFloat = 0
     /// Whether a thin border is drawn around the glass shape.
-    public var showsBorder: Bool = true
+    public var showsBorder = true
     /// Width of the border stroke in points.
     public var borderWidth: CGFloat = 0.9
     /// Border opacity used in dark mode.
@@ -42,7 +42,7 @@ public struct UIKitGlassBackgroundView: UIViewRepresentable {
     }
 
     /// Creates the underlying ``GlassBackgroundHostingView``.
-    public func makeUIView(context: Context) -> GlassBackgroundHostingView {
+    public func makeUIView(context _: Context) -> GlassBackgroundHostingView {
         GlassBackgroundHostingView(
             cornerRadius: cornerRadius,
             innerInset: innerInset,
@@ -56,7 +56,7 @@ public struct UIKitGlassBackgroundView: UIViewRepresentable {
     }
 
     /// Reconfigures the glass background when SwiftUI state changes.
-    public func updateUIView(_ uiView: GlassBackgroundHostingView, context: Context) {
+    public func updateUIView(_ uiView: GlassBackgroundHostingView, context _: Context) {
         uiView.configure(
             cornerRadius: cornerRadius,
             innerInset: innerInset,

@@ -55,10 +55,10 @@ public final class HistoryPresenter {
         deleteAllConversations: @escaping () -> Void
     ) {
         self.conversations = conversations.map(Self.makeRow)
-        self.loadConversationsHandler = loadConversations
-        self.selectConversationHandler = selectConversation
-        self.deleteConversationHandler = deleteConversation
-        self.deleteAllConversationsHandler = deleteAllConversations
+        loadConversationsHandler = loadConversations
+        selectConversationHandler = selectConversation
+        deleteConversationHandler = deleteConversation
+        deleteAllConversationsHandler = deleteAllConversations
     }
 
     /// Conversations filtered by ``searchText``. Returns all conversations when the search is empty.

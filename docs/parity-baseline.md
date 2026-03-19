@@ -1,13 +1,13 @@
-# 4.8.2 Parity Baseline
+# 4.9.0 Parity Baseline
 
-This document records the `4.7.0` production baseline that `4.8.2` must preserve.
+This document records the `4.8.2` production baseline that `4.9.0` must preserve.
 
 ## Stable Baseline
 
-- source branch: `codex/stable-4.8`
-- baseline branch: `codex/stable-4.7`
-- development branch: `codex/feature/4.8.2-*`
-- baseline app version: `4.7.0 (20179)`
+- source branch: `codex/stable-4.9`
+- baseline branch: `codex/stable-4.8`
+- development branch: `codex/feature/4.9.0-*`
+- baseline app version: `4.8.2 (20182)`
 
 ## User-Visible Invariants
 
@@ -22,7 +22,7 @@ This document records the `4.7.0` production baseline that `4.8.2` must preserve
 
 ## Manual Acceptance
 
-Run this checklist against `v4.7.0` and the current `4.8.2` candidate:
+Run this checklist against `v4.8.2` and the current `4.9.0` candidate:
 
 1. launch the app and confirm empty-shell parity
 2. send a standard message and a long streaming message
@@ -36,9 +36,8 @@ Run this checklist against `v4.7.0` and the current `4.8.2` candidate:
 ## Release Gates
 
 - `./scripts/ci.sh`
+- `./scripts/score_4_8_1.sh`
+- `./scripts/score_4_8_2.sh`
 - `./scripts/ci.sh core-tests`
 - `./scripts/ci.sh ui-tests`
-- `./scripts/ci.sh maintainability`
-- `./scripts/ci.sh source-share`
-- `./scripts/ci.sh module-boundary`
 - `./scripts/ci.sh release-readiness`

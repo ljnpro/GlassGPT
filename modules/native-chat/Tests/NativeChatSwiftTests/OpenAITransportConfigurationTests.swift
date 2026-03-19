@@ -1,5 +1,5 @@
-import ChatPersistenceCore
 import ChatDomain
+import ChatPersistenceCore
 import ChatPersistenceSwiftData
 import Foundation
 import OpenAITransport
@@ -7,7 +7,7 @@ import Testing
 @testable import NativeChatComposition
 
 struct OpenAITransportConfigurationTests {
-    @Test func defaultConfigurationProviderTracksGatewayToggleState() {
+    @Test func `default configuration provider tracks gateway toggle state`() {
         let provider = DefaultOpenAIConfigurationProvider(
             directOpenAIBaseURL: "https://api.openai.com/v1",
             cloudflareGatewayBaseURL: "https://gateway.example/v1",
@@ -24,7 +24,7 @@ struct OpenAITransportConfigurationTests {
         #expect(provider.openAIBaseURL == provider.cloudflareGatewayBaseURL)
     }
 
-    @Test func modelsRequestUsesConfiguredGatewayBaseURL() throws {
+    @Test func `models request uses configured gateway base URL`() throws {
         let config = TransportConfigurationFixture(
             directOpenAIBaseURL: "https://api.openai.com/v1",
             cloudflareGatewayBaseURL: "https://gateway.example/v1",
@@ -40,7 +40,7 @@ struct OpenAITransportConfigurationTests {
         #expect(request.value(forHTTPHeaderField: "cf-aig-authorization") == "Bearer gateway-token")
     }
 
-    @Test func requestAuthorizerCanSkipCloudflareAuthorizationWhenDisabled() throws {
+    @Test func `request authorizer can skip cloudflare authorization when disabled`() throws {
         let config = TransportConfigurationFixture(
             directOpenAIBaseURL: "https://api.openai.com/v1",
             cloudflareGatewayBaseURL: "https://gateway.example/v1",
@@ -60,7 +60,7 @@ struct OpenAITransportConfigurationTests {
         #expect(request.value(forHTTPHeaderField: "cf-aig-authorization") == nil)
     }
 
-    @Test func requestAuthorizerAddsCloudflareAuthorizationWhenRequestedAndEnabled() throws {
+    @Test func `request authorizer adds cloudflare authorization when requested and enabled`() throws {
         let config = TransportConfigurationFixture(
             directOpenAIBaseURL: "https://api.openai.com/v1",
             cloudflareGatewayBaseURL: "https://gateway.example/v1",
@@ -83,7 +83,7 @@ struct OpenAITransportConfigurationTests {
         )
     }
 
-    @Test func transportSessionFactoryBuildsExplicitRequestAndDownloadSessions() {
+    @Test func `transport session factory builds explicit request and download sessions`() {
         let requestSession = OpenAITransportSessionFactory.makeRequestSession()
         let downloadSession = OpenAITransportSessionFactory.makeDownloadSession()
 
@@ -100,7 +100,7 @@ struct OpenAITransportConfigurationTests {
         #expect(!downloadSession.configuration.waitsForConnectivity)
     }
 
-    @Test func openAIURLSessionTransportCancelsUnderlyingRequest() async throws {
+    @Test func `open AIURL session transport cancels underlying request`() async throws {
         CancellationAwareURLProtocol.state.reset()
 
         let configuration = URLSessionConfiguration.ephemeral
@@ -121,11 +121,10 @@ struct OpenAITransportConfigurationTests {
             _ = try await task.value
             Issue.record("Expected cancellation")
         } catch {
-            let isCancelledServiceError: Bool
-            if case .cancelled = error as? OpenAIServiceError {
-                isCancelledServiceError = true
+            let isCancelledServiceError = if case .cancelled = error as? OpenAIServiceError {
+                true
             } else {
-                isCancelledServiceError = false
+                false
             }
             let isExpected = error is CancellationError
                 || (error as? URLError)?.code == .cancelled
@@ -138,7 +137,7 @@ struct OpenAITransportConfigurationTests {
     }
 
     @MainActor
-    @Test func openAIServiceStreamsThroughInjectedStreamClient() async {
+    @Test func `open AI service streams through injected stream client`() async {
         let streamClient = RecordingOpenAIStreamClient()
         let transport = MockOpenAIDataTransport()
         let config = TransportConfigurationFixture(
@@ -177,7 +176,7 @@ struct OpenAITransportConfigurationTests {
     }
 
     @MainActor
-    @Test func openAIServiceUploadUsesInjectedTransport() async throws {
+    @Test func `open AI service upload uses injected transport`() async throws {
         let responseData = try JSONSerialization.data(withJSONObject: ["id": "file_123"])
         let transport = MockOpenAIDataTransport()
         transport.nextResponseData = responseData
@@ -222,9 +221,8 @@ struct OpenAITransportConfigurationTests {
 // MARK: - Gateway Fallback & Validation Tests
 
 extension OpenAITransportConfigurationTests {
-
     @MainActor
-    @Test func openAIServiceFetchResponseFallsBackToDirectRouteAfterGatewayFailure() async throws {
+    @Test func `open AI service fetch response falls back to direct route after gateway failure`() async throws {
         let transport = try GatewayTestHelpers.makeGatewayFallbackTransport(
             queuedError: URLError(.cannotConnectToHost),
             responseText: "Recovered text",
@@ -240,7 +238,7 @@ extension OpenAITransportConfigurationTests {
     }
 
     @MainActor
-    @Test func openAIServiceCancelResponseFallsBackToDirectRouteAfterGatewayFailure() async throws {
+    @Test func `open AI service cancel response falls back to direct route after gateway failure`() async throws {
         let transport = MockOpenAIDataTransport()
         transport.queuedErrors = [URLError(.networkConnectionLost)]
         let cancelURL = try #require(
@@ -273,7 +271,7 @@ extension OpenAITransportConfigurationTests {
     }
 
     @MainActor
-    @Test func openAIServiceValidateAPIKeyReturnsFalseWhenTransportFails() async {
+    @Test func `open AI service validate API key returns false when transport fails`() async {
         let transport = MockOpenAIDataTransport()
         transport.queuedErrors = [URLError(.notConnectedToInternet)]
 
@@ -296,7 +294,7 @@ extension OpenAITransportConfigurationTests {
     }
 
     @MainActor
-    @Test func openAIServiceGenerateTitleUsesParsedResponseText() async throws {
+    @Test func `open AI service generate title uses parsed response text`() async throws {
         let transport = MockOpenAIDataTransport()
         let responsesURL = try #require(URL(string: "https://api.openai.com/v1/responses"))
         let httpResponse = try #require(HTTPURLResponse(
@@ -305,9 +303,9 @@ extension OpenAITransportConfigurationTests {
             httpVersion: nil,
             headerFields: nil
         ))
-        transport.queuedResponses = [
+        transport.queuedResponses = try [
             (
-                try JSONCoding.encode(
+                JSONCoding.encode(
                     ResponsesResponseDTO(
                         output: [
                             ResponsesOutputItemDTO(
@@ -347,5 +345,4 @@ extension OpenAITransportConfigurationTests {
         #expect(transport.requests.count == 1)
         #expect(transport.requests.first?.httpMethod == "POST")
     }
-
 }

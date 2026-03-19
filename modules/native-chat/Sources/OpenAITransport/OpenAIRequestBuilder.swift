@@ -1,10 +1,10 @@
 import Foundation
 
 private struct StaticOpenAIConfigurationProvider: OpenAIConfigurationProvider {
-    let directOpenAIBaseURL: String = "https://api.openai.com/v1"
+    let directOpenAIBaseURL = "https://api.openai.com/v1"
     let cloudflareGatewayBaseURL: String = DefaultOpenAIConfigurationProvider.defaultCloudflareGatewayBaseURL
-    let cloudflareAIGToken: String = ""
-    var useCloudflareGateway: Bool = false
+    let cloudflareAIGToken = ""
+    var useCloudflareGateway = false
 }
 
 /// High-level builder that composes configuration, authorization, and request factory
@@ -30,7 +30,7 @@ public struct OpenAIRequestBuilder {
         )
         self.configuration = configuration
         self.requestAuthorizer = resolvedAuthorizer
-        self.requestFactory = OpenAIRequestFactory(
+        requestFactory = OpenAIRequestFactory(
             configuration: configuration,
             requestAuthorizer: resolvedAuthorizer
         )

@@ -1,8 +1,8 @@
 import ChatPersistenceSwiftData
-import NativeChatComposition
-import SwiftUI
 import Foundation
+import NativeChatComposition
 import SwiftData
+import SwiftUI
 
 /// Re-exported alias for the composition root view.
 public typealias NativeChatRootView = NativeChatComposition.NativeChatRootView

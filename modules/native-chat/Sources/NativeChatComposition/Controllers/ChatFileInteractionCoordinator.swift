@@ -7,12 +7,35 @@ import GeneratedFilesInfra
 
 @MainActor
 final class ChatFileInteractionCoordinator {
-    unowned let controller: ChatController
-    let prefetchCoordinator: ChatGeneratedFilePrefetchCoordinator
+    unowned let state: any (
+        ChatAttachmentStateAccess &
+            ChatPreviewStateAccess &
+            ChatReplyFeedbackAccess &
+            ChatConversationSelectionAccess
+    )
+    unowned let services: any (
+        ChatPersistenceAccess &
+            ChatTransportServiceAccess &
+            ChatGeneratedFileServiceAccess
+    )
+    unowned var conversations: (any ChatConversationManaging)!
+    var prefetchCoordinator: ChatGeneratedFilePrefetchCoordinator!
 
-    init(controller: ChatController) {
-        self.controller = controller
-        self.prefetchCoordinator = ChatGeneratedFilePrefetchCoordinator(controller: controller)
+    init(
+        state: any(
+            ChatAttachmentStateAccess &
+                ChatPreviewStateAccess &
+                ChatReplyFeedbackAccess &
+                ChatConversationSelectionAccess
+        ),
+        services: any(
+            ChatPersistenceAccess &
+                ChatTransportServiceAccess &
+                ChatGeneratedFileServiceAccess
+        )
+    ) {
+        self.state = state
+        self.services = services
     }
 
     func handlePickedDocuments(_ urls: [URL]) {
@@ -26,7 +49,7 @@ final class ChatFileInteractionCoordinator {
                     localData: metadata.data,
                     uploadStatus: .pending
                 )
-                controller.pendingAttachments.append(attachment)
+                state.pendingAttachments.append(attachment)
             } catch {
                 #if DEBUG
                 Loggers.files.debug("[Documents] Failed to read file \(url.lastPathComponent): \(error.localizedDescription)")
@@ -36,39 +59,39 @@ final class ChatFileInteractionCoordinator {
     }
 
     func removePendingAttachment(_ attachment: FileAttachment) {
-        controller.pendingAttachments.removeAll { $0.id == attachment.id }
+        state.pendingAttachments.removeAll { $0.id == attachment.id }
     }
 
     // swiftlint:disable:next function_body_length
     func handleSandboxLinkTap(message: Message, sandboxURL: String, annotation: FilePathAnnotation?) {
-        guard !controller.apiKey.isEmpty else {
-            controller.fileDownloadError = "No API key configured."
+        let apiKey = services.apiKeyStore.loadAPIKey()?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        guard !apiKey.isEmpty else {
+            state.fileDownloadError = "No API key configured."
             return
         }
 
-        let key = controller.apiKey
-        let requestedFilename = controller.generatedFileCoordinator.requestedFilename(for: sandboxURL, annotation: annotation)
+        let requestedFilename = services.generatedFileCoordinator.requestedFilename(for: sandboxURL, annotation: annotation)
         var requestedOpenBehavior = GeneratedFilesInfra.FileDownloadService.openBehavior(for: requestedFilename)
 
-        controller.filePreviewItem = nil
-        controller.sharedGeneratedFileItem = nil
-        controller.isDownloadingFile = true
-        controller.fileDownloadError = nil
+        state.filePreviewItem = nil
+        state.sharedGeneratedFileItem = nil
+        state.isDownloadingFile = true
+        state.fileDownloadError = nil
 
-        let controller = controller
-        Task { @MainActor in
+        Task { @MainActor [weak self] in
+            guard let self else { return }
             do {
                 if let annotation,
-                   let cachedResource = await controller.fileDownloadService.cachedGeneratedFile(
-                    fileId: annotation.fileId,
-                    containerId: annotation.containerId,
-                    suggestedFilename: requestedFilename
+                   let cachedResource = await services.fileDownloadService.cachedGeneratedFile(
+                       fileId: annotation.fileId,
+                       containerId: annotation.containerId,
+                       suggestedFilename: requestedFilename
                    ) {
-                    controller.isDownloadingFile = false
+                    state.isDownloadingFile = false
                     applyGeneratedFilePresentation(
-                        controller.generatedFileCoordinator.presentation(for: cachedResource, suggestedFilename: requestedFilename)
+                        services.generatedFileCoordinator.presentation(for: cachedResource, suggestedFilename: requestedFilename)
                     )
-                    controller.hapticService.impact(.light, isEnabled: controller.hapticsEnabled)
+                    state.hapticService.impact(.light, isEnabled: state.hapticsEnabled)
                     return
                 }
 
@@ -76,34 +99,34 @@ final class ChatFileInteractionCoordinator {
                     for: message,
                     sandboxURL: sandboxURL,
                     fallback: annotation,
-                    apiKey: key
+                    apiKey: apiKey
                 ) else {
                     throw GeneratedFilesInfra.FileDownloadError.fileNotFound
                 }
 
                 let resolvedFilename = resolvedAnnotation.filename
                     ?? requestedFilename
-                    ?? controller.generatedFileCoordinator.requestedFilename(for: sandboxURL, annotation: nil)
-                requestedOpenBehavior = controller.generatedFileCoordinator.generatedOpenBehavior(for: resolvedAnnotation)
-                let resource = try await controller.fileDownloadService.prefetchGeneratedFile(
+                    ?? services.generatedFileCoordinator.requestedFilename(for: sandboxURL, annotation: nil)
+                requestedOpenBehavior = services.generatedFileCoordinator.generatedOpenBehavior(for: resolvedAnnotation)
+                let resource = try await services.fileDownloadService.prefetchGeneratedFile(
                     fileId: resolvedAnnotation.fileId,
                     containerId: resolvedAnnotation.containerId,
                     suggestedFilename: resolvedFilename,
-                    apiKey: key
+                    apiKey: apiKey
                 )
 
-                controller.isDownloadingFile = false
+                state.isDownloadingFile = false
                 applyGeneratedFilePresentation(
-                    controller.generatedFileCoordinator.presentation(for: resource, suggestedFilename: resolvedFilename)
+                    services.generatedFileCoordinator.presentation(for: resource, suggestedFilename: resolvedFilename)
                 )
-                controller.hapticService.impact(.light, isEnabled: controller.hapticsEnabled)
+                state.hapticService.impact(.light, isEnabled: state.hapticsEnabled)
             } catch {
-                controller.isDownloadingFile = false
-                controller.fileDownloadError = controller.generatedFileCoordinator.userFacingDownloadError(
+                state.isDownloadingFile = false
+                state.fileDownloadError = services.generatedFileCoordinator.userFacingDownloadError(
                     error,
                     openBehavior: requestedOpenBehavior
                 )
-                controller.hapticService.notify(.error, isEnabled: controller.hapticsEnabled)
+                state.hapticService.notify(.error, isEnabled: state.hapticsEnabled)
                 #if DEBUG
                 Loggers.files.debug("[FileDownload] Failed: \(error.localizedDescription)")
                 #endif
@@ -117,7 +140,7 @@ final class ChatFileInteractionCoordinator {
         fallback: FilePathAnnotation?,
         apiKey: String
     ) async throws -> FilePathAnnotation? {
-        if let fallback, controller.generatedFileCoordinator.annotationCanDownloadDirectly(fallback) {
+        if let fallback, services.generatedFileCoordinator.annotationCanDownloadDirectly(fallback) {
             return fallback
         }
 
@@ -125,8 +148,8 @@ final class ChatFileInteractionCoordinator {
             return fallback
         }
 
-        let result = try await controller.openAIService.fetchResponse(responseId: responseId, apiKey: apiKey)
-        guard let refreshedAnnotation = controller.generatedFileCoordinator.findMatchingFilePathAnnotation(
+        let result = try await services.openAIService.fetchResponse(responseId: responseId, apiKey: apiKey)
+        guard let refreshedAnnotation = services.generatedFileCoordinator.findMatchingFilePathAnnotation(
             in: result.filePathAnnotations,
             sandboxURL: sandboxURL,
             fallback: fallback
@@ -142,17 +165,17 @@ final class ChatFileInteractionCoordinator {
             persistedAnnotations.append(refreshedAnnotation)
         }
 
-        controller.messagePersistence.refreshFileAnnotations(persistedAnnotations, on: message)
-        controller.conversationCoordinator.saveContextIfPossible("resolveDownloadAnnotation")
+        services.messagePersistence.refreshFileAnnotations(persistedAnnotations, on: message)
+        conversations.saveContextIfPossible("resolveDownloadAnnotation")
         return refreshedAnnotation
     }
 
     func applyGeneratedFilePresentation(_ presentation: GeneratedFilePresentation) {
         switch presentation {
-        case .preview(let previewItem):
-            controller.filePreviewItem = previewItem
-        case .share(let sharedItem):
-            controller.sharedGeneratedFileItem = sharedItem
+        case let .preview(previewItem):
+            state.filePreviewItem = previewItem
+        case let .share(sharedItem):
+            state.sharedGeneratedFileItem = sharedItem
         }
     }
 

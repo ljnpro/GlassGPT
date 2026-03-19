@@ -3,7 +3,7 @@ import GeneratedFilesCore
 import os
 
 /// Errors originating from cache store filesystem operations.
-package enum GeneratedFileStoreError: Error, LocalizedError, Sendable {
+package enum GeneratedFileStoreError: Error, LocalizedError {
     /// The cache root directory could not be created.
     case invalidCacheRoot
     /// A filesystem operation failed with an underlying system error.
@@ -13,9 +13,9 @@ package enum GeneratedFileStoreError: Error, LocalizedError, Sendable {
     package var errorDescription: String? {
         switch self {
         case .invalidCacheRoot:
-            return "Unable to create the generated file cache."
-        case .fileSystemError(let underlying):
-            return "File system operation failed: \(underlying.localizedDescription)"
+            "Unable to create the generated file cache."
+        case let .fileSystemError(underlying):
+            "File system operation failed: \(underlying.localizedDescription)"
         }
     }
 }
@@ -133,7 +133,8 @@ package struct GeneratedFileCacheStore {
         let directoryURL = rootURL.appendingPathComponent(sanitizedCacheKey(cacheKey), isDirectory: true)
         var isDirectory: ObjCBool = false
         guard fileManager.fileExists(atPath: directoryURL.path, isDirectory: &isDirectory),
-              isDirectory.boolValue else {
+              isDirectory.boolValue
+        else {
             return nil
         }
 
@@ -145,7 +146,7 @@ package struct GeneratedFileCacheStore {
         }
 
         for fileURL in directoryContents(at: directoryURL, logContext: "existingCacheEntry.contents")
-        where !isDirectoryURL(fileURL) {
+            where !isDirectoryURL(fileURL) {
             if let entry = cachedEntry(fileURL: fileURL, directoryURL: directoryURL) {
                 return entry
             }
@@ -166,7 +167,7 @@ package struct GeneratedFileCacheStore {
             }
 
             for fileURL in directoryContents(at: directoryURL, logContext: "cacheEntries.directoryContents")
-            where !isDirectoryURL(fileURL) {
+                where !isDirectoryURL(fileURL) {
                 if let entry = cachedEntry(fileURL: fileURL, directoryURL: directoryURL) {
                     return entry
                 }

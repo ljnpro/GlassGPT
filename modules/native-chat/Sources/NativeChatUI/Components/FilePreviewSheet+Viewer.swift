@@ -1,5 +1,5 @@
-import PDFKit
 import ChatUIComponents
+import PDFKit
 import SwiftUI
 import UIKit
 
@@ -13,9 +13,9 @@ extension FilePreviewSheet {
                     .controlSize(.regular)
                     .tint(viewerPrimaryColor)
             }
-        case .image(let payload):
+        case let .image(payload):
             imagePreviewView(payload.image, in: geometry)
-        case .error(let message):
+        case let .error(message):
             viewerStateContainer {
                 VStack(spacing: 14) {
                     Image(systemName: "photo.badge.exclamationmark")
@@ -28,7 +28,7 @@ extension FilePreviewSheet {
                         .foregroundStyle(viewerSecondaryColor)
                         .multilineTextAlignment(.center)
                         .padding(.horizontal, 32)
-                        .accessibilityLabel("Image load error: \(message)")
+                        .accessibilityLabel(String(localized: "Image load error") + ": \(message)")
                         .accessibilityIdentifier("filePreview.imageError")
                 }
             }
@@ -44,9 +44,9 @@ extension FilePreviewSheet {
                     .controlSize(.regular)
                     .tint(viewerPrimaryColor)
             }
-        case .document(let document):
+        case let .document(document):
             pdfPreviewView(document, in: geometry)
-        case .error(let message):
+        case let .error(message):
             viewerStateContainer {
                 VStack(spacing: 14) {
                     Image(systemName: "doc.richtext")
@@ -59,7 +59,7 @@ extension FilePreviewSheet {
                         .foregroundStyle(viewerSecondaryColor)
                         .multilineTextAlignment(.center)
                         .padding(.horizontal, 32)
-                        .accessibilityLabel("PDF load error: \(message)")
+                        .accessibilityLabel(String(localized: "PDF load error") + ": \(message)")
                         .accessibilityIdentifier("filePreview.pdfError")
                 }
             }
@@ -109,7 +109,7 @@ extension FilePreviewSheet {
             .padding(.vertical, verticalPadding)
     }
 
-    func viewerStateContainer<Content: View>(@ViewBuilder content: () -> Content) -> some View {
+    func viewerStateContainer(@ViewBuilder content: () -> some View) -> some View {
         content()
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
     }
@@ -149,7 +149,7 @@ extension FilePreviewSheet {
             .minimumScaleFactor(0.7)
             .allowsTightening(true)
             .truncationMode(.middle)
-            .accessibilityLabel("File: \(previewItem.viewerFilename)")
+            .accessibilityLabel(String(localized: "File") + ": \(previewItem.viewerFilename)")
             .accessibilityIdentifier("filePreview.title")
     }
 
@@ -167,7 +167,7 @@ extension FilePreviewSheet {
         PreviewActionButton(
             diameter: circularButtonDiameter,
             isEnabled: !isDismissPending,
-            accessibilityLabel: "Close preview",
+            accessibilityLabel: String(localized: "Close preview"),
             accessibilityIdentifier: "filePreview.close",
             onTriggerStart: onBeginDismissInteraction,
             action: onRequestDismiss
@@ -182,7 +182,7 @@ extension FilePreviewSheet {
         PreviewActionButton(
             diameter: circularButtonDiameter,
             isEnabled: !isDismissPending && saveState != .saving && canSaveToPhotos,
-            accessibilityLabel: "Download to Photos",
+            accessibilityLabel: String(localized: "Download to Photos"),
             action: {
                 Task { await saveImageToPhotos() }
             }
@@ -204,7 +204,7 @@ extension FilePreviewSheet {
         PreviewActionButton(
             diameter: circularButtonDiameter,
             isEnabled: !isDismissPending,
-            accessibilityLabel: "Share",
+            accessibilityLabel: String(localized: "Share"),
             action: presentShareSheet
         ) {
             Image(systemName: "square.and.arrow.up")
@@ -217,7 +217,7 @@ extension FilePreviewSheet {
         PreviewActionButton(
             diameter: circularButtonDiameter,
             isEnabled: !isDismissPending,
-            accessibilityLabel: "Share",
+            accessibilityLabel: String(localized: "Share"),
             action: presentShareSheet
         ) {
             Image(systemName: "square.and.arrow.up")
@@ -227,7 +227,7 @@ extension FilePreviewSheet {
     }
 
     var saveSuccessHUD: some View {
-        Label("Saved to Photos", systemImage: "checkmark.circle.fill")
+        Label(String(localized: "Saved to Photos"), systemImage: "checkmark.circle.fill")
             .font(.system(size: 14, weight: .semibold))
             .foregroundStyle(viewerPrimaryColor)
             .padding(.horizontal, 16)
@@ -239,7 +239,7 @@ extension FilePreviewSheet {
                 darkBorderOpacity: 0.14,
                 lightBorderOpacity: 0.08
             )
-            .accessibilityLabel("Image saved to Photos")
+            .accessibilityLabel(String(localized: "Image saved to Photos"))
             .accessibilityIdentifier("filePreview.saveSuccess")
     }
 

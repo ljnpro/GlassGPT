@@ -42,7 +42,7 @@ public struct ChatScrollContainer: UIViewControllerRepresentable {
     }
 
     /// Creates the underlying ``ChatScrollContainerController``.
-    public func makeUIViewController(context: Context) -> ChatScrollContainerController {
+    public func makeUIViewController(context _: Context) -> ChatScrollContainerController {
         let controller = ChatScrollContainerController()
         controller.update(
             content: content,
@@ -58,7 +58,7 @@ public struct ChatScrollContainer: UIViewControllerRepresentable {
     }
 
     /// Pushes new SwiftUI state into the existing controller.
-    public func updateUIViewController(_ uiViewController: ChatScrollContainerController, context: Context) {
+    public func updateUIViewController(_ uiViewController: ChatScrollContainerController, context _: Context) {
         uiViewController.update(
             content: content,
             composer: composer,

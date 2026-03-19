@@ -7,6 +7,7 @@ import SwiftUI
 package struct CitationLinksView: View {
     let citations: [URLCitation]
 
+    /// Creates a citation strip for the given citation list.
     package init(citations: [URLCitation]) {
         self.citations = citations
     }
@@ -21,6 +22,7 @@ package struct CitationLinksView: View {
         }
     }
 
+    /// The horizontal citation-card strip rendered below assistant messages.
     package var body: some View {
         if !uniqueCitations.isEmpty {
             VStack(alignment: .leading, spacing: 6) {
@@ -29,12 +31,12 @@ package struct CitationLinksView: View {
                         .font(.caption2.weight(.semibold))
                         .foregroundStyle(.blue)
                         .accessibilityHidden(true)
-                    Text("Sources")
+                    Text(String(localized: "Sources"))
                         .font(.caption2.weight(.semibold))
                         .foregroundStyle(.secondary)
                 }
                 .padding(.leading, 4)
-                .accessibilityLabel("Web sources")
+                .accessibilityLabel(String(localized: "Web sources"))
                 .accessibilityIdentifier("citations.header")
 
                 ScrollView(.horizontal, showsIndicators: false) {
@@ -103,7 +105,7 @@ private struct CitationCard: View {
             )
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("Source \(index): \(citation.title.isEmpty ? domain : citation.title)")
+        .accessibilityLabel(String(localized: "Source") + " \(index): \(citation.title.isEmpty ? domain : citation.title)")
         .accessibilityIdentifier("citation.card.\(index)")
     }
 }

@@ -28,8 +28,7 @@ final class MockOpenAIDataTransport: OpenAIDataTransport, @unchecked Sendable {
         }
 
         if !queuedResponses.isEmpty {
-            let next = queuedResponses.removeFirst()
-            return next
+            return queuedResponses.removeFirst()
         }
 
         if let nextResponse {
@@ -75,7 +74,7 @@ struct TransportConfigurationFixture: OpenAIConfigurationProvider {
 final class CancellationAwareURLProtocol: URLProtocol {
     static let state = CancellationAwareURLProtocolState()
 
-    override class func canInit(with request: URLRequest) -> Bool {
+    override class func canInit(with _: URLRequest) -> Bool {
         true
     }
 
@@ -113,7 +112,7 @@ final class CancellationAwareURLProtocolState: @unchecked Sendable {
             return
         }
         didCancel = true
-        let semaphore = self.semaphore
+        let semaphore = semaphore
         lock.unlock()
         semaphore.signal()
     }
@@ -124,7 +123,7 @@ final class CancellationAwareURLProtocolState: @unchecked Sendable {
             lock.unlock()
             return true
         }
-        let semaphore = self.semaphore
+        let semaphore = semaphore
         lock.unlock()
         return semaphore.wait(timeout: .now() + timeout) == .success
     }
@@ -147,9 +146,9 @@ enum GatewayTestHelpers {
             httpVersion: nil,
             headerFields: nil
         ))
-        transport.queuedResponses = [
+        transport.queuedResponses = try [
             (
-                try JSONCoding.encode(
+                JSONCoding.encode(
                     ResponsesResponseDTO(
                         status: "completed",
                         output: [

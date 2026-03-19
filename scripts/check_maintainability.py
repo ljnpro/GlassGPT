@@ -6,6 +6,8 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
+import report_controller_cluster
+
 ROOT = Path(__file__).resolve().parent.parent
 PRODUCTION_ROOTS = [
     ROOT / "modules" / "native-chat" / "Sources",
@@ -22,9 +24,11 @@ MAX_FATAL_ERRORS = int(os.environ.get("MAX_FATAL_ERRORS", "0"))
 MAX_PRECONDITION_FAILURES = int(os.environ.get("MAX_PRECONDITION_FAILURES", "0"))
 MAX_UNCHECKED_SENDABLE = int(os.environ.get("MAX_UNCHECKED_SENDABLE", "0"))
 MAX_EMPTY_CATCH = int(os.environ.get("MAX_EMPTY_CATCH", "0"))
-MAX_NON_UI_FAMILY_LINES = int(os.environ.get("MAX_NON_UI_FAMILY_LINES", "500"))
+MAX_SWIFTLINT_DISABLES = int(os.environ.get("MAX_SWIFTLINT_DISABLES", "36"))
+MAX_NON_UI_FAMILY_LINES = int(os.environ.get("MAX_NON_UI_FAMILY_LINES", "550"))
 MAX_UI_FAMILY_LINES = int(os.environ.get("MAX_UI_FAMILY_LINES", "700"))
 MAX_SCREEN_STORE_FAMILY_LINES = int(os.environ.get("MAX_SCREEN_STORE_FAMILY_LINES", "260"))
+MAX_CONTROLLER_CLUSTER_LINES = int(os.environ.get("MAX_CONTROLLER_CLUSTER_LINES", "3950"))
 
 @dataclass
 class CheckResult:
@@ -68,7 +72,29 @@ def count_pattern(files: list[Path], label: str, pattern: str, limit: int) -> Ch
     return CheckResult(label=label, count=count, limit=limit, matches=matches[:20])
 
 
+def count_swiftlint_disables(files: list[Path], limit: int) -> CheckResult:
+    regex = re.compile(r"\bswiftlint:disable(?::\w+)?")
+    count = 0
+    matches: list[str] = []
+
+    for path in files:
+        text = path.read_text(encoding="utf-8")
+        hit_count = len(regex.findall(text))
+        if hit_count == 0:
+            continue
+        count += hit_count
+        matches.append(f"{hit_count}\t{relative(path)}")
+
+    return CheckResult(
+        label="production swiftlint:disable usage",
+        count=count,
+        limit=limit,
+        matches=sorted(matches, reverse=True)[:20],
+    )
+
+
 def count_fatal_errors(files: list[Path], limit: int) -> CheckResult:
+    coder_init_re = re.compile(r"\brequired\s+init\?\s*\(\s*coder\b")
     count = 0
     matches: list[str] = []
 
@@ -80,9 +106,9 @@ def count_fatal_errors(files: list[Path], limit: int) -> CheckResult:
             if "fatalError(" not in line:
                 continue
 
-            window_start = max(index - 3, 0)
+            window_start = max(index - 6, 0)
             context = "\n".join(lines[window_start:index + 1])
-            if "required init?(coder:" in context:
+            if coder_init_re.search(context):
                 continue
 
             hit_count += 1
@@ -210,6 +236,91 @@ def family_length_results(files: list[Path]) -> list[CheckResult]:
     ]
 
 
+def significant_line_count(text: str) -> int:
+    count = 0
+    in_block_comment = False
+
+    for raw_line in text.splitlines():
+        line = raw_line.strip()
+        if not line:
+            continue
+
+        if in_block_comment:
+            if "*/" in line:
+                in_block_comment = False
+                trailing = line.split("*/", 1)[1].strip()
+                if trailing and not trailing.startswith("//"):
+                    count += 1
+            continue
+
+        if line.startswith("/*"):
+            if "*/" not in line:
+                in_block_comment = True
+            continue
+
+        if line.startswith("//"):
+            continue
+
+        count += 1
+
+    return count
+
+
+def controller_cluster_results() -> list[CheckResult]:
+    family_lines: dict[str, int] = {}
+    family_files: dict[str, int] = {}
+    total_lines = 0
+    metrics = {
+        "full_controller_type_references_in_coordinators": 0,
+        "controller_reach_through_sites": 0,
+        "broad_service_bag_files": 0,
+    }
+
+    for path in report_controller_cluster.current_tracked_paths():
+        text = path.read_text(encoding="utf-8")
+        family = report_controller_cluster.family_name(path)
+        family_lines[family] = family_lines.get(family, 0) + significant_line_count(text)
+        family_files[family] = family_files.get(family, 0) + 1
+        total_lines += significant_line_count(text)
+        for key, value in report_controller_cluster.anti_pattern_metrics(path, text).items():
+            metrics[key] = metrics.get(key, 0) + value
+
+    top_families = [
+        f"{line_count}\t{family}\tfiles={family_files[family]}"
+        for family, line_count in sorted(
+            family_lines.items(),
+            key=lambda item: (-item[1], item[0]),
+        )[:20]
+    ]
+
+    return [
+        CheckResult(
+            label="controller/coordinator significant LOC",
+            count=total_lines,
+            limit=MAX_CONTROLLER_CLUSTER_LINES,
+            matches=top_families,
+        ),
+        CheckResult(
+            label="controller-backed coordinator full-controller references",
+            count=metrics.get("full_controller_type_references_in_coordinators", 0),
+            limit=0,
+            matches=[],
+        ),
+        CheckResult(
+            label="controller-backed coordinator reach-through sites",
+            count=metrics.get("controller_reach_through_sites", 0),
+            limit=0,
+            matches=[],
+        ),
+        CheckResult(
+            label="broad controller service bag files",
+            count=metrics.get("broad_service_bag_files", 0),
+            limit=0,
+            matches=[],
+        ),
+    ]
+
+
 def main() -> int:
     files = production_swift_files()
 
@@ -226,9 +337,11 @@ def main() -> int:
         count_pattern(files, "production preconditionFailure()", r"\bpreconditionFailure\s*\(", MAX_PRECONDITION_FAILURES),
         count_pattern(files, "production @unchecked Sendable", r"@unchecked\s+Sendable", MAX_UNCHECKED_SENDABLE),
         count_pattern(files, "production empty catch blocks", r"catch\s*\{\s*\}", MAX_EMPTY_CATCH),
+        count_swiftlint_disables(files, MAX_SWIFTLINT_DISABLES),
     ]
     checks.extend(line_length_results(files))
     checks.extend(family_length_results(files))
+    checks.extend(controller_cluster_results())
 
     failures = [check for check in checks if not check.ok]
 

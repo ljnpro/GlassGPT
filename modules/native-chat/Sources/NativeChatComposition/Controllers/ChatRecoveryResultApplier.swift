@@ -6,10 +6,36 @@ import OpenAITransport
 
 @MainActor
 final class ChatRecoveryResultApplier {
-    unowned let controller: ChatController
+    unowned let state: any (
+        ChatConversationSelectionAccess &
+            ChatStreamingProjectionAccess &
+            ChatReplyFeedbackAccess
+    )
+    unowned let services: any (
+        ChatPersistenceAccess &
+            ChatTransportServiceAccess &
+            ChatGeneratedFileServiceAccess &
+            ChatRuntimeRegistryAccess
+    )
+    unowned var conversations: (any ChatConversationManaging)!
+    unowned var sessions: (any ChatSessionManaging)!
+    unowned var files: (any ChatFileInteractionManaging)!
 
-    init(controller: ChatController) {
-        self.controller = controller
+    init(
+        state: any(
+            ChatConversationSelectionAccess &
+                ChatStreamingProjectionAccess &
+                ChatReplyFeedbackAccess
+        ),
+        services: any(
+            ChatPersistenceAccess &
+                ChatTransportServiceAccess &
+                ChatGeneratedFileServiceAccess &
+                ChatRuntimeRegistryAccess
+        )
+    ) {
+        self.state = state
+        self.services = services
     }
 
     @discardableResult
@@ -27,12 +53,12 @@ final class ChatRecoveryResultApplier {
         let fallbackText: String
         if message.usedBackgroundMode {
             if visible {
-                controller.errorMessage = "This response is no longer resumable."
+                state.errorMessage = "This response is no longer resumable."
             }
             fallbackText = recoveryFallbackText(for: message, session: session)
         } else {
             if visible {
-                controller.errorMessage = nil
+                state.errorMessage = nil
             }
             fallbackText = interruptedResponseFallbackText(for: message, session: session)
         }
@@ -53,24 +79,24 @@ final class ChatRecoveryResultApplier {
 
     func recoveryFallbackText(for message: Message, session: ReplySession? = nil) -> String {
         if let session,
-           let runtimeState = controller.sessionCoordinator.cachedRuntimeState(for: session),
+           let runtimeState = sessions.cachedRuntimeState(for: session),
            !runtimeState.buffer.text.isEmpty {
             return runtimeState.buffer.text
         }
-        if message.id == controller.visibleSessionMessageID, !controller.currentStreamingText.isEmpty {
-            return controller.currentStreamingText
+        if message.id == sessions.visibleSessionMessageID, !state.currentStreamingText.isEmpty {
+            return state.currentStreamingText
         }
         return message.content
     }
 
     func recoveryFallbackThinking(for message: Message, session: ReplySession? = nil) -> String? {
         if let session,
-           let runtimeState = controller.sessionCoordinator.cachedRuntimeState(for: session),
+           let runtimeState = sessions.cachedRuntimeState(for: session),
            !runtimeState.buffer.thinking.isEmpty {
             return runtimeState.buffer.thinking
         }
-        if message.id == controller.visibleSessionMessageID, !controller.currentThinkingText.isEmpty {
-            return controller.currentThinkingText
+        if message.id == sessions.visibleSessionMessageID, !state.currentThinkingText.isEmpty {
+            return state.currentThinkingText
         }
         return message.thinking
     }
@@ -93,7 +119,8 @@ final class ChatRecoveryResultApplier {
 
     func activeAPIKey(for session: ReplySession) -> String {
         let key = session.request.apiKey.trimmingCharacters(in: .whitespacesAndNewlines)
-        return key.isEmpty ? controller.apiKey : key
+        let storedKey = services.apiKeyStore.loadAPIKey()?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return key.isEmpty ? storedKey : key
     }
 
     func applyRecoveredResult(
@@ -102,7 +129,7 @@ final class ChatRecoveryResultApplier {
         fallbackText: String,
         fallbackThinking: String?
     ) {
-        controller.messagePersistence.applyRecoveredResult(
+        services.messagePersistence.applyRecoveredResult(
             result,
             to: message,
             fallbackText: fallbackText,
@@ -124,23 +151,29 @@ final class ChatRecoveryResultApplier {
             fallbackThinking: fallbackThinking
         )
 
-        controller.conversationCoordinator.saveContextIfPossible("finishRecovery")
-        controller.conversationCoordinator.upsertMessage(message)
-        controller.fileInteractionCoordinator.prefetchGeneratedFilesIfNeeded(for: message)
+        conversations.saveContextIfPossible("finishRecovery")
+        conversations.upsertMessage(message)
+        files.prefetchGeneratedFilesIfNeeded(for: message)
 
         let conversation = message.conversation
-        let wasVisible = controller.visibleSessionMessageID == session.messageID
-        controller.sessionCoordinator.removeSession(session)
+        let wasVisible = sessions.visibleSessionMessageID == session.messageID
+        sessions.removeSession(session)
 
         if let conversation {
-            let viewModel = controller
-            Task { @MainActor in
-                await viewModel.generateTitleIfNeeded(for: conversation)
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                let apiKey = services.apiKeyStore.loadAPIKey()?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+                await generateConversationTitleIfNeeded(
+                    for: conversation,
+                    apiKey: apiKey,
+                    openAIService: services.openAIService,
+                    saveContext: { self.conversations.saveContextIfPossible($0) }
+                )
             }
         }
 
         if wasVisible {
-            controller.hapticService.notify(.success, isEnabled: controller.hapticsEnabled)
+            state.hapticService.notify(.success, isEnabled: state.hapticsEnabled)
         }
     }
 }

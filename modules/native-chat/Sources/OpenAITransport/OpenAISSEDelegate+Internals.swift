@@ -79,7 +79,7 @@ extension OpenAISSEDelegate {
             continuation.finish()
             cleanupTransport()
             return true
-        case .terminalIncomplete(let message):
+        case let .terminalIncomplete(message):
             guard markFinishedIfNeeded() else { return true }
             let snapshot = decoder.withLock { state in
                 state.yieldThinkingFinishedIfNeeded(continuation: continuation)

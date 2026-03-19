@@ -1,5 +1,5 @@
-import XCTest
 import OpenAITransport
+import XCTest
 
 final class OpenAITransportSourceTests: XCTestCase {
     func testModelsRequestUsesConfiguredRouteAndHeaders() throws {

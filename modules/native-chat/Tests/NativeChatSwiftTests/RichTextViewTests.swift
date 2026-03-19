@@ -1,12 +1,12 @@
-import Foundation
-import Testing
 import ChatDomain
+import Foundation
 import NativeChatUI
+import Testing
 @testable import NativeChatComposition
 
 @MainActor
 struct RichTextViewTests {
-    @Test func findFilePathAnnotationPrefersExactSandboxMatch() {
+    @Test func `find file path annotation prefers exact sandbox match`() {
         let exact = makeAnnotation(
             fileId: "file-exact",
             sandboxPath: "sandbox:/mnt/data/chart.png",
@@ -21,11 +21,11 @@ struct RichTextViewTests {
 
         #expect(
             view.findFilePathAnnotation(for: "sandbox:/mnt/data/chart.png") ==
-            exact
+                exact
         )
     }
 
-    @Test func findFilePathAnnotationFallsBackToFilenameMatch() {
+    @Test func `find file path annotation falls back to filename match`() {
         let report = makeAnnotation(
             fileId: "file-report",
             sandboxPath: "/private/var/mobile/report.csv",
@@ -40,11 +40,11 @@ struct RichTextViewTests {
 
         #expect(
             view.findFilePathAnnotation(for: "sandbox:/mnt/data/report.csv") ==
-            report
+                report
         )
     }
 
-    @Test func findFilePathAnnotationReturnsOnlyAnnotationAsLastResort() {
+    @Test func `find file path annotation returns only annotation as last resort`() {
         let only = makeAnnotation(
             fileId: "file-only",
             sandboxPath: "/private/var/mobile/output.json",
@@ -54,11 +54,11 @@ struct RichTextViewTests {
 
         #expect(
             view.findFilePathAnnotation(for: "sandbox:/mnt/data/unrelated-name.txt") ==
-            only
+                only
         )
     }
 
-    @Test func findFilePathAnnotationReturnsNilWhenNoUniqueMatchExists() {
+    @Test func `find file path annotation returns nil when no unique match exists`() {
         let first = makeAnnotation(
             fileId: "file-one",
             sandboxPath: "/tmp/one.txt",
@@ -74,12 +74,12 @@ struct RichTextViewTests {
         #expect(view.findFilePathAnnotation(for: "sandbox:/mnt/data/unknown.txt") == nil)
     }
 
-    @Test func latexToUnicodeConvertsRepresentativeMathCommands() {
+    @Test func `latex to unicode converts representative math commands`() {
         let view = RichTextView(segments: [])
 
         #expect(
             view.latexToUnicode(#"\frac{\alpha_2^n}{x} + \text{speed} + \vec{v} \rightarrow \infty"#) ==
-            "α₂ⁿ/x + speed + v⃗ → ∞"
+                "α₂ⁿ/x + speed + v⃗ → ∞"
         )
     }
 

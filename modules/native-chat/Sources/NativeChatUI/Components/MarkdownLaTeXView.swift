@@ -13,6 +13,7 @@ package struct BlockLaTeXView: View {
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.displayScale) private var displayScale
 
+    /// The rendered block-level LaTeX view sized to its measured content.
     package var body: some View {
         BlockLaTeXWebView(
             latex: latex,
@@ -49,6 +50,7 @@ package struct BlockLaTeXView: View {
 package struct StandaloneBlockLaTeXCardView: View {
     let latex: String
 
+    /// The standalone glass-card presentation for a block-level LaTeX expression.
     package var body: some View {
         BlockLaTeXView(latex: latex)
             .padding(.horizontal, 12)
@@ -124,7 +126,7 @@ struct BlockLaTeXWebView: UIViewRepresentable {
         webView.loadHTMLString(result.html, baseURL: result.baseURL)
     }
 
-    static func dismantleUIView(_ webView: WKWebView, coordinator: Coordinator) {
+    static func dismantleUIView(_ webView: WKWebView, coordinator _: Coordinator) {
         webView.navigationDelegate = nil
         webView.configuration.userContentController.removeScriptMessageHandler(forName: "sizeCallback")
     }
@@ -133,9 +135,9 @@ struct BlockLaTeXWebView: UIViewRepresentable {
     final class Coordinator: NSObject, WKNavigationDelegate, WKScriptMessageHandler {
         @Binding var height: CGFloat
         var displayScale: CGFloat
-        var lastKey: String = ""
-        var cacheKey: String = ""
-        var expectedMeasurementToken: String = ""
+        var lastKey = ""
+        var cacheKey = ""
+        var expectedMeasurementToken = ""
 
         init(height: Binding<CGFloat>, displayScale: CGFloat) {
             _height = height
@@ -143,7 +145,7 @@ struct BlockLaTeXWebView: UIViewRepresentable {
         }
 
         nonisolated func userContentController(
-            _ userContentController: WKUserContentController,
+            _: WKUserContentController,
             didReceive message: WKScriptMessage
         ) {
             Task { @MainActor in

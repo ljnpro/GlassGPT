@@ -1,19 +1,19 @@
-import XCTest
+import ChatApplication
+import ChatDomain
 import ChatPersistenceContracts
 import ChatPersistenceCore
 import ChatPersistenceSwiftData
-import GeneratedFilesCore
+import ChatPresentation
 import ChatRuntimeModel
 import ChatRuntimePorts
 import ChatRuntimeWorkflows
-import ChatApplication
-import ChatPresentation
 import ChatUIComponents
+import GeneratedFilesCore
 import NativeChat
-import NativeChatUI
 import NativeChatComposition
-import ChatDomain
+import NativeChatUI
 import SwiftData
+import XCTest
 
 final class NativeChatArchitectureTests: XCTestCase {
     private var packageRoot: URL {
@@ -118,6 +118,32 @@ final class NativeChatArchitectureTests: XCTestCase {
         XCTAssertTrue(swiftlint.contains("modules/native-chat/Sources"))
     }
 
+    func testCompositionCoordinatorsDoNotDependOnFullChatController() throws {
+        let compositionRoot = packageRoot.appendingPathComponent("Sources/NativeChatComposition")
+        let controllerFiles = try FileManager.default.contentsOfDirectory(
+            at: compositionRoot.appendingPathComponent("Controllers"),
+            includingPropertiesForKeys: nil
+        )
+        let additionalCoordinator = compositionRoot.appendingPathComponent("NativeChatHistoryCoordinator.swift")
+        let files = controllerFiles
+            .filter { $0.pathExtension == "swift" }
+            .filter { !$0.lastPathComponent.hasPrefix("ChatController") }
+            + [additionalCoordinator]
+
+        for file in files {
+            guard FileManager.default.fileExists(atPath: file.path) else { continue }
+            let text = try String(contentsOf: file, encoding: .utf8)
+            XCTAssertFalse(
+                text.contains("unowned let controller: ChatController"),
+                "\(file.lastPathComponent) must not keep a full ChatController reference"
+            )
+            XCTAssertFalse(
+                text.contains("init(controller: ChatController"),
+                "\(file.lastPathComponent) must not accept ChatController as a direct dependency"
+            )
+        }
+    }
+
     func testNativeChatUmbrellaNoLongerImportsLegacyImplementationDirectly() throws {
         let umbrella = try String(
             contentsOf: packageRoot.appendingPathComponent("Sources/NativeChat/NativeChatRootView.swift"),
@@ -166,7 +192,7 @@ final class NativeChatArchitectureTests: XCTestCase {
     }
 
     // swiftlint:disable:next function_body_length
-    func testNewArchitectureModulesAreDirectlyCallable() async throws {
+    func testNewArchitectureModulesAreDirectlyCallable() async {
         let conversation = StoredConversationSnapshot(
             id: UUID(),
             title: "  4.4.1 Baseline  ",

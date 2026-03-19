@@ -62,5 +62,4 @@ public struct ToolCallInfo: PayloadCodable, Identifiable, Equatable {
         self.results = results
         self.queries = queries
     }
-
 }

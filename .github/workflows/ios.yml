@@ -4,7 +4,7 @@ on:
   push:
     branches:
       - main
-      - codex/stable-4.8
+      - codex/stable-4.9
       - codex/feature/**
   pull_request:
 
@@ -28,6 +28,15 @@ jobs:
           if ! command -v swiftlint >/dev/null 2>&1; then
             HOMEBREW_NO_AUTO_UPDATE=1 brew install swiftlint
           fi
+
+      - name: Install SwiftFormat
+        run: |
+          if ! command -v swiftformat >/dev/null 2>&1; then
+            HOMEBREW_NO_AUTO_UPDATE=1 brew install swiftformat
+          fi
+
+      - name: CI Health Gate
+        run: ./scripts/ci.sh ci-health
 
       - name: Lint Gate
         run: ./scripts/ci.sh lint
@@ -130,6 +139,15 @@ jobs:
       - name: Module Boundary Gate
         run: ./scripts/ci.sh module-boundary
 
+      - name: Doc Build Gate
+        run: ./scripts/ci.sh doc-build
+
+      - name: Doc Completeness Gate
+        run: ./scripts/ci.sh doc-completeness
+
+      - name: Localization Gate
+        run: ./scripts/ci.sh localization-check
+
       - name: Upload quality reports
         if: always()
         uses: actions/upload-artifact@v4
@@ -140,13 +158,16 @@ jobs:
             .local/build/ci/source-share-report.txt
             .local/build/ci/infra-safety-report.txt
             .local/build/ci/module-boundary-report.txt
+            .local/build/ci/doc-build-report.txt
+            .local/build/ci/doc-completeness-report.txt
+            .local/build/ci/localization-report.txt
           retention-days: 14
 
   release-readiness:
     name: Release Readiness
     runs-on: macos-15
     needs: [test, quality]
-    if: github.ref == 'refs/heads/codex/stable-4.8' || github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/codex/stable-4.9' || github.ref == 'refs/heads/main'
     steps:
       - name: Checkout
         uses: actions/checkout@v4

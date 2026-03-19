@@ -1,9 +1,9 @@
 import Foundation
 
-extension MarkdownContentView {
+package extension MarkdownContentView {
     /// Splits a raw text line into plain text and inline LaTeX segments.
     // swiftlint:disable:next cyclomatic_complexity function_body_length
-    package func parseInlineSegments(_ input: String) -> [InlineSegment] {
+    func parseInlineSegments(_ input: String) -> [InlineSegment] {
         var segments: [InlineSegment] = []
         var textBuffer = ""
         let chars = Array(input)
@@ -18,13 +18,13 @@ extension MarkdownContentView {
         }
 
         while index < count {
-            if index + 1 < count && chars[index] == "\\" && chars[index + 1] == "(" {
+            if index + 1 < count, chars[index] == "\\", chars[index + 1] == "(" {
                 flushText()
                 let start = index + 2
                 var end = start
                 var found = false
                 while end + 1 < count {
-                    if chars[end] == "\\" && chars[end + 1] == ")" {
+                    if chars[end] == "\\", chars[end + 1] == ")" {
                         found = true
                         break
                     }
@@ -32,7 +32,7 @@ extension MarkdownContentView {
                 }
 
                 if found {
-                    let latex = String(chars[start..<end]).trimmingCharacters(in: .whitespaces)
+                    let latex = String(chars[start ..< end]).trimmingCharacters(in: .whitespaces)
                     if !latex.isEmpty {
                         segments.append(.latexInline(latex))
                     }
@@ -44,21 +44,21 @@ extension MarkdownContentView {
                 continue
             }
 
-            if chars[index] == "$" && (index == 0 || chars[index - 1] != "\\") {
+            if chars[index] == "$", index == 0 || chars[index - 1] != "\\" {
                 let start = index + 1
                 var end = start
                 var found = false
-                while end < count && chars[end] != "\n" {
-                    if chars[end] == "$" && (end == start || chars[end - 1] != "\\") {
+                while end < count, chars[end] != "\n" {
+                    if chars[end] == "$", end == start || chars[end - 1] != "\\" {
                         found = true
                         break
                     }
                     end += 1
                 }
 
-                if found && end > start {
+                if found, end > start {
                     flushText()
-                    let latex = String(chars[start..<end]).trimmingCharacters(in: .whitespaces)
+                    let latex = String(chars[start ..< end]).trimmingCharacters(in: .whitespaces)
                     if !latex.isEmpty {
                         segments.append(.latexInline(latex))
                     }

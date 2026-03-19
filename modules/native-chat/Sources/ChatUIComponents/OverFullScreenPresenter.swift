@@ -19,7 +19,7 @@ public struct OverFullScreenPresenter<PresentedContent: View>: UIViewControllerR
         interfaceStyle: UIUserInterfaceStyle,
         presentedContent: @escaping () -> PresentedContent
     ) {
-        self._isPresented = isPresented
+        _isPresented = isPresented
         self.onDismiss = onDismiss
         self.interfaceStyle = interfaceStyle
         self.presentedContent = presentedContent
@@ -73,8 +73,8 @@ public struct OverFullScreenPresenter<PresentedContent: View>: UIViewControllerR
     }
 }
 
-@MainActor
 /// Zero-size anchor view controller that presents and manages an over-full-screen modal.
+@MainActor
 public final class AnchorViewController<PresentedContent: View>: UIViewController, UIAdaptivePresentationControllerDelegate {
     /// Closure invoked when the presented modal is dismissed.
     public var onDismiss: (() -> Void)?
@@ -119,14 +119,14 @@ public final class AnchorViewController<PresentedContent: View>: UIViewControlle
     }
 
     /// Handles interactive dismissal by cleaning up the hosting controller reference.
-    public func presentationControllerDidDismiss(_ presentationController: UIPresentationController) {
+    public func presentationControllerDidDismiss(_: UIPresentationController) {
         hostingController = nil
         onDismiss?()
     }
 }
 
-@MainActor
 /// A `UIHostingController` subclass that fires a dismiss handler when it disappears.
+@MainActor
 public final class DismissAwareHostingController<Content: View>: UIHostingController<Content> {
     /// Closure called when this controller is dismissed from the screen.
     public var dismissHandler: (() -> Void)?
