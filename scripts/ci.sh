@@ -447,6 +447,9 @@ function gate_package_tests() {
     -scheme NativeChat-Package \
     -destination "$SIMULATOR_DEVICE_DESTINATION" \
     -enableCodeCoverage YES \
+    -parallel-testing-enabled NO \
+    -test-timeouts-enabled YES \
+    -maximum-test-execution-time-allowance "$XCODE_TEST_TIMEOUT_ALLOWANCE" \
     -resultBundlePath "$CI_OUTPUT_DIR/NativeChatCoverageTests.xcresult" \
     -skip-testing:NativeChatTests/SnapshotViewTests \
     test
