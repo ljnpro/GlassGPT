@@ -16,7 +16,7 @@ env:
   DEVELOPER_DIR: /Applications/Xcode_26.3.app/Contents/Developer
   EXPECTED_XCODE_VERSION: "26.3"
   EXPECTED_SWIFT_DRIVER_VERSION: "1.127.15"
-  EXPECTED_PYTHON_VERSION: "3.14.3"
+  EXPECTED_PYTHON_VERSION: "3.14"
 
 jobs:
   lint:
