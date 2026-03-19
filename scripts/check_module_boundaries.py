@@ -90,7 +90,10 @@ TARGET_RULES: dict[str, TargetRule] = {
         ),
     ),
     "GeneratedFilesInfra": TargetRule(
-        allowed_imports=frozenset({"Foundation", "OSLog", "ImageIO", "PDFKit", "ChatDomain", "GeneratedFilesCore", "OpenAITransport", "os"}),
+        allowed_imports=frozenset({
+            "Foundation", "OSLog", "ImageIO", "PDFKit",
+            "ChatDomain", "GeneratedFilesCore", "OpenAITransport", "os",
+        }),
         forbidden_patterns=(
             ("Bundle.main", "GeneratedFilesInfra must not reach app bundle state"),
             ("ProcessInfo.processInfo", "GeneratedFilesInfra must not read process environment"),
