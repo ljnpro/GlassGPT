@@ -27,6 +27,8 @@ creation. There are no CI bypass flags on the tracked path.
 GitHub can run the same tracked release wrapper through the manual
 `Release TestFlight` workflow in
 `.github/workflows/release-testflight.yml`.
+The release branch comes from the GitHub Actions `Use workflow from` selector;
+there is no separate branch input inside the form.
 
 Required `testflight` environment secrets:
 
