@@ -246,6 +246,49 @@ jobs:
           path: .local/build/ci/*.xcresult
           retention-days: 14
 
+  coverage:
+    name: Coverage Report
+    runs-on: macos-26
+    needs: [core-tests, ui-tests]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.EXPECTED_PYTHON_VERSION }}
+
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode_26.3.app
+
+      - name: Print toolchain versions
+        run: |
+          python3 --version
+          xcodebuild -version
+          swift --version
+
+      - name: Download test result artifacts
+        uses: actions/download-artifact@v6
+        with:
+          pattern: test-results-*
+          path: .local/build/ci
+          merge-multiple: true
+
+      - name: Generate coverage report
+        run: ./scripts/ci.sh coverage-report
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v6
+        with:
+          name: coverage-report
+          path: |
+            .local/build/ci/coverage-production.txt
+            .local/build/ci/coverage-production.json
+            .local/build/ci/coverage-report.txt
+          retention-days: 14
+          if-no-files-found: error
+
   quality:
     name: Quality Gates
     runs-on: macos-26
@@ -307,7 +350,7 @@ jobs:
   release-readiness:
     name: Release Readiness
     runs-on: macos-26
-    needs: [core-tests, ui-tests, quality]
+    needs: [coverage, quality]
     if: github.ref == 'refs/heads/codex/stable-4.9' || github.ref == 'refs/heads/main'
     steps:
       - name: Checkout

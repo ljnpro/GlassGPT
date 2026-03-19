@@ -1,26 +1,51 @@
 name: PR Coverage Comment
 
 on:
-  pull_request:
-    types: [opened, synchronize]
+  workflow_run:
+    workflows: ["iOS"]
+    types: [completed]
 
 permissions:
   pull-requests: write
   contents: read
+  actions: read
 
 jobs:
   coverage-comment:
     runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request'
+    if: github.event.workflow_run.event == 'pull_request' && github.event.workflow_run.conclusion == 'success'
     steps:
-      - uses: actions/checkout@v6
+      - name: Locate coverage artifact
+        id: coverage-artifact
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const pullRequests = context.payload.workflow_run.pull_requests || [];
+            const prNumber = pullRequests.length > 0 ? String(pullRequests[0].number) : '';
+            core.setOutput('pr-number', prNumber);
+
+            const artifacts = await github.paginate(github.rest.actions.listWorkflowRunArtifacts, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              run_id: context.payload.workflow_run.id,
+              per_page: 100,
+            });
+
+            const coverageArtifact = artifacts.find(artifact => artifact.name === 'coverage-report');
+            core.setOutput('present', coverageArtifact ? 'true' : 'false');
+
       - name: Download coverage artifact
+        if: steps.coverage-artifact.outputs.pr-number != '' && steps.coverage-artifact.outputs.present == 'true'
         uses: actions/download-artifact@v6
         with:
           name: coverage-report
           path: .local/build/ci
-        continue-on-error: true
+          repository: ${{ github.repository }}
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Post coverage delta
+        if: steps.coverage-artifact.outputs.pr-number != ''
         uses: actions/github-script@v8
         with:
           script: |
@@ -37,7 +62,7 @@ jobs:
             const { data: comments } = await github.rest.issues.listComments({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              issue_number: context.issue.number,
+              issue_number: Number('${{ steps.coverage-artifact.outputs.pr-number }}'),
             });
 
             const botComment = comments.find(c => c.body.includes('Posted by CI coverage bot'));
@@ -53,7 +78,7 @@ jobs:
               await github.rest.issues.createComment({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
-                issue_number: context.issue.number,
+                issue_number: Number('${{ steps.coverage-artifact.outputs.pr-number }}'),
                 body,
               });
             }

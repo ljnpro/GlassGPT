@@ -4,12 +4,12 @@ on:
   workflow_dispatch:
     inputs:
       marketing_version:
-        description: Marketing version to publish
-        required: true
+        description: Leave blank to auto-bump the current patch version
+        required: false
         type: string
       build_number:
-        description: Build number to publish
-        required: true
+        description: Leave blank to auto-increment the current build number
+        required: false
         type: string
       target_branch:
         description: Stable branch or main to release from
@@ -84,6 +84,22 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
+      - name: Resolve release identifiers
+        id: release-identifiers
+        run: |
+          python3 ./scripts/resolve_release_identifiers.py \
+            --versions-file "$GITHUB_WORKSPACE/ios/GlassGPT/Config/Versions.xcconfig" \
+            --marketing-version "${{ inputs.marketing_version }}" \
+            --build-number "${{ inputs.build_number }}" \
+            --github-output "$GITHUB_OUTPUT"
+
+      - name: Print resolved release identifiers
+        run: |
+          echo "Current marketing version: ${{ steps.release-identifiers.outputs.current_marketing_version }}"
+          echo "Current build number: ${{ steps.release-identifiers.outputs.current_build_number }}"
+          echo "Resolved marketing version: ${{ steps.release-identifiers.outputs.marketing_version }}"
+          echo "Resolved build number: ${{ steps.release-identifiers.outputs.build_number }}"
+
       - name: Materialize release credentials
         env:
           ASC_API_KEY_ID: ${{ secrets.ASC_API_KEY_ID }}
@@ -110,13 +126,17 @@ jobs:
           EOF
 
       - name: Run tracked release wrapper
-        run: ./scripts/release_testflight.sh "${{ inputs.marketing_version }}" "${{ inputs.build_number }}" --branch "${{ inputs.target_branch }}"
+        run: |
+          ./scripts/release_testflight.sh \
+            "${{ steps.release-identifiers.outputs.marketing_version }}" \
+            "${{ steps.release-identifiers.outputs.build_number }}" \
+            --branch "${{ inputs.target_branch }}"
 
       - name: Upload release logs
         if: always()
         uses: actions/upload-artifact@v6
         with:
-          name: release-testflight-${{ inputs.marketing_version }}-${{ inputs.build_number }}
+          name: release-testflight-${{ steps.release-identifiers.outputs.marketing_version }}-${{ steps.release-identifiers.outputs.build_number }}
           path: |
             .local/build/archive-*.log
             .local/build/export-*.log
