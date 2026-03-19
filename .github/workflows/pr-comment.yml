@@ -36,7 +36,7 @@ jobs:
 
       - name: Download coverage artifact
         if: steps.coverage-artifact.outputs.pr-number != '' && steps.coverage-artifact.outputs.present == 'true'
-        uses: actions/download-artifact@v6
+        uses: actions/download-artifact@v8
         with:
           name: coverage-report
           path: .local/build/ci

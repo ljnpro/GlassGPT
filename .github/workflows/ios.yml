@@ -227,7 +227,7 @@ jobs:
           swift --version
 
       - name: Download UI test bundle
-        uses: actions/download-artifact@v6
+        uses: actions/download-artifact@v8
         with:
           name: ui-test-products
           path: .local/build/ci/DerivedData/Build/Products
@@ -270,7 +270,7 @@ jobs:
           swift --version
 
       - name: Download test result artifacts
-        uses: actions/download-artifact@v6
+        uses: actions/download-artifact@v8
         with:
           pattern: test-results-*
           path: .local/build/ci
@@ -372,7 +372,7 @@ jobs:
           swift --version
 
       - name: Download UI test bundle
-        uses: actions/download-artifact@v6
+        uses: actions/download-artifact@v8
         with:
           name: ui-test-products
           path: .local/build/ci/DerivedData/Build/Products
