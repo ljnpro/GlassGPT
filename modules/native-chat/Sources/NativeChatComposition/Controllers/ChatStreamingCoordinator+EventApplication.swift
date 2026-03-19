@@ -1,6 +1,7 @@
 import ChatDomain
 import ChatPersistenceCore
 import ChatPersistenceSwiftData
+import ChatRuntimeWorkflows
 import Foundation
 import OpenAITransport
 import SwiftUI
