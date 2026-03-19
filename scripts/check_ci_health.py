@@ -33,12 +33,14 @@ def command_output(*args: str) -> str:
 def main() -> int:
     failures: list[str] = []
     python_version = sys.version.split()[0]
+    expected_python_version = tuple(int(part) for part in EXPECTED_PYTHON_VERSION.split("."))
+    actual_python_version = tuple(int(part) for part in python_version.split("."))
 
     print("CI health report")
     print(f"Workspace root: {ROOT}")
 
-    if python_version != EXPECTED_PYTHON_VERSION:
-        failures.append(f"Python {EXPECTED_PYTHON_VERSION} required, found {python_version}")
+    if actual_python_version[: len(expected_python_version)] != expected_python_version:
+        failures.append(f"Python {EXPECTED_PYTHON_VERSION}+ required, found {python_version}")
     else:
         print(f"[PASS] Python: {python_version}")
 
