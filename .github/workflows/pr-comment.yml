@@ -13,7 +13,7 @@ jobs:
     runs-on: macos-15
     if: github.event_name == 'pull_request'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Download coverage artifact
         uses: actions/download-artifact@v4
         with:
