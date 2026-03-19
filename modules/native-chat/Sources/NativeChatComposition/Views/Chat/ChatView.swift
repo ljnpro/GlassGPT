@@ -96,7 +96,7 @@ package struct ChatView: View {
                                 )
                         }
                         .buttonStyle(GlassPressButtonStyle())
-                        .accessibilityLabel("New Chat")
+                        .accessibilityLabel("Start new chat")
                         .accessibilityIdentifier("chat.newChat")
                         .allowsHitTesting(!shouldShowGeneratedPreviewTouchShield)
                     }

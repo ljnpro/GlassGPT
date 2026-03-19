@@ -23,7 +23,7 @@ public extension OpenAIRequestFactory {
         serviceTier: ServiceTier,
         vectorStoreIds: [String] = [],
         useDirectBaseURL: Bool = false
-    ) throws -> URLRequest {
+    ) throws(OpenAIServiceError) -> URLRequest {
         var tools: [ResponsesToolDTO] = [
             ResponsesToolDTO(type: "web_search_preview"),
             ResponsesToolDTO(
@@ -85,7 +85,7 @@ public extension OpenAIRequestFactory {
         startingAfter: Int,
         apiKey: String,
         useDirectBaseURL: Bool
-    ) throws -> URLRequest {
+    ) throws(OpenAIServiceError) -> URLRequest {
         let endpoint = configuration.resolvedEndpoint(useDirectBaseURL: useDirectBaseURL)
         let url = try url(
             for: OpenAIRequestDescriptor(
@@ -126,7 +126,7 @@ public extension OpenAIRequestFactory {
         apiKey: String,
         modelIdentifier: String = "gpt-5.4",
         useDirectBaseURL: Bool = false
-    ) throws -> URLRequest {
+    ) throws(OpenAIServiceError) -> URLRequest {
         let body = try JSONCoding.encode(
             ResponsesTitleRequestDTO(
                 model: modelIdentifier,

@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.8.1] - 2026-03-19
+
+### Added
+- Typed throws on all public and package API boundaries (Phase B)
+- PersistenceError and RuntimeTransitionError typed error enums
+- MetricKit subscriber for crash, hang, and disk-write diagnostics (Phase C)
+- OSSignposter instrumentation across 12 critical code paths (Phase C)
+- Launch profiling with CFAbsoluteTimeGetCurrent timing (Phase C)
+- Debug memory monitor with os_proc_available_memory (Phase C)
+- DiagnosticsView for debug-only runtime inspection (Phase C)
+- Full accessibility coverage: 70+ accessibilityLabel, 74+ accessibilityIdentifier (Phase F)
+- Accessibility audit tests for Chat, History, and Settings tabs (Phase F)
+- Architecture Decision Records (8 ADRs in MADR format) (Phase H)
+- DocC documentation catalogs for ChatDomain, OpenAITransport, ChatRuntimeWorkflows (Phase L)
+- doc-build CI gate for documentation catalog verification (Phase L)
+
+### Changed
+- APP_INTENTS_METADATA_TOOL_SEARCH_PATHS build setting to suppress vendor warnings (Phase J)
+- check_warnings.sh now checks only source-file warnings, eliminating exception patterns (Phase J)
+
 ## [Unreleased] - 4.8.0
 
 ### Added

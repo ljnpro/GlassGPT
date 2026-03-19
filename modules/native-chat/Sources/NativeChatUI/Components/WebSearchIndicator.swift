@@ -20,6 +20,7 @@ package struct WebSearchIndicator: View {
                     .font(.subheadline.weight(.medium))
                     .foregroundStyle(.blue)
                     .symbolEffect(.pulse, options: .repeating)
+                    .accessibilityHidden(true)
 
                 Text("Searching the web…")
                     .font(.subheadline)

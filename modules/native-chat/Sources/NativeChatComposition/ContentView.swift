@@ -19,14 +19,20 @@ package struct ContentView: View {
             Tab("Chat", systemImage: "bubble.left.and.bubble.right.fill", value: 0) {
                 ChatView(viewModel: appStore.chatController)
             }
+            .accessibilityLabel("Chat tab")
+            .accessibilityIdentifier("tab.chat")
 
             Tab("History", systemImage: "clock.fill", value: 1) {
                 NativeChatUI.HistoryView(store: appStore.historyPresenter)
             }
+            .accessibilityLabel("History tab")
+            .accessibilityIdentifier("tab.history")
 
             Tab("Settings", systemImage: "gearshape.fill", value: 2) {
                 NativeChatUI.SettingsView(viewModel: appStore.settingsPresenter)
             }
+            .accessibilityLabel("Settings tab")
+            .accessibilityIdentifier("tab.settings")
         }
         .environment(\.hapticsEnabled, appStore.settingsPresenter.hapticEnabled)
         .tabBarMinimizeBehavior(.never)

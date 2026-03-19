@@ -3,7 +3,7 @@ import Foundation
 /// Abstraction for storing and retrieving an API key, enabling keychain or in-memory backends.
 public protocol APIKeyPersisting: Sendable {
     /// Persists the given API key string.
-    func saveAPIKey(_ apiKey: String) throws
+    func saveAPIKey(_ apiKey: String) throws(PersistenceError)
     /// Returns the currently stored API key, or `nil` if none exists.
     func loadAPIKey() -> String?
     /// Removes the stored API key.
@@ -28,7 +28,7 @@ public final class PersistedAPIKeyStore {
 
     /// Persists the given API key.
     /// - Throws: Propagates errors from the underlying backend.
-    public func saveAPIKey(_ apiKey: String) throws {
+    public func saveAPIKey(_ apiKey: String) throws(PersistenceError) {
         try backend.saveAPIKey(apiKey)
     }
 

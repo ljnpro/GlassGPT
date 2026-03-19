@@ -107,6 +107,8 @@ package struct CodeBlockView: View {
                     )
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel(isCopied ? "Code copied" : "Copy code")
+                .accessibilityIdentifier("codeBlock.copy")
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 2)

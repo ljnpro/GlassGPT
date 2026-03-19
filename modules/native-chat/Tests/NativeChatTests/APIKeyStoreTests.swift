@@ -33,7 +33,7 @@ final class APIKeyStoreTests: XCTestCase {
         let store = PersistedAPIKeyStore(backend: backend)
 
         XCTAssertThrowsError(try store.saveAPIKey("sk-test")) { error in
-            XCTAssertTrue(error is NativeChatTestError)
+            XCTAssertTrue(error is PersistenceError)
         }
     }
 

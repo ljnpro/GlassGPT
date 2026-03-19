@@ -12,6 +12,7 @@ package struct CodeInterpreterIndicator: View {
                 .font(.subheadline.weight(.medium))
                 .foregroundStyle(.green)
                 .symbolEffect(.pulse, options: .repeating)
+                .accessibilityHidden(true)
 
             Text("Running code…")
                 .font(.subheadline)
@@ -53,6 +54,7 @@ package struct CodeInterpreterResultView: View {
                     Image(systemName: "terminal.fill")
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(.green)
+                        .accessibilityHidden(true)
 
                     Text("Code Executed")
                         .font(.caption.weight(.semibold))
@@ -64,11 +66,14 @@ package struct CodeInterpreterResultView: View {
                         .font(.caption2.weight(.bold))
                         .foregroundStyle(.tertiary)
                         .rotationEffect(.degrees(isExpanded ? 90 : 0))
+                        .accessibilityHidden(true)
                 }
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)
             }
             .buttonStyle(.plain)
+            .accessibilityLabel(isExpanded ? "Collapse code execution result" : "Expand code execution result")
+            .accessibilityIdentifier("indicator.codeResult")
 
             // Expandable content
             if isExpanded {

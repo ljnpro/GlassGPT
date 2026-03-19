@@ -45,4 +45,6 @@ public enum Loggers {
     public static let persistence = AppLogger(category: "persistence")
     /// User settings logger.
     public static let settings = AppLogger(category: "settings")
+    /// Diagnostics, MetricKit, and performance logger.
+    public static let diagnostics = AppLogger(category: "diagnostics")
 }

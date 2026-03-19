@@ -13,16 +13,21 @@ struct SettingsAPIConfigurationSection: View {
                 .textContentType(.password)
                 .autocorrectionDisabled()
                 .textInputAutocapitalization(.never)
+                .accessibilityLabel("API key input")
                 .accessibilityIdentifier("settings.apiKey")
 
             if let isValid = viewModel.isAPIKeyValid {
                 HStack {
                     Image(systemName: isValid ? "checkmark.circle.fill" : "xmark.circle.fill")
                         .foregroundStyle(isValid ? .green : .red)
+                        .accessibilityHidden(true)
                     Text(isValid ? "API key is valid" : "API key is invalid")
                         .font(.caption)
                         .foregroundStyle(isValid ? .green : .red)
                 }
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel(isValid ? "API key is valid" : "API key is invalid")
+                .accessibilityIdentifier("settings.apiKeyStatus")
             }
 
             HStack {
@@ -33,6 +38,8 @@ struct SettingsAPIConfigurationSection: View {
                 }
                 .buttonStyle(.glass)
                 .disabled(viewModel.apiKey.isEmpty || viewModel.isValidating)
+                .accessibilityLabel("Validate API key")
+                .accessibilityIdentifier("settings.validateAPIKey")
 
                 Spacer()
 
@@ -41,12 +48,16 @@ struct SettingsAPIConfigurationSection: View {
                 }
                 .buttonStyle(.glass)
                 .tint(.red)
+                .accessibilityLabel("Clear API key")
+                .accessibilityIdentifier("settings.clearAPIKey")
 
                 Button("Save") {
                     viewModel.saveAPIKey()
                 }
                 .buttonStyle(.glassProminent)
                 .disabled(viewModel.apiKey.isEmpty)
+                .accessibilityLabel("Save API key")
+                .accessibilityIdentifier("settings.saveAPIKey")
             }
         } header: {
             Text("API Configuration")
@@ -73,6 +84,7 @@ struct SettingsCloudflareSection: View {
     var body: some View {
         Section {
             Toggle("Enable Cloudflare Gateway", isOn: $viewModel.cloudflareEnabled)
+                .accessibilityLabel("Enable Cloudflare Gateway")
                 .accessibilityIdentifier("settings.cloudflare")
 
             if viewModel.cloudflareEnabled {
@@ -94,8 +106,12 @@ struct SettingsCloudflareSection: View {
                     if viewModel.isCheckingCloudflareHealth {
                         ProgressView()
                             .controlSize(.small)
+                            .accessibilityLabel("Checking connection")
                     }
                 }
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel("Cloudflare connection status: \(statusText)")
+                .accessibilityIdentifier("settings.cloudflareStatus")
 
                 Button("Check Connection") {
                     Task { @MainActor in
@@ -104,6 +120,8 @@ struct SettingsCloudflareSection: View {
                 }
                 .buttonStyle(.glass)
                 .disabled(viewModel.isCheckingCloudflareHealth || !canCheckConnection)
+                .accessibilityLabel("Check Cloudflare connection")
+                .accessibilityIdentifier("settings.checkConnection")
             }
         } header: {
             Text("Cloudflare Gateway")
@@ -122,19 +140,27 @@ struct SettingsChatDefaultsSection: View {
                 get: { viewModel.defaultProModeEnabled },
                 set: { viewModel.defaultProModeEnabled = $0 }
             ))
+            .accessibilityLabel("Default Pro Mode")
+            .accessibilityIdentifier("settings.defaultProMode")
 
             Toggle("Default Background Mode", isOn: $viewModel.defaultBackgroundModeEnabled)
+                .accessibilityLabel("Default Background Mode")
+                .accessibilityIdentifier("settings.defaultBackgroundMode")
 
             Toggle("Default Flex Mode", isOn: Binding(
                 get: { viewModel.defaultFlexModeEnabled },
                 set: { viewModel.defaultFlexModeEnabled = $0 }
             ))
+            .accessibilityLabel("Default Flex Mode")
+            .accessibilityIdentifier("settings.defaultFlexMode")
 
             Picker("Reasoning Effort", selection: $viewModel.defaultEffort) {
                 ForEach(viewModel.availableDefaultEfforts) { effort in
                     Text(effort.displayName).tag(effort)
                 }
             }
+            .accessibilityLabel("Default reasoning effort")
+            .accessibilityIdentifier("settings.defaultEffort")
         } header: {
             Text("Chat Defaults")
         } footer: {
@@ -155,10 +181,12 @@ struct SettingsAppearanceSection: View {
                 }
             }
             .pickerStyle(.segmented)
+            .accessibilityLabel("App theme")
             .accessibilityIdentifier("settings.themePicker")
 
             if UIDevice.current.userInterfaceIdiom == .phone {
                 Toggle("Haptic Feedback", isOn: $viewModel.hapticEnabled)
+                    .accessibilityLabel("Haptic feedback")
                     .accessibilityIdentifier("settings.haptics")
             }
         }

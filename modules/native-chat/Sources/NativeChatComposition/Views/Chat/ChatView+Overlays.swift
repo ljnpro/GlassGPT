@@ -7,10 +7,14 @@ import UIKit
 extension ChatView {
     var restoringOverlay: some View {
         statusOverlay(title: "Restoring conversation…")
+            .accessibilityLabel("Restoring conversation")
+            .accessibilityIdentifier("chat.restoringOverlay")
     }
 
     var fileDownloadingOverlay: some View {
         statusOverlay(title: "Downloading file…")
+            .accessibilityLabel("Downloading file")
+            .accessibilityIdentifier("chat.downloadingOverlay")
     }
 
     var emptyState: some View {
@@ -19,6 +23,7 @@ extension ChatView {
                 .font(.system(size: 56))
                 .foregroundStyle(.secondary)
                 .symbolEffect(.breathe)
+                .accessibilityHidden(true)
 
             Text("Start a Conversation")
                 .font(.title2.weight(.semibold))
@@ -28,10 +33,14 @@ extension ChatView {
                     .font(.callout)
                     .foregroundStyle(.orange)
                     .padding(.top, 8)
+                    .accessibilityLabel("Add your API key in Settings")
+                    .accessibilityIdentifier("chat.missingAPIKeyHint")
             }
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 24)
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("chat.emptyState")
     }
 
     var modelSelectorPresentation: some View {
@@ -89,6 +98,7 @@ extension ChatView {
         HStack {
             Image(systemName: "exclamationmark.triangle.fill")
                 .foregroundStyle(.red)
+                .accessibilityHidden(true)
             Text(message)
                 .font(.caption)
                 .foregroundStyle(.secondary)
@@ -101,6 +111,9 @@ extension ChatView {
             darkBorderOpacity: 0.14,
             lightBorderOpacity: 0.08
         )
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Error: \(message)")
+        .accessibilityIdentifier("chat.errorBanner")
     }
 
     var showsEmptyState: Bool {

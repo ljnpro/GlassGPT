@@ -12,7 +12,7 @@ public extension OpenAIRequestBuilder {
     ///   - serviceTier: The service tier for the request.
     ///   - vectorStoreIds: Optional vector store IDs for file search.
     /// - Returns: A configured URL request for streaming.
-    /// - Throws: If URL or body encoding fails.
+    /// - Throws: ``OpenAIServiceError`` if URL or body encoding fails.
     func streamingRequest(
         apiKey: String,
         messages: [APIMessage],
@@ -21,7 +21,7 @@ public extension OpenAIRequestBuilder {
         backgroundModeEnabled: Bool,
         serviceTier: ServiceTier,
         vectorStoreIds: [String] = []
-    ) throws -> URLRequest {
+    ) throws(OpenAIServiceError) -> URLRequest {
         try requestFactory.streamingRequest(
             apiKey: apiKey,
             messages: messages,
@@ -40,13 +40,13 @@ public extension OpenAIRequestBuilder {
     ///   - apiKey: The API key for authentication.
     ///   - useDirectBaseURL: Whether to force the direct OpenAI endpoint.
     /// - Returns: A configured URL request for stream recovery.
-    /// - Throws: If URL construction fails.
+    /// - Throws: ``OpenAIServiceError`` if URL construction fails.
     func recoveryRequest(
         responseId: String,
         startingAfter: Int,
         apiKey: String,
         useDirectBaseURL: Bool
-    ) throws -> URLRequest {
+    ) throws(OpenAIServiceError) -> URLRequest {
         try requestFactory.recoveryRequest(
             responseID: responseId,
             startingAfter: startingAfter,

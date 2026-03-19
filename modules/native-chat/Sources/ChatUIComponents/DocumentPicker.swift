@@ -69,7 +69,7 @@ public struct FileMetadata {
     public let data: Data
 
     /// Reads the file at the given URL and returns a populated ``FileMetadata`` instance.
-    public static func from(url: URL) throws -> FileMetadata {
+    public static func from(url: URL) throws(any Error) -> FileMetadata {
         let filename = url.lastPathComponent
         let fileType = url.pathExtension.lowercased()
         let data = try Data(contentsOf: url)

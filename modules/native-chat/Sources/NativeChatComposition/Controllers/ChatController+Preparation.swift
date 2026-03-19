@@ -6,7 +6,7 @@ import Foundation
 @MainActor
 extension ChatController {
     /// Prepares a new assistant reply by delegating to the send coordinator.
-    package func prepareSendMessage(text rawText: String) throws -> PreparedAssistantReply {
+    package func prepareSendMessage(text rawText: String) throws(SendMessagePreparationError) -> PreparedAssistantReply {
         try sendCoordinator.prepareSendMessage(text: rawText)
     }
 
@@ -15,7 +15,7 @@ extension ChatController {
         sendCoordinator.persistUploadedAttachments(attachments, onUserMessageID: messageID)
     }
 
-    func prepareExistingDraft(_ draft: Message) throws -> PreparedAssistantReply {
+    func prepareExistingDraft(_ draft: Message) throws(SendMessagePreparationError) -> PreparedAssistantReply {
         try sendCoordinator.prepareExistingDraft(draft)
     }
 }

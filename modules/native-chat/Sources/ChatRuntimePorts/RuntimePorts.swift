@@ -11,7 +11,7 @@ public protocol StreamingPort: Sendable {
     ///   - replyID: The identifier of the assistant reply to stream.
     ///   - configuration: The conversation configuration controlling model and parameters.
     /// - Throws: If the streaming session cannot be established.
-    func beginStreaming(replyID: AssistantReplyID, configuration: ConversationConfiguration) async throws
+    func beginStreaming(replyID: AssistantReplyID, configuration: ConversationConfiguration) async throws(any Error)
 }
 
 /// Port for recovering an interrupted or detached streaming session.
@@ -22,7 +22,7 @@ public protocol RecoveryPort: Sendable {
     ///   - cursor: The stream cursor from which to resume, or `nil` to start fresh.
     /// - Returns: The lifecycle state after recovery.
     /// - Throws: If recovery fails.
-    func recover(replyID: AssistantReplyID, cursor: StreamCursor?) async throws -> ReplyLifecycle
+    func recover(replyID: AssistantReplyID, cursor: StreamCursor?) async throws(any Error) -> ReplyLifecycle
 }
 
 /// Port for loading persisted conversation data.
@@ -30,7 +30,7 @@ public protocol ConversationPersistencePort: Sendable {
     /// Returns the most recently updated conversation snapshot, if any.
     /// - Returns: The most recent conversation snapshot, or `nil` if none exists.
     /// - Throws: If the persistence layer encounters an error.
-    func mostRecentConversation() async throws -> StoredConversationSnapshot?
+    func mostRecentConversation() async throws(any Error) -> StoredConversationSnapshot?
 }
 
 /// Port for loading recoverable draft messages from persistence.
@@ -41,7 +41,7 @@ public protocol DraftPersistencePort: Sendable {
     ///   - staleAfter: The maximum age in seconds before a draft is considered stale.
     /// - Returns: An array of recoverable draft snapshots.
     /// - Throws: If the persistence layer encounters an error.
-    func recoverableDrafts(referenceDate: Date, staleAfter: TimeInterval) async throws -> [StoredDraftSnapshot]
+    func recoverableDrafts(referenceDate: Date, staleAfter: TimeInterval) async throws(any Error) -> [StoredDraftSnapshot]
 }
 
 /// Port for managing background execution tasks tied to reply sessions.
@@ -61,7 +61,7 @@ public protocol GeneratedFilePort: Sendable {
     /// - Parameter descriptor: The descriptor identifying the generated file.
     /// - Returns: A local resource representing the downloaded file.
     /// - Throws: If the download or local storage operation fails.
-    func localResource(for descriptor: GeneratedFileDescriptor) async throws -> GeneratedFileLocalResource
+    func localResource(for descriptor: GeneratedFileDescriptor) async throws(any Error) -> GeneratedFileLocalResource
 }
 
 /// Port for generating conversation titles from message content.
@@ -70,7 +70,7 @@ public protocol TitleGenerationPort: Sendable {
     /// - Parameter text: The message text to summarize.
     /// - Returns: A generated title string.
     /// - Throws: If title generation fails.
-    func generateTitle(from text: String) async throws -> String
+    func generateTitle(from text: String) async throws(any Error) -> String
 }
 
 /// Port providing the current date and time, abstracting the system clock for testability.

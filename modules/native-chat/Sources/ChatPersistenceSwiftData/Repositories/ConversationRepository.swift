@@ -1,10 +1,14 @@
 import ChatDomain
+import ChatPersistenceCore
 import Foundation
 import SwiftData
+import os
 
 /// Repository for creating, querying, and deleting ``Conversation`` and ``Message`` entities.
 ///
 /// All methods are `@MainActor`-isolated because they operate on a `ModelContext`.
+private let conversationRepoSignposter = OSSignposter(subsystem: "GlassGPT", category: "persistence")
+
 @MainActor
 public final class ConversationRepository {
     private let modelContext: ModelContext
@@ -15,8 +19,12 @@ public final class ConversationRepository {
     }
 
     /// Persists all pending changes in the model context.
-    public func save() throws {
-        try modelContext.save()
+    public func save() throws(PersistenceError) {
+        do {
+            try modelContext.save()
+        } catch {
+            throw .migrationFailure(underlying: error)
+        }
     }
 
     /// Creates and inserts a new conversation configured with the given parameters.
@@ -32,38 +40,58 @@ public final class ConversationRepository {
     }
 
     /// Returns the most recently updated conversation, or `nil` if none exist.
-    public func fetchMostRecentConversation() throws -> Conversation? {
-        var descriptor = FetchDescriptor<Conversation>(
-            sortBy: [SortDescriptor(\.updatedAt, order: .reverse)]
-        )
-        descriptor.fetchLimit = 1
-        return try modelContext.fetch(descriptor).first
+    public func fetchMostRecentConversation() throws(PersistenceError) -> Conversation? {
+        let signpostID = conversationRepoSignposter.makeSignpostID()
+        let signpostState = conversationRepoSignposter.beginInterval("FetchMostRecentConversation", id: signpostID)
+        defer { conversationRepoSignposter.endInterval("FetchMostRecentConversation", signpostState) }
+
+        do {
+            var descriptor = FetchDescriptor<Conversation>(
+                sortBy: [SortDescriptor(\.updatedAt, order: .reverse)]
+            )
+            descriptor.fetchLimit = 1
+            return try modelContext.fetch(descriptor).first
+        } catch {
+            throw .migrationFailure(underlying: error)
+        }
     }
 
     /// Returns the most recently updated conversation that has at least one message.
-    public func fetchMostRecentConversationWithMessages() throws -> Conversation? {
-        let descriptor = FetchDescriptor<Conversation>(
-            sortBy: [SortDescriptor(\.updatedAt, order: .reverse)]
-        )
-        return try modelContext.fetch(descriptor).first(where: { !$0.messages.isEmpty })
+    public func fetchMostRecentConversationWithMessages() throws(PersistenceError) -> Conversation? {
+        do {
+            let descriptor = FetchDescriptor<Conversation>(
+                sortBy: [SortDescriptor(\.updatedAt, order: .reverse)]
+            )
+            return try modelContext.fetch(descriptor).first(where: { !$0.messages.isEmpty })
+        } catch {
+            throw .migrationFailure(underlying: error)
+        }
     }
 
     /// Returns all conversations whose title is still "New Chat".
-    public func fetchUntitledConversations() throws -> [Conversation] {
-        let descriptor = FetchDescriptor<Conversation>(
-            predicate: #Predicate<Conversation> { conversation in
-                conversation.title == "New Chat"
-            }
-        )
-        return try modelContext.fetch(descriptor)
+    public func fetchUntitledConversations() throws(PersistenceError) -> [Conversation] {
+        do {
+            let descriptor = FetchDescriptor<Conversation>(
+                predicate: #Predicate<Conversation> { conversation in
+                    conversation.title == "New Chat"
+                }
+            )
+            return try modelContext.fetch(descriptor)
+        } catch {
+            throw .migrationFailure(underlying: error)
+        }
     }
 
     /// Fetches a single message by its unique identifier.
-    public func fetchMessage(id: UUID) throws -> Message? {
-        let descriptor = FetchDescriptor<Message>(
-            predicate: #Predicate<Message> { $0.id == id }
-        )
-        return try modelContext.fetch(descriptor).first
+    public func fetchMessage(id: UUID) throws(PersistenceError) -> Message? {
+        do {
+            let descriptor = FetchDescriptor<Message>(
+                predicate: #Predicate<Message> { $0.id == id }
+            )
+            return try modelContext.fetch(descriptor).first
+        } catch {
+            throw .migrationFailure(underlying: error)
+        }
     }
 
     /// Deletes the given message from the model context.

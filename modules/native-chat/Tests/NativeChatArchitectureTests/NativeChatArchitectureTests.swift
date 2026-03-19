@@ -103,7 +103,10 @@ final class NativeChatArchitectureTests: XCTestCase {
             contentsOf: workspaceRoot.appendingPathComponent(".github/workflows/ios.yml"),
             encoding: .utf8
         )
-        XCTAssertTrue(workflow.contains("./scripts/ci.sh architecture-tests"))
+        XCTAssertTrue(workflow.contains("matrix:"))
+        XCTAssertTrue(workflow.contains("gate:"))
+        XCTAssertTrue(workflow.contains("- architecture-tests"))
+        XCTAssertTrue(workflow.contains("./scripts/ci.sh ${{ matrix.gate }}"))
         XCTAssertTrue(workflow.contains("./scripts/ci.sh source-share"))
         XCTAssertTrue(workflow.contains("./scripts/ci.sh infra-safety"))
         XCTAssertTrue(workflow.contains("./scripts/ci.sh module-boundary"))

@@ -1,7 +1,4 @@
 import Foundation
-import OSLog
-
-private let katexLogger = Logger(subsystem: "GlassGPT", category: "katex")
 
 extension KaTeXProvider {
     /// Generates a self-contained HTML page that renders the given LaTeX string using KaTeX.
@@ -43,14 +40,10 @@ extension KaTeXProvider {
     }
 
     private static func encodedLatexString(_ latex: String) -> String {
-        do {
-            let data = try JSONEncoder().encode(latex)
-            if let json = String(data: data, encoding: .utf8) {
-                return json
-            }
-        } catch {
-            // swiftlint:disable:next line_length
-            katexLogger.debug("JSON encoding failed for LaTeX string, using manual escaping: \(error.localizedDescription, privacy: .public)")
+        let encodedResult = Result { try JSONEncoder().encode(latex) }
+        if case .success(let data) = encodedResult,
+           let json = String(data: data, encoding: .utf8) {
+            return json
         }
 
         let escaped = latex

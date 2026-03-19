@@ -1,6 +1,9 @@
 import ChatPersistenceSwiftData
 import ChatRuntimeModel
 import Foundation
+import os
+
+private let recoverySignposter = OSSignposter(subsystem: "GlassGPT", category: "recovery")
 
 @MainActor
 extension ChatRecoveryCoordinator {
@@ -11,6 +14,10 @@ extension ChatRecoveryCoordinator {
         preferStreamingResume: Bool,
         visible: Bool = false
     ) {
+        let signpostID = recoverySignposter.makeSignpostID()
+        let signpostState = recoverySignposter.beginInterval("RecoverResponse", id: signpostID)
+        defer { recoverySignposter.endInterval("RecoverResponse", signpostState) }
+
         guard !controller.apiKey.isEmpty else { return }
         guard let message = controller.conversationCoordinator.findMessage(byId: messageId) else { return }
 

@@ -19,6 +19,7 @@ package struct FileSearchIndicator: View {
                     .font(.subheadline.weight(.medium))
                     .foregroundStyle(.teal)
                     .symbolEffect(.pulse, options: .repeating)
+                    .accessibilityHidden(true)
 
                 Text("Reading documents…")
                     .font(.subheadline)

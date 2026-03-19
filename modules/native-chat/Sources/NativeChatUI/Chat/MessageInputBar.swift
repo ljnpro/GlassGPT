@@ -67,6 +67,8 @@ package struct MessageInputBar: View {
                         .scaledToFit()
                         .frame(height: 60)
                         .clipShape(RoundedRectangle(cornerRadius: 8))
+                        .accessibilityLabel("Attached image preview")
+                        .accessibilityIdentifier("composer.imagePreview")
 
                     Button {
                         withAnimation { selectedImageData = nil }
@@ -104,12 +106,16 @@ package struct MessageInputBar: View {
                     } label: {
                         Label("Photo", systemImage: "photo")
                     }
+                    .accessibilityLabel("Attach photo")
+                    .accessibilityIdentifier("composer.attachPhoto")
 
                     Button {
                         onPickDocument()
                     } label: {
                         Label("Document", systemImage: "doc")
                     }
+                    .accessibilityLabel("Attach document")
+                    .accessibilityIdentifier("composer.attachDocument")
                 } label: {
                     Image(systemName: "plus.circle")
                         .font(.title3)

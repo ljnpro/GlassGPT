@@ -1,5 +1,5 @@
 import Foundation
-import OSLog
+import os
 
 /// Translates raw SSE event frames into typed ``StreamEvent`` values.
 ///

@@ -28,11 +28,14 @@ package struct CitationLinksView: View {
                     Image(systemName: "globe")
                         .font(.caption2.weight(.semibold))
                         .foregroundStyle(.blue)
+                        .accessibilityHidden(true)
                     Text("Sources")
                         .font(.caption2.weight(.semibold))
                         .foregroundStyle(.secondary)
                 }
                 .padding(.leading, 4)
+                .accessibilityLabel("Web sources")
+                .accessibilityIdentifier("citations.header")
 
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 8) {
@@ -100,5 +103,7 @@ private struct CitationCard: View {
             )
         }
         .buttonStyle(.plain)
+        .accessibilityLabel("Source \(index): \(citation.title.isEmpty ? domain : citation.title)")
+        .accessibilityIdentifier("citation.card.\(index)")
     }
 }

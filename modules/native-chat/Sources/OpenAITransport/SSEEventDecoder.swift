@@ -1,6 +1,6 @@
 import ChatDomain
 import Foundation
-import OSLog
+import os
 
 /// The result of processing an SSE frame, indicating whether the stream should continue.
 public enum SSEEventTerminalResult {
@@ -13,6 +13,8 @@ public enum SSEEventTerminalResult {
     /// A terminal error event was received.
     case terminalError
 }
+
+private let sseDecoderSignposter = OSSignposter(subsystem: "GlassGPT", category: "streaming")
 
 /// Stateful decoder that processes SSE frames, accumulates content, and emits ``StreamEvent`` values.
 ///
@@ -48,6 +50,10 @@ public struct SSEEventDecoder {
         frame: SSEFrame,
         continuation: AsyncStream<StreamEvent>.Continuation
     ) -> SSEEventTerminalResult {
+        let signpostID = sseDecoderSignposter.makeSignpostID()
+        let signpostState = sseDecoderSignposter.beginInterval("DecodeSSEFrame", id: signpostID)
+        defer { sseDecoderSignposter.endInterval("DecodeSSEFrame", signpostState) }
+
         guard let jsonData = frame.data.data(using: .utf8) else {
             return .continued
         }
