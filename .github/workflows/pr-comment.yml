@@ -15,6 +15,9 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event.workflow_run.event == 'pull_request' && github.event.workflow_run.conclusion == 'success'
     steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
       - name: Locate coverage artifact
         id: coverage-artifact
         uses: actions/github-script@v8
@@ -33,16 +36,17 @@ jobs:
 
             const coverageArtifact = artifacts.find(artifact => artifact.name === 'coverage-report');
             core.setOutput('present', coverageArtifact ? 'true' : 'false');
+            core.setOutput('artifact-id', coverageArtifact ? String(coverageArtifact.id) : '');
 
       - name: Download coverage artifact
         if: steps.coverage-artifact.outputs.pr-number != '' && steps.coverage-artifact.outputs.present == 'true'
-        uses: actions/download-artifact@v6
-        with:
-          name: coverage-report
-          path: .local/build/ci
-          repository: ${{ github.repository }}
-          run-id: ${{ github.event.workflow_run.id }}
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          python3 ./scripts/download_run_artifacts.py \
+            --repo "${{ github.repository }}" \
+            --dest .local/build/ci \
+            --artifact-id "${{ steps.coverage-artifact.outputs.artifact-id }}"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Post coverage delta
         if: steps.coverage-artifact.outputs.pr-number != ''

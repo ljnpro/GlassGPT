@@ -157,6 +157,8 @@ jobs:
     name: UI Test Build
     runs-on: macos-26
     needs: build
+    outputs:
+      ui_test_artifact_id: ${{ steps.upload-ui-test-bundle.outputs.artifact-id }}
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -187,6 +189,7 @@ jobs:
         run: ./scripts/ci.sh ui-build-for-testing
 
       - name: Upload UI test bundle
+        id: upload-ui-test-bundle
         uses: actions/upload-artifact@v6
         with:
           name: ui-test-products
@@ -227,10 +230,13 @@ jobs:
           swift --version
 
       - name: Download UI test bundle
-        uses: actions/download-artifact@v6
-        with:
-          name: ui-test-products
-          path: .local/build/ci/DerivedData/Build/Products
+        run: |
+          python3 ./scripts/download_run_artifacts.py \
+            --repo "${{ github.repository }}" \
+            --dest .local/build/ci/DerivedData/Build/Products \
+            --artifact-id "${{ needs.ui-test-build.outputs.ui_test_artifact_id }}"
+        env:
+          GH_TOKEN: ${{ github.token }}
 
       - name: Run UI tests
         run: ./scripts/ci.sh ui-tests
@@ -270,11 +276,15 @@ jobs:
           swift --version
 
       - name: Download test result artifacts
-        uses: actions/download-artifact@v6
-        with:
-          pattern: test-results-*
-          path: .local/build/ci
-          merge-multiple: true
+        run: |
+          python3 ./scripts/download_run_artifacts.py \
+            --repo "${{ github.repository }}" \
+            --run-id "${{ github.run_id }}" \
+            --pattern 'test-results-*' \
+            --dest .local/build/ci \
+            --merge-multiple
+        env:
+          GH_TOKEN: ${{ github.token }}
 
       - name: Generate coverage report
         run: ./scripts/ci.sh coverage-report
@@ -351,7 +361,7 @@ jobs:
   release-readiness:
     name: Release Readiness
     runs-on: macos-26
-    needs: [coverage, quality]
+    needs: [coverage, quality, ui-test-build]
     if: github.ref == 'refs/heads/codex/stable-4.9' || github.ref == 'refs/heads/main'
     steps:
       - name: Checkout
@@ -372,10 +382,13 @@ jobs:
           swift --version
 
       - name: Download UI test bundle
-        uses: actions/download-artifact@v6
-        with:
-          name: ui-test-products
-          path: .local/build/ci/DerivedData/Build/Products
+        run: |
+          python3 ./scripts/download_run_artifacts.py \
+            --repo "${{ github.repository }}" \
+            --dest .local/build/ci/DerivedData/Build/Products \
+            --artifact-id "${{ needs.ui-test-build.outputs.ui_test_artifact_id }}"
+        env:
+          GH_TOKEN: ${{ github.token }}
 
       - name: Release Readiness Gate
         run: ./scripts/ci.sh release-readiness
