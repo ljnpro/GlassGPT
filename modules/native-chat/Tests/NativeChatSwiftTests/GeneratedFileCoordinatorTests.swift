@@ -1,12 +1,13 @@
+import Foundation
+import Testing
 import ChatDomain
 import ChatPersistenceSwiftData
 import GeneratedFilesCore
 import GeneratedFilesInfra
-import XCTest
 @testable import NativeChatComposition
 
-final class GeneratedFileCoordinatorTests: XCTestCase {
-    func testRequestedFilenamePrefersAnnotationThenSandboxPath() {
+struct GeneratedFileCoordinatorTests {
+    @Test func requestedFilenamePrefersAnnotationThenSandboxPath() {
         let coordinator = GeneratedFileCoordinator()
         let annotation = FilePathAnnotation(
             fileId: "file_chart",
@@ -17,23 +18,23 @@ final class GeneratedFileCoordinatorTests: XCTestCase {
             endIndex: 5
         )
 
-        XCTAssertEqual(
+        #expect(
             coordinator.requestedFilename(
                 for: "sandbox:/mnt/data/fallback.png",
                 annotation: annotation
-            ),
+            ) ==
             "chart.png"
         )
-        XCTAssertEqual(
+        #expect(
             coordinator.requestedFilename(
                 for: "sandbox:/mnt/data/fallback.png",
                 annotation: nil
-            ),
+            ) ==
             "fallback.png"
         )
     }
 
-    func testFindMatchingFilePathAnnotationPrefersFallbackFileIDAndExactPath() {
+    @Test func findMatchingFilePathAnnotationPrefersFallbackFileIDAndExactPath() {
         let coordinator = GeneratedFileCoordinator()
         let primary = FilePathAnnotation(
             fileId: "file_primary",
@@ -52,7 +53,7 @@ final class GeneratedFileCoordinatorTests: XCTestCase {
             endIndex: 24
         )
 
-        XCTAssertEqual(
+        #expect(
             coordinator.findMatchingFilePathAnnotation(
                 in: [primary, fallback],
                 sandboxURL: "sandbox:/mnt/data/unknown",
@@ -64,21 +65,21 @@ final class GeneratedFileCoordinatorTests: XCTestCase {
                     startIndex: 0,
                     endIndex: 0
                 )
-            )?.fileId,
+            )?.fileId ==
             "file_secondary"
         )
 
-        XCTAssertEqual(
+        #expect(
             coordinator.findMatchingFilePathAnnotation(
                 in: [primary, fallback],
                 sandboxURL: "sandbox:/mnt/data/primary.png",
                 fallback: nil
-            )?.fileId,
+            )?.fileId ==
             "file_primary"
         )
     }
 
-    func testPresentationBuildsImagePreviewWithoutChangingNames() {
+    @Test func presentationBuildsImagePreviewWithoutChangingNames() {
         let coordinator = GeneratedFileCoordinator()
         let resource = GeneratedFileLocalResource(
             localURL: URL(fileURLWithPath: "/tmp/chart.png"),
@@ -89,29 +90,29 @@ final class GeneratedFileCoordinatorTests: XCTestCase {
 
         switch coordinator.presentation(for: resource, suggestedFilename: "ignored.png") {
         case .preview(let item):
-            XCTAssertEqual(item.kind.rawValue, FilePreviewKind.generatedImage.rawValue)
-            XCTAssertEqual(item.displayName, "chart")
-            XCTAssertEqual(item.viewerFilename, "chart.png")
+            #expect(item.kind.rawValue == FilePreviewKind.generatedImage.rawValue)
+            #expect(item.displayName == "chart")
+            #expect(item.viewerFilename == "chart.png")
         default:
-            XCTFail("Expected image resource to open in preview")
+            Issue.record("Expected image resource to open in preview")
         }
     }
 
-    func testUserFacingDownloadErrorPreservesExistingMessages() {
+    @Test func userFacingDownloadErrorPreservesExistingMessages() {
         let coordinator = GeneratedFileCoordinator()
 
-        XCTAssertEqual(
+        #expect(
             coordinator.userFacingDownloadError(
                 FileDownloadError.invalidPDFData,
                 openBehavior: .pdfPreview
-            ),
+            ) ==
             "This generated PDF could not be rendered."
         )
-        XCTAssertEqual(
+        #expect(
             coordinator.userFacingDownloadError(
                 FileDownloadError.httpError(410, "expired"),
                 openBehavior: .directShare
-            ),
+            ) ==
             "This generated file has expired and can no longer be downloaded. Please regenerate it."
         )
     }

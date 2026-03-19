@@ -34,7 +34,7 @@ package struct FileSearchIndicator: View {
                 darkBorderOpacity: 0.14,
                 lightBorderOpacity: 0.08
             )
-            .accessibilityLabel("Reading documents")
+            .accessibilityLabel(String(localized: "Reading documents"))
             .accessibilityIdentifier("indicator.fileSearch")
             .transition(.opacity.combined(with: .scale(scale: 0.95)))
             .onAppear {

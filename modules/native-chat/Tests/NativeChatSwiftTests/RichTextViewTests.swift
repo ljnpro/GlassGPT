@@ -1,11 +1,12 @@
+import Foundation
+import Testing
 import ChatDomain
 import NativeChatUI
-import XCTest
 @testable import NativeChatComposition
 
 @MainActor
-final class RichTextViewTests: XCTestCase {
-    func testFindFilePathAnnotationPrefersExactSandboxMatch() {
+struct RichTextViewTests {
+    @Test func findFilePathAnnotationPrefersExactSandboxMatch() {
         let exact = makeAnnotation(
             fileId: "file-exact",
             sandboxPath: "sandbox:/mnt/data/chart.png",
@@ -18,13 +19,13 @@ final class RichTextViewTests: XCTestCase {
         )
         let view = RichTextView(segments: [], filePathAnnotations: [filenameOnly, exact])
 
-        XCTAssertEqual(
-            view.findFilePathAnnotation(for: "sandbox:/mnt/data/chart.png"),
+        #expect(
+            view.findFilePathAnnotation(for: "sandbox:/mnt/data/chart.png") ==
             exact
         )
     }
 
-    func testFindFilePathAnnotationFallsBackToFilenameMatch() {
+    @Test func findFilePathAnnotationFallsBackToFilenameMatch() {
         let report = makeAnnotation(
             fileId: "file-report",
             sandboxPath: "/private/var/mobile/report.csv",
@@ -37,13 +38,13 @@ final class RichTextViewTests: XCTestCase {
         )
         let view = RichTextView(segments: [], filePathAnnotations: [other, report])
 
-        XCTAssertEqual(
-            view.findFilePathAnnotation(for: "sandbox:/mnt/data/report.csv"),
+        #expect(
+            view.findFilePathAnnotation(for: "sandbox:/mnt/data/report.csv") ==
             report
         )
     }
 
-    func testFindFilePathAnnotationReturnsOnlyAnnotationAsLastResort() {
+    @Test func findFilePathAnnotationReturnsOnlyAnnotationAsLastResort() {
         let only = makeAnnotation(
             fileId: "file-only",
             sandboxPath: "/private/var/mobile/output.json",
@@ -51,13 +52,13 @@ final class RichTextViewTests: XCTestCase {
         )
         let view = RichTextView(segments: [], filePathAnnotations: [only])
 
-        XCTAssertEqual(
-            view.findFilePathAnnotation(for: "sandbox:/mnt/data/unrelated-name.txt"),
+        #expect(
+            view.findFilePathAnnotation(for: "sandbox:/mnt/data/unrelated-name.txt") ==
             only
         )
     }
 
-    func testFindFilePathAnnotationReturnsNilWhenNoUniqueMatchExists() {
+    @Test func findFilePathAnnotationReturnsNilWhenNoUniqueMatchExists() {
         let first = makeAnnotation(
             fileId: "file-one",
             sandboxPath: "/tmp/one.txt",
@@ -70,14 +71,14 @@ final class RichTextViewTests: XCTestCase {
         )
         let view = RichTextView(segments: [], filePathAnnotations: [first, second])
 
-        XCTAssertNil(view.findFilePathAnnotation(for: "sandbox:/mnt/data/unknown.txt"))
+        #expect(view.findFilePathAnnotation(for: "sandbox:/mnt/data/unknown.txt") == nil)
     }
 
-    func testLatexToUnicodeConvertsRepresentativeMathCommands() {
+    @Test func latexToUnicodeConvertsRepresentativeMathCommands() {
         let view = RichTextView(segments: [])
 
-        XCTAssertEqual(
-            view.latexToUnicode(#"\frac{\alpha_2^n}{x} + \text{speed} + \vec{v} \rightarrow \infty"#),
+        #expect(
+            view.latexToUnicode(#"\frac{\alpha_2^n}{x} + \text{speed} + \vec{v} \rightarrow \infty"#) ==
             "α₂ⁿ/x + speed + v⃗ → ∞"
         )
     }

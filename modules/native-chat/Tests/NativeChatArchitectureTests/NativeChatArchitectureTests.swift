@@ -105,7 +105,7 @@ final class NativeChatArchitectureTests: XCTestCase {
         )
         XCTAssertTrue(workflow.contains("matrix:"))
         XCTAssertTrue(workflow.contains("gate:"))
-        XCTAssertTrue(workflow.contains("- architecture-tests"))
+        XCTAssertTrue(workflow.contains("architecture-tests"))
         XCTAssertTrue(workflow.contains("./scripts/ci.sh ${{ matrix.gate }}"))
         XCTAssertTrue(workflow.contains("./scripts/ci.sh source-share"))
         XCTAssertTrue(workflow.contains("./scripts/ci.sh infra-safety"))

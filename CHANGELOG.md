@@ -5,6 +5,40 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.8.2] - 2026-03-19
+
+### Added
+
+- Swift Testing migration: 18 test files migrated from XCTest to Swift Testing framework (Phase A)
+- Parameterized tests with @Test(arguments:) for model types, reasoning efforts, service tiers, message roles, and error descriptions (Phase A)
+- Test tags for networking, persistence, runtime, parsing, and presentation (Phase A)
+- Performance benchmarks: 6 measure blocks for SSE decoding, markdown parsing, rich text building, JSON decoding, text sanitization, and frame buffer throughput (Phase D)
+- Performance regression detection script with 15% threshold (Phase D)
+- Fuzz testing: 1,000 random byte sequences against SSE decoder (Phase E)
+- Property-based testing: JSON round-trip encode/decode verification (Phase E)
+- Concurrency stress tests: TaskGroup-based tests for ReplySessionActor, RuntimeRegistryActor, and SettingsStore (Phase E)
+- CI dual progress bar with non-TTY fallback for GitHub Actions (Phase I)
+- UI test sharding across 3 parallel matrix jobs (Phase I)
+- PR comment bot for coverage delta reporting (Phase I)
+- Stale .xctestrun bundle recovery in CI pipeline (Phase I)
+- Simulator transient failure recovery with CoreSimulator service restart (Phase I)
+- Artifact retention policy: 14-day result bundles, 30-day coverage reports (Phase I)
+- SwiftFormat hard gate in CI (Phase I)
+- Public API documentation completeness gate (Phase I)
+- Localizable.xcstrings String Catalog with 38 strings (Phase K)
+- Chinese (Simplified / zh-Hans) translations for all UI strings (Phase K)
+- Plural rules for countable items (Phase K)
+- String(localized:) wrappers for 25+ UI strings (Phase K)
+- Localization CI gate with check_localization.py (Phase K)
+- ADR-009: Phase G module decomposition evaluation documenting evidence-based decision to retain current architecture (Phase G)
+
+### Changed
+
+- Version bumped to 4.8.2 (build 20182)
+- NativeChatSwiftTests test target added to Package.swift
+- Migrated test files deleted from NativeChatTests/
+- CI gates expanded from 17 to 22 (performance-tests, localization-check, swiftformat-check, plus stability gates)
+
 ## [4.8.1] - 2026-03-19
 
 ### Added

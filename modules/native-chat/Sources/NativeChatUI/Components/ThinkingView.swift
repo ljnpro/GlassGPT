@@ -29,7 +29,7 @@ package struct ThinkingIndicator: View {
             darkBorderOpacity: 0.14,
             lightBorderOpacity: 0.08
         )
-        .accessibilityLabel("Reasoning in progress")
+        .accessibilityLabel(String(localized: "Reasoning in progress"))
         .accessibilityIdentifier("indicator.thinking")
     }
 }
@@ -93,7 +93,7 @@ package struct ThinkingView: View {
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
             .contentShape(Rectangle())
-            .accessibilityLabel(isLive ? "Reasoning in progress" : "Reasoning completed")
+            .accessibilityLabel(isLive ? String(localized: "Reasoning in progress") : String(localized: "Reasoning completed"))
             .accessibilityHint(isExpanded ? "Double-tap to collapse" : "Double-tap to expand")
             .accessibilityIdentifier("thinking.header")
             .accessibilityAddTraits(.isButton)
@@ -196,7 +196,7 @@ package struct TypingIndicator: View {
             }
         }
         .padding(8)
-        .accessibilityLabel("Waiting for response")
+        .accessibilityLabel(String(localized: "Waiting for response"))
         .accessibilityIdentifier("indicator.typing")
         .onAppear { animating = true }
     }

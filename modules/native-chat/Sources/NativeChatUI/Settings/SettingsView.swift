@@ -31,19 +31,19 @@ public struct SettingsView: View {
     private var cloudflareStatusText: String {
         switch viewModel.cloudflareHealthStatus {
         case .connected:
-            return "Connected"
+            return String(localized: "Connected")
         case .checking:
-            return "Checking connection…"
+            return String(localized: "Checking connection…")
         case .gatewayUnavailable:
-            return "Gateway unavailable in this build"
+            return String(localized: "Gateway unavailable in this build")
         case .missingAPIKey:
-            return "No API key configured"
+            return String(localized: "No API key configured")
         case .invalidGatewayURL:
-            return "Invalid gateway URL"
+            return String(localized: "Invalid gateway URL")
         case .remoteError(let message):
             return message
         case .unknown:
-            return "Not checked"
+            return String(localized: "Not checked")
         }
     }
 

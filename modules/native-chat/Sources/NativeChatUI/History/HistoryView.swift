@@ -55,7 +55,7 @@ public struct HistoryView: View {
                                 )
                         }
                         .buttonStyle(GlassPressButtonStyle())
-                        .accessibilityLabel("Delete all conversations")
+                        .accessibilityLabel(String(localized: "Delete all conversations"))
                         .accessibilityIdentifier("history.deleteAll")
                     }
                 }

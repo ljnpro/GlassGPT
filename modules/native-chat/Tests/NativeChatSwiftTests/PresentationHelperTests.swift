@@ -1,16 +1,17 @@
+import Foundation
+import Testing
 import SwiftUI
 import ChatDomain
 import ChatPersistenceSwiftData
 import GeneratedFilesCore
 import PDFKit
 import UIKit
-import XCTest
 @testable import NativeChatComposition
 @testable import NativeChatUI
 
 @MainActor
-final class PresentationHelperTests: XCTestCase {
-    func testMessageBubblePrefersLiveAssistantOverrides() {
+struct PresentationHelperTests {
+    @Test func messageBubblePrefersLiveAssistantOverrides() {
         let message = Message(
             role: .assistant,
             content: "Stored content",
@@ -48,15 +49,15 @@ final class PresentationHelperTests: XCTestCase {
             showsRecoveryIndicator: true
         )
 
-        XCTAssertEqual(bubble.displayedContent, "Live content")
-        XCTAssertEqual(bubble.displayedThinking, "Live thinking")
-        XCTAssertEqual(bubble.displayedToolCalls, [liveToolCall])
-        XCTAssertEqual(bubble.displayedCitations, [liveCitation])
-        XCTAssertEqual(bubble.displayedFilePathAnnotations, [liveFileAnnotation])
-        XCTAssertTrue(bubble.isDisplayingLiveAssistantState)
+        #expect(bubble.displayedContent == "Live content")
+        #expect(bubble.displayedThinking == "Live thinking")
+        #expect(bubble.displayedToolCalls == [liveToolCall])
+        #expect(bubble.displayedCitations == [liveCitation])
+        #expect(bubble.displayedFilePathAnnotations == [liveFileAnnotation])
+        #expect(bubble.isDisplayingLiveAssistantState)
     }
 
-    func testMessageBubbleIgnoresLiveStateForUserMessages() {
+    @Test func messageBubbleIgnoresLiveStateForUserMessages() {
         let message = Message(role: .user, content: "Prompt")
         let bubble = MessageBubble(
             message: message,
@@ -67,11 +68,11 @@ final class PresentationHelperTests: XCTestCase {
             showsRecoveryIndicator: true
         )
 
-        XCTAssertFalse(bubble.isDisplayingLiveAssistantState)
-        XCTAssertEqual(bubble.displayedContent, "Ignored live content")
+        #expect(!bubble.isDisplayingLiveAssistantState)
+        #expect(bubble.displayedContent == "Ignored live content")
     }
 
-    func testModelSelectorMetricsAndShortLabelsStayStableAcrossIdioms() {
+    @Test func modelSelectorMetricsAndShortLabelsStayStableAcrossIdioms() {
         let padMetrics = ModelSelectorSheet.Metrics(idiom: .pad)
         let phoneMetrics = ModelSelectorSheet.Metrics(idiom: .phone)
         let sheet = ModelSelectorSheet(
@@ -82,16 +83,16 @@ final class PresentationHelperTests: XCTestCase {
             onDone: {}
         )
 
-        XCTAssertEqual(padMetrics.sheetMaxWidth, 620)
-        XCTAssertEqual(padMetrics.reasoningColumnWidth, 280)
-        XCTAssertNil(phoneMetrics.sheetMaxWidth)
-        XCTAssertNil(phoneMetrics.reasoningColumnWidth)
-        XCTAssertEqual(sheet.effortShortLabel(.none), "Off")
-        XCTAssertEqual(sheet.effortShortLabel(.medium), "Med")
-        XCTAssertEqual(sheet.effortShortLabel(.xhigh), "Max")
+        #expect(padMetrics.sheetMaxWidth == 620)
+        #expect(padMetrics.reasoningColumnWidth == 280)
+        #expect(phoneMetrics.sheetMaxWidth == nil)
+        #expect(phoneMetrics.reasoningColumnWidth == nil)
+        #expect(sheet.effortShortLabel(.none) == "Off")
+        #expect(sheet.effortShortLabel(.medium) == "Med")
+        #expect(sheet.effortShortLabel(.xhigh) == "Max")
     }
 
-    func testStreamingTextSanitiserReplacesLatexDelimitersWithoutTouchingPlainText() {
+    @Test func streamingTextSanitiserReplacesLatexDelimitersWithoutTouchingPlainText() {
         let text = """
         Intro $$x^2$$ and \\(y\\) then \\[z\\]
         ```swift
@@ -101,20 +102,20 @@ final class PresentationHelperTests: XCTestCase {
 
         let sanitised = StreamingTextView.sanitiseText(text)
 
-        XCTAssertTrue(sanitised.contains("[math]"))
-        XCTAssertFalse(sanitised.contains("\\("))
-        XCTAssertFalse(sanitised.contains("\\["))
-        XCTAssertTrue(sanitised.contains("```swift"))
-        XCTAssertTrue(sanitised.contains("print(1)"))
+        #expect(sanitised.contains("[math]"))
+        #expect(!sanitised.contains("\\("))
+        #expect(!sanitised.contains("\\["))
+        #expect(sanitised.contains("```swift"))
+        #expect(sanitised.contains("print(1)"))
     }
 
-    func testAppThemeColorSchemeMappingMatchesStoredTheme() {
-        XCTAssertNil(AppTheme.system.colorScheme)
-        XCTAssertEqual(AppTheme.light.colorScheme, .light)
-        XCTAssertEqual(AppTheme.dark.colorScheme, .dark)
+    @Test func appThemeColorSchemeMappingMatchesStoredTheme() {
+        #expect(AppTheme.system.colorScheme == nil)
+        #expect(AppTheme.light.colorScheme == .light)
+        #expect(AppTheme.dark.colorScheme == .dark)
     }
 
-    func testFilePreviewSheetComputesStableViewerMetrics() throws {
+    @Test func filePreviewSheetComputesStableViewerMetrics() throws {
         let sheet = FilePreviewSheet(
             previewItem: FilePreviewItem(
                 url: try makeSnapshotImageFile(),
@@ -124,24 +125,24 @@ final class PresentationHelperTests: XCTestCase {
             )
         )
 
-        XCTAssertEqual(sheet.fileURL.lastPathComponent, "snapshot-preview-image.png")
-        XCTAssertFalse(sheet.isPad)
-        XCTAssertGreaterThan(sheet.circularButtonDiameter, 0)
-        XCTAssertGreaterThan(sheet.closeIconSize, 0)
-        XCTAssertGreaterThan(sheet.actionIconSize, 0)
+        #expect(sheet.fileURL.lastPathComponent == "snapshot-preview-image.png")
+        #expect(!sheet.isPad)
+        #expect(sheet.circularButtonDiameter > 0)
+        #expect(sheet.closeIconSize > 0)
+        #expect(sheet.actionIconSize > 0)
     }
 
-    func testLoadGeneratedImagePreviewReturnsUnavailableForMissingFile() {
+    @Test func loadGeneratedImagePreviewReturnsUnavailableForMissingFile() {
         let missingURL = URL(fileURLWithPath: "/tmp/missing-generated-image.png")
         switch FilePreviewLoadingModel.loadGeneratedImagePreview(from: missingURL) {
         case .unavailable:
-            XCTAssertTrue(true)
+            #expect(true)
         default:
-            XCTFail("Expected unavailable image preview")
+            Issue.record("Expected unavailable image preview")
         }
     }
 
-    func testLoadGeneratedImagePreviewRejectsNonImageFilename() throws {
+    @Test func loadGeneratedImagePreviewRejectsNonImageFilename() throws {
         let url = try makeSnapshotPDFFile()
         let renamed = url.deletingPathExtension().appendingPathExtension("txt")
         try? FileManager.default.removeItem(at: renamed)
@@ -149,53 +150,53 @@ final class PresentationHelperTests: XCTestCase {
 
         switch FilePreviewLoadingModel.loadGeneratedImagePreview(from: renamed) {
         case .error(let message):
-            XCTAssertEqual(message, "This file is no longer recognized as an image.")
+            #expect(message == "This file is no longer recognized as an image.")
         default:
-            XCTFail("Expected image filename validation failure")
+            Issue.record("Expected image filename validation failure")
         }
     }
 
-    func testLoadGeneratedImagePreviewLoadsValidImage() throws {
+    @Test func loadGeneratedImagePreviewLoadsValidImage() throws {
         let url = try makeSnapshotImageFile()
 
         switch FilePreviewLoadingModel.loadGeneratedImagePreview(from: url) {
         case .image(let payload):
-            XCTAssertFalse(payload.data.isEmpty)
+            #expect(!payload.data.isEmpty)
         default:
-            XCTFail("Expected valid generated image preview")
+            Issue.record("Expected valid generated image preview")
         }
     }
 
-    func testLoadGeneratedPDFPreviewReturnsUnavailableForMissingFile() {
+    @Test func loadGeneratedPDFPreviewReturnsUnavailableForMissingFile() {
         let missingURL = URL(fileURLWithPath: "/tmp/missing-generated-document.pdf")
         switch FilePreviewLoadingModel.loadGeneratedPDFPreview(from: missingURL) {
         case .unavailable:
-            XCTAssertTrue(true)
+            #expect(true)
         default:
-            XCTFail("Expected unavailable PDF preview")
+            Issue.record("Expected unavailable PDF preview")
         }
     }
 
-    func testLoadGeneratedPDFPreviewRejectsNonPDFFilename() throws {
+    @Test func loadGeneratedPDFPreviewRejectsNonPDFFilename() throws {
         let url = try makeSnapshotImageFile()
         let renamed = url.deletingPathExtension().appendingPathExtension("png")
 
         switch FilePreviewLoadingModel.loadGeneratedPDFPreview(from: renamed) {
         case .error(let message):
-            XCTAssertEqual(message, "This file is no longer recognized as a PDF.")
+            #expect(message == "This file is no longer recognized as a PDF.")
         default:
-            XCTFail("Expected PDF filename validation failure")
+            Issue.record("Expected PDF filename validation failure")
         }
     }
 
-    func testLoadGeneratedPDFPreviewLoadsValidPDF() throws {
+    @Test func loadGeneratedPDFPreviewLoadsValidPDF() throws {
         let url = try makeSnapshotPDFFile()
 
         switch FilePreviewLoadingModel.loadGeneratedPDFPreview(from: url) {
         case .document(let document):
-            XCTAssertGreaterThan(document.pageCount, 0)
+            #expect(document.pageCount > 0)
         default:
-            XCTFail("Expected valid generated PDF preview")
+            Issue.record("Expected valid generated PDF preview")
         }
     }
 }
