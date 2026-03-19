@@ -110,7 +110,7 @@ jobs:
 
       - name: Upload test results
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: test-results-${{ matrix.gate }}${{ matrix.ui-tests-shard && format('-shard-{0}', matrix.ui-tests-shard) || '' }}
           path: .local/build/ci/*.xcresult
@@ -150,7 +150,7 @@ jobs:
 
       - name: Upload quality reports
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: quality-reports
           path: |
