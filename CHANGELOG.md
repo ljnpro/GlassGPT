@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.9.1] - 2026-03-20
+
+### Added
+
+- Dedicated runtime evaluator tests that lock the `Outcome -> Action` behavior for stream terminal, recovery fetch, recovery stream, and recovery poll decisions
+
+### Changed
+
+- `StreamTerminalEvaluator` now accepts a single `StreamTerminalOutcome`, completing the pure-function evaluator contract across all four runtime evaluators
+- Production `swiftlint:disable` maintainability budget is now ratcheted to `0`, matching the cleaned source tree instead of preserving a stale allowance
+- Runtime evaluator docs now explicitly describe the pure-function contract so future refactors do not drift back toward service-coupled decision logic
+
 ## [4.9.0] - 2026-03-19
 
 ### Added

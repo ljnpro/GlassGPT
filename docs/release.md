@@ -13,7 +13,7 @@
 ## Tracked Release Command
 
 ```bash
-./scripts/release_testflight.sh 4.9.0 20183 --branch codex/stable-4.9
+./scripts/release_testflight.sh 4.9.1 20184 --branch codex/stable-4.9
 ```
 
 The wrapper always runs `release-readiness`, the full `./scripts/ci.sh` suite,
@@ -25,10 +25,10 @@ creation. There are no CI bypass flags on the tracked path.
 1. `./scripts/ci.sh`
 2. `./scripts/score_4_8_1.sh`
 3. `./scripts/score_4_8_2.sh`
-4. any release-specific `4.9.0` scoring or verification scripts
+4. any release-specific `4.9.1` scoring or verification scripts
 5. manual parity checklist from `docs/parity-baseline.md`
 6. clean worktree on `codex/stable-4.9`
-7. version/build match the intended `4.9.0 (20183 or next available)` candidate
+7. version/build match the intended `4.9.1 (20184 or next available)` candidate
 8. Phase G has been re-evaluated and the ADR updated before release
 9. workflow triggers and readiness docs all reference `codex/stable-4.9`
 
