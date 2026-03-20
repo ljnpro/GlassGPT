@@ -1,7 +1,3 @@
-// PURE FUNCTION CONTRACT: This evaluator must remain a pure Outcome → Action
-// mapper. It may import OpenAITransport for DTO types (OpenAIResponseFetchResult)
-// but must NEVER hold a transport client, perform I/O, or read global state.
-
 import ChatRuntimeModel
 import Foundation
 import OpenAITransport
@@ -20,14 +16,14 @@ public struct PollAttemptOutcome: Sendable {
     /// Creates a successful poll attempt outcome.
     public init(result: OpenAIResponseFetchResult, attempt: Int, maxAttempts: Int) {
         self.result = result
-        self.error = nil
+        error = nil
         self.attempt = attempt
         self.maxAttempts = maxAttempts
     }
 
     /// Creates a failed poll attempt outcome.
     public init(error: any Error, attempt: Int, maxAttempts: Int) {
-        self.result = nil
+        result = nil
         self.error = error
         self.attempt = attempt
         self.maxAttempts = maxAttempts
@@ -57,19 +53,25 @@ public enum RecoveryPollEvaluator {
     public static func evaluate(_ outcome: PollAttemptOutcome) -> PollStepAction {
         // Error path
         if outcome.error != nil {
-            let delay: UInt64 = outcome.attempt < 10 ? 2_000_000_000 : 3_000_000_000
-            return .continuePolling(delayNanoseconds: delay)
+            guard outcome.attempt < outcome.maxAttempts else {
+                return exhaustedPollingAction(for: outcome)
+            }
+            return .continuePolling(delayNanoseconds: pollDelay(for: outcome.attempt))
         }
 
         guard let result = outcome.result else {
-            let delay: UInt64 = outcome.attempt < 10 ? 2_000_000_000 : 3_000_000_000
-            return .continuePolling(delayNanoseconds: delay)
+            guard outcome.attempt < outcome.maxAttempts else {
+                return exhaustedPollingAction(for: outcome)
+            }
+            return .continuePolling(delayNanoseconds: pollDelay(for: outcome.attempt))
         }
 
         switch result.status {
         case .queued, .inProgress:
-            let delay: UInt64 = outcome.attempt < 10 ? 2_000_000_000 : 3_000_000_000
-            return .continuePolling(delayNanoseconds: delay)
+            guard outcome.attempt < outcome.maxAttempts else {
+                return exhaustedPollingAction(for: outcome)
+            }
+            return .continuePolling(delayNanoseconds: pollDelay(for: outcome.attempt))
 
         case .completed:
             return .terminal(result: result, errorMessage: nil)
@@ -80,5 +82,25 @@ public enum RecoveryPollEvaluator {
                 errorMessage: result.errorMessage ?? "Response did not complete."
             )
         }
+    }
+
+    private static func pollDelay(for attempt: Int) -> UInt64 {
+        attempt < 10 ? 2_000_000_000 : 3_000_000_000
+    }
+
+    private static func exhaustedPollingAction(for outcome: PollAttemptOutcome) -> PollStepAction {
+        let errorMessage = outcome.result?.errorMessage
+            ?? outcome.error?.localizedDescription
+            ?? "Recovery polling exceeded maximum attempts."
+        let result = outcome.result ?? OpenAIResponseFetchResult(
+            status: outcome.error == nil ? .unknown : .failed,
+            text: "",
+            thinking: nil,
+            annotations: [],
+            toolCalls: [],
+            filePathAnnotations: [],
+            errorMessage: errorMessage
+        )
+        return .terminal(result: result, errorMessage: errorMessage)
     }
 }
