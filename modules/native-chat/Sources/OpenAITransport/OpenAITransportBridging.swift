@@ -2,9 +2,9 @@ import AITransportContracts
 import ChatDomain
 
 /// Bridges ``OpenAIServiceError`` to the provider-agnostic ``AIServiceError``.
-extension OpenAIServiceError {
+public extension OpenAIServiceError {
     /// Converts this OpenAI-specific error to a provider-agnostic error.
-    public var asAIServiceError: AIServiceError {
+    var asAIServiceError: AIServiceError {
         switch self {
         case .noAPIKey:
             .noCredentials
@@ -21,9 +21,9 @@ extension OpenAIServiceError {
 }
 
 /// Bridges ``StreamEvent`` to the provider-agnostic ``AIStreamEvent``.
-extension StreamEvent {
+public extension StreamEvent {
     /// Converts this OpenAI-specific stream event to a provider-agnostic event.
-    public var asAIStreamEvent: AIStreamEvent {
+    var asAIStreamEvent: AIStreamEvent {
         switch self {
         case let .textDelta(text):
             .textDelta(text)
@@ -76,9 +76,9 @@ extension StreamEvent {
 }
 
 /// Bridges ``OpenAIResponseFetchResult`` to the provider-agnostic ``AIResponseFetchResult``.
-extension OpenAIResponseFetchResult {
+public extension OpenAIResponseFetchResult {
     /// Converts this OpenAI-specific fetch result to a provider-agnostic result.
-    public var asAIResponseFetchResult: AIResponseFetchResult {
+    var asAIResponseFetchResult: AIResponseFetchResult {
         AIResponseFetchResult(
             status: status.asAIStatus,
             text: text,
@@ -92,9 +92,9 @@ extension OpenAIResponseFetchResult {
 }
 
 /// Bridges ``OpenAIResponseFetchResult.Status`` to ``AIResponseFetchResult.Status``.
-extension OpenAIResponseFetchResult.Status {
+public extension OpenAIResponseFetchResult.Status {
     /// Converts this OpenAI-specific status to a provider-agnostic status.
-    public var asAIStatus: AIResponseFetchResult.Status {
+    var asAIStatus: AIResponseFetchResult.Status {
         switch self {
         case .queued: .queued
         case .inProgress: .inProgress

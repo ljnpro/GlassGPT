@@ -2,8 +2,8 @@ import Foundation
 
 /// Describes the parameters needed to construct an API request.
 public struct OpenAIRequestDescriptor: Sendable {
-    /// The API path relative to the base URL (e.g. "/responses").
-    public let path: String
+    /// The API path relative to the base URL, expressed as raw path segments.
+    public let pathSegments: [String]
     /// The HTTP method (e.g. "GET", "POST").
     public let method: String
     /// The Accept header value.
@@ -27,7 +27,28 @@ public struct OpenAIRequestDescriptor: Sendable {
         includeCloudflareAuthorization: Bool? = nil,
         contentType: String? = nil
     ) {
-        self.path = path
+        pathSegments = path
+            .split(separator: "/")
+            .map(String.init)
+        self.method = method
+        self.accept = accept
+        self.timeoutInterval = timeoutInterval
+        self.queryItems = queryItems
+        self.includeCloudflareAuthorization = includeCloudflareAuthorization
+        self.contentType = contentType
+    }
+
+    /// Creates a new request descriptor from raw path segments.
+    public init(
+        pathSegments: [String],
+        method: String,
+        accept: String = "application/json",
+        timeoutInterval: TimeInterval = 60,
+        queryItems: [URLQueryItem] = [],
+        includeCloudflareAuthorization: Bool? = nil,
+        contentType: String? = nil
+    ) {
+        self.pathSegments = pathSegments
         self.method = method
         self.accept = accept
         self.timeoutInterval = timeoutInterval
@@ -101,7 +122,7 @@ public struct OpenAIRequestFactory {
 
         return try url(
             for: OpenAIRequestDescriptor(
-                path: "/responses/\(responseID)",
+                pathSegments: ["responses", responseID],
                 method: "GET",
                 queryItems: queryItems
             ),
@@ -156,15 +177,11 @@ public struct OpenAIRequestFactory {
         useDirectBaseURL: Bool = false
     ) throws(OpenAIServiceError) -> URL {
         let endpoint = configuration.resolvedEndpoint(useDirectBaseURL: useDirectBaseURL)
-        guard var components = URLComponents(string: endpoint.baseURL) else {
-            throw OpenAIServiceError.invalidURL
-        }
-
-        let normalizedPath = normalizedPath(basePath: components.path, requestPath: descriptor.path)
-        components.path = normalizedPath
-        components.queryItems = descriptor.queryItems.isEmpty ? nil : descriptor.queryItems
-
-        guard let url = components.url else {
+        guard let url = OpenAIURLPathBuilder.url(
+            baseURL: endpoint.baseURL,
+            pathSegments: descriptor.pathSegments,
+            queryItems: descriptor.queryItems
+        ) else {
             throw OpenAIServiceError.invalidURL
         }
 
@@ -173,11 +190,5 @@ public struct OpenAIRequestFactory {
 
     private func defaultContentType(for method: String) -> String? {
         method.uppercased() == "GET" ? nil : "application/json"
-    }
-
-    private func normalizedPath(basePath: String, requestPath: String) -> String {
-        let baseSegments = basePath.split(separator: "/").map(String.init)
-        let requestSegments = requestPath.split(separator: "/").map(String.init)
-        return "/" + (baseSegments + requestSegments).joined(separator: "/")
     }
 }

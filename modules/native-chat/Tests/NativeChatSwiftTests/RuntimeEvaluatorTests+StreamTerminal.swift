@@ -8,10 +8,9 @@ import Testing
 /// prioritized decision tree: completed → recover → retryConnection →
 /// finalizePartial → removeEmptyMessage.
 struct StreamTerminalEvaluatorEdgeCaseTests {
-
     // MARK: - Branch 1: Completed
 
-    @Test func completedTakesPrecedenceOverRecoveryID() {
+    @Test func `completed takes precedence over recovery ID`() {
         let action = StreamTerminalEvaluator.evaluate(
             StreamTerminalOutcome(
                 didComplete: true,
@@ -29,7 +28,7 @@ struct StreamTerminalEvaluatorEdgeCaseTests {
         #expect(action == .completed)
     }
 
-    @Test func completedTakesPrecedenceOverConnectionLoss() {
+    @Test func `completed takes precedence over connection loss`() {
         let action = StreamTerminalEvaluator.evaluate(
             StreamTerminalOutcome(
                 didComplete: true,
@@ -49,7 +48,7 @@ struct StreamTerminalEvaluatorEdgeCaseTests {
 
     // MARK: - Branch 2: Recover
 
-    @Test func recoverUsesPendingRecoveryIDOverStateID() {
+    @Test func `recover uses pending recovery ID over state ID`() {
         let action = StreamTerminalEvaluator.evaluate(
             StreamTerminalOutcome(
                 didComplete: false,
@@ -73,7 +72,7 @@ struct StreamTerminalEvaluatorEdgeCaseTests {
         )
     }
 
-    @Test func recoverFallsBackToStateIDWhenPendingIsNil() {
+    @Test func `recover falls back to state ID when pending is nil`() {
         let action = StreamTerminalEvaluator.evaluate(
             StreamTerminalOutcome(
                 didComplete: false,
@@ -97,7 +96,7 @@ struct StreamTerminalEvaluatorEdgeCaseTests {
         )
     }
 
-    @Test func recoverPassesNilSequenceNumber() {
+    @Test func `recover passes nil sequence number`() {
         let action = StreamTerminalEvaluator.evaluate(
             StreamTerminalOutcome(
                 didComplete: false,
@@ -121,7 +120,7 @@ struct StreamTerminalEvaluatorEdgeCaseTests {
         )
     }
 
-    @Test func recoverTakesPrecedenceOverRetryConnection() {
+    @Test func `recover takes precedence over retry connection`() {
         let action = StreamTerminalEvaluator.evaluate(
             StreamTerminalOutcome(
                 didComplete: false,
@@ -147,7 +146,7 @@ struct StreamTerminalEvaluatorEdgeCaseTests {
 
     // MARK: - Branch 3: Retry Connection
 
-    @Test func retryConnectionRequiresBothConnectionLostAndCanRetry() {
+    @Test func `retry connection requires both connection lost and can retry`() {
         let action = StreamTerminalEvaluator.evaluate(
             StreamTerminalOutcome(
                 didComplete: false,
@@ -165,7 +164,7 @@ struct StreamTerminalEvaluatorEdgeCaseTests {
         #expect(action == .retryConnection)
     }
 
-    @Test func connectionLostWithoutCanRetrySkipsToPartialOrRemove() {
+    @Test func `connection lost without can retry skips to partial or remove`() {
         let action = StreamTerminalEvaluator.evaluate(
             StreamTerminalOutcome(
                 didComplete: false,
@@ -183,7 +182,7 @@ struct StreamTerminalEvaluatorEdgeCaseTests {
         #expect(action == .finalizePartial)
     }
 
-    @Test func canRetryWithoutConnectionLostSkipsToPartialOrRemove() {
+    @Test func `can retry without connection lost skips to partial or remove`() {
         let action = StreamTerminalEvaluator.evaluate(
             StreamTerminalOutcome(
                 didComplete: false,
@@ -203,7 +202,7 @@ struct StreamTerminalEvaluatorEdgeCaseTests {
 
     // MARK: - Branch 4: Finalize Partial
 
-    @Test func finalizePartialWhenBufferHasContent() {
+    @Test func `finalize partial when buffer has content`() {
         let action = StreamTerminalEvaluator.evaluate(
             StreamTerminalOutcome(
                 didComplete: false,
@@ -223,7 +222,7 @@ struct StreamTerminalEvaluatorEdgeCaseTests {
 
     // MARK: - Branch 5: Remove Empty Message
 
-    @Test func removeEmptyMessageWithPendingError() {
+    @Test func `remove empty message with pending error`() {
         let action = StreamTerminalEvaluator.evaluate(
             StreamTerminalOutcome(
                 didComplete: false,
@@ -241,7 +240,7 @@ struct StreamTerminalEvaluatorEdgeCaseTests {
         #expect(action == .removeEmptyMessage(errorMessage: "Rate limit exceeded"))
     }
 
-    @Test func removeEmptyMessageWithConnectionLostFallback() {
+    @Test func `remove empty message with connection lost fallback`() {
         let action = StreamTerminalEvaluator.evaluate(
             StreamTerminalOutcome(
                 didComplete: false,
@@ -263,7 +262,7 @@ struct StreamTerminalEvaluatorEdgeCaseTests {
         )
     }
 
-    @Test func removeEmptyMessageWithNilErrorWhenNotConnectionLost() {
+    @Test func `remove empty message with nil error when not connection lost`() {
         let action = StreamTerminalEvaluator.evaluate(
             StreamTerminalOutcome(
                 didComplete: false,
@@ -281,7 +280,7 @@ struct StreamTerminalEvaluatorEdgeCaseTests {
         #expect(action == .removeEmptyMessage(errorMessage: nil))
     }
 
-    @Test func pendingErrorTakesPrecedenceOverConnectionLostFallback() {
+    @Test func `pending error takes precedence over connection lost fallback`() {
         let action = StreamTerminalEvaluator.evaluate(
             StreamTerminalOutcome(
                 didComplete: false,

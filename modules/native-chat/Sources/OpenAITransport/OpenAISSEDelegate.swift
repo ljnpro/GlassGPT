@@ -5,6 +5,7 @@ final class OpenAISSEDelegate: NSObject, URLSessionDataDelegate {
     let continuation: AsyncStream<StreamEvent>.Continuation
     let buffer = Mutex(SSEFrameBuffer())
     let decoder = Mutex(SSEEventDecoder())
+    let utf8Decoder = Mutex(OpenAIUTF8ChunkDecoder())
     let finished = Mutex(false)
     let session = Mutex(URLSession?.none)
     let task = Mutex(URLSessionDataTask?.none)
@@ -67,8 +68,15 @@ final class OpenAISSEDelegate: NSObject, URLSessionDataDelegate {
     }
 
     func urlSession(_: URLSession, dataTask _: URLSessionDataTask, didReceive data: Data) {
-        guard let chunk = String(data: data, encoding: .utf8) else { return }
         guard !isFinished else { return }
+        let chunk: String
+        do {
+            chunk = try utf8Decoder.withLock { try $0.append(data) }
+        } catch {
+            yieldErrorAndFinish(.requestFailed("Invalid UTF-8 in streaming response"))
+            return
+        }
+        guard !chunk.isEmpty else { return }
         let frames = buffer.withLock { $0.append(chunk) }
         if process(frames: frames) {
             return
@@ -77,7 +85,19 @@ final class OpenAISSEDelegate: NSObject, URLSessionDataDelegate {
 
     func urlSession(_: URLSession, task _: URLSessionTask, didCompleteWithError error: Error?) {
         guard !isFinished else { return }
-        let pendingFrames = buffer.withLock { $0.finishPendingFrames() }
+        let finalChunk: String
+        do {
+            finalChunk = try utf8Decoder.withLock {
+                try $0.finish(allowTruncatedTrailingBytes: error != nil)
+            }
+        } catch {
+            yieldErrorAndFinish(.requestFailed("Invalid UTF-8 in streaming response"))
+            return
+        }
+        let pendingFrames = buffer.withLock { state in
+            let flushedFrames = finalChunk.isEmpty ? [] : state.append(finalChunk)
+            return flushedFrames + state.finishPendingFrames()
+        }
         if process(frames: pendingFrames) {
             return
         }

@@ -73,8 +73,7 @@ public final class AppRouter: Sendable {
 
         case "settings":
             if let sectionString = pathComponents.first,
-               let section = SettingsSection(rawValue: sectionString)
-            {
+               let section = SettingsSection(rawValue: sectionString) {
                 navigate(to: .settingsSection(section))
             } else {
                 navigate(to: .settings)

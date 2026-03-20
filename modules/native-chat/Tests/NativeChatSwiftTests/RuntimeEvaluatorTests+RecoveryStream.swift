@@ -4,10 +4,9 @@ import Testing
 
 /// Comprehensive edge-case tests for ``RecoveryStreamEvaluator``.
 struct RecoveryStreamEvaluatorEdgeCaseTests {
-
     // MARK: - Completed
 
-    @Test func completedWhenFinishedFromStream() {
+    @Test func `completed when finished from stream`() {
         let action = RecoveryStreamEvaluator.evaluate(
             RecoveryStreamOutcome(
                 finishedFromStream: true,
@@ -23,7 +22,7 @@ struct RecoveryStreamEvaluatorEdgeCaseTests {
         #expect(action == .completed)
     }
 
-    @Test func completedTakesPrecedenceOverGatewayTimeout() {
+    @Test func `completed takes precedence over gateway timeout`() {
         let action = RecoveryStreamEvaluator.evaluate(
             RecoveryStreamOutcome(
                 finishedFromStream: true,
@@ -41,7 +40,7 @@ struct RecoveryStreamEvaluatorEdgeCaseTests {
 
     // MARK: - Retry Direct Stream (Gateway Fallback)
 
-    @Test func retryDirectStreamWhenGatewayTimesOut() {
+    @Test func `retry direct stream when gateway times out`() {
         let action = RecoveryStreamEvaluator.evaluate(
             RecoveryStreamOutcome(
                 finishedFromStream: false,
@@ -57,7 +56,7 @@ struct RecoveryStreamEvaluatorEdgeCaseTests {
         #expect(action == .retryDirectStream)
     }
 
-    @Test func retryDirectStreamWhenNoEventsReceivedViaGateway() {
+    @Test func `retry direct stream when no events received via gateway`() {
         let action = RecoveryStreamEvaluator.evaluate(
             RecoveryStreamOutcome(
                 finishedFromStream: false,
@@ -73,7 +72,7 @@ struct RecoveryStreamEvaluatorEdgeCaseTests {
         #expect(action == .retryDirectStream)
     }
 
-    @Test func noRetryDirectStreamWhenAlreadyUsingDirectEndpoint() {
+    @Test func `no retry direct stream when already using direct endpoint`() {
         let action = RecoveryStreamEvaluator.evaluate(
             RecoveryStreamOutcome(
                 finishedFromStream: false,
@@ -90,7 +89,7 @@ struct RecoveryStreamEvaluatorEdgeCaseTests {
         #expect(action != .retryDirectStream)
     }
 
-    @Test func noRetryDirectStreamWhenGatewayDisabled() {
+    @Test func `no retry direct stream when gateway disabled`() {
         let action = RecoveryStreamEvaluator.evaluate(
             RecoveryStreamOutcome(
                 finishedFromStream: false,
@@ -108,7 +107,7 @@ struct RecoveryStreamEvaluatorEdgeCaseTests {
 
     // MARK: - Poll Fallback
 
-    @Test func pollWhenRecoverableFailureWithResponseID() {
+    @Test func `poll when recoverable failure with response ID`() {
         let action = RecoveryStreamEvaluator.evaluate(
             RecoveryStreamOutcome(
                 finishedFromStream: false,
@@ -124,7 +123,7 @@ struct RecoveryStreamEvaluatorEdgeCaseTests {
         #expect(action == .poll)
     }
 
-    @Test func pollWhenResponseIDAvailableWithoutRecoverableFailure() {
+    @Test func `poll when response ID available without recoverable failure`() {
         let action = RecoveryStreamEvaluator.evaluate(
             RecoveryStreamOutcome(
                 finishedFromStream: false,
@@ -142,7 +141,7 @@ struct RecoveryStreamEvaluatorEdgeCaseTests {
 
     // MARK: - Give Up
 
-    @Test func giveUpWhenNoRetryAndNoPollingPath() {
+    @Test func `give up when no retry and no polling path`() {
         let action = RecoveryStreamEvaluator.evaluate(
             RecoveryStreamOutcome(
                 finishedFromStream: false,
@@ -158,7 +157,7 @@ struct RecoveryStreamEvaluatorEdgeCaseTests {
         #expect(action == .giveUp)
     }
 
-    @Test func giveUpWhenDirectEndpointAndNoRecoverableFailureAndNoResponseID() {
+    @Test func `give up when direct endpoint and no recoverable failure and no response ID`() {
         let action = RecoveryStreamEvaluator.evaluate(
             RecoveryStreamOutcome(
                 finishedFromStream: false,
@@ -176,7 +175,7 @@ struct RecoveryStreamEvaluatorEdgeCaseTests {
 
     // MARK: - Gateway Matrix Combinations
 
-    @Test func gatewayEnabledWithEventsReceivedAndNoTimeoutPollsIfHasResponseID() {
+    @Test func `gateway enabled with events received and no timeout polls if has response ID`() {
         let action = RecoveryStreamEvaluator.evaluate(
             RecoveryStreamOutcome(
                 finishedFromStream: false,
@@ -193,7 +192,7 @@ struct RecoveryStreamEvaluatorEdgeCaseTests {
         #expect(action == .poll)
     }
 
-    @Test func gatewayEnabledWithEventsReceivedAndNoTimeoutGivesUpIfNoResponseID() {
+    @Test func `gateway enabled with events received and no timeout gives up if no response ID`() {
         let action = RecoveryStreamEvaluator.evaluate(
             RecoveryStreamOutcome(
                 finishedFromStream: false,

@@ -91,7 +91,7 @@ public extension OpenAIRequestFactory {
         let endpoint = configuration.resolvedEndpoint(useDirectBaseURL: useDirectBaseURL)
         let url = try url(
             for: OpenAIRequestDescriptor(
-                path: "/responses/\(responseID)",
+                pathSegments: ["responses", responseID],
                 method: "GET",
                 accept: "text/event-stream",
                 timeoutInterval: timeoutInterval,

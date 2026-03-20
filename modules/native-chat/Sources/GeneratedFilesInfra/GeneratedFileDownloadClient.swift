@@ -86,13 +86,16 @@ struct GeneratedFileDownloadClient {
         useDirectBaseURL: Bool = false
     ) async throws -> (Data, URLResponse) {
         let endpoint = configurationProvider.resolvedEndpoint(useDirectBaseURL: useDirectBaseURL)
-        let urlString = if let containerId, !containerId.isEmpty {
-            "\(endpoint.baseURL)/containers/\(containerId)/files/\(fileId)/content"
+        let pathSegments = if let containerId, !containerId.isEmpty {
+            ["containers", containerId, "files", fileId, "content"]
         } else {
-            "\(endpoint.baseURL)/files/\(fileId)/content"
+            ["files", fileId, "content"]
         }
 
-        guard let url = URL(string: urlString) else {
+        guard let url = OpenAIURLPathBuilder.url(
+            baseURL: endpoint.baseURL,
+            pathSegments: pathSegments
+        ) else {
             throw FileDownloadError.invalidURL
         }
 

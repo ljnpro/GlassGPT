@@ -5,10 +5,9 @@ import Testing
 
 /// Comprehensive edge-case tests for ``RecoveryFetchEvaluator``.
 struct RecoveryFetchEvaluatorEdgeCaseTests {
-
     // MARK: - Error Path
 
-    @Test func handleErrorWhenFetchFails() {
+    @Test func `handle error when fetch fails`() {
         let action = RecoveryFetchEvaluator.evaluate(
             RecoveryFetchOutcome(
                 error: StubFetchError.networkTimeout,
@@ -28,7 +27,7 @@ struct RecoveryFetchEvaluatorEdgeCaseTests {
 
     // MARK: - Nil Result Path
 
-    @Test func pollWhenResultIsNil() {
+    @Test func `poll when result is nil`() {
         // This exercises the guard-else path where fetchResult is nil
         // but fetchError is also nil (defensive edge case).
         let outcome = RecoveryFetchOutcome(
@@ -57,7 +56,7 @@ struct RecoveryFetchEvaluatorEdgeCaseTests {
 
     // MARK: - Completed Status
 
-    @Test func finishWithNoErrorForCompletedResponse() {
+    @Test func `finish with no error for completed response`() {
         let result = OpenAIResponseFetchResult(
             status: .completed,
             text: "Full response text",
@@ -88,7 +87,7 @@ struct RecoveryFetchEvaluatorEdgeCaseTests {
 
     // MARK: - Failed Status
 
-    @Test func finishWithErrorForFailedResponse() {
+    @Test func `finish with error for failed response`() {
         let result = OpenAIResponseFetchResult(
             status: .failed,
             text: "",
@@ -117,7 +116,7 @@ struct RecoveryFetchEvaluatorEdgeCaseTests {
         }
     }
 
-    @Test func finishWithFallbackErrorForIncompleteResponse() {
+    @Test func `finish with fallback error for incomplete response`() {
         let result = OpenAIResponseFetchResult(
             status: .incomplete,
             text: "partial",
@@ -147,7 +146,7 @@ struct RecoveryFetchEvaluatorEdgeCaseTests {
 
     // MARK: - InProgress with Streaming Resume
 
-    @Test func startStreamWhenInProgressWithStreamingResume() {
+    @Test func `start stream when in progress with streaming resume`() {
         let result = OpenAIResponseFetchResult(
             status: .inProgress,
             text: "",
@@ -175,7 +174,7 @@ struct RecoveryFetchEvaluatorEdgeCaseTests {
         }
     }
 
-    @Test func pollWhenInProgressWithoutStreamingResume() {
+    @Test func `poll when in progress without streaming resume`() {
         let result = OpenAIResponseFetchResult(
             status: .inProgress,
             text: "",
@@ -203,7 +202,7 @@ struct RecoveryFetchEvaluatorEdgeCaseTests {
         }
     }
 
-    @Test func pollWhenInProgressWithResumePrefButNoBackgroundMode() {
+    @Test func `poll when in progress with resume pref but no background mode`() {
         let result = OpenAIResponseFetchResult(
             status: .inProgress,
             text: "",
@@ -231,7 +230,7 @@ struct RecoveryFetchEvaluatorEdgeCaseTests {
         }
     }
 
-    @Test func pollWhenInProgressWithResumePrefButNoSequenceNumber() {
+    @Test func `poll when in progress with resume pref but no sequence number`() {
         let result = OpenAIResponseFetchResult(
             status: .inProgress,
             text: "",
@@ -261,7 +260,7 @@ struct RecoveryFetchEvaluatorEdgeCaseTests {
 
     // MARK: - Queued Status
 
-    @Test func pollForQueuedResponseWithoutBackgroundMode() {
+    @Test func `poll for queued response without background mode`() {
         let result = OpenAIResponseFetchResult(
             status: .queued,
             text: "",
@@ -291,7 +290,7 @@ struct RecoveryFetchEvaluatorEdgeCaseTests {
 
     // MARK: - Unknown Status
 
-    @Test func finishForUnknownStatus() {
+    @Test func `finish for unknown status`() {
         let result = OpenAIResponseFetchResult(
             status: .unknown,
             text: "",

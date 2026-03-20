@@ -126,7 +126,10 @@ TARGET_RULES: dict[str, TargetRule] = {
         ),
     ),
     "ChatRuntimeWorkflows": TargetRule(
-        allowed_imports=frozenset({"Foundation", "ChatDomain", "AITransportContracts", "ChatRuntimeModel", "ChatRuntimePorts", "OpenAITransport", "os"}),
+        allowed_imports=frozenset({
+            "Foundation", "ChatDomain", "AITransportContracts",
+            "ChatRuntimeModel", "ChatRuntimePorts", "OpenAITransport", "os",
+        }),
         forbidden_patterns=(
             ("Bundle.main", "ChatRuntimeWorkflows must not reach app bundle state"),
             ("ProcessInfo.processInfo", "ChatRuntimeWorkflows must not read process environment"),

@@ -4,10 +4,9 @@ import Testing
 
 /// Comprehensive tests for ``RuntimeSessionDecisionPolicy``.
 struct RuntimeSessionDecisionPolicyTests {
-
     // MARK: - Recovery Resume Mode
 
-    @Test func streamResumeWhenAllConditionsMet() {
+    @Test func `stream resume when all conditions met`() {
         let mode = RuntimeSessionDecisionPolicy.recoveryResumeMode(
             preferStreamingResume: true,
             usedBackgroundMode: true,
@@ -17,7 +16,7 @@ struct RuntimeSessionDecisionPolicyTests {
         #expect(mode == .stream(lastSequenceNumber: 42))
     }
 
-    @Test func pollWhenNotPreferringStreamResume() {
+    @Test func `poll when not preferring stream resume`() {
         let mode = RuntimeSessionDecisionPolicy.recoveryResumeMode(
             preferStreamingResume: false,
             usedBackgroundMode: true,
@@ -27,7 +26,7 @@ struct RuntimeSessionDecisionPolicyTests {
         #expect(mode == .poll)
     }
 
-    @Test func pollWhenNotUsingBackgroundMode() {
+    @Test func `poll when not using background mode`() {
         let mode = RuntimeSessionDecisionPolicy.recoveryResumeMode(
             preferStreamingResume: true,
             usedBackgroundMode: false,
@@ -37,7 +36,7 @@ struct RuntimeSessionDecisionPolicyTests {
         #expect(mode == .poll)
     }
 
-    @Test func pollWhenNoLastSequenceNumber() {
+    @Test func `poll when no last sequence number`() {
         let mode = RuntimeSessionDecisionPolicy.recoveryResumeMode(
             preferStreamingResume: true,
             usedBackgroundMode: true,
@@ -49,7 +48,7 @@ struct RuntimeSessionDecisionPolicyTests {
 
     // MARK: - Recovery Fetch Action
 
-    @Test func finishCompletedForCompletedStatus() {
+    @Test func `finish completed for completed status`() {
         let action = RuntimeSessionDecisionPolicy.recoveryFetchAction(
             status: .completed,
             preferStreamingResume: false,
@@ -61,7 +60,7 @@ struct RuntimeSessionDecisionPolicyTests {
         #expect(action == .finish(.completed))
     }
 
-    @Test func finishFailedWithErrorMessage() {
+    @Test func `finish failed with error message`() {
         let action = RuntimeSessionDecisionPolicy.recoveryFetchAction(
             status: .failed,
             preferStreamingResume: false,
@@ -73,7 +72,7 @@ struct RuntimeSessionDecisionPolicyTests {
         #expect(action == .finish(.failed("Rate limit")))
     }
 
-    @Test func finishFailedWithNilErrorMessage() {
+    @Test func `finish failed with nil error message`() {
         let action = RuntimeSessionDecisionPolicy.recoveryFetchAction(
             status: .failed,
             preferStreamingResume: false,
@@ -85,7 +84,7 @@ struct RuntimeSessionDecisionPolicyTests {
         #expect(action == .finish(.failed(nil)))
     }
 
-    @Test func startStreamForInProgressWithAllResumeConditions() {
+    @Test func `start stream for in progress with all resume conditions`() {
         let action = RuntimeSessionDecisionPolicy.recoveryFetchAction(
             status: .inProgress,
             preferStreamingResume: true,
@@ -97,7 +96,7 @@ struct RuntimeSessionDecisionPolicyTests {
         #expect(action == .startStream(lastSequenceNumber: 17))
     }
 
-    @Test func pollForQueuedWithoutResumeConditions() {
+    @Test func `poll for queued without resume conditions`() {
         let action = RuntimeSessionDecisionPolicy.recoveryFetchAction(
             status: .queued,
             preferStreamingResume: false,
@@ -109,7 +108,7 @@ struct RuntimeSessionDecisionPolicyTests {
         #expect(action == .poll)
     }
 
-    @Test func pollForInProgressWithoutBackgroundMode() {
+    @Test func `poll for in progress without background mode`() {
         let action = RuntimeSessionDecisionPolicy.recoveryFetchAction(
             status: .inProgress,
             preferStreamingResume: true,
@@ -123,7 +122,7 @@ struct RuntimeSessionDecisionPolicyTests {
 
     // MARK: - Should Fallback to Direct Recovery Stream
 
-    @Test func fallbackWhenGatewayTimedOut() {
+    @Test func `fallback when gateway timed out`() {
         let result = RuntimeSessionDecisionPolicy.shouldFallbackToDirectRecoveryStream(
             cloudflareGatewayEnabled: true,
             useDirectEndpoint: false,
@@ -134,7 +133,7 @@ struct RuntimeSessionDecisionPolicyTests {
         #expect(result == true)
     }
 
-    @Test func fallbackWhenNoEventsReceived() {
+    @Test func `fallback when no events received`() {
         let result = RuntimeSessionDecisionPolicy.shouldFallbackToDirectRecoveryStream(
             cloudflareGatewayEnabled: true,
             useDirectEndpoint: false,
@@ -145,7 +144,7 @@ struct RuntimeSessionDecisionPolicyTests {
         #expect(result == true)
     }
 
-    @Test func noFallbackWhenAlreadyDirect() {
+    @Test func `no fallback when already direct`() {
         let result = RuntimeSessionDecisionPolicy.shouldFallbackToDirectRecoveryStream(
             cloudflareGatewayEnabled: true,
             useDirectEndpoint: true,
@@ -156,7 +155,7 @@ struct RuntimeSessionDecisionPolicyTests {
         #expect(result == false)
     }
 
-    @Test func noFallbackWhenGatewayDisabled() {
+    @Test func `no fallback when gateway disabled`() {
         let result = RuntimeSessionDecisionPolicy.shouldFallbackToDirectRecoveryStream(
             cloudflareGatewayEnabled: false,
             useDirectEndpoint: false,
@@ -167,7 +166,7 @@ struct RuntimeSessionDecisionPolicyTests {
         #expect(result == false)
     }
 
-    @Test func noFallbackWhenEventsReceivedAndNoTimeout() {
+    @Test func `no fallback when events received and no timeout`() {
         let result = RuntimeSessionDecisionPolicy.shouldFallbackToDirectRecoveryStream(
             cloudflareGatewayEnabled: true,
             useDirectEndpoint: false,
@@ -180,7 +179,7 @@ struct RuntimeSessionDecisionPolicyTests {
 
     // MARK: - Should Poll After Recovery Stream
 
-    @Test func pollWhenRecoverableFailure() {
+    @Test func `poll when recoverable failure`() {
         let result = RuntimeSessionDecisionPolicy.shouldPollAfterRecoveryStream(
             encounteredRecoverableFailure: true,
             responseId: nil
@@ -189,7 +188,7 @@ struct RuntimeSessionDecisionPolicyTests {
         #expect(result == true)
     }
 
-    @Test func pollWhenResponseIDPresent() {
+    @Test func `poll when response ID present`() {
         let result = RuntimeSessionDecisionPolicy.shouldPollAfterRecoveryStream(
             encounteredRecoverableFailure: false,
             responseId: "resp_123"
@@ -198,7 +197,7 @@ struct RuntimeSessionDecisionPolicyTests {
         #expect(result == true)
     }
 
-    @Test func noPollWhenNoFailureAndNoResponseID() {
+    @Test func `no poll when no failure and no response ID`() {
         let result = RuntimeSessionDecisionPolicy.shouldPollAfterRecoveryStream(
             encounteredRecoverableFailure: false,
             responseId: nil
@@ -209,7 +208,7 @@ struct RuntimeSessionDecisionPolicyTests {
 
     // MARK: - Recovery Stream Next Step
 
-    @Test func retryDirectWhenGatewayFallbackApplies() {
+    @Test func `retry direct when gateway fallback applies`() {
         let step = RuntimeSessionDecisionPolicy.recoveryStreamNextStep(
             cloudflareGatewayEnabled: true,
             useDirectEndpoint: false,
@@ -222,7 +221,7 @@ struct RuntimeSessionDecisionPolicyTests {
         #expect(step == .retryDirectStream)
     }
 
-    @Test func pollWhenNoFallbackButRecoverableFailure() {
+    @Test func `poll when no fallback but recoverable failure`() {
         let step = RuntimeSessionDecisionPolicy.recoveryStreamNextStep(
             cloudflareGatewayEnabled: false,
             useDirectEndpoint: true,
@@ -235,7 +234,7 @@ struct RuntimeSessionDecisionPolicyTests {
         #expect(step == .poll)
     }
 
-    @Test func noneWhenNoFallbackAndNoPollPath() {
+    @Test func `none when no fallback and no poll path`() {
         let step = RuntimeSessionDecisionPolicy.recoveryStreamNextStep(
             cloudflareGatewayEnabled: false,
             useDirectEndpoint: true,
@@ -250,7 +249,7 @@ struct RuntimeSessionDecisionPolicyTests {
 
     // MARK: - Pending Background Cancellation
 
-    @Test func cancellationWhenBackgroundModeWithResponseID() {
+    @Test func `cancellation when background mode with response ID`() {
         let messageId = UUID()
         let cancellation = RuntimeSessionDecisionPolicy.pendingBackgroundCancellation(
             requestUsesBackgroundMode: true,
@@ -263,7 +262,7 @@ struct RuntimeSessionDecisionPolicyTests {
         #expect(cancellation?.messageId == messageId)
     }
 
-    @Test func noCancellationWhenNotBackgroundMode() {
+    @Test func `no cancellation when not background mode`() {
         let cancellation = RuntimeSessionDecisionPolicy.pendingBackgroundCancellation(
             requestUsesBackgroundMode: false,
             responseId: "resp_123",
@@ -273,7 +272,7 @@ struct RuntimeSessionDecisionPolicyTests {
         #expect(cancellation == nil)
     }
 
-    @Test func noCancellationWhenNoResponseID() {
+    @Test func `no cancellation when no response ID`() {
         let cancellation = RuntimeSessionDecisionPolicy.pendingBackgroundCancellation(
             requestUsesBackgroundMode: true,
             responseId: nil,
@@ -285,7 +284,7 @@ struct RuntimeSessionDecisionPolicyTests {
 
     // MARK: - Can Detach Background Response
 
-    @Test func canDetachWhenAllConditionsMet() {
+    @Test func `can detach when all conditions met`() {
         let result = RuntimeSessionDecisionPolicy.canDetachBackgroundResponse(
             hasVisibleSession: true,
             usedBackgroundMode: true,
@@ -295,7 +294,7 @@ struct RuntimeSessionDecisionPolicyTests {
         #expect(result == true)
     }
 
-    @Test func cannotDetachWhenNoVisibleSession() {
+    @Test func `cannot detach when no visible session`() {
         let result = RuntimeSessionDecisionPolicy.canDetachBackgroundResponse(
             hasVisibleSession: false,
             usedBackgroundMode: true,
@@ -305,7 +304,7 @@ struct RuntimeSessionDecisionPolicyTests {
         #expect(result == false)
     }
 
-    @Test func cannotDetachWhenNotBackgroundMode() {
+    @Test func `cannot detach when not background mode`() {
         let result = RuntimeSessionDecisionPolicy.canDetachBackgroundResponse(
             hasVisibleSession: true,
             usedBackgroundMode: false,
@@ -315,7 +314,7 @@ struct RuntimeSessionDecisionPolicyTests {
         #expect(result == false)
     }
 
-    @Test func cannotDetachWhenNoResponseID() {
+    @Test func `cannot detach when no response ID`() {
         let result = RuntimeSessionDecisionPolicy.canDetachBackgroundResponse(
             hasVisibleSession: true,
             usedBackgroundMode: true,

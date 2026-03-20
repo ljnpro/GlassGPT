@@ -34,21 +34,21 @@ public final class NetworkMonitor: Sendable {
 
     /// Creates and starts a new network monitor.
     public init() {
-        self.monitor = NWPathMonitor()
-        self.queue = DispatchQueue(label: "com.glassgpt.network-monitor")
+        monitor = NWPathMonitor()
+        queue = DispatchQueue(label: "com.glassgpt.network-monitor")
 
         monitor.pathUpdateHandler = { [weak self] path in
             Task { @MainActor [weak self] in
                 guard let self else { return }
                 switch path.status {
                 case .satisfied:
-                    self.availability = path.isConstrained ? .constrained : .available
+                    availability = path.isConstrained ? .constrained : .available
                 case .unsatisfied:
-                    self.availability = .unavailable
+                    availability = .unavailable
                 case .requiresConnection:
-                    self.availability = .unavailable
+                    availability = .unavailable
                 @unknown default:
-                    self.availability = .unavailable
+                    availability = .unavailable
                 }
             }
         }

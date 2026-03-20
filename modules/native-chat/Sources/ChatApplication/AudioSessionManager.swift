@@ -1,4 +1,4 @@
-import AVFoundation
+@preconcurrency import AVFoundation
 import Foundation
 import Observation
 
@@ -36,7 +36,7 @@ public final class AudioSessionManager: NSObject, Sendable {
     private var recordingURL: URL?
 
     /// Creates a new audio session manager.
-    public override init() {
+    override public init() {
         super.init()
     }
 
@@ -69,7 +69,17 @@ public final class AudioSessionManager: NSObject, Sendable {
             try session.setActive(true)
 
             let format = AVAudioFormat(standardFormatWithSampleRate: 44100, channels: 1)
-            audioRecorder = try AVAudioRecorder(url: url, format: format ?? AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: 44100, channels: 1, interleaved: false)!)
+            let fallbackFormat = AVAudioFormat(
+                commonFormat: .pcmFormatFloat32,
+                sampleRate: 44100,
+                channels: 1,
+                interleaved: false
+            )
+            guard let recorderFormat = format ?? fallbackFormat else {
+                state = .idle
+                return false
+            }
+            audioRecorder = try AVAudioRecorder(url: url, format: recorderFormat)
             audioRecorder?.record()
             state = .recording
             return true
@@ -132,9 +142,9 @@ public final class AudioSessionManager: NSObject, Sendable {
     }
 }
 
-extension AudioSessionManager: @preconcurrency AVAudioPlayerDelegate {
+extension AudioSessionManager: AVAudioPlayerDelegate {
     /// Called when audio playback finishes.
-    nonisolated public func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully _: Bool) {
+    public nonisolated func audioPlayerDidFinishPlaying(_: AVAudioPlayer, successfully _: Bool) {
         Task { @MainActor in
             self.state = .idle
             self.audioPlayer = nil

@@ -39,7 +39,7 @@ public extension OpenAIRequestFactory {
     ) throws(OpenAIServiceError) -> URLRequest {
         try request(
             for: OpenAIRequestDescriptor(
-                path: "/responses/\(responseID)/cancel",
+                pathSegments: ["responses", responseID, "cancel"],
                 method: "POST",
                 timeoutInterval: 30
             ),
@@ -65,7 +65,7 @@ public extension OpenAIRequestFactory {
     ) throws(OpenAIServiceError) -> URLRequest {
         try request(
             for: OpenAIRequestDescriptor(
-                path: "/responses/\(responseID)",
+                pathSegments: ["responses", responseID],
                 method: "GET",
                 timeoutInterval: 30,
                 queryItems: include.map { URLQueryItem(name: "include[]", value: $0) }

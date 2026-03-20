@@ -5,10 +5,9 @@ import Testing
 
 /// Comprehensive edge-case tests for ``RecoveryPollEvaluator``.
 struct RecoveryPollEvaluatorEdgeCaseTests {
-
     // MARK: - Error Path
 
-    @Test func shortDelayForEarlyAttemptErrors() {
+    @Test func `short delay for early attempt errors`() {
         let action = RecoveryPollEvaluator.evaluate(
             PollAttemptOutcome(error: StubPollError.transient, attempt: 1, maxAttempts: 180)
         )
@@ -21,7 +20,7 @@ struct RecoveryPollEvaluatorEdgeCaseTests {
         }
     }
 
-    @Test func shortDelayForAttemptNineError() {
+    @Test func `short delay for attempt nine error`() {
         let action = RecoveryPollEvaluator.evaluate(
             PollAttemptOutcome(error: StubPollError.transient, attempt: 9, maxAttempts: 180)
         )
@@ -34,7 +33,7 @@ struct RecoveryPollEvaluatorEdgeCaseTests {
         }
     }
 
-    @Test func longDelayForAttemptTenError() {
+    @Test func `long delay for attempt ten error`() {
         let action = RecoveryPollEvaluator.evaluate(
             PollAttemptOutcome(error: StubPollError.transient, attempt: 10, maxAttempts: 180)
         )
@@ -47,7 +46,7 @@ struct RecoveryPollEvaluatorEdgeCaseTests {
         }
     }
 
-    @Test func longDelayForLateAttemptError() {
+    @Test func `long delay for late attempt error`() {
         let action = RecoveryPollEvaluator.evaluate(
             PollAttemptOutcome(error: StubPollError.transient, attempt: 100, maxAttempts: 180)
         )
@@ -62,7 +61,7 @@ struct RecoveryPollEvaluatorEdgeCaseTests {
 
     // MARK: - Nil Result Path (defensive)
 
-    @Test func continuePollingWhenResultIsNilAndNoError() {
+    @Test func `continue polling when result is nil and no error`() {
         // Construct via error init then exercise nil-result guard
         let action = RecoveryPollEvaluator.evaluate(
             PollAttemptOutcome(error: StubPollError.transient, attempt: 5, maxAttempts: 180)
@@ -78,7 +77,7 @@ struct RecoveryPollEvaluatorEdgeCaseTests {
 
     // MARK: - Queued Status
 
-    @Test func continuePollingForQueuedResponse() {
+    @Test func `continue polling for queued response`() {
         let action = RecoveryPollEvaluator.evaluate(
             PollAttemptOutcome(
                 result: makeResult(status: .queued),
@@ -97,7 +96,7 @@ struct RecoveryPollEvaluatorEdgeCaseTests {
 
     // MARK: - InProgress Status
 
-    @Test func continuePollingForInProgressResponse() {
+    @Test func `continue polling for in progress response`() {
         let action = RecoveryPollEvaluator.evaluate(
             PollAttemptOutcome(
                 result: makeResult(status: .inProgress),
@@ -116,7 +115,7 @@ struct RecoveryPollEvaluatorEdgeCaseTests {
 
     // MARK: - Completed Status
 
-    @Test func terminalWithNoErrorForCompleted() {
+    @Test func `terminal with no error for completed`() {
         let action = RecoveryPollEvaluator.evaluate(
             PollAttemptOutcome(
                 result: makeResult(status: .completed, text: "done"),
@@ -136,7 +135,7 @@ struct RecoveryPollEvaluatorEdgeCaseTests {
 
     // MARK: - Failed Status
 
-    @Test func terminalWithErrorMessageForFailed() {
+    @Test func `terminal with error message for failed`() {
         let action = RecoveryPollEvaluator.evaluate(
             PollAttemptOutcome(
                 result: makeResult(status: .failed, errorMessage: "Server error"),
@@ -154,7 +153,7 @@ struct RecoveryPollEvaluatorEdgeCaseTests {
         }
     }
 
-    @Test func terminalWithFallbackMessageForFailedWithoutErrorMessage() {
+    @Test func `terminal with fallback message for failed without error message`() {
         let action = RecoveryPollEvaluator.evaluate(
             PollAttemptOutcome(
                 result: makeResult(status: .failed),
@@ -173,7 +172,7 @@ struct RecoveryPollEvaluatorEdgeCaseTests {
 
     // MARK: - Incomplete Status
 
-    @Test func terminalForIncompleteResponse() {
+    @Test func `terminal for incomplete response`() {
         let action = RecoveryPollEvaluator.evaluate(
             PollAttemptOutcome(
                 result: makeResult(status: .incomplete, errorMessage: "Max tokens"),
@@ -193,7 +192,7 @@ struct RecoveryPollEvaluatorEdgeCaseTests {
 
     // MARK: - Unknown Status
 
-    @Test func terminalForUnknownStatus() {
+    @Test func `terminal for unknown status`() {
         let action = RecoveryPollEvaluator.evaluate(
             PollAttemptOutcome(
                 result: makeResult(status: .unknown),
@@ -212,13 +211,13 @@ struct RecoveryPollEvaluatorEdgeCaseTests {
 
     // MARK: - Default Max Attempts
 
-    @Test func defaultMaxAttemptsIs180() {
+    @Test func `default max attempts is180`() {
         #expect(RecoveryPollEvaluator.defaultMaxAttempts == 180)
     }
 
     // MARK: - Delay Boundary at Attempt 10
 
-    @Test func delayBoundaryForQueuedAtAttemptNine() {
+    @Test func `delay boundary for queued at attempt nine`() {
         let action = RecoveryPollEvaluator.evaluate(
             PollAttemptOutcome(
                 result: makeResult(status: .queued),
@@ -235,7 +234,7 @@ struct RecoveryPollEvaluatorEdgeCaseTests {
         }
     }
 
-    @Test func delayBoundaryForQueuedAtAttemptTen() {
+    @Test func `delay boundary for queued at attempt ten`() {
         let action = RecoveryPollEvaluator.evaluate(
             PollAttemptOutcome(
                 result: makeResult(status: .queued),

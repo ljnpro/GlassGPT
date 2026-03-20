@@ -115,22 +115,8 @@ public struct ModelSelectorSheet: View {
 
     private var reasoningControl: some View {
         VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                Text(String(localized: "Reasoning"))
-                    .font(.subheadline.weight(.medium))
-                    .foregroundStyle(.secondary)
-
-                Spacer()
-
-                Text(reasoningEffort.displayName)
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.primary)
-                    .contentTransition(.numericText())
-                    .animation(.easeInOut(duration: 0.15), value: reasoningEffort)
-                    .accessibilityLabel(String(localized: "Current reasoning effort") + ": \(reasoningEffort.displayName)")
-                    .accessibilityIdentifier("modelSelector.reasoningValue")
-            }
-            .padding(.horizontal, 4)
+            ModelSelectorReasoningHeader(reasoningEffort: reasoningEffort)
+                .padding(.horizontal, 4)
 
             VStack(spacing: 4) {
                 Slider(
@@ -251,6 +237,7 @@ public struct ModelSelectorSheet: View {
             lightBorderOpacity: 0.085
         )
     }
+
     private func toggleRow(
         title: String,
         subtitle: String,

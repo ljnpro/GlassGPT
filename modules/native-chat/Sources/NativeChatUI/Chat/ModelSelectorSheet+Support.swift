@@ -54,6 +54,31 @@ package struct ModelBadge: View {
     }
 }
 
+/// Header row showing the reasoning control title and the currently selected effort.
+package struct ModelSelectorReasoningHeader: View {
+    /// The currently selected reasoning effort shown in the header.
+    let reasoningEffort: ReasoningEffort
+
+    /// The header content used above the reasoning slider.
+    package var body: some View {
+        HStack {
+            Text(String(localized: "Reasoning"))
+                .font(.subheadline.weight(.medium))
+                .foregroundStyle(.secondary)
+
+            Spacer()
+
+            Text(reasoningEffort.displayName)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.primary)
+                .contentTransition(.numericText())
+                .animation(.easeInOut(duration: 0.15), value: reasoningEffort)
+                .accessibilityLabel(String(localized: "Current reasoning effort") + ": \(reasoningEffort.displayName)")
+                .accessibilityIdentifier("modelSelector.reasoningValue")
+        }
+    }
+}
+
 public extension ModelSelectorSheet {
     /// Layout metrics for the model selector sheet, adapted for phone and iPad idioms.
     struct Metrics {
