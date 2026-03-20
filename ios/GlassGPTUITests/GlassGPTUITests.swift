@@ -338,7 +338,7 @@ final class GlassGPTUITests: XCTestCase {
         XCTAssertTrue(saveButton.waitForExistence(timeout: 5))
         saveButton.tap()
 
-        XCTAssertTrue(waitForNonExistence(of: saveButton, timeout: 5))
+        XCTAssertTrue(waitForUnavailable(saveButton, timeout: 5))
         XCTAssertTrue(app.buttons["chat.newChat"].waitForExistence(timeout: 5))
     }
 
@@ -357,7 +357,7 @@ final class GlassGPTUITests: XCTestCase {
         XCTAssertTrue(backdrop.waitForExistence(timeout: 5))
         backdrop.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.15)).tap()
 
-        XCTAssertTrue(waitForNonExistence(of: saveButton, timeout: 5))
+        XCTAssertTrue(waitForUnavailable(saveButton, timeout: 5))
         XCTAssertTrue(modelBadge.waitForExistence(timeout: 5))
     }
 
@@ -490,6 +490,13 @@ final class GlassGPTUITests: XCTestCase {
     @MainActor
     private func waitForNonExistence(of element: XCUIElement, timeout: TimeInterval) -> Bool {
         let predicate = NSPredicate(format: "exists == false")
+        let expectation = XCTNSPredicateExpectation(predicate: predicate, object: element)
+        return XCTWaiter.wait(for: [expectation], timeout: timeout) == .completed
+    }
+
+    @MainActor
+    private func waitForUnavailable(_ element: XCUIElement, timeout: TimeInterval) -> Bool {
+        let predicate = NSPredicate(format: "exists == false OR hittable == false")
         let expectation = XCTNSPredicateExpectation(predicate: predicate, object: element)
         return XCTWaiter.wait(for: [expectation], timeout: timeout) == .completed
     }
