@@ -1,3 +1,6 @@
+// PURE FUNCTION CONTRACT: This evaluator must remain a pure Outcome → Action
+// mapper. It must NEVER hold service references, perform I/O, or read global state.
+
 import Foundation
 
 /// The raw outcomes observed when a streaming event loop exits.

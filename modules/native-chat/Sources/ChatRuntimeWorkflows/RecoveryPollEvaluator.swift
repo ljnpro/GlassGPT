@@ -1,3 +1,7 @@
+// PURE FUNCTION CONTRACT: This evaluator must remain a pure Outcome → Action
+// mapper. It may import OpenAITransport for DTO types (OpenAIResponseFetchResult)
+// but must NEVER hold a transport client, perform I/O, or read global state.
+
 import ChatRuntimeModel
 import Foundation
 import OpenAITransport

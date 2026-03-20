@@ -1,3 +1,6 @@
+// PURE FUNCTION CONTRACT: This evaluator must remain a pure Outcome → Action
+// mapper. It must NEVER hold service references, perform I/O, or read global state.
+
 import ChatRuntimeModel
 import Foundation
 
