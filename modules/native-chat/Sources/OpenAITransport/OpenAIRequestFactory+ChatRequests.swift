@@ -24,6 +24,7 @@ public extension OpenAIRequestFactory {
         vectorStoreIds: [String] = [],
         useDirectBaseURL: Bool = false
     ) throws(OpenAIServiceError) -> URLRequest {
+        let timeoutInterval = configuration.chatRequestTimeoutInterval
         var tools: [ResponsesToolDTO] = [
             ResponsesToolDTO(type: "web_search_preview"),
             ResponsesToolDTO(
@@ -64,7 +65,7 @@ public extension OpenAIRequestFactory {
                 path: "/responses",
                 method: "POST",
                 accept: "text/event-stream",
-                timeoutInterval: 300
+                timeoutInterval: timeoutInterval
             ),
             apiKey: apiKey,
             body: body,
@@ -86,13 +87,14 @@ public extension OpenAIRequestFactory {
         apiKey: String,
         useDirectBaseURL: Bool
     ) throws(OpenAIServiceError) -> URLRequest {
+        let timeoutInterval = configuration.chatRequestTimeoutInterval
         let endpoint = configuration.resolvedEndpoint(useDirectBaseURL: useDirectBaseURL)
         let url = try url(
             for: OpenAIRequestDescriptor(
                 path: "/responses/\(responseID)",
                 method: "GET",
                 accept: "text/event-stream",
-                timeoutInterval: 300,
+                timeoutInterval: timeoutInterval,
                 queryItems: [
                     URLQueryItem(name: "stream", value: "true"),
                     URLQueryItem(name: "starting_after", value: String(startingAfter))
@@ -103,7 +105,7 @@ public extension OpenAIRequestFactory {
         )
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
-        request.timeoutInterval = 300
+        request.timeoutInterval = timeoutInterval
         request.setValue("text/event-stream", forHTTPHeaderField: "Accept")
         requestAuthorizer.applyAuthorization(
             to: &request,

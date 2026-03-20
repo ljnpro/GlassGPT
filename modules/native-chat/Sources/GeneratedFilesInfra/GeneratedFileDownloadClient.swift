@@ -98,7 +98,7 @@ struct GeneratedFileDownloadClient {
 
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
-        request.timeoutInterval = 120
+        request.timeoutInterval = configurationProvider.generatedFileDownloadTimeoutInterval
         requestAuthorizer.applyAuthorization(
             to: &request,
             apiKey: apiKey,
