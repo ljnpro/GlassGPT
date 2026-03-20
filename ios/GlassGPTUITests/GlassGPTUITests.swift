@@ -21,25 +21,17 @@ final class GlassGPTUITests: XCTestCase {
     }
 
     @MainActor
-    func testTabsAndPrimaryScreensRemainReachable() throws {
+    func testTabsAndPrimaryScreensRemainReachable() {
         let app = launchApp()
 
-        XCTAssertTrue(app.tabBars.buttons["Chat"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.buttons["chat.newChat"].exists)
-
-        app.tabBars.buttons["History"].tap()
-        XCTAssertTrue(app.navigationBars["History"].waitForExistence(timeout: 5))
-
-        app.tabBars.buttons["Settings"].tap()
-        XCTAssertTrue(app.navigationBars["Settings"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.secureTextFields["settings.apiKey"].waitForExistence(timeout: 5))
-
-        app.tabBars.buttons["Chat"].tap()
-        XCTAssertTrue(app.buttons["chat.newChat"].waitForExistence(timeout: 5))
+        openChat(in: app)
+        openHistory(in: app)
+        _ = openSettings(in: app)
+        openChat(in: app)
     }
 
     @MainActor
-    func testHistoryScenarioCanOpenConversationAndDeleteAll() throws {
+    func testHistoryScenarioCanOpenConversationAndDeleteAll() {
         let app = launchApp(scenario: "history")
         openHistory(in: app)
 
@@ -59,7 +51,7 @@ final class GlassGPTUITests: XCTestCase {
     }
 
     @MainActor
-    func testHistoryScenarioOpeningConversationShowsSeededMessages() throws {
+    func testHistoryScenarioOpeningConversationShowsSeededMessages() {
         let app = launchApp(scenario: "history")
         openHistory(in: app)
 
@@ -75,7 +67,7 @@ final class GlassGPTUITests: XCTestCase {
     }
 
     @MainActor
-    func testHistoryScenarioCanDeleteSingleConversationWithoutDeletingOthers() throws {
+    func testHistoryScenarioCanDeleteSingleConversationWithoutDeletingOthers() {
         let app = launchApp(scenario: "history")
         openHistory(in: app)
 
@@ -98,7 +90,7 @@ final class GlassGPTUITests: XCTestCase {
     }
 
     @MainActor
-    func testHistoryScenarioSearchFiltersSeededConversations() throws {
+    func testHistoryScenarioSearchFiltersSeededConversations() {
         let app = launchApp(scenario: "history")
         openHistory(in: app)
 
@@ -117,7 +109,7 @@ final class GlassGPTUITests: XCTestCase {
     }
 
     @MainActor
-    func testSettingsScenarioPersistsThemeSelectionWithinSession() throws {
+    func testSettingsScenarioPersistsThemeSelectionWithinSession() {
         let app = launchApp(scenario: "settings")
 
         _ = openSettings(in: app)
@@ -129,17 +121,15 @@ final class GlassGPTUITests: XCTestCase {
         darkSegment.tap()
         XCTAssertTrue(waitForSelection(of: darkSegment, timeout: 5))
 
-        app.tabBars.buttons["Chat"].tap()
-        XCTAssertTrue(app.buttons["chat.newChat"].waitForExistence(timeout: 5))
-
-        app.tabBars.buttons["Settings"].tap()
+        openChat(in: app)
+        _ = openSettings(in: app)
         let refreshedThemePicker = app.segmentedControls["settings.themePicker"]
         XCTAssertTrue(refreshedThemePicker.waitForExistence(timeout: 5))
         XCTAssertTrue(waitForSelection(of: refreshedThemePicker.buttons["Dark"], timeout: 5))
     }
 
     @MainActor
-    func testSettingsGatewayScenarioShowsCloudflareControlsAndMissingKeyFeedback() throws {
+    func testSettingsGatewayScenarioShowsCloudflareControlsAndMissingKeyFeedback() {
         let app = launchApp(scenario: "settingsGateway")
         _ = openSettings(in: app)
 
@@ -155,7 +145,7 @@ final class GlassGPTUITests: XCTestCase {
     }
 
     @MainActor
-    func testHistoryScenarioShowsDeleteAllActionWhenSeeded() throws {
+    func testHistoryScenarioShowsDeleteAllActionWhenSeeded() {
         let app = launchApp(scenario: "history")
         openHistory(in: app)
 
@@ -164,7 +154,7 @@ final class GlassGPTUITests: XCTestCase {
     }
 
     @MainActor
-    func testSettingsScenarioCanSaveAndClearAPIKeyLocally() throws {
+    func testSettingsScenarioCanSaveAndClearAPIKeyLocally() {
         let app = launchApp(scenario: "settings")
 
         let apiKeyField = app.secureTextFields["settings.apiKey"]
@@ -189,23 +179,20 @@ final class GlassGPTUITests: XCTestCase {
     }
 
     @MainActor
-    func testEmptyScenarioWithoutAPIKeyKeepsShellUsable() throws {
+    func testEmptyScenarioWithoutAPIKeyKeepsShellUsable() {
         let app = launchApp(scenario: "empty")
 
         XCTAssertTrue(app.buttons["chat.newChat"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.staticTexts["Add your API key in Settings"].waitForExistence(timeout: 5))
 
-        app.tabBars.buttons["History"].tap()
-        XCTAssertTrue(app.navigationBars["History"].waitForExistence(timeout: 5))
-
-        app.tabBars.buttons["Settings"].tap()
-        let apiKeyField = app.secureTextFields["settings.apiKey"]
+        openHistory(in: app)
+        let apiKeyField = openSettings(in: app)
         XCTAssertTrue(apiKeyField.waitForExistence(timeout: 5))
         XCTAssertFalse(app.buttons["settings.saveAPIKey"].isEnabled)
     }
 
     @MainActor
-    func testAPIKeyPersistsAcrossAppRelaunch() throws {
+    func testAPIKeyPersistsAcrossAppRelaunch() {
         let app = launchApp()
 
         let apiKeyField = openSettings(in: app)
@@ -233,9 +220,7 @@ final class GlassGPTUITests: XCTestCase {
         XCTAssertTrue(app.wait(for: .notRunning, timeout: 5))
 
         let relaunched = launchApp()
-        relaunched.tabBars.buttons["Settings"].tap()
-
-        let relaunchedField = relaunched.secureTextFields["settings.apiKey"]
+        let relaunchedField = openSettings(in: relaunched)
         let relaunchedSaveButton = relaunched.buttons["settings.saveAPIKey"]
         XCTAssertTrue(relaunchedField.waitForExistence(timeout: 5))
         XCTAssertTrue(relaunchedSaveButton.waitForExistence(timeout: 5))
@@ -248,7 +233,7 @@ final class GlassGPTUITests: XCTestCase {
     }
 
     @MainActor
-    func testPreparePersistedAPIKeyForReinstall() throws {
+    func testPreparePersistedAPIKeyForReinstall() {
         let app = launchApp(scenario: "reinstallSeed")
         let apiKeyField = openSettings(in: app)
         let saveButton = app.buttons["settings.saveAPIKey"]
@@ -267,7 +252,7 @@ final class GlassGPTUITests: XCTestCase {
     }
 
     @MainActor
-    func testReinstalledAppReadsPersistedAPIKeyWithoutRestoringHistory() throws {
+    func testReinstalledAppReadsPersistedAPIKeyWithoutRestoringHistory() {
         let app = launchApp(scenario: "reinstallVerify")
         let apiKeyField = openSettings(in: app)
         let saveButton = app.buttons["settings.saveAPIKey"]
@@ -278,20 +263,17 @@ final class GlassGPTUITests: XCTestCase {
         XCTAssertTrue(clearButton.waitForExistence(timeout: 5))
         XCTAssertFalse(saveButton.isEnabled)
 
-        app.tabBars.buttons["Chat"].tap()
-        XCTAssertTrue(app.buttons["chat.newChat"].waitForExistence(timeout: 5))
+        openChat(in: app)
         XCTAssertTrue(app.staticTexts["Add your API key in Settings"].waitForExistence(timeout: 5))
     }
 
     @MainActor
-    func testFreshInstallWithoutPersistedAPIKeyKeepsShellUsable() throws {
+    func testFreshInstallWithoutPersistedAPIKeyKeepsShellUsable() {
         let app = launchApp(scenario: "freshInstall")
 
         XCTAssertTrue(app.buttons["chat.newChat"].waitForExistence(timeout: 5))
 
-        app.tabBars.buttons["History"].tap()
-        XCTAssertTrue(app.navigationBars["History"].waitForExistence(timeout: 5))
-
+        openHistory(in: app)
         let apiKeyField = openSettings(in: app)
         let saveButton = app.buttons["settings.saveAPIKey"]
         XCTAssertTrue(apiKeyField.waitForExistence(timeout: 10))
@@ -300,15 +282,13 @@ final class GlassGPTUITests: XCTestCase {
     }
 
     @MainActor
-    func testSeededScenarioPreservesConversationAfterTabRoundTrip() throws {
+    func testSeededScenarioPreservesConversationAfterTabRoundTrip() {
         let app = launchApp(scenario: "seeded")
 
         XCTAssertTrue(app.staticTexts["Can you keep the refactor zero-diff?"].waitForExistence(timeout: 5))
 
-        app.tabBars.buttons["History"].tap()
-        XCTAssertTrue(app.tabBars.buttons["Chat"].waitForExistence(timeout: 5))
-
-        app.tabBars.buttons["Chat"].tap()
+        openHistory(in: app)
+        openChat(in: app)
         XCTAssertTrue(app.staticTexts["Can you keep the refactor zero-diff?"].waitForExistence(timeout: 5))
         XCTAssertTrue(
             app.staticTexts["Yes. I will preserve the current UX and tighten the internal architecture only."].waitForExistence(timeout: 5)
@@ -316,7 +296,7 @@ final class GlassGPTUITests: XCTestCase {
     }
 
     @MainActor
-    func testSeededScenarioLoadsExistingConversationContent() throws {
+    func testSeededScenarioLoadsExistingConversationContent() {
         let app = launchApp(scenario: "seeded")
 
         XCTAssertTrue(app.buttons["chat.newChat"].waitForExistence(timeout: 5))
@@ -327,7 +307,7 @@ final class GlassGPTUITests: XCTestCase {
     }
 
     @MainActor
-    func testStreamingScenarioCanOpenAndDismissModelSelector() throws {
+    func testStreamingScenarioCanOpenAndDismissModelSelector() {
         let app = launchApp(scenario: "streaming")
 
         let modelBadge = app.buttons["chat.modelBadge"]
@@ -343,7 +323,7 @@ final class GlassGPTUITests: XCTestCase {
     }
 
     @MainActor
-    func testStreamingScenarioCanDismissModelSelectorByTappingBackdrop() throws {
+    func testStreamingScenarioCanDismissModelSelectorByTappingBackdrop() {
         let app = launchApp(scenario: "streaming")
 
         let modelBadge = app.buttons["chat.modelBadge"]
@@ -362,7 +342,7 @@ final class GlassGPTUITests: XCTestCase {
     }
 
     @MainActor
-    func testStreamingScenarioShowsLiveReasoningOutputAndToolIndicator() throws {
+    func testStreamingScenarioShowsLiveReasoningOutputAndToolIndicator() {
         let app = launchApp(scenario: "streaming")
 
         XCTAssertTrue(app.staticTexts["Running code…"].waitForExistence(timeout: 5))
@@ -375,7 +355,7 @@ final class GlassGPTUITests: XCTestCase {
     }
 
     @MainActor
-    func testStreamingScenarioModelSelectorShowsConfigurationControls() throws {
+    func testStreamingScenarioModelSelectorShowsConfigurationControls() {
         let app = launchApp(scenario: "streaming")
 
         let modelBadge = app.buttons["chat.modelBadge"]
@@ -391,7 +371,7 @@ final class GlassGPTUITests: XCTestCase {
     }
 
     @MainActor
-    func testPreviewScenarioShowsAndDismissesGeneratedPreview() throws {
+    func testPreviewScenarioShowsAndDismissesGeneratedPreview() {
         let app = launchApp(scenario: "preview")
 
         let previewRoot = app.otherElements["filePreview.root"]
@@ -406,7 +386,7 @@ final class GlassGPTUITests: XCTestCase {
     }
 
     @MainActor
-    func testPreviewScenarioExposesDownloadAndShareActions() throws {
+    func testPreviewScenarioExposesDownloadAndShareActions() {
         let app = launchApp(scenario: "preview")
 
         XCTAssertTrue(app.otherElements["filePreview.root"].waitForExistence(timeout: 5))
@@ -415,7 +395,7 @@ final class GlassGPTUITests: XCTestCase {
     }
 
     @MainActor
-    func testReplySplitScenarioKeepsOneAssistantSurface() throws {
+    func testReplySplitScenarioKeepsOneAssistantSurface() {
         let app = launchApp(scenario: "replySplit")
 
         let assistantSurfaces = app.descendants(matching: .any)
@@ -514,7 +494,7 @@ final class GlassGPTUITests: XCTestCase {
     @MainActor
     private func revealIfNeeded(_ element: XCUIElement, in app: XCUIApplication, maxSwipes: Int = 4) {
         var remainingSwipes = maxSwipes
-        while !element.exists && remainingSwipes > 0 {
+        while !element.exists, remainingSwipes > 0 {
             app.swipeUp()
             remainingSwipes -= 1
         }
@@ -527,25 +507,46 @@ final class GlassGPTUITests: XCTestCase {
             return
         }
 
-        let historyTab = app.tabBars.buttons["History"]
-        XCTAssertTrue(historyTab.waitForExistence(timeout: 5))
-        historyTab.tap()
+        activateTab(named: "History", in: app)
         XCTAssertTrue(historyBar.waitForExistence(timeout: 5))
+    }
+
+    @MainActor
+    private func openChat(in app: XCUIApplication) {
+        let newChatButton = app.buttons["chat.newChat"]
+        if newChatButton.waitForExistence(timeout: 2) {
+            return
+        }
+
+        activateTab(named: "Chat", in: app)
+        if newChatButton.waitForExistence(timeout: 5) {
+            return
+        }
+
+        // Retry once after dismissing any transient overlay that may have intercepted the first tap.
+        app.tap()
+        activateTab(named: "Chat", in: app)
+        XCTAssertTrue(newChatButton.waitForExistence(timeout: 5))
     }
 
     @MainActor
     private func openSettings(in app: XCUIApplication) -> XCUIElement {
         let settingsBar = app.navigationBars["Settings"]
         if !settingsBar.waitForExistence(timeout: 2) {
-            let settingsTab = app.tabBars.buttons["Settings"]
-            XCTAssertTrue(settingsTab.waitForExistence(timeout: 5))
-            settingsTab.tap()
+            activateTab(named: "Settings", in: app)
             XCTAssertTrue(settingsBar.waitForExistence(timeout: 5))
         }
 
         let apiKeyField = app.secureTextFields["settings.apiKey"]
         XCTAssertTrue(apiKeyField.waitForExistence(timeout: 5))
         return apiKeyField
+    }
+
+    @MainActor
+    private func activateTab(named tabName: String, in app: XCUIApplication) {
+        let tab = app.tabBars.buttons[tabName]
+        XCTAssertTrue(tab.waitForExistence(timeout: 5))
+        tab.tap()
     }
 
     @MainActor
