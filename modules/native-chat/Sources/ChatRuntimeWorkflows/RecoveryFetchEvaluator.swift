@@ -1,7 +1,3 @@
-// PURE FUNCTION CONTRACT: This evaluator must remain a pure Outcome → Action
-// mapper. It may import OpenAITransport for DTO types (OpenAIResponseFetchResult)
-// but must NEVER hold a transport client, perform I/O, or read global state.
-
 import ChatRuntimeModel
 import Foundation
 import OpenAITransport
@@ -26,8 +22,8 @@ public struct RecoveryFetchOutcome: Sendable {
         usedBackgroundMode: Bool,
         lastSequenceNumber: Int?
     ) {
-        self.fetchResult = result
-        self.fetchError = nil
+        fetchResult = result
+        fetchError = nil
         self.preferStreamingResume = preferStreamingResume
         self.usedBackgroundMode = usedBackgroundMode
         self.lastSequenceNumber = lastSequenceNumber
@@ -40,8 +36,8 @@ public struct RecoveryFetchOutcome: Sendable {
         usedBackgroundMode: Bool,
         lastSequenceNumber: Int?
     ) {
-        self.fetchResult = nil
-        self.fetchError = error
+        fetchResult = nil
+        fetchError = error
         self.preferStreamingResume = preferStreamingResume
         self.usedBackgroundMode = usedBackgroundMode
         self.lastSequenceNumber = lastSequenceNumber

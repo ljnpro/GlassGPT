@@ -1,6 +1,3 @@
-// PURE FUNCTION CONTRACT: This evaluator must remain a pure Outcome → Action
-// mapper. It must NEVER hold service references, perform I/O, or read global state.
-
 import Foundation
 
 /// The raw outcomes observed when a streaming event loop exits.
@@ -94,7 +91,7 @@ public enum StreamTerminalEvaluator {
         }
 
         // 3. Connection lost with no response ID — try reconnecting first.
-        if outcome.connectionLost && outcome.canRetryConnection {
+        if outcome.connectionLost, outcome.canRetryConnection {
             return .retryConnection
         }
 

@@ -1,7 +1,3 @@
-// PURE FUNCTION CONTRACT: This evaluator must remain a pure Outcome → Action
-// mapper. It may import OpenAITransport for DTO types (OpenAIResponseFetchResult)
-// but must NEVER hold a transport client, perform I/O, or read global state.
-
 import ChatRuntimeModel
 import Foundation
 import OpenAITransport
@@ -20,14 +16,14 @@ public struct PollAttemptOutcome: Sendable {
     /// Creates a successful poll attempt outcome.
     public init(result: OpenAIResponseFetchResult, attempt: Int, maxAttempts: Int) {
         self.result = result
-        self.error = nil
+        error = nil
         self.attempt = attempt
         self.maxAttempts = maxAttempts
     }
 
     /// Creates a failed poll attempt outcome.
     public init(error: any Error, attempt: Int, maxAttempts: Int) {
-        self.result = nil
+        result = nil
         self.error = error
         self.attempt = attempt
         self.maxAttempts = maxAttempts
