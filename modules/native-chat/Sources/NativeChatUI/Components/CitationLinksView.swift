@@ -7,6 +7,9 @@ import SwiftUI
 package struct CitationLinksView: View {
     let citations: [URLCitation]
 
+    /// Scales card spacing with Dynamic Type for accessibility.
+    @ScaledMetric(relativeTo: .caption2) private var cardSpacing: CGFloat = 6
+
     /// Creates a citation strip for the given citation list.
     package init(citations: [URLCitation]) {
         self.citations = citations
@@ -25,7 +28,7 @@ package struct CitationLinksView: View {
     /// The horizontal citation-card strip rendered below assistant messages.
     package var body: some View {
         if !uniqueCitations.isEmpty {
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: cardSpacing) {
                 HStack(spacing: 4) {
                     Image(systemName: "globe")
                         .font(.caption2.weight(.semibold))

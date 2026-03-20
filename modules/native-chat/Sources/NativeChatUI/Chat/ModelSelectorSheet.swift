@@ -150,6 +150,7 @@ public struct ModelSelectorSheet: View {
                 }
                 .tint(.accentColor)
                 .accessibilityLabel(String(localized: "Reasoning effort slider"))
+                .accessibilityValue(reasoningEffort.displayName)
                 .accessibilityIdentifier("modelSelector.reasoningSlider")
 
                 HStack {
@@ -209,6 +210,7 @@ public struct ModelSelectorSheet: View {
             }
             .buttonStyle(GlassPressButtonStyle())
             .accessibilityLabel(String(localized: "Save model settings"))
+            .accessibilityHint(String(localized: "Double-tap to save and dismiss"))
             .accessibilityIdentifier("modelSelector.save")
         }
         .padding(.horizontal, 2)
@@ -273,6 +275,7 @@ public struct ModelSelectorSheet: View {
             Toggle("", isOn: isOn)
                 .labelsHidden()
                 .toggleStyle(.switch)
+                .accessibilityValue(isOn.wrappedValue ? String(localized: "On") : String(localized: "Off"))
                 .accessibilityIdentifier(accessibilityIdentifier)
                 .onChange(of: isOn.wrappedValue) { _, _ in
                     hapticService.selection(isEnabled: hapticsEnabled)

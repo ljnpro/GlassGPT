@@ -5,6 +5,11 @@ package struct OfflineBannerView: View {
     /// Whether the banner should be visible.
     let isVisible: Bool
 
+    /// Scales icon-text spacing with Dynamic Type for accessibility.
+    @ScaledMetric(relativeTo: .subheadline) private var iconSpacing: CGFloat = 8
+    /// Scales horizontal padding with Dynamic Type for accessibility.
+    @ScaledMetric(relativeTo: .subheadline) private var horizontalPadding: CGFloat = 16
+
     /// Creates an offline banner.
     /// - Parameter isVisible: Whether to show the banner.
     package init(isVisible: Bool) {
@@ -14,14 +19,14 @@ package struct OfflineBannerView: View {
     /// The banner body with icon, text, and slide animation.
     package var body: some View {
         if isVisible {
-            HStack(spacing: 8) {
+            HStack(spacing: iconSpacing) {
                 Image(systemName: "wifi.slash")
                     .font(.subheadline)
                 Text(String(localized: "You are offline"))
                     .font(.subheadline)
             }
             .foregroundStyle(.white)
-            .padding(.horizontal, 16)
+            .padding(.horizontal, horizontalPadding)
             .padding(.vertical, 8)
             .frame(maxWidth: .infinity)
             .background(.orange.gradient)

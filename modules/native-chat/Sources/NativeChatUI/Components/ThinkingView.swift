@@ -5,12 +5,15 @@ import SwiftUI
 
 /// Animated capsule indicator shown while the model is actively reasoning, before thinking text arrives.
 package struct ThinkingIndicator: View {
+    /// Scales spacing with Dynamic Type for accessibility.
+    @ScaledMetric(relativeTo: .subheadline) private var iconSpacing: CGFloat = 8
+
     /// Creates a new thinking indicator.
     package init() {}
 
     /// The capsule indicator shown while the model is still reasoning.
     package var body: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: iconSpacing) {
             Image(systemName: "brain")
                 .font(.subheadline.weight(.medium))
                 .foregroundStyle(.orange)
