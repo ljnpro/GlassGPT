@@ -78,49 +78,55 @@ extension ChatRecoveryCoordinator {
             guard sessions.isSessionActive(session) else { return }
             let apiKey = resultApplier.activeAPIKey(for: session)
 
+            // Collect facts from the fetch attempt
+            let fetchOutcome: RecoveryFetchOutcome
             do {
                 let result = try await execution.service.fetchResponse(responseId: responseId, apiKey: apiKey)
-
-                switch ReplyRecoveryPlanner.fetchAction(
-                    for: result,
+                fetchOutcome = RecoveryFetchOutcome(
+                    result: result,
                     preferStreamingResume: preferStreamingResume,
                     usedBackgroundMode: message.usedBackgroundMode,
                     lastSequenceNumber: message.lastSequenceNumber
-                ) {
-                case .finish(.completed):
-                    resultApplier.finishRecovery(
-                        for: message,
-                        session: session,
-                        result: result,
-                        fallbackText: resultApplier.recoveryFallbackText(for: message, session: session),
-                        fallbackThinking: resultApplier.recoveryFallbackThinking(for: message, session: session)
-                    )
-
-                case let .finish(.failed(errorMessage)):
-                    if visible {
-                        state.errorMessage = errorMessage ?? "Response did not complete."
-                    }
-                    resultApplier.finishRecovery(
-                        for: message,
-                        session: session,
-                        result: result,
-                        fallbackText: resultApplier.recoveryFallbackText(for: message, session: session),
-                        fallbackThinking: resultApplier.recoveryFallbackThinking(for: message, session: session)
-                    )
-
-                case let .startStream(lastSequenceNumber):
-                    await startStreamingRecovery(
-                        session: session,
-                        responseId: responseId,
-                        lastSeq: lastSequenceNumber,
-                        apiKey: apiKey,
-                        useDirectEndpoint: false
-                    )
-
-                case .poll:
-                    await pollResponseUntilTerminal(session: session, responseId: responseId)
-                }
+                )
             } catch {
+                fetchOutcome = RecoveryFetchOutcome(
+                    error: error,
+                    preferStreamingResume: preferStreamingResume,
+                    usedBackgroundMode: message.usedBackgroundMode,
+                    lastSequenceNumber: message.lastSequenceNumber
+                )
+            }
+
+            // Runtime evaluator decides the next action
+            let action = RecoveryFetchEvaluator.evaluate(fetchOutcome)
+
+            // Composition dispatches the decided action
+            switch action {
+            case let .finish(result, errorMessage):
+                if visible, let errorMessage {
+                    state.errorMessage = errorMessage
+                }
+                resultApplier.finishRecovery(
+                    for: message,
+                    session: session,
+                    result: result,
+                    fallbackText: resultApplier.recoveryFallbackText(for: message, session: session),
+                    fallbackThinking: resultApplier.recoveryFallbackThinking(for: message, session: session)
+                )
+
+            case let .startStream(lastSequenceNumber):
+                await startStreamingRecovery(
+                    session: session,
+                    responseId: responseId,
+                    lastSeq: lastSequenceNumber,
+                    apiKey: apiKey,
+                    useDirectEndpoint: false
+                )
+
+            case .poll:
+                await pollResponseUntilTerminal(session: session, responseId: responseId)
+
+            case let .handleError(error):
                 if resultApplier.handleUnrecoverableRecoveryError(
                     error,
                     for: message,
