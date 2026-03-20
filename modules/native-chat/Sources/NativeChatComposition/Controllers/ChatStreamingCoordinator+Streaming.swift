@@ -116,32 +116,24 @@ extension ChatStreamingCoordinator {
             // --- Runtime-driven terminal evaluation ---
             // Composition collects facts; runtime decides what to do next.
             let runtimeState = sessions.cachedRuntimeState(for: session)
-            let outcome = StreamTerminalOutcome(
-                didComplete: didReceiveCompletedEvent,
-                connectionLost: receivedConnectionLost,
-                pendingRecoveryResponseID: pendingRecoveryResponseId,
-                pendingError: pendingRecoveryError,
-                hasBufferContent: !(runtimeState?.buffer.text.isEmpty ?? true),
-                wasStillStreaming: runtimeState?.isStreaming ?? false
-            )
-
             let canRetry = await retryStreamIfPossible(
                 session: session,
                 streamID: streamID,
                 reconnectAttempt: reconnectAttempt,
                 dryRun: true
             )
-
-            let action = StreamTerminalEvaluator.evaluate(
-                outcome: outcome,
-                state: runtimeState ?? ReplyRuntimeState(
-                    assistantReplyID: session.assistantReplyID,
-                    messageID: session.messageID,
-                    conversationID: session.conversationID
-                ),
+            let outcome = StreamTerminalOutcome(
+                didComplete: didReceiveCompletedEvent,
+                connectionLost: receivedConnectionLost,
+                pendingRecoveryResponseID: pendingRecoveryResponseId,
+                stateResponseID: runtimeState?.responseID,
+                pendingError: pendingRecoveryError,
+                hasBufferContent: !(runtimeState?.buffer.text.isEmpty ?? true),
+                lastSequenceNumber: runtimeState?.lastSequenceNumber,
                 usesBackgroundMode: session.request.usesBackgroundMode,
                 canRetryConnection: canRetry && receivedConnectionLost
             )
+            let action = StreamTerminalEvaluator.evaluate(outcome)
 
             // --- Composition dispatches the decided action ---
             switch action {

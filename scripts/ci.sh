@@ -733,7 +733,7 @@ function gate_maintainability() {
   MAX_FATAL_ERRORS=0 \
   MAX_PRECONDITION_FAILURES=0 \
   MAX_UNCHECKED_SENDABLE=0 \
-  MAX_SWIFTLINT_DISABLES=36 \
+  MAX_SWIFTLINT_DISABLES=0 \
   MAX_NON_UI_FAMILY_LINES=550 \
   MAX_CONTROLLER_CLUSTER_LINES=3950 \
     python3 ./scripts/check_maintainability.py | tee "$CI_OUTPUT_DIR/maintainability-report.txt"

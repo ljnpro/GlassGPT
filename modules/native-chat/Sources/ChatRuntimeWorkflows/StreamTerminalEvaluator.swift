@@ -1,4 +1,3 @@
-import ChatRuntimeModel
 import Foundation
 
 /// The raw outcomes observed when a streaming event loop exits.
@@ -12,28 +11,40 @@ public struct StreamTerminalOutcome: Sendable, Equatable {
     public let connectionLost: Bool
     /// A response ID discovered during the stream that enables recovery.
     public let pendingRecoveryResponseID: String?
+    /// The runtime state's current response ID, if any.
+    public let stateResponseID: String?
     /// An error surfaced during the terminal or incomplete event.
     public let pendingError: String?
     /// Whether the reply buffer contains any assistant text.
     public let hasBufferContent: Bool
-    /// Whether the session was still in a streaming lifecycle when the loop exited.
-    public let wasStillStreaming: Bool
+    /// The runtime state's last received sequence number, if any.
+    public let lastSequenceNumber: Int?
+    /// Whether the original request used background mode.
+    public let usesBackgroundMode: Bool
+    /// Whether a reconnect attempt is still available.
+    public let canRetryConnection: Bool
 
     /// Creates a terminal outcome from the facts observed during a stream.
     public init(
         didComplete: Bool,
         connectionLost: Bool,
         pendingRecoveryResponseID: String?,
+        stateResponseID: String?,
         pendingError: String?,
         hasBufferContent: Bool,
-        wasStillStreaming: Bool
+        lastSequenceNumber: Int?,
+        usesBackgroundMode: Bool,
+        canRetryConnection: Bool
     ) {
         self.didComplete = didComplete
         self.connectionLost = connectionLost
         self.pendingRecoveryResponseID = pendingRecoveryResponseID
+        self.stateResponseID = stateResponseID
         self.pendingError = pendingError
         self.hasBufferContent = hasBufferContent
-        self.wasStillStreaming = wasStillStreaming
+        self.lastSequenceNumber = lastSequenceNumber
+        self.usesBackgroundMode = usesBackgroundMode
+        self.canRetryConnection = canRetryConnection
     }
 }
 
@@ -61,36 +72,26 @@ public enum StreamTerminalAction: Sendable, Equatable {
 /// embed terminal-condition logic.
 public enum StreamTerminalEvaluator {
     /// Evaluate a terminal outcome and return the action composition should take.
-    ///
-    /// - Parameters:
-    ///   - outcome: The facts observed when the stream ended.
-    ///   - state: The current runtime state snapshot.
-    ///   - usesBackgroundMode: Whether the original request used background mode.
-    ///   - canRetryConnection: Whether a reconnect attempt is still available.
+    /// - Parameter outcome: The facts observed when the stream ended.
     /// - Returns: The decided action for composition to dispatch.
-    public static func evaluate(
-        outcome: StreamTerminalOutcome,
-        state: ReplyRuntimeState,
-        usesBackgroundMode: Bool,
-        canRetryConnection: Bool
-    ) -> StreamTerminalAction {
+    public static func evaluate(_ outcome: StreamTerminalOutcome) -> StreamTerminalAction {
         // 1. Clean completion — nothing more to do.
         if outcome.didComplete {
             return .completed
         }
 
         // 2. We have a response ID for recovery (from pending recovery or current state).
-        let recoveryResponseID = outcome.pendingRecoveryResponseID ?? state.responseID
+        let recoveryResponseID = outcome.pendingRecoveryResponseID ?? outcome.stateResponseID
         if let responseID = recoveryResponseID {
             return .recover(
                 responseID: responseID,
-                lastSequenceNumber: state.lastSequenceNumber,
-                usesBackgroundMode: usesBackgroundMode
+                lastSequenceNumber: outcome.lastSequenceNumber,
+                usesBackgroundMode: outcome.usesBackgroundMode
             )
         }
 
         // 3. Connection lost with no response ID — try reconnecting first.
-        if outcome.connectionLost && canRetryConnection {
+        if outcome.connectionLost && outcome.canRetryConnection {
             return .retryConnection
         }
 
