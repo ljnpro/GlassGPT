@@ -55,7 +55,23 @@ public enum NativeChatPersistence {
 
     /// Creates a ``NativeChatPersistenceBootstrap`` with the full recovery pipeline.
     public static func makeSharedBootstrap(bundleIdentifier: String?) -> NativeChatPersistenceBootstrap {
-        createPersistentContainer(bundleIdentifier: bundleIdentifier)
+        _ = ReleaseResetCoordinator.performIfNeeded(bundleIdentifier: bundleIdentifier)
+        return createPersistentContainer(
+            makePersistentContainer: makeContainer,
+            preserveExistingStore: {
+                let result = preserveExistingStoreForRecovery()
+                let failureMessage: String? = if case let .failed(message) = result {
+                    message
+                } else {
+                    nil
+                }
+                return StoreRecoveryOutcome(
+                    didRecoverPersistentStore: result.didRecoverPersistentStore,
+                    failureMessage: failureMessage
+                )
+            },
+            makeFallbackContainer: makeInMemoryContainer
+        )
     }
 
     /// Convenience that returns only the `ModelContainer` from the bootstrap result.
@@ -65,16 +81,23 @@ public enum NativeChatPersistence {
 
     private static let persistenceSignposter = OSSignposter(subsystem: "GlassGPT", category: "persistence")
 
-    private static func createPersistentContainer(bundleIdentifier: String?) -> NativeChatPersistenceBootstrap {
+    struct StoreRecoveryOutcome {
+        let didRecoverPersistentStore: Bool
+        let failureMessage: String?
+    }
+
+    static func createPersistentContainer(
+        makePersistentContainer: () throws -> ModelContainer,
+        preserveExistingStore: () -> StoreRecoveryOutcome,
+        makeFallbackContainer: () -> ModelContainer?
+    ) -> NativeChatPersistenceBootstrap {
         let signpostID = persistenceSignposter.makeSignpostID()
         let signpostState = persistenceSignposter.beginInterval("CreatePersistentContainer", id: signpostID)
         defer { persistenceSignposter.endInterval("CreatePersistentContainer", signpostState) }
 
-        _ = ReleaseResetCoordinator.performIfNeeded(bundleIdentifier: bundleIdentifier)
-
         do {
             return try NativeChatPersistenceBootstrap(
-                container: makeContainer(),
+                container: makePersistentContainer(),
                 didRecoverPersistentStore: false,
                 startupErrorDescription: nil
             )
@@ -82,14 +105,14 @@ public enum NativeChatPersistence {
             Loggers.persistence.error("[NativeChatPersistence] Initial persistent container creation failed: \(error.localizedDescription)")
         }
 
-        let preservationResult = preserveExistingStoreForRecovery()
-        if case let .failed(message) = preservationResult {
+        let preservationResult = preserveExistingStore()
+        if let message = preservationResult.failureMessage {
             Loggers.persistence.error("[NativeChatPersistence] \(message)")
         }
 
         do {
             return try NativeChatPersistenceBootstrap(
-                container: makeContainer(),
+                container: makePersistentContainer(),
                 didRecoverPersistentStore: preservationResult.didRecoverPersistentStore,
                 startupErrorDescription: nil
             )
@@ -97,11 +120,11 @@ public enum NativeChatPersistence {
             Loggers.persistence.error("[NativeChatPersistence] Persistent container retry failed: \(error.localizedDescription)")
         }
 
-        if let inMemoryContainer = makeInMemoryContainer() {
+        if let inMemoryContainer = makeFallbackContainer() {
             return NativeChatPersistenceBootstrap(
                 container: inMemoryContainer,
                 didRecoverPersistentStore: preservationResult.didRecoverPersistentStore,
-                startupErrorDescription: nil
+                startupErrorDescription: "Chat storage is running in temporary mode. Your conversations will not be saved."
             )
         }
 
