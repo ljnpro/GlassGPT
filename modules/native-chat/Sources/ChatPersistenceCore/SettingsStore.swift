@@ -95,7 +95,11 @@ public final class SettingsStore {
             }
 
             let resolvedModel = defaultModel
-            return resolvedModel.availableEfforts.contains(effort) ? effort : resolvedModel.defaultEffort
+            let correctedEffort = resolvedModel.availableEfforts.contains(effort) ? effort : resolvedModel.defaultEffort
+            if correctedEffort != effort {
+                valueStore.set(correctedEffort.rawValue, forKey: Keys.defaultEffort)
+            }
+            return correctedEffort
         }
         set {
             valueStore.set(newValue.rawValue, forKey: Keys.defaultEffort)
