@@ -117,7 +117,6 @@ public extension OpenAIRequestFactory {
     /// Returns the MIME type for the given filename based on its extension.
     /// - Parameter filename: The filename to inspect.
     /// - Returns: The corresponding MIME type string, or "application/octet-stream" for unknown types.
-    // swiftlint:disable:next cyclomatic_complexity
     static func mimeType(for filename: String) -> String {
         switch URL(fileURLWithPath: filename).pathExtension.lowercased() {
         case "png": "image/png"

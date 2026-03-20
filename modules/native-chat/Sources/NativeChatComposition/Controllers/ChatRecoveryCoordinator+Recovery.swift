@@ -7,7 +7,6 @@ private let recoverySignposter = OSSignposter(subsystem: "GlassGPT", category: "
 
 @MainActor
 extension ChatRecoveryCoordinator {
-    // swiftlint:disable:next cyclomatic_complexity function_body_length
     func recoverResponse(
         messageId: UUID,
         responseId: String,

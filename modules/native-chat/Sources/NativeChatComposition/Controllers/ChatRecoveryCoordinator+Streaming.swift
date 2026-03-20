@@ -4,7 +4,6 @@ import Foundation
 
 @MainActor
 extension ChatRecoveryCoordinator {
-    // swiftlint:disable:next cyclomatic_complexity function_body_length
     func startStreamingRecovery(
         session: ReplySession,
         responseId: String,

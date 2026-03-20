@@ -43,7 +43,6 @@ public enum OpenAIStreamEventTranslator {
         return translate(eventType: eventType, envelope: envelope)
     }
 
-    // swiftlint:disable:next cyclomatic_complexity function_body_length
     private static func translate(
         eventType: String,
         envelope: ResponsesStreamEnvelopeDTO

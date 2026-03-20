@@ -1,5 +1,7 @@
 import ChatPersistenceCore
 import ChatPersistenceSwiftData
+import ChatRuntimeModel
+import ChatRuntimeWorkflows
 import ChatUIComponents
 import Foundation
 import OpenAITransport
@@ -9,7 +11,6 @@ private let streamingSignposter = OSSignposter(subsystem: "GlassGPT", category: 
 
 @MainActor
 extension ChatStreamingCoordinator {
-    // swiftlint:disable:next cyclomatic_complexity function_body_length
     func startStreamingRequest(for session: ReplySession, reconnectAttempt: Int = 0) {
         let signpostID = streamingSignposter.makeSignpostID()
         let signpostState = streamingSignposter.beginInterval("StreamingRequest", id: signpostID)
@@ -112,110 +113,81 @@ extension ChatStreamingCoordinator {
                 return
             }
 
-            if didReceiveCompletedEvent {
-                services.endBackgroundTask()
-                return
-            }
+            // --- Runtime-driven terminal evaluation ---
+            // Composition collects facts; runtime decides what to do next.
+            let runtimeState = sessions.cachedRuntimeState(for: session)
+            let outcome = StreamTerminalOutcome(
+                didComplete: didReceiveCompletedEvent,
+                connectionLost: receivedConnectionLost,
+                pendingRecoveryResponseID: pendingRecoveryResponseId,
+                pendingError: pendingRecoveryError,
+                hasBufferContent: !(runtimeState?.buffer.text.isEmpty ?? true),
+                wasStillStreaming: runtimeState?.isStreaming ?? false
+            )
 
-            if let responseId = pendingRecoveryResponseId {
-                let shouldSurfacePendingRecoveryError =
-                    sessions.visibleSessionMessageID == session.messageID &&
-                    (pendingRecoveryError?.isEmpty == false)
+            let canRetry = await retryStreamIfPossible(
+                session: session,
+                streamID: streamID,
+                reconnectAttempt: reconnectAttempt,
+                dryRun: true
+            )
+
+            let action = StreamTerminalEvaluator.evaluate(
+                outcome: outcome,
+                state: runtimeState ?? ReplyRuntimeState(
+                    assistantReplyID: session.assistantReplyID,
+                    messageID: session.messageID,
+                    conversationID: session.conversationID
+                ),
+                usesBackgroundMode: session.request.usesBackgroundMode,
+                canRetryConnection: canRetry && receivedConnectionLost
+            )
+
+            // --- Composition dispatches the decided action ---
+            switch action {
+            case .completed:
+                break
+
+            case let .recover(responseID, lastSeq, usesBackground):
+                if let error = pendingRecoveryError,
+                   sessions.visibleSessionMessageID == session.messageID {
+                    state.errorMessage = error
+                }
                 _ = await sessions.applyRuntimeTransition(
                     .beginRecoveryStatus(
-                        responseID: responseId,
-                        lastSequenceNumber: sessions.cachedRuntimeState(for: session)?.lastSequenceNumber,
-                        usedBackgroundMode: session.request.usesBackgroundMode,
+                        responseID: responseID,
+                        lastSequenceNumber: lastSeq,
+                        usedBackgroundMode: usesBackground,
                         route: sessions.runtimeRoute(for: session)
                     ),
                     to: session
                 )
-                if shouldSurfacePendingRecoveryError, let pendingRecoveryError {
-                    state.errorMessage = pendingRecoveryError
-                }
                 sessions.syncVisibleState(from: session)
                 recovery.recoverResponse(
                     messageId: session.messageID,
-                    responseId: responseId,
-                    preferStreamingResume: session.request.usesBackgroundMode,
+                    responseId: responseID,
+                    preferStreamingResume: usesBackground,
                     visible: false
                 )
-                services.endBackgroundTask()
-                return
-            }
 
-            if receivedConnectionLost {
-                if let responseId = sessions.cachedRuntimeState(for: session)?.responseID {
-                    _ = await sessions.applyRuntimeTransition(
-                        .beginRecoveryStatus(
-                            responseID: responseId,
-                            lastSequenceNumber: sessions.cachedRuntimeState(for: session)?.lastSequenceNumber,
-                            usedBackgroundMode: session.request.usesBackgroundMode,
-                            route: sessions.runtimeRoute(for: session)
-                        ),
-                        to: session
-                    )
-                    sessions.syncVisibleState(from: session)
-                    recovery.recoverResponse(
-                        messageId: session.messageID,
-                        responseId: responseId,
-                        preferStreamingResume: session.request.usesBackgroundMode,
-                        visible: false
-                    )
-                    services.endBackgroundTask()
-                    return
-                }
-
-                if await retryStreamIfPossible(
+            case .retryConnection:
+                _ = await retryStreamIfPossible(
                     session: session,
                     streamID: streamID,
                     reconnectAttempt: reconnectAttempt
-                ) {
-                    services.endBackgroundTask()
-                    return
-                }
+                )
 
-                if !(sessions.cachedRuntimeState(for: session)?.buffer.text.isEmpty ?? true) {
-                    sessions.finalizeSessionAsPartial(session)
-                } else if let message = conversations.findMessage(byId: session.messageID) {
+            case .finalizePartial:
+                sessions.finalizeSessionAsPartial(session)
+
+            case let .removeEmptyMessage(errorMessage):
+                if let message = conversations.findMessage(byId: session.messageID) {
                     sessions.removeEmptyMessage(message, for: session)
-                    if sessions.visibleSessionMessageID == session.messageID {
-                        state.errorMessage = "Connection lost. Please check your network and try again."
-                        sessions.clearLiveGenerationState(clearDraft: true)
-                        state.hapticService.notify(.error, isEnabled: state.hapticsEnabled)
-                    }
                 }
-
-                services.endBackgroundTask()
-                return
-            }
-
-            if sessions.cachedRuntimeState(for: session)?.isStreaming == true {
-                if let responseId = sessions.cachedRuntimeState(for: session)?.responseID {
-                    sessions.saveSessionNow(session)
-                    _ = await sessions.applyRuntimeTransition(
-                        .beginRecoveryStatus(
-                            responseID: responseId,
-                            lastSequenceNumber: sessions.cachedRuntimeState(for: session)?.lastSequenceNumber,
-                            usedBackgroundMode: session.request.usesBackgroundMode,
-                            route: sessions.runtimeRoute(for: session)
-                        ),
-                        to: session
-                    )
-                    sessions.syncVisibleState(from: session)
-                    recovery.recoverResponse(
-                        messageId: session.messageID,
-                        responseId: responseId,
-                        preferStreamingResume: session.request.usesBackgroundMode,
-                        visible: false
-                    )
-                } else if !(sessions.cachedRuntimeState(for: session)?.buffer.text.isEmpty ?? true) {
-                    sessions.finalizeSessionAsPartial(session)
-                } else if let message = conversations.findMessage(byId: session.messageID) {
-                    sessions.removeEmptyMessage(message, for: session)
-                    if sessions.visibleSessionMessageID == session.messageID {
-                        sessions.clearLiveGenerationState(clearDraft: true)
-                    }
+                if let errorMessage, sessions.visibleSessionMessageID == session.messageID {
+                    state.errorMessage = errorMessage
+                    sessions.clearLiveGenerationState(clearDraft: true)
+                    state.hapticService.notify(.error, isEnabled: state.hapticsEnabled)
                 }
             }
 

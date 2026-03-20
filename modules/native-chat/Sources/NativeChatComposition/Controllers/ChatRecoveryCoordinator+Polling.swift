@@ -6,7 +6,6 @@ import OpenAITransport
 
 @MainActor
 extension ChatRecoveryCoordinator {
-    // swiftlint:disable:next cyclomatic_complexity function_body_length
     func pollResponseUntilTerminal(session: ReplySession, responseId: String) async {
         let key = resultApplier.activeAPIKey(for: session)
         guard !key.isEmpty else { return }
