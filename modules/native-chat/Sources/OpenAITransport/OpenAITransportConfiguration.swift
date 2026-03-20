@@ -11,6 +11,10 @@ public protocol OpenAIConfigurationProvider: Sendable {
     var cloudflareAIGToken: String { get }
     /// Whether to route API requests through the Cloudflare gateway.
     var useCloudflareGateway: Bool { get set }
+    /// The timeout interval for long-running chat streaming and recovery requests.
+    var chatRequestTimeoutInterval: TimeInterval { get }
+    /// The timeout interval for generated file download requests.
+    var generatedFileDownloadTimeoutInterval: TimeInterval { get }
 }
 
 /// A fully resolved API endpoint with its route, base URL, and authorization requirements.
@@ -44,6 +48,14 @@ public struct OpenAIResolvedEndpoint: Sendable {
 }
 
 public extension OpenAIConfigurationProvider {
+    var chatRequestTimeoutInterval: TimeInterval {
+        300
+    }
+
+    var generatedFileDownloadTimeoutInterval: TimeInterval {
+        120
+    }
+
     /// The resolved base URL for the current routing configuration.
     var openAIBaseURL: String {
         resolvedEndpoint().baseURL
