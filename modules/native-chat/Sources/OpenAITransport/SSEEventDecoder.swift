@@ -36,6 +36,8 @@ public struct SSEEventDecoder {
     public private(set) var sawTerminalEvent = false
     /// The response ID that has been emitted, if any.
     public private(set) var emittedResponseID: String?
+    /// The number of malformed frames seen in a row.
+    private(set) var consecutiveDecodeFailures = 0
 
     /// Creates a new empty SSE event decoder.
     public init() {}
@@ -54,6 +56,7 @@ public struct SSEEventDecoder {
         defer { sseDecoderSignposter.endInterval("DecodeSSEFrame", signpostState) }
 
         guard let jsonData = frame.data.data(using: .utf8) else {
+            recordDecodeFailure("SSE frame data is not valid UTF-8.")
             return .continued
         }
 
@@ -61,6 +64,7 @@ public struct SSEEventDecoder {
         let responseID = OpenAIStreamEventTranslator.extractResponseIdentifier(from: jsonData)
 
         if let translated = OpenAIStreamEventTranslator.translate(eventType: frame.type, data: jsonData) {
+            resetDecodeFailures()
             switch translated {
             case let .textDelta(delta):
                 yieldResponseIdentifierIfNeeded(responseID, continuation: continuation)
@@ -145,8 +149,11 @@ public struct SSEEventDecoder {
             if let envelope = decodeEnvelope(from: jsonData),
                let fullText = envelope.text,
                !fullText.isEmpty {
+                resetDecodeFailures()
                 accumulatedText = fullText
                 emittedAnyOutput = true
+            } else {
+                recordDecodeFailure("SSE frame could not be decoded for event type \(frame.type).")
             }
             yieldSequenceIfNeeded(sequenceNumber, continuation: continuation)
             return .continued
@@ -159,11 +166,17 @@ public struct SSEEventDecoder {
              "response.content_part.done",
              "response.reasoning_summary_part.added",
              "response.reasoning_summary_part.done":
+            resetDecodeFailures()
             yieldResponseIdentifierIfNeeded(responseID, continuation: continuation)
             yieldSequenceIfNeeded(sequenceNumber, continuation: continuation)
             return .continued
 
         default:
+            if decodeEnvelope(from: jsonData) == nil {
+                recordDecodeFailure("SSE frame could not be decoded for event type \(frame.type).")
+            } else {
+                resetDecodeFailures()
+            }
             return .continued
         }
     }
@@ -228,6 +241,19 @@ public struct SSEEventDecoder {
         } catch {
             Self.logger.debug("SSE envelope decode failed: \(error.localizedDescription, privacy: .public)")
             return nil
+        }
+    }
+
+    private mutating func resetDecodeFailures() {
+        consecutiveDecodeFailures = 0
+    }
+
+    private mutating func recordDecodeFailure(_ message: String) {
+        consecutiveDecodeFailures += 1
+        if consecutiveDecodeFailures >= 5 {
+            Self.logger.error("\(message, privacy: .public)")
+        } else {
+            Self.logger.debug("\(message, privacy: .public)")
         }
     }
 }
