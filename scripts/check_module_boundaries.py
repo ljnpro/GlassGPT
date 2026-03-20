@@ -10,6 +10,7 @@ SOURCES_ROOT = ROOT / "modules" / "native-chat" / "Sources"
 IMPORT_PATTERN = re.compile(r"(?m)^\s*import\s+([A-Za-z_][A-Za-z0-9_]*)\s*$")
 ACTIVE_SOURCE_TARGETS = (
     "ChatDomain",
+    "AITransportContracts",
     "ChatPersistenceContracts",
     "ChatPersistenceCore",
     "ChatPersistenceSwiftData",
@@ -35,6 +36,14 @@ class TargetRule:
 
 
 TARGET_RULES: dict[str, TargetRule] = {
+    "AITransportContracts": TargetRule(
+        allowed_imports=frozenset({"Foundation", "ChatDomain"}),
+        forbidden_patterns=(
+            ("Bundle.main", "AITransportContracts must not reach app bundle state"),
+            ("ProcessInfo.processInfo", "AITransportContracts must not read process environment"),
+            ("URLSession.shared", "AITransportContracts must not perform networking"),
+        ),
+    ),
     "ChatDomain": TargetRule(
         allowed_imports=frozenset({"Foundation"}),
         forbidden_patterns=(
@@ -74,7 +83,7 @@ TARGET_RULES: dict[str, TargetRule] = {
         ),
     ),
     "OpenAITransport": TargetRule(
-        allowed_imports=frozenset({"Foundation", "ChatDomain", "Synchronization", "os"}),
+        allowed_imports=frozenset({"Foundation", "ChatDomain", "AITransportContracts", "Synchronization", "os"}),
         forbidden_patterns=(
             ("Bundle.main", "OpenAITransport must not reach app bundle state directly"),
             ("ProcessInfo.processInfo", "OpenAITransport configuration must flow through providers"),
@@ -117,7 +126,7 @@ TARGET_RULES: dict[str, TargetRule] = {
         ),
     ),
     "ChatRuntimeWorkflows": TargetRule(
-        allowed_imports=frozenset({"Foundation", "ChatDomain", "ChatRuntimeModel", "ChatRuntimePorts", "OpenAITransport", "os"}),
+        allowed_imports=frozenset({"Foundation", "ChatDomain", "AITransportContracts", "ChatRuntimeModel", "ChatRuntimePorts", "OpenAITransport", "os"}),
         forbidden_patterns=(
             ("Bundle.main", "ChatRuntimeWorkflows must not reach app bundle state"),
             ("ProcessInfo.processInfo", "ChatRuntimeWorkflows must not read process environment"),
@@ -127,9 +136,10 @@ TARGET_RULES: dict[str, TargetRule] = {
     ),
     "ChatApplication": TargetRule(
         allowed_imports=frozenset({
-            "Foundation", "ChatDomain", "ChatPersistenceContracts",
-            "ChatPersistenceCore",
+            "Foundation", "ChatDomain", "AITransportContracts",
+            "ChatPersistenceContracts", "ChatPersistenceCore",
             "ChatRuntimeModel", "ChatRuntimePorts", "ChatRuntimeWorkflows",
+            "Observation", "AVFoundation", "Network",
         }),
         forbidden_patterns=(
             ("Bundle.main", "ChatApplication must not reach app bundle state"),

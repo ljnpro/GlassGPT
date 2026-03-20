@@ -18,22 +18,22 @@ public extension OpenAIRequestFactory {
         boundary: String = "Boundary-\(UUID().uuidString)"
     ) throws(OpenAIServiceError) -> URLRequest {
         var body = Data()
-        let crlf = "\r\n"
+        let crlf = Data("\r\n".utf8)
 
         // Model field
-        body.append("--\(boundary)\(crlf)".data(using: .utf8)!)
-        body.append("Content-Disposition: form-data; name=\"model\"\(crlf)\(crlf)".data(using: .utf8)!)
-        body.append("\(model)\(crlf)".data(using: .utf8)!)
+        body.append(Data("--\(boundary)\r\n".utf8))
+        body.append(Data("Content-Disposition: form-data; name=\"model\"\r\n\r\n".utf8))
+        body.append(Data("\(model)\r\n".utf8))
 
         // Audio file field
-        body.append("--\(boundary)\(crlf)".data(using: .utf8)!)
-        body.append("Content-Disposition: form-data; name=\"file\"; filename=\"audio.m4a\"\(crlf)".data(using: .utf8)!)
-        body.append("Content-Type: audio/m4a\(crlf)\(crlf)".data(using: .utf8)!)
+        body.append(Data("--\(boundary)\r\n".utf8))
+        body.append(Data("Content-Disposition: form-data; name=\"file\"; filename=\"audio.m4a\"\r\n".utf8))
+        body.append(Data("Content-Type: audio/m4a\r\n\r\n".utf8))
         body.append(audioData)
-        body.append(crlf.data(using: .utf8)!)
+        body.append(crlf)
 
         // Closing boundary
-        body.append("--\(boundary)--\(crlf)".data(using: .utf8)!)
+        body.append(Data("--\(boundary)--\r\n".utf8))
 
         return try request(
             for: OpenAIRequestDescriptor(
@@ -64,18 +64,7 @@ public extension OpenAIRequestFactory {
         model: String = "tts-1",
         useDirectBaseURL: Bool = false
     ) throws(OpenAIServiceError) -> URLRequest {
-        let payload: [String: String] = [
-            "model": model,
-            "input": text,
-            "voice": voice,
-        ]
-
-        let body: Data
-        do {
-            body = try JSONSerialization.data(withJSONObject: payload)
-        } catch {
-            throw OpenAIServiceError.requestFailed("Failed to encode speech request")
-        }
+        let body = try JSONCoding.encode(SpeechRequestDTO(model: model, input: text, voice: voice))
 
         return try request(
             for: OpenAIRequestDescriptor(
@@ -89,4 +78,14 @@ public extension OpenAIRequestFactory {
             useDirectBaseURL: useDirectBaseURL
         )
     }
+}
+
+/// Internal DTO for encoding TTS speech requests.
+struct SpeechRequestDTO: Encodable {
+    /// The TTS model identifier.
+    let model: String
+    /// The text to synthesize.
+    let input: String
+    /// The voice identifier.
+    let voice: String
 }

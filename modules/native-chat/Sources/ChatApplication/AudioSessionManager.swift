@@ -63,19 +63,13 @@ public final class AudioSessionManager: NSObject, Sendable {
         let url = tempDir.appendingPathComponent("glassgpt_recording_\(UUID().uuidString).m4a")
         recordingURL = url
 
-        let settings: [String: Any] = [
-            AVFormatIDKey: Int(kAudioFormatMPEG4AAC),
-            AVSampleRateKey: 44100.0,
-            AVNumberOfChannelsKey: 1,
-            AVEncoderAudioQualityKey: AVAudioQuality.high.rawValue,
-        ]
-
         do {
             let session = AVAudioSession.sharedInstance()
             try session.setCategory(.playAndRecord, mode: .default)
             try session.setActive(true)
 
-            audioRecorder = try AVAudioRecorder(url: url, settings: settings)
+            let format = AVAudioFormat(standardFormatWithSampleRate: 44100, channels: 1)
+            audioRecorder = try AVAudioRecorder(url: url, format: format ?? AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: 44100, channels: 1, interleaved: false)!)
             audioRecorder?.record()
             state = .recording
             return true
@@ -92,9 +86,13 @@ public final class AudioSessionManager: NSObject, Sendable {
         audioRecorder?.stop()
         audioRecorder = nil
 
-        if let url = recordingURL, let data = try? Data(contentsOf: url) {
-            recordedAudioData = data
-            try? FileManager.default.removeItem(at: url)
+        if let url = recordingURL {
+            do {
+                recordedAudioData = try Data(contentsOf: url)
+                try FileManager.default.removeItem(at: url)
+            } catch {
+                recordedAudioData = nil
+            }
         }
 
         recordingURL = nil

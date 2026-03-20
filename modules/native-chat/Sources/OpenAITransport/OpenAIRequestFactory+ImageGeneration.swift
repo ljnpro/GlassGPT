@@ -19,19 +19,9 @@ public extension OpenAIRequestFactory {
         quality: String = "auto",
         useDirectBaseURL: Bool = false
     ) throws(OpenAIServiceError) -> URLRequest {
-        let payload: [String: String] = [
-            "model": model,
-            "prompt": prompt,
-            "size": size,
-            "quality": quality,
-        ]
-
-        let body: Data
-        do {
-            body = try JSONSerialization.data(withJSONObject: payload)
-        } catch {
-            throw OpenAIServiceError.requestFailed("Failed to encode image generation request")
-        }
+        let body = try JSONCoding.encode(
+            ImageGenerationRequestDTO(model: model, prompt: prompt, size: size, quality: quality)
+        )
 
         return try request(
             for: OpenAIRequestDescriptor(
@@ -44,4 +34,16 @@ public extension OpenAIRequestFactory {
             useDirectBaseURL: useDirectBaseURL
         )
     }
+}
+
+/// Internal DTO for encoding image generation requests.
+struct ImageGenerationRequestDTO: Encodable {
+    /// The image generation model identifier.
+    let model: String
+    /// The text prompt describing the desired image.
+    let prompt: String
+    /// The image dimensions (e.g., "1024x1024").
+    let size: String
+    /// The image quality level.
+    let quality: String
 }

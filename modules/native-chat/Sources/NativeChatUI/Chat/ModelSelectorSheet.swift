@@ -251,7 +251,6 @@ public struct ModelSelectorSheet: View {
             lightBorderOpacity: 0.085
         )
     }
-
     private func toggleRow(
         title: String,
         subtitle: String,
@@ -269,9 +268,7 @@ public struct ModelSelectorSheet: View {
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
-
             Spacer(minLength: 12)
-
             Toggle("", isOn: isOn)
                 .labelsHidden()
                 .toggleStyle(.switch)
