@@ -531,13 +531,19 @@ final class GlassGPTUITests: XCTestCase {
 
     @MainActor
     private func openSettings(in app: XCUIApplication) -> XCUIElement {
-        let settingsBar = app.navigationBars["Settings"]
-        if !settingsBar.waitForExistence(timeout: 2) {
-            activateTab(named: "Settings", in: app)
-            XCTAssertTrue(settingsBar.waitForExistence(timeout: 5))
+        let apiKeyField = app.secureTextFields["settings.apiKey"]
+        if apiKeyField.waitForExistence(timeout: 2) {
+            return apiKeyField
         }
 
-        let apiKeyField = app.secureTextFields["settings.apiKey"]
+        activateTab(named: "Settings", in: app)
+        if apiKeyField.waitForExistence(timeout: 5) {
+            return apiKeyField
+        }
+
+        // Retry once after dismissing any transient overlay that may have intercepted the first tap.
+        app.tap()
+        activateTab(named: "Settings", in: app)
         XCTAssertTrue(apiKeyField.waitForExistence(timeout: 5))
         return apiKeyField
     }
