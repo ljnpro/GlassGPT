@@ -300,7 +300,7 @@ function is_transient_xcresult_failure() {
     return 1
   fi
 
-  printf '%s\n' "$summary" | search_quiet 'Early unexpected exit|signal kill|encountered an error'
+  printf '%s\n' "$summary" | search_quiet 'Early unexpected exit|signal kill|encountered an error|Failed to terminate'
 }
 
 function find_xctestrun_path() {
