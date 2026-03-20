@@ -3,8 +3,8 @@
 ## Source Of Truth
 
 - default branch: `main`
-- active stable branch: `codex/stable-4.9`
-- frozen prior stable branch: `codex/stable-4.8`
+- active stable branch: `codex/stable-4.10`
+- frozen prior stable branch: `codex/stable-4.9`
 - version/build source of truth: `ios/GlassGPT/Config/Versions.xcconfig`
 - tracked release wrapper: `scripts/release_testflight.sh`
 - local publishing credentials: `.local/publish.env`
@@ -13,7 +13,7 @@
 ## Tracked Release Command
 
 ```bash
-./scripts/release_testflight.sh 4.9.1 20184 --branch codex/stable-4.9
+./scripts/release_testflight.sh 4.10.0 20185 --branch codex/stable-4.10
 ```
 
 The wrapper always runs `release-readiness`, the full `./scripts/ci.sh` suite,
@@ -25,12 +25,12 @@ creation. There are no CI bypass flags on the tracked path.
 1. `./scripts/ci.sh`
 2. `./scripts/score_4_8_1.sh`
 3. `./scripts/score_4_8_2.sh`
-4. any release-specific `4.9.1` scoring or verification scripts
+4. any release-specific `4.10.0` scoring or verification scripts
 5. manual parity checklist from `docs/parity-baseline.md`
-6. clean worktree on `codex/stable-4.9`
-7. version/build match the intended `4.9.1 (20184 or next available)` candidate
+6. clean worktree on `codex/stable-4.10`
+7. version/build match the intended `4.10.0 (20185 or next available)` candidate
 8. Phase G has been re-evaluated and the ADR updated before release
-9. workflow triggers and readiness docs all reference `codex/stable-4.9`
+9. workflow triggers and readiness docs all reference `codex/stable-4.10`
 
 ## Output Artifacts
 
@@ -43,7 +43,7 @@ creation. There are no CI bypass flags on the tracked path.
 ## Post-Release Checklist
 
 1. capture the TestFlight Delivery UUID
-2. verify `codex/stable-4.9` points to the release commit
-3. verify `v4.9.0` points to the same commit
-4. verify `git ls-remote` shows `codex/stable-4.9`, `main`, and `v<marketing-version>` aligned
-5. preserve the `v4.8.2-backup-before-4.9.0` tag and source bundle
+2. verify `codex/stable-4.10` points to the release commit
+3. verify `v4.10.0` points to the same commit
+4. verify `git ls-remote` shows `codex/stable-4.10`, `main`, and `v<marketing-version>` aligned
+5. preserve the prior stable backup tag and source bundle

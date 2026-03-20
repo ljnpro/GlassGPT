@@ -21,7 +21,7 @@ struct OpenAIMultipartFormBodyTests {
             return
         }
 
-        let headerFilename = String(bodyString[filenameStart..<filenameEnd])
+        let headerFilename = String(bodyString[filenameStart ..< filenameEnd])
         #expect(headerFilename.utf8.count == 255)
     }
 }

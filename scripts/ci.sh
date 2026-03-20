@@ -17,8 +17,8 @@ APP_BUNDLE_IDENTIFIER="space.manus.liquid.glass.chat.t20260308214621"
 UI_TEST_RUNNER_BUNDLE_IDENTIFIER="${APP_BUNDLE_IDENTIFIER}UITests.xctrunner"
 SIMULATOR_DEVICE_NAME="${SIMULATOR_DEVICE_NAME:-iPhone 17}"
 SIMULATOR_DEVICE_DESTINATION="platform=iOS Simulator,name=${SIMULATOR_DEVICE_NAME}"
-DEFAULT_RELEASE_VERSION="4.9.1"
-DEFAULT_RELEASE_BUILD="20184"
+DEFAULT_RELEASE_VERSION="4.10.0"
+DEFAULT_RELEASE_BUILD="20185"
 XCODEBUILD_RETRY_ATTEMPTS="${XCODEBUILD_RETRY_ATTEMPTS:-5}"
 XCODE_TEST_TIMEOUT_ALLOWANCE="${XCODE_TEST_TIMEOUT_ALLOWANCE:-180}"
 SIMULATOR_BOOT_TIMEOUT_SECONDS="${SIMULATOR_BOOT_TIMEOUT_SECONDS:-60}"
@@ -672,7 +672,7 @@ function assert_release_readiness() {
   current_branch="${GITHUB_REF_NAME:-$(git rev-parse --abbrev-ref HEAD)}"
 
   case "$current_branch" in
-    main|codex/stable-4.1|codex/stable-4.2|codex/stable-4.3|codex/stable-4.4|codex/stable-4.5|codex/stable-4.6|codex/stable-4.7|codex/stable-4.8|codex/stable-4.9|codex/feature/4.9*|HEAD)
+    main|codex/stable-4.1|codex/stable-4.2|codex/stable-4.3|codex/stable-4.4|codex/stable-4.5|codex/stable-4.6|codex/stable-4.7|codex/stable-4.8|codex/stable-4.9|codex/stable-4.10|codex/feature/4.9*|codex/feature/4.10*|HEAD)
       ;;
     *)
       echo "Release-readiness gate does not permit branch '$current_branch'." >&2
@@ -680,18 +680,18 @@ function assert_release_readiness() {
       ;;
   esac
 
-  if ! search_quiet "codex/stable-4.9" "$ROOT_DIR/docs/branch-strategy.md"; then
-    echo "branch-strategy.md does not include codex/stable-4.9." >&2
+  if ! search_quiet "codex/stable-4.10" "$ROOT_DIR/docs/branch-strategy.md"; then
+    echo "branch-strategy.md does not include codex/stable-4.10." >&2
     exit 1
   fi
 
-  if ! search_quiet "4.8.2" "$ROOT_DIR/docs/parity-baseline.md"; then
-    echo "parity-baseline.md must include the active 4.8.2 baseline marker." >&2
+  if ! search_quiet "4.9.1" "$ROOT_DIR/docs/parity-baseline.md"; then
+    echo "parity-baseline.md must include the active 4.9.1 baseline marker." >&2
     exit 1
   fi
 
-  if ! search_quiet "codex/stable-4.9" "$ROOT_DIR/docs/release.md"; then
-    echo "release.md must describe the codex/stable-4.9 release line." >&2
+  if ! search_quiet "codex/stable-4.10" "$ROOT_DIR/docs/release.md"; then
+    echo "release.md must describe the codex/stable-4.10 release line." >&2
     exit 1
   fi
 
@@ -700,8 +700,8 @@ function assert_release_readiness() {
     exit 1
   fi
 
-  if ! search_quiet "codex/stable-4.9" "$ROOT_DIR/.github/workflows/ios.yml"; then
-    echo "ios.yml must include codex/stable-4.9." >&2
+  if ! search_quiet "codex/stable-4.10" "$ROOT_DIR/.github/workflows/ios.yml"; then
+    echo "ios.yml must include codex/stable-4.10." >&2
     exit 1
   fi
 

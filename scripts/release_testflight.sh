@@ -20,7 +20,7 @@ Usage:
   ./scripts/release_testflight.sh <marketing_version> <build_number> [--branch <name>] [--commit-message "<message>"]
 
 Examples:
-  ./scripts/release_testflight.sh 4.9.1 20184 --branch codex/stable-4.9
+  ./scripts/release_testflight.sh 4.10.0 20185 --branch codex/stable-4.10
 EOF
 }
 
@@ -70,7 +70,7 @@ if [[ -z "$TARGET_BRANCH" ]]; then
 fi
 
 case "$TARGET_BRANCH" in
-  main|codex/stable-4.1|codex/stable-4.2|codex/stable-4.3|codex/stable-4.4|codex/stable-4.5|codex/stable-4.6|codex/stable-4.7|codex/stable-4.8|codex/stable-4.9)
+  main|codex/stable-4.1|codex/stable-4.2|codex/stable-4.3|codex/stable-4.4|codex/stable-4.5|codex/stable-4.6|codex/stable-4.7|codex/stable-4.8|codex/stable-4.9|codex/stable-4.10)
     ;;
   *)
     echo "Release target branch must be a stable branch or main. Got: $TARGET_BRANCH" >&2

@@ -21,21 +21,23 @@
 - `codex/stable-4.8`
   - frozen pre-4.9 baseline
 - `codex/stable-4.9`
+  - frozen pre-4.10 baseline
+- `codex/stable-4.10`
   - active stable release line
 
 ## Short-Lived Branches
 
 - `codex/feature/<topic>`
-  - branch from `codex/stable-4.9`
-  - merge back to `codex/stable-4.9` through review
+  - branch from `codex/stable-4.10`
+  - merge back to `codex/stable-4.10` through review
   - delete after the release commit lands
 
 ## Release Alignment
 
 - release tags use `v<marketing-version>`
-- keep the `v4.8.2-backup-before-4.9.0` backup tag and source bundle
+- keep the prior stable backup tag and source bundle
 - after TestFlight publication:
-  - verify `./scripts/ci.sh release-readiness` on `codex/stable-4.9`
-  - verify `./scripts/ci.sh maintainability` on `codex/stable-4.9`
-  - push `codex/stable-4.9`
+  - verify `./scripts/ci.sh release-readiness` on `codex/stable-4.10`
+  - verify `./scripts/ci.sh maintainability` on `codex/stable-4.10`
+  - push `codex/stable-4.10`
   - fast-forward `main` to the same commit

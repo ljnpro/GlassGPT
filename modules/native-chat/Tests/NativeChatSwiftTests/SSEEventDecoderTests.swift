@@ -10,7 +10,7 @@ struct SSEEventDecoderTests {
             continuation: AsyncStream<StreamEvent>.Continuation
         )
 
-        for _ in 0..<5 {
+        for _ in 0 ..< 5 {
             let result = decoder.decode(
                 frame: SSEFrame(
                     type: "response.output_text.delta",
