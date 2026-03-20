@@ -4,7 +4,6 @@ set -euo pipefail
 export PYTHONDONTWRITEBYTECODE="${PYTHONDONTWRITEBYTECODE:-1}"
 
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-LOCAL_RELEASE_SCRIPT="$ROOT_DIR/.local/one_click_release.sh"
 ENV_FILE="$ROOT_DIR/.local/publish.env"
 VERSIONS_XCCONFIG_PATH="${VERSIONS_XCCONFIG_PATH:-$ROOT_DIR/ios/GlassGPT/Config/Versions.xcconfig}"
 PROJECT_PATH="${XCODE_PROJECT_PATH:-$ROOT_DIR/ios/GlassGPT.xcodeproj}"
@@ -81,11 +80,6 @@ esac
 CURRENT_BRANCH="$(git -C "$ROOT_DIR" rev-parse --abbrev-ref HEAD)"
 if [[ "$CURRENT_BRANCH" != "HEAD" && "$CURRENT_BRANCH" != "$TARGET_BRANCH" ]]; then
   echo "Run the release wrapper from the target branch. Current: $CURRENT_BRANCH, target: $TARGET_BRANCH" >&2
-  exit 1
-fi
-
-if [[ ! -x "$LOCAL_RELEASE_SCRIPT" ]]; then
-  echo "Missing executable local release helper: $LOCAL_RELEASE_SCRIPT" >&2
   exit 1
 fi
 

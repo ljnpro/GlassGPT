@@ -716,11 +716,6 @@ function assert_release_readiness() {
     exit 1
   fi
 
-  if [[ ! -x "$ROOT_DIR/.local/one_click_release.sh" ]]; then
-    echo "Missing executable local release helper: .local/one_click_release.sh" >&2
-    exit 1
-  fi
-
   if [[ ! -f "$ROOT_DIR/docs/branch-strategy.md" || \
         ! -f "$ROOT_DIR/docs/testing.md" || \
         ! -f "$ROOT_DIR/docs/release.md" || \
