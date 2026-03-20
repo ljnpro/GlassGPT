@@ -13,7 +13,6 @@ public extension ReplySessionActor {
     /// - Parameter transition: The transition to apply.
     /// - Returns: The updated runtime state.
     @discardableResult
-    // swiftlint:disable:next cyclomatic_complexity function_body_length
     func apply(_ transition: ReplyRuntimeTransition) -> ReplyRuntimeState {
         let signpostID = runtimeSignposter.makeSignpostID()
         let signpostState = runtimeSignposter.beginInterval("ApplyTransition", id: signpostID)

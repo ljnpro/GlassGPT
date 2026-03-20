@@ -82,7 +82,6 @@ public enum RichTextAttributedStringBuilder {
         }
     }
 
-    // swiftlint:disable:next cyclomatic_complexity function_body_length
     private static func manualMarkdownParse(_ text: String, style: Style) -> AttributedString {
         var result = AttributedString()
         let chars = Array(text)

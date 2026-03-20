@@ -45,7 +45,6 @@ public struct SSEEventDecoder {
     ///   - frame: The SSE frame to decode.
     ///   - continuation: The async stream continuation to yield events to.
     /// - Returns: The terminal result indicating whether the stream should continue.
-    // swiftlint:disable:next cyclomatic_complexity function_body_length
     public mutating func decode(
         frame: SSEFrame,
         continuation: AsyncStream<StreamEvent>.Continuation

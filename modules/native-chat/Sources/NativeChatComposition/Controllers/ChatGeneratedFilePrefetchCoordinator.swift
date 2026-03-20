@@ -25,7 +25,6 @@ final class ChatGeneratedFilePrefetchCoordinator {
         self.services = services
     }
 
-    // swiftlint:disable:next function_body_length
     func prefetchGeneratedFilesIfNeeded(for message: Message) {
         let key = services.apiKeyStore.loadAPIKey()?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         guard !key.isEmpty else { return }

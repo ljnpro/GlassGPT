@@ -1,10 +1,8 @@
 /// The available language model variants for chat completions.
 public enum ModelType: String, CaseIterable, Identifiable, Codable, Sendable {
     /// Standard GPT-5.4 model.
-    // swiftlint:disable:next identifier_name
     case gpt5_4 = "gpt-5.4"
     /// Enhanced GPT-5.4 Pro model with extended reasoning capabilities.
-    // swiftlint:disable:next identifier_name
     case gpt5_4_pro = "gpt-5.4-pro"
 
     /// Stable identifier derived from the raw value.

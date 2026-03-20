@@ -19,7 +19,7 @@ Usage:
   ./scripts/release_testflight.sh <marketing_version> <build_number> [--branch <name>] [--commit-message "<message>"]
 
 Examples:
-  ./scripts/release_testflight.sh 4.9.0 20183 --branch codex/stable-4.9
+  ./scripts/release_testflight.sh 4.9.1 20184 --branch codex/stable-4.9
 EOF
 }
 

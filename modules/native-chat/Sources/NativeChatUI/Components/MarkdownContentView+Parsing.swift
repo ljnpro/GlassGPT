@@ -5,7 +5,6 @@ package extension MarkdownContentView {
 
     /// First pass: extract code blocks and LaTeX blocks from raw text.
     /// Returns a mix of code/latex blocks and raw text chunks.
-    // swiftlint:disable:next cyclomatic_complexity function_body_length
     func parseBlocks(_ input: String) -> [BlockPart] {
         var firstPass: [BlockPart] = []
         var inlineBuffer = ""

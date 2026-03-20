@@ -130,8 +130,8 @@ public extension OpenAIRequestFactory {
         let body = try JSONCoding.encode(
             ResponsesTitleRequestDTO(
                 model: modelIdentifier,
-                // swiftlint:disable:next line_length
-                instructions: "Generate a very short title (2-4 words max) for this conversation. Return only the title, no quotes, no punctuation at the end.",
+                instructions: "Generate a very short title (2-4 words max) for this conversation. "
+                    + "Return only the title, no quotes, no punctuation at the end.",
                 input: [
                     ResponsesInputMessageDTO(
                         role: "user",

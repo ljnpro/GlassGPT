@@ -62,7 +62,6 @@ final class ChatFileInteractionCoordinator {
         state.pendingAttachments.removeAll { $0.id == attachment.id }
     }
 
-    // swiftlint:disable:next function_body_length
     func handleSandboxLinkTap(message: Message, sandboxURL: String, annotation: FilePathAnnotation?) {
         let apiKey = services.apiKeyStore.loadAPIKey()?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         guard !apiKey.isEmpty else {

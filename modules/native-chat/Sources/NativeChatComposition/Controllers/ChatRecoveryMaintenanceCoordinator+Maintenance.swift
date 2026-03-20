@@ -73,7 +73,6 @@ extension ChatRecoveryMaintenanceCoordinator {
         }
     }
 
-    // swiftlint:disable:next function_body_length
     func resendOrphanedDrafts() async {
         let apiKey = services.apiKeyStore.loadAPIKey()?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         guard !apiKey.isEmpty else { return }
@@ -205,8 +204,9 @@ extension ChatRecoveryMaintenanceCoordinator {
         state.errorMessage = nil
 
         #if DEBUG
-        // swiftlint:disable:next line_length
-        Loggers.recovery.debug("[Recovery] Starting resend stream for conversation: \(conversation.title), messages count: \(state.messages.count)")
+        Loggers.recovery.debug(
+            "[Recovery] Starting resend stream for \(conversation.title), messages: \(state.messages.count)"
+        )
         #endif
 
         streaming.startStreamingRequest(for: session, reconnectAttempt: 0)

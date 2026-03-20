@@ -4,7 +4,6 @@ import Foundation
 
 @MainActor
 extension ChatRecoveryCoordinator {
-    // swiftlint:disable:next cyclomatic_complexity function_body_length
     func startStreamingRecovery(
         session: ReplySession,
         responseId: String,
@@ -99,14 +98,23 @@ extension ChatRecoveryCoordinator {
             return
         }
 
-        switch ReplyRecoveryPlanner.streamNextStep(
+        // Runtime evaluator decides the next recovery step
+        let streamOutcome = RecoveryStreamOutcome(
+            finishedFromStream: finishedFromStream,
+            receivedAnyEvent: receivedAnyRecoveryEvent,
+            gatewayResumeTimedOut: gatewayResumeTimedOut,
+            encounteredRecoverableFailure: encounteredRecoverableFailure,
             cloudflareGatewayEnabled: execution.service.configurationProvider.useCloudflareGateway,
             useDirectEndpoint: useDirectEndpoint,
-            gatewayResumeTimedOut: gatewayResumeTimedOut,
-            receivedAnyRecoveryEvent: receivedAnyRecoveryEvent,
-            encounteredRecoverableFailure: encounteredRecoverableFailure,
-            responseId: sessions.cachedRuntimeState(for: session)?.responseID
-        ) {
+            responseID: sessions.cachedRuntimeState(for: session)?.responseID
+        )
+        let nextAction = RecoveryStreamEvaluator.evaluate(streamOutcome)
+
+        // Composition dispatches the decided action
+        switch nextAction {
+        case .completed:
+            return
+
         case .retryDirectStream:
             #if DEBUG
             Loggers.recovery.debug("[Recovery] Gateway resume stalled for \(responseId); retrying direct")
@@ -125,7 +133,7 @@ extension ChatRecoveryCoordinator {
             sessions.syncVisibleState(from: session)
             await pollResponseUntilTerminal(session: session, responseId: responseId)
 
-        case .none:
+        case .giveUp:
             return
         }
     }
