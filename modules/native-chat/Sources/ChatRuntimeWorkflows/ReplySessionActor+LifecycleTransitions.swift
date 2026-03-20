@@ -54,6 +54,8 @@ extension ReplySessionActor {
                         route: cursor.route
                     )
                 )
+            } else {
+                state.lifecycle = .failed(nil)
             }
             state.isThinking = false
 
