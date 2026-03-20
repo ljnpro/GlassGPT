@@ -7,6 +7,8 @@ import GeneratedFilesCore
 @Observable
 @MainActor
 package final class NativeChatAppStore {
+    /// The application router for navigation and deep linking.
+    package let router = AppRouter()
     /// The currently selected tab index (0=Chat, 1=History, 2=Settings).
     package var selectedTab = 0
     /// Whether UI-test preview mode is active.

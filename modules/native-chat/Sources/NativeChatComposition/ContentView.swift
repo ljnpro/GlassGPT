@@ -35,6 +35,9 @@ package struct ContentView: View {
             .accessibilityIdentifier("tab.settings")
         }
         .environment(\.hapticsEnabled, settingsDefaults.hapticEnabled)
+        .onOpenURL { url in
+            appStore.router.handleURL(url)
+        }
         .tabBarMinimizeBehavior(.never)
         .fullScreenCover(item: uiTestPreviewItemBinding, onDismiss: handleUITestPreviewDismiss) { previewItem in
             if appStore.isUITestPreviewMode {
