@@ -1,3 +1,4 @@
+import AITransportContracts
 import ChatApplication
 import ChatDomain
 import ChatPersistenceContracts
@@ -35,6 +36,7 @@ final class NativeChatArchitectureTests: XCTestCase {
             encoding: .utf8
         )
         let requiredTargets = [
+            "AITransportContracts",
             "ChatPersistenceContracts",
             "ChatPersistenceCore",
             "ChatPersistenceSwiftData",
@@ -68,6 +70,7 @@ final class NativeChatArchitectureTests: XCTestCase {
 
     func testNewSourceTargetsContainProductionSwift() throws {
         let targets = [
+            "AITransportContracts",
             "ChatPersistenceContracts",
             "ChatPersistenceCore",
             "ChatPersistenceSwiftData",

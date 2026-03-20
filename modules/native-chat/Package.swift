@@ -9,6 +9,12 @@ let boundaryTargets: [Target] = [
         resources: [.process("ChatDomain.docc")],
     ),
     .target(
+        name: "AITransportContracts",
+        dependencies: ["ChatDomain"],
+        path: "Sources/AITransportContracts",
+        resources: [.process("AITransportContracts.docc")],
+    ),
+    .target(
         name: "ChatPersistenceContracts",
         dependencies: ["ChatDomain"],
         path: "Sources/ChatPersistenceContracts",
@@ -30,7 +36,7 @@ let boundaryTargets: [Target] = [
     ),
     .target(
         name: "OpenAITransport",
-        dependencies: ["ChatDomain"],
+        dependencies: ["ChatDomain", "AITransportContracts"],
         path: "Sources/OpenAITransport",
         resources: [.process("OpenAITransport.docc")],
     ),
@@ -67,6 +73,7 @@ let boundaryTargets: [Target] = [
         name: "ChatRuntimeWorkflows",
         dependencies: [
             "ChatDomain",
+            "AITransportContracts",
             "ChatRuntimeModel",
             "ChatRuntimePorts",
             "OpenAITransport",
@@ -78,6 +85,7 @@ let boundaryTargets: [Target] = [
         name: "ChatApplication",
         dependencies: [
             "ChatDomain",
+            "AITransportContracts",
             "ChatPersistenceContracts",
             "ChatPersistenceCore",
             "ChatRuntimeModel",
@@ -181,6 +189,7 @@ let package = Package(
             name: "NativeChatArchitectureTests",
             dependencies: [
                 "ChatDomain",
+                "AITransportContracts",
                 "ChatPersistenceContracts",
                 "ChatPersistenceCore",
                 "ChatPersistenceSwiftData",
@@ -204,6 +213,7 @@ let package = Package(
             name: "NativeChatSwiftTests",
             dependencies: [
                 "ChatDomain",
+                "AITransportContracts",
                 "ChatPersistenceContracts",
                 "ChatPersistenceCore",
                 "ChatPersistenceSwiftData",
@@ -227,6 +237,7 @@ let package = Package(
             name: "NativeChatTests",
             dependencies: [
                 "ChatDomain",
+                "AITransportContracts",
                 "ChatPersistenceContracts",
                 "ChatPersistenceCore",
                 "ChatPersistenceSwiftData",
