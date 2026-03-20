@@ -1,7 +1,6 @@
 import Foundation
 
 enum GeneratedFileTypeInspector {
-    // swiftlint:disable:next cyclomatic_complexity
     static func extensionForMimeType(_ mimeType: String) -> String? {
         let lower = mimeType.lowercased()
         switch lower {
@@ -46,7 +45,6 @@ enum GeneratedFileTypeInspector {
         }
     }
 
-    // swiftlint:disable:next cyclomatic_complexity
     static func extensionForFileSignature(_ data: Data) -> String? {
         if data.starts(with: [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]) {
             return "png"

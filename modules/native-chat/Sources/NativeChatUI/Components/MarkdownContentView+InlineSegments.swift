@@ -2,7 +2,6 @@ import Foundation
 
 package extension MarkdownContentView {
     /// Splits a raw text line into plain text and inline LaTeX segments.
-    // swiftlint:disable:next cyclomatic_complexity function_body_length
     func parseInlineSegments(_ input: String) -> [InlineSegment] {
         var segments: [InlineSegment] = []
         var textBuffer = ""

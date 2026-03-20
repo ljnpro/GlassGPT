@@ -45,7 +45,6 @@ public extension OpenAIResponseParser {
     /// Extracts all tool call information from a completed response.
     /// - Parameter response: The response DTO to extract from.
     /// - Returns: An array of tool call info objects.
-    // swiftlint:disable:next cyclomatic_complexity function_body_length
     static func extractToolCalls(from response: ResponsesResponseDTO) -> [ToolCallInfo] {
         guard let output = response.output else {
             return []

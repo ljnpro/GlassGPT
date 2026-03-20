@@ -124,8 +124,9 @@ public enum NativeChatPersistence {
             let configuration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
             return try ModelContainer(for: schema, configurations: [configuration])
         } catch {
-            // swiftlint:disable:next line_length
-            Loggers.persistence.error("[NativeChatPersistence] Cannot create fallback in-memory ModelContainer: \(error.localizedDescription)")
+            Loggers.persistence.error(
+                "[NativeChatPersistence] Cannot create fallback in-memory container: \(error.localizedDescription)"
+            )
             return nil
         }
     }

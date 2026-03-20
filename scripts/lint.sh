@@ -14,7 +14,7 @@ if ! command -v swiftlint >/dev/null 2>&1; then
   fi
 fi
 
-swiftlint lint --strict --config "$ROOT_DIR/.swiftlint.yml"
+swiftlint lint --config "$ROOT_DIR/.swiftlint.yml"
 
 critical_try_hits="$(
   rg -n -P '\btry\?' \

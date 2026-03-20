@@ -7,7 +7,6 @@ extension ReplySessionActor {
     /// Non-lifecycle transitions are ignored and the current state is returned unchanged.
     /// - Parameter transition: The transition to apply.
     /// - Returns: The updated runtime state after applying the transition.
-    // swiftlint:disable:next cyclomatic_complexity function_body_length
     func applyLifecycleTransition(_ transition: ReplyRuntimeTransition) -> ReplyRuntimeState {
         switch transition {
         case let .beginRecoveryStatus(responseID, lastSequenceNumber, usedBackgroundMode, route):
@@ -108,7 +107,6 @@ extension ReplySessionActor {
 
     /// Updates the stream cursor's sequence number to the maximum of the current and provided values.
     /// - Parameter sequence: The new sequence number to consider.
-    // swiftlint:disable:next function_body_length
     func updateCursor(lastSequenceNumber sequence: Int) {
         guard let cursor = state.cursor else {
             return

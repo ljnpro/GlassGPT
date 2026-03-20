@@ -52,7 +52,6 @@ extension KaTeXProvider {
         return "\"\(escaped)\""
     }
 
-    // swiftlint:disable:next function_body_length
     private static func offlineHTML(
         css: String,
         js: String,
@@ -126,7 +125,6 @@ extension KaTeXProvider {
         """
     }
 
-    // swiftlint:disable:next function_body_length
     private static func cdnHTML(
         textColor: String,
         clampedMaxWidth: Int,

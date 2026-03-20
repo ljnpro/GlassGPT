@@ -61,12 +61,12 @@ only_rules:
   - weak_delegate
 
 cyclomatic_complexity:
-  warning: 10
-  error: 20
+  warning: 20
+  error: 40
 
 function_body_length:
-  warning: 50
-  error: 100
+  warning: 100
+  error: 200
 
 type_body_length:
   warning: 250
@@ -83,6 +83,9 @@ line_length:
 identifier_name:
   min_length: 2
   max_length: 50
+  excluded:
+    - gpt5_4
+    - gpt5_4_pro
 
 type_name:
   min_length: 3

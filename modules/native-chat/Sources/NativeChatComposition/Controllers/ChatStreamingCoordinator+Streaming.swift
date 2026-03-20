@@ -9,7 +9,6 @@ private let streamingSignposter = OSSignposter(subsystem: "GlassGPT", category: 
 
 @MainActor
 extension ChatStreamingCoordinator {
-    // swiftlint:disable:next cyclomatic_complexity function_body_length
     func startStreamingRequest(for session: ReplySession, reconnectAttempt: Int = 0) {
         let signpostID = streamingSignposter.makeSignpostID()
         let signpostState = streamingSignposter.beginInterval("StreamingRequest", id: signpostID)

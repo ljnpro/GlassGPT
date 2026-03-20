@@ -54,7 +54,6 @@ extension OpenAISSEDelegate {
         return false
     }
 
-    // swiftlint:disable:next function_body_length
     func handleTerminalResult(_ result: SSEEventTerminalResult) -> Bool {
         switch result {
         case .continued:
