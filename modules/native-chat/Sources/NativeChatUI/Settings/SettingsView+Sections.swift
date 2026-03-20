@@ -222,6 +222,7 @@ struct SettingsAppearanceSection: View {
             .pickerStyle(.segmented)
             .accessibilityLabel(String(localized: "App theme"))
             .accessibilityIdentifier("settings.themePicker")
+            .accessibilityValue(viewModel.appTheme.displayName)
 
             if UIDevice.current.userInterfaceIdiom == .phone {
                 Toggle(String(localized: "Haptic Feedback"), isOn: $viewModel.hapticEnabled)

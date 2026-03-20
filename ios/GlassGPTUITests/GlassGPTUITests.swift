@@ -118,12 +118,18 @@ final class GlassGPTUITests: XCTestCase {
         let darkSegment = themePicker.buttons["Dark"]
         XCTAssertTrue(darkSegment.waitForExistence(timeout: 5))
         darkSegment.tap()
-        XCTAssertTrue(waitForSelection(of: darkSegment, timeout: 5))
+        XCTAssertTrue(
+            waitForValue(of: themePicker, "Dark", timeout: 5),
+            "theme picker value after tap: \(String(describing: themePicker.value))"
+        )
 
         openChat(in: app)
         _ = openSettings(in: app)
         let refreshedThemePicker = settingsThemePicker(in: app)
-        XCTAssertTrue(waitForSelection(of: refreshedThemePicker.buttons["Dark"], timeout: 5))
+        XCTAssertTrue(
+            waitForValue(of: refreshedThemePicker, "Dark", timeout: 5),
+            "theme picker value after reopen: \(String(describing: refreshedThemePicker.value))"
+        )
     }
 
     @MainActor
@@ -457,13 +463,6 @@ final class GlassGPTUITests: XCTestCase {
     }
 
     @MainActor
-    private func waitForSelection(of element: XCUIElement, timeout: TimeInterval) -> Bool {
-        let predicate = NSPredicate(format: "selected == true")
-        let expectation = XCTNSPredicateExpectation(predicate: predicate, object: element)
-        return XCTWaiter.wait(for: [expectation], timeout: timeout) == .completed
-    }
-
-    @MainActor
     private func waitForNonExistence(of element: XCUIElement, timeout: TimeInterval) -> Bool {
         let predicate = NSPredicate(format: "exists == false")
         let expectation = XCTNSPredicateExpectation(predicate: predicate, object: element)
@@ -519,8 +518,7 @@ final class GlassGPTUITests: XCTestCase {
             return
         }
 
-        // Retry once after dismissing any transient overlay that may have intercepted the first tap.
-        app.tap()
+        // Retry once in case the first tab switch was dropped during a transient transition.
         activateTab(named: "Chat", in: app)
         XCTAssertTrue(newChatButton.waitForExistence(timeout: 5))
     }
@@ -537,8 +535,7 @@ final class GlassGPTUITests: XCTestCase {
             return apiKeyField
         }
 
-        // Retry once after dismissing any transient overlay that may have intercepted the first tap.
-        app.tap()
+        // Retry once in case the first tab switch was dropped during a transient transition.
         activateTab(named: "Settings", in: app)
         XCTAssertTrue(apiKeyField.waitForExistence(timeout: 5))
         return apiKeyField
