@@ -8,7 +8,7 @@
 - version/build source of truth: `ios/GlassGPT/Config/Versions.xcconfig`
 - tracked release wrapper: `scripts/release_testflight.sh`
 - local publishing credentials: `.local/publish.env`
-- local release helper: `.local/one_click_release.sh`
+- optional local release helper: `.local/one_click_release.sh`
 - GitHub release workflow: `.github/workflows/release-testflight.yml`
 - GitHub release environment: `testflight`
 
@@ -21,6 +21,10 @@
 The wrapper always runs `release-readiness`, the full `./scripts/ci.sh` suite,
 archive/export, IPA verification, TestFlight upload, and release commit/tag
 creation. There are no CI bypass flags on the tracked path.
+
+`.local/one_click_release.sh` is a local convenience helper only. It is not a
+required dependency of `release-readiness`, and GitHub-hosted release runs do
+not depend on it.
 
 ## GitHub Release Path
 
