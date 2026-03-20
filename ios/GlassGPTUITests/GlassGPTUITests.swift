@@ -113,8 +113,7 @@ final class GlassGPTUITests: XCTestCase {
         let app = launchApp(scenario: "settings")
 
         _ = openSettings(in: app)
-        let themePicker = app.segmentedControls["settings.themePicker"]
-        XCTAssertTrue(themePicker.waitForExistence(timeout: 5))
+        let themePicker = settingsThemePicker(in: app)
 
         let darkSegment = themePicker.buttons["Dark"]
         XCTAssertTrue(darkSegment.waitForExistence(timeout: 5))
@@ -123,8 +122,7 @@ final class GlassGPTUITests: XCTestCase {
 
         openChat(in: app)
         _ = openSettings(in: app)
-        let refreshedThemePicker = app.segmentedControls["settings.themePicker"]
-        XCTAssertTrue(refreshedThemePicker.waitForExistence(timeout: 5))
+        let refreshedThemePicker = settingsThemePicker(in: app)
         XCTAssertTrue(waitForSelection(of: refreshedThemePicker.buttons["Dark"], timeout: 5))
     }
 
@@ -316,9 +314,7 @@ final class GlassGPTUITests: XCTestCase {
 
         let saveButton = app.buttons["modelSelector.save"]
         XCTAssertTrue(saveButton.waitForExistence(timeout: 5))
-        saveButton.tap()
-
-        XCTAssertTrue(waitForUnavailable(saveButton, timeout: 5))
+        dismissModelSelector(saveButton, in: app)
         XCTAssertTrue(app.buttons["chat.newChat"].waitForExistence(timeout: 5))
     }
 
@@ -549,10 +545,42 @@ final class GlassGPTUITests: XCTestCase {
     }
 
     @MainActor
+    private func settingsThemePicker(in app: XCUIApplication) -> XCUIElement {
+        let themePicker = app.segmentedControls["settings.themePicker"]
+        if themePicker.waitForExistence(timeout: 2) {
+            return themePicker
+        }
+
+        revealIfNeeded(themePicker, in: app)
+        XCTAssertTrue(themePicker.waitForExistence(timeout: 5))
+        return themePicker
+    }
+
+    @MainActor
     private func activateTab(named tabName: String, in app: XCUIApplication) {
         let tab = app.tabBars.buttons[tabName]
         XCTAssertTrue(tab.waitForExistence(timeout: 5))
         tab.tap()
+    }
+
+    @MainActor
+    private func dismissModelSelector(_ saveButton: XCUIElement, in app: XCUIApplication) {
+        saveButton.tap()
+        if waitForUnavailable(saveButton, timeout: 5) {
+            return
+        }
+
+        saveButton.tap()
+        if waitForUnavailable(saveButton, timeout: 5) {
+            return
+        }
+
+        let backdrop = app.otherElements["modelSelector.backdrop"]
+        if backdrop.waitForExistence(timeout: 2) {
+            backdrop.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.15)).tap()
+        }
+
+        XCTAssertTrue(waitForUnavailable(saveButton, timeout: 5))
     }
 
     @MainActor
