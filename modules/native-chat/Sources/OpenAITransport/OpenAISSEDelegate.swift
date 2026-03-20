@@ -56,6 +56,12 @@ final class OpenAISSEDelegate: NSObject, URLSessionDataDelegate {
                 yieldErrorAndFinish(.httpError(429, "Rate limited. Please wait and try again."))
                 return
             }
+
+            completionHandler(.cancel)
+            yieldErrorAndFinish(
+                .httpError(httpResponse.statusCode, "Server error (\(httpResponse.statusCode))")
+            )
+            return
         }
         completionHandler(.allow)
     }
