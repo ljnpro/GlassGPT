@@ -1,5 +1,5 @@
-import ChatPresentation
 import ChatPersistenceSwiftData
+import ChatPresentation
 import NativeChatComposition
 import SwiftData
 import SwiftUI
@@ -8,7 +8,7 @@ public struct NativeChatUITestRootOverrideFactory: NativeChatRootOverrideFactory
     public init() {}
 
     @MainActor
-    public func makeRootContent(modelContext: ModelContext) -> AnyView? {
+    public func makeRootContent(modelContext _: ModelContext) -> AnyView? {
         let resolvedModelContext: ModelContext
         do {
             resolvedModelContext = try makeUITestModelContext()

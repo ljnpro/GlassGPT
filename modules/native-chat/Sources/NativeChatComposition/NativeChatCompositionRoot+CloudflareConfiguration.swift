@@ -62,7 +62,7 @@ extension NativeChatCompositionRoot {
         provider.useCloudflareGateway = settingsStore.cloudflareGatewayEnabled
             && (
                 settingsStore.cloudflareGatewayConfigurationMode == .default
-                || hasCompleteCustomConfiguration
+                    || hasCompleteCustomConfiguration
             )
     }
 

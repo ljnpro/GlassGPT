@@ -1,5 +1,5 @@
-import GeneratedFilesCore
 import ChatPresentation
+import GeneratedFilesCore
 import NativeChatComposition
 
 package enum UITestScenario: String {
@@ -18,20 +18,20 @@ package enum UITestScenario: String {
     package var initialTab: Int {
         switch self {
         case .history:
-            return 1
+            1
         case .settings, .settingsGateway, .reinstallSeed, .reinstallVerify:
-            return 2
+            2
         default:
-            return 0
+            0
         }
     }
 
     package var usesLiveKeychain: Bool {
         switch self {
         case .reinstallSeed, .reinstallVerify, .freshInstall:
-            return true
+            true
         default:
-            return false
+            false
         }
     }
 }

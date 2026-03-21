@@ -267,7 +267,7 @@ func makeSettingsSnapshotViewModel() -> SettingsPresenter {
             configurationProvider.useCloudflareGateway = settingsStore.cloudflareGatewayEnabled
                 && (
                     settingsStore.cloudflareGatewayConfigurationMode == .default
-                    || hasCompleteCustomConfiguration
+                        || hasCompleteCustomConfiguration
                 )
         },
         appVersionString: snapshotAppVersionString,

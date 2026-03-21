@@ -26,7 +26,7 @@ final class GlassGPTUITests: XCTestCase {
     }
 
     @MainActor
-    func testTabsAndPrimaryScreensRemainReachable() throws {
+    func testTabsAndPrimaryScreensRemainReachable() {
         let app = launchApp()
 
         XCTAssertTrue(app.tabBars.buttons["Chat"].waitForExistence(timeout: 5))
@@ -44,7 +44,7 @@ final class GlassGPTUITests: XCTestCase {
     }
 
     @MainActor
-    func testHistoryScenarioCanOpenConversationAndDeleteAll() throws {
+    func testHistoryScenarioCanOpenConversationAndDeleteAll() {
         let app = launchApp(scenario: "history")
         openHistory(in: app)
 
@@ -64,7 +64,7 @@ final class GlassGPTUITests: XCTestCase {
     }
 
     @MainActor
-    func testHistoryScenarioOpeningConversationShowsSeededMessages() throws {
+    func testHistoryScenarioOpeningConversationShowsSeededMessages() {
         let app = launchApp(scenario: "history")
         openHistory(in: app)
 
@@ -80,7 +80,7 @@ final class GlassGPTUITests: XCTestCase {
     }
 
     @MainActor
-    func testHistoryScenarioCanDeleteSingleConversationWithoutDeletingOthers() throws {
+    func testHistoryScenarioCanDeleteSingleConversationWithoutDeletingOthers() {
         let app = launchApp(scenario: "history")
         openHistory(in: app)
 
@@ -103,7 +103,7 @@ final class GlassGPTUITests: XCTestCase {
     }
 
     @MainActor
-    func testHistoryScenarioSearchFiltersSeededConversations() throws {
+    func testHistoryScenarioSearchFiltersSeededConversations() {
         let app = launchApp(scenario: "history")
         openHistory(in: app)
 
@@ -122,7 +122,7 @@ final class GlassGPTUITests: XCTestCase {
     }
 
     @MainActor
-    func testSettingsScenarioPersistsThemeSelectionWithinSession() throws {
+    func testSettingsScenarioPersistsThemeSelectionWithinSession() {
         let app = launchApp(scenario: "settings")
 
         _ = openSettings(in: app)
@@ -144,7 +144,7 @@ final class GlassGPTUITests: XCTestCase {
     }
 
     @MainActor
-    func testSettingsGatewayScenarioShowsCloudflareControlsAndMissingKeyFeedback() throws {
+    func testSettingsGatewayScenarioShowsCloudflareControlsAndMissingKeyFeedback() {
         let app = launchApp(scenario: "settingsGateway")
         _ = openSettings(in: app)
 
@@ -160,7 +160,7 @@ final class GlassGPTUITests: XCTestCase {
     }
 
     @MainActor
-    func testSettingsGatewayScenarioCustomModeShowsEditableGatewayFields() throws {
+    func testSettingsGatewayScenarioCustomModeShowsEditableGatewayFields() {
         let app = launchApp(scenario: "settingsGateway")
         _ = openSettings(in: app)
 
@@ -179,7 +179,7 @@ final class GlassGPTUITests: XCTestCase {
     }
 
     @MainActor
-    func testSettingsGatewayScenarioCustomModeWaitsForInputBeforeStatusValidation() throws {
+    func testSettingsGatewayScenarioCustomModeWaitsForInputBeforeStatusValidation() {
         let app = launchApp(scenario: "settingsGateway")
         _ = openSettings(in: app)
 
@@ -199,7 +199,7 @@ final class GlassGPTUITests: XCTestCase {
     }
 
     @MainActor
-    func testHistoryScenarioShowsDeleteAllActionWhenSeeded() throws {
+    func testHistoryScenarioShowsDeleteAllActionWhenSeeded() {
         let app = launchApp(scenario: "history")
         openHistory(in: app)
 
@@ -208,7 +208,7 @@ final class GlassGPTUITests: XCTestCase {
     }
 
     @MainActor
-    func testSettingsScenarioCanSaveAndClearAPIKeyLocally() throws {
+    func testSettingsScenarioCanSaveAndClearAPIKeyLocally() {
         let app = launchApp(scenario: "settings")
 
         let apiKeyField = app.secureTextFields["settings.apiKey"]
@@ -233,7 +233,7 @@ final class GlassGPTUITests: XCTestCase {
     }
 
     @MainActor
-    func testSettingsScenarioTapOutsideDismissesAPIKeyKeyboard() throws {
+    func testSettingsScenarioTapOutsideDismissesAPIKeyKeyboard() {
         let app = launchApp(scenario: "settings")
 
         let apiKeyField = openSettings(in: app)
@@ -251,7 +251,7 @@ final class GlassGPTUITests: XCTestCase {
     }
 
     @MainActor
-    func testSettingsScenarioDragDismissesAPIKeyKeyboard() throws {
+    func testSettingsScenarioDragDismissesAPIKeyKeyboard() {
         let app = launchApp(scenario: "settings")
 
         let apiKeyField = openSettings(in: app)
@@ -267,7 +267,7 @@ final class GlassGPTUITests: XCTestCase {
     }
 
     @MainActor
-    func testSettingsScenarioReasoningEffortPickerOpensAvailableOptions() throws {
+    func testSettingsScenarioReasoningEffortPickerOpensAvailableOptions() {
         let app = launchApp(scenario: "settings")
 
         _ = openSettings(in: app)
@@ -281,7 +281,7 @@ final class GlassGPTUITests: XCTestCase {
     }
 
     @MainActor
-    func testEmptyScenarioWithoutAPIKeyKeepsShellUsable() throws {
+    func testEmptyScenarioWithoutAPIKeyKeepsShellUsable() {
         let app = launchApp(scenario: "empty")
 
         XCTAssertTrue(app.buttons["chat.newChat"].waitForExistence(timeout: 5))
@@ -297,7 +297,7 @@ final class GlassGPTUITests: XCTestCase {
     }
 
     @MainActor
-    func testAPIKeyPersistsAcrossAppRelaunch() throws {
+    func testAPIKeyPersistsAcrossAppRelaunch() {
         let app = launchApp(resetState: true)
 
         let apiKeyField = openSettings(in: app)
@@ -340,7 +340,7 @@ final class GlassGPTUITests: XCTestCase {
     }
 
     @MainActor
-    func testSettingsGatewayScenarioCanSaveAndClearCustomConfiguration() throws {
+    func testSettingsGatewayScenarioCanSaveAndClearCustomConfiguration() {
         let customGatewayURL = "https://gateway.ui.custom/v1"
         let customGatewayToken = "cf-ui-custom-token"
         let app = launchApp(scenario: "settingsGateway")
@@ -389,7 +389,7 @@ final class GlassGPTUITests: XCTestCase {
     }
 
     @MainActor
-    func testPreparePersistedAPIKeyForReinstall() throws {
+    func testPreparePersistedAPIKeyForReinstall() {
         let app = launchApp(scenario: "reinstallSeed")
         let apiKeyField = openSettings(in: app)
         let saveButton = app.buttons["settings.saveAPIKey"]
@@ -408,7 +408,7 @@ final class GlassGPTUITests: XCTestCase {
     }
 
     @MainActor
-    func testReinstalledAppReadsPersistedAPIKeyWithoutRestoringHistory() throws {
+    func testReinstalledAppReadsPersistedAPIKeyWithoutRestoringHistory() {
         let app = launchApp(scenario: "reinstallVerify")
         let apiKeyField = openSettings(in: app)
         let saveButton = app.buttons["settings.saveAPIKey"]
@@ -425,7 +425,7 @@ final class GlassGPTUITests: XCTestCase {
     }
 
     @MainActor
-    func testFreshInstallWithoutPersistedAPIKeyKeepsShellUsable() throws {
+    func testFreshInstallWithoutPersistedAPIKeyKeepsShellUsable() {
         let app = launchApp(scenario: "freshInstall")
 
         XCTAssertTrue(app.buttons["chat.newChat"].waitForExistence(timeout: 5))
@@ -441,7 +441,7 @@ final class GlassGPTUITests: XCTestCase {
     }
 
     @MainActor
-    func testFreshInstallScenarioChatDefaultsStartDisabled() throws {
+    func testFreshInstallScenarioChatDefaultsStartDisabled() {
         let app = launchApp(scenario: "freshInstall")
 
         _ = openSettings(in: app)
@@ -463,7 +463,7 @@ final class GlassGPTUITests: XCTestCase {
     }
 
     @MainActor
-    func testSettingsScenarioCanChangeDefaultReasoningEffort() throws {
+    func testSettingsScenarioCanChangeDefaultReasoningEffort() {
         let app = launchApp(scenario: "freshInstall")
 
         _ = openSettings(in: app)
@@ -482,7 +482,7 @@ final class GlassGPTUITests: XCTestCase {
     }
 
     @MainActor
-    func testSeededScenarioPreservesConversationAfterTabRoundTrip() throws {
+    func testSeededScenarioPreservesConversationAfterTabRoundTrip() {
         let app = launchApp(scenario: "seeded")
 
         XCTAssertTrue(app.staticTexts["Can you keep the refactor zero-diff?"].waitForExistence(timeout: 5))
@@ -498,7 +498,7 @@ final class GlassGPTUITests: XCTestCase {
     }
 
     @MainActor
-    func testSeededScenarioLoadsExistingConversationContent() throws {
+    func testSeededScenarioLoadsExistingConversationContent() {
         let app = launchApp(scenario: "seeded")
 
         XCTAssertTrue(app.buttons["chat.newChat"].waitForExistence(timeout: 5))
@@ -509,7 +509,7 @@ final class GlassGPTUITests: XCTestCase {
     }
 
     @MainActor
-    func testStreamingScenarioCanOpenAndDismissModelSelector() throws {
+    func testStreamingScenarioCanOpenAndDismissModelSelector() {
         let app = launchApp(scenario: "streaming")
 
         let modelBadge = app.buttons["chat.modelBadge"]
@@ -525,7 +525,7 @@ final class GlassGPTUITests: XCTestCase {
     }
 
     @MainActor
-    func testStreamingScenarioCanDismissModelSelectorByTappingBackdrop() throws {
+    func testStreamingScenarioCanDismissModelSelectorByTappingBackdrop() {
         let app = launchApp(scenario: "streaming")
 
         let modelBadge = app.buttons["chat.modelBadge"]
@@ -544,7 +544,7 @@ final class GlassGPTUITests: XCTestCase {
     }
 
     @MainActor
-    func testStreamingScenarioShowsLiveReasoningOutputAndToolIndicator() throws {
+    func testStreamingScenarioShowsLiveReasoningOutputAndToolIndicator() {
         let app = launchApp(scenario: "streaming")
 
         XCTAssertTrue(app.staticTexts["Running code…"].waitForExistence(timeout: 5))
@@ -557,7 +557,7 @@ final class GlassGPTUITests: XCTestCase {
     }
 
     @MainActor
-    func testStreamingScenarioModelSelectorShowsConfigurationControls() throws {
+    func testStreamingScenarioModelSelectorShowsConfigurationControls() {
         let app = launchApp(scenario: "streaming")
 
         let modelBadge = app.buttons["chat.modelBadge"]
@@ -573,7 +573,7 @@ final class GlassGPTUITests: XCTestCase {
     }
 
     @MainActor
-    func testPreviewScenarioShowsAndDismissesGeneratedPreview() throws {
+    func testPreviewScenarioShowsAndDismissesGeneratedPreview() {
         let app = launchApp(scenario: "preview")
 
         let previewRoot = app.otherElements["filePreview.root"]
@@ -588,7 +588,7 @@ final class GlassGPTUITests: XCTestCase {
     }
 
     @MainActor
-    func testPreviewScenarioExposesDownloadAndShareActions() throws {
+    func testPreviewScenarioExposesDownloadAndShareActions() {
         let app = launchApp(scenario: "preview")
 
         XCTAssertTrue(app.otherElements["filePreview.root"].waitForExistence(timeout: 5))
@@ -597,7 +597,7 @@ final class GlassGPTUITests: XCTestCase {
     }
 
     @MainActor
-    func testReplySplitScenarioKeepsOneAssistantSurface() throws {
+    func testReplySplitScenarioKeepsOneAssistantSurface() {
         let app = launchApp(scenario: "replySplit")
 
         let assistantSurfaces = app.descendants(matching: .any)

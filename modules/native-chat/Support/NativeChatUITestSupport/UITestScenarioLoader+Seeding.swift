@@ -1,6 +1,6 @@
-import ChatPersistenceSwiftData
 import ChatDomain
 import ChatPersistenceCore
+import ChatPersistenceSwiftData
 import Foundation
 import NativeChatComposition
 import SwiftData

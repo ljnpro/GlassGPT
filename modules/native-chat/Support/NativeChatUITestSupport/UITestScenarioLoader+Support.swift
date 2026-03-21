@@ -3,16 +3,16 @@ import Foundation
 import NativeChatComposition
 import OSLog
 
-enum ScenarioSettingsValue: Sendable {
+enum ScenarioSettingsValue {
     case string(String)
     case bool(Bool)
 
     var objectValue: Any {
         switch self {
-        case .string(let value):
-            return value
-        case .bool(let value):
-            return value
+        case let .string(value):
+            value
+        case let .bool(value):
+            value
         }
     }
 }
@@ -25,14 +25,14 @@ final class ScenarioSettingsValueStore: SettingsValueStore {
     }
 
     func string(forKey defaultName: String) -> String? {
-        if case .string(let value)? = values[defaultName] {
+        if case let .string(value)? = values[defaultName] {
             return value
         }
         return nil
     }
 
     func bool(forKey defaultName: String) -> Bool {
-        if case .bool(let value)? = values[defaultName] {
+        if case let .bool(value)? = values[defaultName] {
             return value
         }
         return false
@@ -55,7 +55,7 @@ final class ScenarioSettingsValueStore: SettingsValueStore {
 }
 
 final class ScenarioAPIKeyBackend: APIKeyPersisting {
-    private let storedKey = OSAllocatedUnfairLock(initialState: Optional<String>.none)
+    private let storedKey = OSAllocatedUnfairLock(initialState: String?.none)
 
     func saveAPIKey(_ apiKey: String) throws(PersistenceError) {
         storedKey.withLock { value in
