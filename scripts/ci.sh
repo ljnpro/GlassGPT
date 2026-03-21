@@ -363,45 +363,7 @@ function sanitize_successful_xcodebuild_log() {
 
   [[ -f "$log_file" ]] || return 0
 
-  python3 - "$log_file" <<'PY'
-from pathlib import Path
-import re
-import sys
-
-path = Path(sys.argv[1])
-lines = path.read_text(encoding="utf-8").splitlines(keepends=True)
-cleaned: list[str] = []
-i = 0
-iderundestination_pattern = re.compile(
-    r"^\d{4}-\d{2}-\d{2} .* \[MT\] IDERunDestination: Supported platforms for the buildables in the current scheme is empty\.\n?$"
-)
-
-while i < len(lines):
-    if iderundestination_pattern.match(lines[i]):
-        i += 1
-        if i + 1 < len(lines) and lines[i] == "\n" and lines[i + 1] == "\n":
-            i += 1
-        continue
-
-    if lines[i].rstrip("\n") == "IOSurfaceClientSetSurfaceNotify failed e00002c7":
-        i += 1
-        continue
-
-    if (
-        i + 3 < len(lines)
-        and lines[i].startswith("Test Suite 'All tests' started at ")
-        and lines[i + 1].startswith("Test Suite 'All tests' passed at ")
-        and "Executed 0 tests, with 0 failures" in lines[i + 2]
-        and lines[i + 3].startswith("◇ Test run started.")
-    ):
-        i += 3
-        continue
-
-    cleaned.append(lines[i])
-    i += 1
-
-path.write_text("".join(cleaned), encoding="utf-8")
-PY
+  python3 "$ROOT_DIR/scripts/sanitize_success_log.py" xcodebuild "$log_file"
 }
 
 function run_checked_xcodebuild_impl() {

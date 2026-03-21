@@ -98,6 +98,14 @@ function ensure_commit_present() {
   git -C "$ROOT_DIR" cat-file -e "${commit_sha}^{commit}" 2>/dev/null
 }
 
+function sanitize_successful_distribution_log() {
+  local log_file="$1"
+
+  [[ -f "$log_file" ]] || return 0
+
+  python3 "$ROOT_DIR/scripts/sanitize_success_log.py" distribution "$log_file"
+}
+
 if [[ ! -f "$ENV_FILE" ]]; then
   echo "Missing env file: $ENV_FILE" >&2
   exit 1
@@ -258,6 +266,7 @@ xcodebuild \
   -authenticationKeyID "$ASC_API_KEY_ID" \
   -authenticationKeyIssuerID "$ASC_ISSUER_ID" \
   "$XCODEBUILD_APPINTENTS_LINKER_SETTING" | tee "$ARCHIVE_LOG"
+python3 "$ROOT_DIR/scripts/sanitize_success_log.py" xcodebuild "$ARCHIVE_LOG"
 
 echo "==> Exporting"
 xcodebuild \
@@ -269,6 +278,8 @@ xcodebuild \
   -authenticationKeyPath "$KEY_PATH" \
   -authenticationKeyID "$ASC_API_KEY_ID" \
   -authenticationKeyIssuerID "$ASC_ISSUER_ID" | tee "$EXPORT_LOG"
+python3 "$ROOT_DIR/scripts/sanitize_success_log.py" xcodebuild "$EXPORT_LOG"
+sanitize_successful_distribution_log "$EXPORT_PATH/Packaging.log"
 
 if [[ ! -f "$IPA_PATH" ]]; then
   echo "Missing IPA at $IPA_PATH" >&2

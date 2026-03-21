@@ -184,16 +184,8 @@ function test_successful_xcodebuild_log_sanitizer() {
     fail "ci.sh must sanitize successful xcodebuild logs before warning checks run."
   fi
 
-  if ! grep -Fq "and lines[i + 3].startswith(\"◇ Test run started.\")" "$ROOT_DIR/scripts/ci.sh"; then
-    fail "ci.sh should only remove the empty XCTest prelude when it is immediately followed by Swift Testing output."
-  fi
-
-  if ! grep -Fq 'IDERunDestination:' "$ROOT_DIR/scripts/ci.sh"; then
-    fail "ci.sh should remove the known xcodebuild IDERunDestination noise from successful logs."
-  fi
-
-  if ! grep -Fq 'IOSurfaceClientSetSurfaceNotify failed e00002c7' "$ROOT_DIR/scripts/ci.sh"; then
-    fail "ci.sh should remove the known IOSurface snapshot noise from successful logs."
+  if ! grep -Fq 'sanitize_success_log.py" xcodebuild "$log_file"' "$ROOT_DIR/scripts/ci.sh"; then
+    fail "ci.sh should delegate successful xcodebuild log cleanup to the shared sanitizer."
   fi
 
   local architecture_tests_block
@@ -201,6 +193,57 @@ function test_successful_xcodebuild_log_sanitizer() {
   if ! printf '%s\n' "$architecture_tests_block" | grep -Fq 'sanitize_successful_xcodebuild_log "$log_file"'; then
     fail "gate_architecture_tests should sanitize its successful log before warning checks run."
   fi
+
+  local temp_dir
+  temp_dir="$(mktemp -d)"
+  trap 'rm -rf "$temp_dir"' RETURN
+
+  cat <<'EOF' >"$temp_dir/xcodebuild.log"
+2026-03-21 00:00:00.000 [MT] IDERunDestination: Supported platforms for the buildables in the current scheme is empty.
+IOSurfaceClientSetSurfaceNotify failed e00002c7
+Test Suite 'All tests' started at 2026-03-21 00:00:00.000
+Test Suite 'All tests' passed at 2026-03-21 00:00:00.000
+Executed 0 tests, with 0 failures (0 unexpected) in 0.000 (0.000) seconds
+◇ Test run started.
+    cd /Applications/GlassGPT/ios
+    /Applications/Xcode.app/Contents/Developer/usr/bin/appintentsmetadataprocessor --force
+2026-03-21 00:00:00.000 appintentsmetadataprocessor[1:2] Starting appintentsmetadataprocessor export
+2026-03-21 00:00:00.000 appintentsmetadataprocessor[1:2] Extracted no relevant App Intents symbols, skipping writing output
+    cd /Applications/GlassGPT/ios
+    /Applications/Xcode.app/Contents/Developer/usr/bin/appintentsnltrainingprocessor --archive-ssu-assets
+2026-03-21 00:00:00.000 appintentsnltrainingprocessor[1:2] Parsing options for appintentsnltrainingprocessor
+2026-03-21 00:00:00.000 appintentsnltrainingprocessor[1:2] No AppShortcuts found - Skipping.
+Retained line
+EOF
+  python3 "$ROOT_DIR/scripts/sanitize_success_log.py" xcodebuild "$temp_dir/xcodebuild.log"
+
+  if grep -Eq 'IDERunDestination|IOSurfaceClientSetSurfaceNotify|appintentsmetadataprocessor|appintentsnltrainingprocessor|No AppShortcuts found - Skipping|skipping writing output' "$temp_dir/xcodebuild.log"; then
+    fail "sanitize_success_log.py should remove known harmless xcodebuild skip/noise lines."
+  fi
+
+  if ! grep -Fq 'Retained line' "$temp_dir/xcodebuild.log"; then
+    fail "sanitize_success_log.py should preserve unrelated xcodebuild output."
+  fi
+
+  cat <<'EOF' >"$temp_dir/Packaging.log"
+2026-03-21 00:00:00 +0000 [MT] Skipping setting DTXcodeBuildDistribution because toolsBuildVersionName was nil.
+2026-03-21 00:00:00 +0000 [MT] Skipping step: IDEDistributionAppThinningStep because it said so
+2026-03-21 00:00:00 +0000 [MT] Skipping stripping extended attributes because the codesign step will strip them.
+2026-03-21 00:00:00 +0000 [MT] Associated App Clip Identifiers Filter: Skipping because "com.apple.developer.associated-appclip-app-identifiers" is not present
+Retained packaging line
+EOF
+  python3 "$ROOT_DIR/scripts/sanitize_success_log.py" distribution "$temp_dir/Packaging.log"
+
+  if grep -Eq 'Skipping setting|Skipping step|Skipping stripping|Associated App Clip Identifiers Filter: Skipping' "$temp_dir/Packaging.log"; then
+    fail "sanitize_success_log.py should remove known harmless distribution skip/noise lines."
+  fi
+
+  if ! grep -Fq 'Retained packaging line' "$temp_dir/Packaging.log"; then
+    fail "sanitize_success_log.py should preserve unrelated distribution output."
+  fi
+
+  rm -rf "$temp_dir"
+  trap - RETURN
 
   echo "[PASS] ci.sh sanitizes successful xcodebuild logs for known harmless noise"
 }
