@@ -657,11 +657,6 @@ function assert_release_readiness() {
     exit 1
   fi
 
-  if [[ ! -x "$ROOT_DIR/.local/one_click_release.sh" ]]; then
-    echo "Missing executable local release helper: .local/one_click_release.sh" >&2
-    exit 1
-  fi
-
   if [[ ! -f "$ROOT_DIR/docs/branch-strategy.md" || \
         ! -f "$ROOT_DIR/docs/testing.md" || \
         ! -f "$ROOT_DIR/docs/release.md" || \
@@ -674,7 +669,7 @@ function assert_release_readiness() {
   current_branch="${GITHUB_REF_NAME:-$(git rev-parse --abbrev-ref HEAD)}"
 
   case "$current_branch" in
-    main|codex/stable-4.1|codex/stable-4.2|codex/stable-4.3|codex/stable-4.4|codex/stable-4.5|codex/stable-4.6|codex/stable-4.7|codex/stable-4.8|codex/stable-4.9|codex/stable-4.10|codex/feature/4.9*|codex/feature/4.10*|HEAD)
+    main|codex/stable-4.10|codex/feature/4.10*|HEAD)
       ;;
     *)
       echo "Release-readiness gate does not permit branch '$current_branch'." >&2
@@ -781,6 +776,7 @@ function gate_python_lint() {
 function gate_ci_health() {
   log "Running ci-health gate"
   python3 ./scripts/check_ci_health.py | tee "$CI_OUTPUT_DIR/ci-health-report.txt"
+  ./scripts/test_release_infra.sh | tee "$CI_OUTPUT_DIR/release-infra-report.txt"
 }
 
 function gate_module_boundary() {

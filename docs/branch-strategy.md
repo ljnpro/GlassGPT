@@ -39,5 +39,6 @@
 - after TestFlight publication:
   - verify `./scripts/ci.sh release-readiness` on `codex/stable-4.10`
   - verify `./scripts/ci.sh maintainability` on `codex/stable-4.10`
+  - preserve the previous `main` tip on `codex/stable-4.9` before a non-fast-forward promotion
   - push `codex/stable-4.10`
-  - fast-forward `main` to the same commit
+  - promote `main` to the same commit

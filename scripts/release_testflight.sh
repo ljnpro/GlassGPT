@@ -4,7 +4,6 @@ set -euo pipefail
 export PYTHONDONTWRITEBYTECODE="${PYTHONDONTWRITEBYTECODE:-1}"
 
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-LOCAL_RELEASE_SCRIPT="$ROOT_DIR/.local/one_click_release.sh"
 ENV_FILE="$ROOT_DIR/.local/publish.env"
 VERSIONS_XCCONFIG_PATH="${VERSIONS_XCCONFIG_PATH:-$ROOT_DIR/ios/GlassGPT/Config/Versions.xcconfig}"
 PROJECT_PATH="${XCODE_PROJECT_PATH:-$ROOT_DIR/ios/GlassGPT.xcodeproj}"
@@ -17,7 +16,7 @@ REMOTE_REPO="${GITHUB_REPO_URL:-}"
 function usage() {
   cat <<'EOF'
 Usage:
-  ./scripts/release_testflight.sh <marketing_version> <build_number> [--branch <name>] [--commit-message "<message>"]
+  ./scripts/release_testflight.sh <marketing_version> <build_number> [--branch <name>] [--commit-message "<message>"] [--preserve-main-as <name>] [--force-main-with-lease] [--skip-main-promotion] [--preflight-only]
 
 Examples:
   ./scripts/release_testflight.sh 4.10.0 20185 --branch codex/stable-4.10
@@ -35,6 +34,10 @@ shift 2
 
 TARGET_BRANCH=""
 COMMIT_MESSAGE="Release $VERSION ($BUILD_NUMBER)"
+PRESERVE_MAIN_AS=""
+FORCE_MAIN_WITH_LEASE=0
+PROMOTE_MAIN=1
+PREFLIGHT_ONLY=0
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -45,6 +48,22 @@ while [[ $# -gt 0 ]]; do
     --commit-message)
       COMMIT_MESSAGE="${2:-}"
       shift 2
+      ;;
+    --preserve-main-as)
+      PRESERVE_MAIN_AS="${2:-}"
+      shift 2
+      ;;
+    --force-main-with-lease)
+      FORCE_MAIN_WITH_LEASE=1
+      shift
+      ;;
+    --skip-main-promotion)
+      PROMOTE_MAIN=0
+      shift
+      ;;
+    --preflight-only)
+      PREFLIGHT_ONLY=1
+      shift
       ;;
     --help|-h)
       usage
@@ -57,6 +76,26 @@ while [[ $# -gt 0 ]]; do
       ;;
   esac
 done
+
+function remote_branch_sha() {
+  local branch_name="$1"
+  git -C "$ROOT_DIR" ls-remote --heads "$REMOTE" "$branch_name" | awk '{print $1}' | tail -1
+}
+
+function ensure_commit_present() {
+  local commit_sha="$1"
+
+  if [[ -z "$commit_sha" ]]; then
+    return 0
+  fi
+
+  if git -C "$ROOT_DIR" cat-file -e "${commit_sha}^{commit}" 2>/dev/null; then
+    return 0
+  fi
+
+  git -C "$ROOT_DIR" fetch "$REMOTE" main >/dev/null 2>&1
+  git -C "$ROOT_DIR" cat-file -e "${commit_sha}^{commit}" 2>/dev/null
+}
 
 if [[ ! -f "$ENV_FILE" ]]; then
   echo "Missing env file: $ENV_FILE" >&2
@@ -84,8 +123,19 @@ if [[ "$CURRENT_BRANCH" != "HEAD" && "$CURRENT_BRANCH" != "$TARGET_BRANCH" ]]; t
   exit 1
 fi
 
-if [[ ! -x "$LOCAL_RELEASE_SCRIPT" ]]; then
-  echo "Missing executable local release helper: $LOCAL_RELEASE_SCRIPT" >&2
+if [[ -n "$PRESERVE_MAIN_AS" ]]; then
+  if ! git check-ref-format --branch "$PRESERVE_MAIN_AS" >/dev/null 2>&1; then
+    echo "Invalid preserve-main branch: $PRESERVE_MAIN_AS" >&2
+    exit 1
+  fi
+  if [[ "$PRESERVE_MAIN_AS" == "main" || "$PRESERVE_MAIN_AS" == "$TARGET_BRANCH" ]]; then
+    echo "preserve-main branch must differ from main and the target branch." >&2
+    exit 1
+  fi
+fi
+
+if (( FORCE_MAIN_WITH_LEASE == 1 )) && (( PROMOTE_MAIN == 0 )); then
+  echo "--force-main-with-lease cannot be combined with --skip-main-promotion." >&2
   exit 1
 fi
 
@@ -101,6 +151,34 @@ fi
 
 if [[ ! -d "$BUILD_DIR" ]]; then
   mkdir -p "$BUILD_DIR"
+fi
+
+REMOTE_MAIN_SHA=""
+if [[ "${PUSH_RELEASE:-1}" == "1" && "$PROMOTE_MAIN" == "1" ]]; then
+  REMOTE_MAIN_SHA="$(remote_branch_sha main)"
+  if [[ -n "$REMOTE_MAIN_SHA" ]]; then
+    if ! ensure_commit_present "$REMOTE_MAIN_SHA"; then
+      echo "Could not fetch the current remote main commit ($REMOTE_MAIN_SHA)." >&2
+      exit 1
+    fi
+
+    if ! git -C "$ROOT_DIR" merge-base --is-ancestor "$REMOTE_MAIN_SHA" HEAD; then
+      if (( FORCE_MAIN_WITH_LEASE == 0 )); then
+        echo "Remote main does not fast-forward to HEAD. Use --force-main-with-lease and --preserve-main-as before promoting main." >&2
+        exit 1
+      fi
+
+      if [[ -z "$PRESERVE_MAIN_AS" ]]; then
+        echo "Non-fast-forward main promotion requires --preserve-main-as to retain the current remote main tip." >&2
+        exit 1
+      fi
+    fi
+  fi
+fi
+
+if (( PREFLIGHT_ONLY == 1 )); then
+  echo "Release preflight checks passed."
+  exit 0
 fi
 
 echo "==> Running release-readiness gate"
@@ -252,13 +330,33 @@ else
 fi
 
 if [[ "${PUSH_RELEASE:-1}" == "1" ]]; then
+  verify_refs=("$TARGET_BRANCH" main "refs/tags/$RELEASE_TAG")
+  if [[ -n "$PRESERVE_MAIN_AS" ]]; then
+    verify_refs+=("$PRESERVE_MAIN_AS")
+  fi
+
   echo "==> Pushing branch and release tag"
   git -C "$ROOT_DIR" push "$REMOTE" "HEAD:$TARGET_BRANCH"
   git -C "$ROOT_DIR" push "$REMOTE" "$RELEASE_TAG"
-  echo "==> Fast-forwarding main"
-  git -C "$ROOT_DIR" push "$REMOTE" "HEAD:main"
+
+  if [[ "$PROMOTE_MAIN" == "1" ]]; then
+    if [[ -n "$PRESERVE_MAIN_AS" && -n "$REMOTE_MAIN_SHA" ]]; then
+      echo "==> Preserving current main on $PRESERVE_MAIN_AS"
+      git -C "$ROOT_DIR" push "$REMOTE" "${REMOTE_MAIN_SHA}:refs/heads/$PRESERVE_MAIN_AS"
+    fi
+
+    echo "==> Promoting main"
+    if (( FORCE_MAIN_WITH_LEASE == 1 )) && [[ -n "$REMOTE_MAIN_SHA" ]]; then
+      git -C "$ROOT_DIR" push --force-with-lease="main:$REMOTE_MAIN_SHA" "$REMOTE" "HEAD:main"
+    else
+      git -C "$ROOT_DIR" push "$REMOTE" "HEAD:main"
+    fi
+  else
+    echo "==> Skipping main promotion"
+  fi
+
   echo "==> Verifying remote refs"
-  git -C "$ROOT_DIR" ls-remote --heads --tags "$REMOTE" "$TARGET_BRANCH" main "refs/tags/$RELEASE_TAG"
+  git -C "$ROOT_DIR" ls-remote --heads --tags "$REMOTE" "${verify_refs[@]}"
 fi
 
 echo ""

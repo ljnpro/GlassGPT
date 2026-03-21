@@ -14,7 +14,7 @@ if [[ ! -f "$log_file" ]]; then
 fi
 
 warning_lines="$(
-  rg --text --no-messages '\.swift:\d+:\d+: warning:' "$log_file" || true
+  rg --text --no-messages '^.*warning:' "$log_file" || true
 )"
 
 if [[ -z "$warning_lines" ]]; then
