@@ -17,8 +17,6 @@ SIMULATOR_RUNTIME_IDENTIFIER="${SIMULATOR_RUNTIME_IDENTIFIER:-}"
 SIM_UDID="${SIM_UDID:-}"
 SIMULATOR_ARCH="${SIMULATOR_ARCH:-$(uname -m)}"
 SIMULATOR_DEVICE_DESTINATION=""
-DEFAULT_RELEASE_VERSION="4.10.0"
-DEFAULT_RELEASE_BUILD="20185"
 XCODEBUILD_RETRY_ATTEMPTS="${XCODEBUILD_RETRY_ATTEMPTS:-5}"
 XCODE_TEST_TIMEOUT_ALLOWANCE="${XCODE_TEST_TIMEOUT_ALLOWANCE:-180}"
 SIMULATOR_BOOT_TIMEOUT_SECONDS="${SIMULATOR_BOOT_TIMEOUT_SECONDS:-60}"
@@ -754,8 +752,6 @@ function assert_expected_versions_config() {
 
   local marketing_versions
   local build_versions
-  local expected_marketing="${RELEASE_EXPECT_MARKETING_VERSION:-$DEFAULT_RELEASE_VERSION}"
-  local expected_build="${RELEASE_EXPECT_BUILD_NUMBER:-$DEFAULT_RELEASE_BUILD}"
   local marketing_version_count
   local build_version_count
 
@@ -782,6 +778,8 @@ function assert_expected_versions_config() {
   local marketing_version build_version
   marketing_version="${marketing_versions%% *}"
   build_version="${build_versions%% *}"
+  local expected_marketing="${RELEASE_EXPECT_MARKETING_VERSION:-$marketing_version}"
+  local expected_build="${RELEASE_EXPECT_BUILD_NUMBER:-$build_version}"
 
   if [[ "$marketing_version" != "$expected_marketing" ]]; then
     echo "Expected MARKETING_VERSION=$expected_marketing, found $marketing_version" >&2

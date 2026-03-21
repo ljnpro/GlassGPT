@@ -313,6 +313,26 @@ function test_release_upload_log_sanitizer() {
   echo "[PASS] release_testflight.sh sanitizes successful upload logs"
 }
 
+function test_release_readiness_defaults_to_versions_file() {
+  if grep -Fq 'DEFAULT_RELEASE_VERSION=' "$ROOT_DIR/scripts/ci.sh"; then
+    fail "ci.sh should not hardcode a default release marketing version."
+  fi
+
+  if grep -Fq 'DEFAULT_RELEASE_BUILD=' "$ROOT_DIR/scripts/ci.sh"; then
+    fail "ci.sh should not hardcode a default release build number."
+  fi
+
+  if ! grep -Fq 'local expected_marketing="${RELEASE_EXPECT_MARKETING_VERSION:-$marketing_version}"' "$ROOT_DIR/scripts/ci.sh"; then
+    fail "ci.sh release-readiness should default the expected marketing version to Versions.xcconfig."
+  fi
+
+  if ! grep -Fq 'local expected_build="${RELEASE_EXPECT_BUILD_NUMBER:-$build_version}"' "$ROOT_DIR/scripts/ci.sh"; then
+    fail "ci.sh release-readiness should default the expected build number to Versions.xcconfig."
+  fi
+
+  echo "[PASS] release-readiness defaults track Versions.xcconfig"
+}
+
 function test_snapshot_gates_are_split_cleanly() {
   local hosted_snapshot_block package_tests_block core_tests_block
   hosted_snapshot_block="$(sed -n '/function gate_hosted_snapshot_tests()/,/^}/p' "$ROOT_DIR/scripts/ci.sh")"
@@ -541,6 +561,7 @@ test_core_tests_skip_empty_app_tests_gate
 test_package_tests_skip_duplicate_architecture_bundle
 test_successful_xcodebuild_log_sanitizer
 test_release_upload_log_sanitizer
+test_release_readiness_defaults_to_versions_file
 test_snapshot_gates_are_split_cleanly
 test_simulator_lifecycle_uses_resolved_udid
 test_clean_outputs_removes_serial_probe_logs
