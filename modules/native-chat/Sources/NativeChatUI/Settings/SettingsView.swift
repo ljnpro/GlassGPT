@@ -118,14 +118,16 @@ public struct SettingsView: View {
                     }
 
                     dismissAPIKeyKeyboard()
-                }
-            , including: focusedField == .apiKey ? .all : .none)
+                },
+                including: focusedField == .apiKey ? .all : .none
+            )
             .simultaneousGesture(
                 DragGesture(minimumDistance: 12).onChanged { _ in
                     guard focusedField == .apiKey else { return }
                     dismissAPIKeyKeyboard()
-                }
-            , including: focusedField == .apiKey ? .all : .none)
+                },
+                including: focusedField == .apiKey ? .all : .none
+            )
             .navigationTitle(String(localized: "Settings"))
             .task {
                 await cache.refreshAll()
