@@ -162,7 +162,7 @@ struct SettingsCloudflareSection: View {
             return nil
         }
 
-        switch credentials.cloudflareHealthStatus {
+        return switch credentials.cloudflareHealthStatus {
         case .connected:
             String(localized: "Connected")
         case .checking:
