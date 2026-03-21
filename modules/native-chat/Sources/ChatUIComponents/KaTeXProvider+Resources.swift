@@ -10,8 +10,12 @@ extension KaTeXProvider {
         return bundles
     }
 
-    static func findResourceDirectory() -> URL? {
-        for bundle in candidateBundles {
+    static func findResourceDirectory(
+        in bundles: [Bundle] = candidateBundles,
+        onFailure: ((String) -> Void)? = nil,
+        logFailure: Bool = true
+    ) -> URL? {
+        for bundle in bundles {
             if let cssURL = bundle.url(forResource: "katex.min", withExtension: "css") {
                 return cssURL.deletingLastPathComponent()
             }
@@ -25,11 +29,22 @@ extension KaTeXProvider {
             }
         }
 
+        let message = "Failed to locate KaTeX resource directory in loaded bundles."
+        onFailure?(message)
+        if logFailure {
+            NSLog("%@", message)
+        }
         return nil
     }
 
-    static func findResource(named name: String, ext: String) -> URL? {
-        for bundle in candidateBundles {
+    static func findResource(
+        named name: String,
+        ext: String,
+        in bundles: [Bundle] = candidateBundles,
+        onFailure: ((String) -> Void)? = nil,
+        logFailure: Bool = true
+    ) -> URL? {
+        for bundle in bundles {
             if let url = bundle.url(forResource: name, withExtension: ext) {
                 return url
             }
@@ -44,6 +59,11 @@ extension KaTeXProvider {
             }
         }
 
+        let message = "Failed to locate KaTeX resource \(name).\(ext) in loaded bundles."
+        onFailure?(message)
+        if logFailure {
+            NSLog("%@", message)
+        }
         return nil
     }
 }

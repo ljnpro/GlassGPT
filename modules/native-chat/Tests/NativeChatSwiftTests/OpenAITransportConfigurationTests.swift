@@ -7,10 +7,22 @@ import Testing
 @testable import NativeChatComposition
 
 struct OpenAITransportConfigurationTests {
-    @Test func `default configuration provider ships bundled Cloudflare token`() {
+    @Test func `app info plist externalizes cloudflare token through build settings`() throws {
+        let infoPlistURL = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("ios/GlassGPT/Info.plist")
+        let infoDictionary = try #require(NSDictionary(contentsOf: infoPlistURL) as? [String: Any])
+
+        #expect(infoDictionary["CloudflareAIGToken"] as? String == "$(CLOUDFLARE_AIG_TOKEN)")
+    }
+
+    @Test func `default configuration provider starts with no bundled Cloudflare token in transport`() {
         let provider = DefaultOpenAIConfigurationProvider()
-        #expect(provider.cloudflareAIGToken == DefaultOpenAIConfigurationProvider.defaultCloudflareAIGToken)
-        #expect(!provider.cloudflareAIGToken.isEmpty)
+        #expect(provider.cloudflareAIGToken.isEmpty)
     }
 
     @Test func `default configuration provider tracks gateway toggle state`() {

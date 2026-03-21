@@ -48,5 +48,7 @@ extension MessageBubble {
         let liveCitations: [URLCitation]
         let liveFilePathAnnotations: [FilePathAnnotation]
         let showsRecoveryIndicator: Bool
+        let isLiveThinking: Bool
+        let suppressesPersistedThinking: Bool
     }
 }

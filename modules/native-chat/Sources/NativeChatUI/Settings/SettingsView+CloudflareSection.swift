@@ -6,6 +6,7 @@ import SwiftUI
 struct SettingsCloudflareSection: View {
     @Bindable var credentials: SettingsCredentialsStore
     @Bindable var defaults: SettingsDefaultsStore
+    let focusedField: FocusState<SettingsFocusedField?>.Binding
 
     var body: some View {
         Section {
@@ -34,8 +35,17 @@ struct SettingsCloudflareSection: View {
                         String(localized: "https://gateway.example/v1"),
                         text: $credentials.customCloudflareGatewayBaseURL
                     )
+                    .focused(focusedField, equals: .cloudflareGatewayBaseURL)
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
+                    .background(
+                        GeometryReader { geometry in
+                            Color.clear.preference(
+                                key: SettingsFieldFramePreferenceKey.self,
+                                value: [.cloudflareGatewayBaseURL: geometry.frame(in: .named("settingsForm"))]
+                            )
+                        }
+                    )
                     .accessibilityLabel(String(localized: "Custom Cloudflare gateway URL"))
                     .accessibilityIdentifier("settings.cloudflareCustomURL")
                     .onChange(of: credentials.customCloudflareGatewayBaseURL) { _, _ in
@@ -46,9 +56,18 @@ struct SettingsCloudflareSection: View {
                         String(localized: "Cloudflare AIG token"),
                         text: $credentials.customCloudflareAIGToken
                     )
+                    .focused(focusedField, equals: .cloudflareAIGToken)
                     .textContentType(.password)
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
+                    .background(
+                        GeometryReader { geometry in
+                            Color.clear.preference(
+                                key: SettingsFieldFramePreferenceKey.self,
+                                value: [.cloudflareAIGToken: geometry.frame(in: .named("settingsForm"))]
+                            )
+                        }
+                    )
                     .accessibilityLabel(String(localized: "Custom Cloudflare gateway token"))
                     .accessibilityIdentifier("settings.cloudflareCustomToken")
                     .onChange(of: credentials.customCloudflareAIGToken) { _, _ in

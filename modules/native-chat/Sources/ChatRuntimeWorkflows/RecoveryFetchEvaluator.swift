@@ -83,6 +83,8 @@ public enum RecoveryFetchEvaluator {
         switch plannerAction {
         case .finish(.completed):
             return .finish(result: result, errorMessage: nil)
+        case let .finish(.incomplete(errorMessage)):
+            return .finish(result: result, errorMessage: errorMessage)
         case let .finish(.failed(errorMessage)):
             return .finish(result: result, errorMessage: errorMessage)
         case let .startStream(lastSeq):

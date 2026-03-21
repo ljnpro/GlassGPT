@@ -7,13 +7,13 @@ public extension OpenAIResponseParser {
     /// - Returns: An array of URL citations found in the response output.
     static func extractCitations(from response: ResponsesResponseDTO) -> [URLCitation] {
         var annotations: [URLCitation] = []
-
-        guard let output = response.output else {
+        let messageItems = OpenAIResponseOutputSelection.preferredMessageItems(from: response)
+        guard !messageItems.isEmpty else {
             return annotations
         }
 
-        for item in output {
-            guard item.type == "message", let content = item.content else { continue }
+        for item in messageItems {
+            guard let content = item.content else { continue }
 
             for part in content {
                 guard let partAnnotations = part.annotations else { continue }

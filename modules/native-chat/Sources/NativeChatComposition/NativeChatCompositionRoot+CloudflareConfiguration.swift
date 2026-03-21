@@ -33,7 +33,7 @@ extension NativeChatCompositionRoot {
             gatewayToken: resolvedConfigurationValue(
                 infoKey: "CloudflareAIGToken",
                 environmentKey: "CLOUDFLARE_AIG_TOKEN",
-                fallback: DefaultOpenAIConfigurationProvider.defaultCloudflareAIGToken
+                fallback: ""
             )
         )
     }

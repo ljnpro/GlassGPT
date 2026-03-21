@@ -5,13 +5,22 @@ import Foundation
 package protocol PayloadCodable: Codable, Sendable {}
 
 package extension PayloadCodable {
+    static func encodeOrThrow(_ items: [Self]?) throws(EncodingError) -> Data? {
+        guard let items, !items.isEmpty else { return nil }
+        return try PayloadJSONCoding.encode(items)
+    }
+
+    static func decodeOrThrow(_ data: Data?) throws(DecodingError) -> [Self]? {
+        guard let data else { return nil }
+        return try PayloadJSONCoding.decode([Self].self, from: data)
+    }
+
     /// Encodes an optional array of items to JSON data, returning `nil` for empty or nil input.
     /// - Parameter items: The optional array to encode.
     /// - Returns: The encoded JSON data, or `nil` if the array is nil, empty, or encoding fails.
     static func encode(_ items: [Self]?) -> Data? {
-        guard let items, !items.isEmpty else { return nil }
         do {
-            return try PayloadJSONCoding.encode(items)
+            return try encodeOrThrow(items)
         } catch {
             return nil
         }
@@ -21,9 +30,8 @@ package extension PayloadCodable {
     /// - Parameter data: The JSON data to decode, or `nil`.
     /// - Returns: The decoded array, or `nil` if data is nil or decoding fails.
     static func decode(_ data: Data?) -> [Self]? {
-        guard let data else { return nil }
         do {
-            return try PayloadJSONCoding.decode([Self].self, from: data)
+            return try decodeOrThrow(data)
         } catch {
             return nil
         }

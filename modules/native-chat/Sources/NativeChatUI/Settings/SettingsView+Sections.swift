@@ -53,29 +53,25 @@ private struct SettingsInlineReasoningEffortControl: View {
     let availableEfforts: [ReasoningEffort]
     @Binding var isExpanded: Bool
 
-    private let columns = [
-        GridItem(.adaptive(minimum: 92, maximum: 140), spacing: 10, alignment: .leading)
-    ]
-
     var body: some View {
-        VStack(alignment: .leading, spacing: isExpanded ? 12 : 0) {
+        VStack(alignment: .leading, spacing: isExpanded ? 10 : 0) {
             Button {
                 withAnimation(.spring(response: 0.28, dampingFraction: 0.84)) {
                     isExpanded.toggle()
                 }
             } label: {
-                HStack(spacing: 12) {
+                HStack(spacing: 10) {
                     Text(String(localized: "Reasoning Effort"))
                         .foregroundStyle(.primary)
 
-                    Spacer(minLength: 12)
+                    Spacer(minLength: 10)
 
                     HStack(spacing: 8) {
                         Text(selectedEffort.displayName)
-                            .font(.subheadline.weight(.semibold))
+                            .font(.caption.weight(.semibold))
                             .foregroundStyle(.primary)
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 6)
+                            .padding(.horizontal, 9)
+                            .padding(.vertical, 5)
                             .singleFrameGlassCapsuleControl(
                                 tintOpacity: 0.02,
                                 borderWidth: 0.78,
@@ -88,8 +84,8 @@ private struct SettingsInlineReasoningEffortControl: View {
                             .foregroundStyle(.secondary)
                     }
                 }
-                .padding(.horizontal, 14)
-                .padding(.vertical, 12)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 10)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
             }
@@ -99,13 +95,16 @@ private struct SettingsInlineReasoningEffortControl: View {
             .accessibilityIdentifier("settings.defaultEffort")
 
             if isExpanded {
-                LazyVGrid(columns: columns, alignment: .leading, spacing: 10) {
-                    ForEach(availableEfforts) { effort in
-                        effortButton(for: effort)
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        ForEach(availableEfforts) { effort in
+                            effortButton(for: effort)
+                        }
                     }
                 }
-                .padding(.horizontal, 14)
-                .padding(.bottom, 12)
+                .scrollClipDisabled()
+                .padding(.horizontal, 12)
+                .padding(.bottom, 10)
                 .transition(.move(edge: .top).combined(with: .opacity))
             }
         }
@@ -158,10 +157,10 @@ private struct SettingsInlineReasoningEffortControl: View {
             }
 
             Text(effort.displayName)
-                .font(.subheadline.weight(showsCheckmark ? .semibold : .medium))
+                .font(.caption.weight(showsCheckmark ? .semibold : .medium))
                 .lineLimit(1)
         }
-        .frame(maxWidth: .infinity)
+        .padding(.horizontal, 2)
     }
 }
 

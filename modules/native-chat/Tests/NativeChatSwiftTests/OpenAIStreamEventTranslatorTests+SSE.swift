@@ -128,6 +128,43 @@ extension OpenAIStreamEventTranslatorTests {
         )
     }
 
+    @Test func `sse decoder replaces streamed text when output item changes`() async {
+        var decoder = SSEEventDecoder()
+        let continuation = makeTestAsyncStream() as (
+            stream: AsyncStream<StreamEvent>,
+            continuation: AsyncStream<StreamEvent>.Continuation
+        )
+
+        _ = decoder.decode(
+            frame: SSEFrame(
+                type: "response.output_text.delta",
+                data: #"{"item_id":"msg_1","delta":"Hi"}"#
+            ),
+            continuation: continuation.continuation
+        )
+        _ = decoder.decode(
+            frame: SSEFrame(
+                type: "response.output_text.delta",
+                data: #"{"item_id":"msg_2","delta":"Hello"}"#
+            ),
+            continuation: continuation.continuation
+        )
+
+        continuation.continuation.finish()
+
+        var emitted: [StreamEvent] = []
+        for await event in continuation.stream {
+            emitted.append(event)
+        }
+
+        #expect(
+            emitted.map { eventDescription($0) }
+                == ["textDelta(\"Hi\")", "replaceText(Hello)"]
+        )
+        #expect(decoder.accumulatedText == "Hello")
+        #expect(decoder.activeTextItemID == "msg_2")
+    }
+
     @Test func `sse decoder emits response identifier from in progress frames`() async throws {
         var decoder = SSEEventDecoder()
         let continuation = makeTestAsyncStream() as (

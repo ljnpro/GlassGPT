@@ -69,6 +69,8 @@ public struct ReplyStreamEventContext: Equatable, Sendable {
     public let route: OpenAITransportRoute
     /// Whether runtime state reported an active thinking phase before this event.
     public let wasThinking: Bool
+    /// Whether runtime state has any active tool call before this event.
+    public let hasActiveToolCalls: Bool
     /// Whether the originating request used background mode.
     public let usedBackgroundMode: Bool
 
@@ -76,10 +78,12 @@ public struct ReplyStreamEventContext: Equatable, Sendable {
     public init(
         route: OpenAITransportRoute,
         wasThinking: Bool,
+        hasActiveToolCalls: Bool = false,
         usedBackgroundMode: Bool
     ) {
         self.route = route
         self.wasThinking = wasThinking
+        self.hasActiveToolCalls = hasActiveToolCalls
         self.usedBackgroundMode = usedBackgroundMode
     }
 }

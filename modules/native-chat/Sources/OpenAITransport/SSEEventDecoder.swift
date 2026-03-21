@@ -22,6 +22,7 @@ private let sseDecoderSignposter = OSSignposter(subsystem: "GlassGPT", category:
 /// the lifetime of a single streaming session.
 public struct SSEEventDecoder {
     static let logger = Logger(subsystem: "GlassGPT", category: "sse")
+    static let decodeFailureLogThreshold = 5
     /// The accumulated output text from all text deltas.
     public internal(set) var accumulatedText = ""
     /// The accumulated reasoning/thinking text.
@@ -36,6 +37,8 @@ public struct SSEEventDecoder {
     public internal(set) var sawTerminalEvent = false
     /// The response ID that has been emitted, if any.
     public internal(set) var emittedResponseID: String?
+    /// The active output item currently contributing visible assistant text.
+    public internal(set) var activeTextItemID: String?
     /// The number of malformed frames seen in a row.
     var consecutiveDecodeFailures = 0
 
@@ -62,6 +65,7 @@ public struct SSEEventDecoder {
 
         let sequenceNumber = OpenAIStreamEventTranslator.extractSequenceNumber(from: jsonData)
         let responseID = OpenAIStreamEventTranslator.extractResponseIdentifier(from: jsonData)
+        let itemID = decodeEnvelope(from: jsonData)?.itemID
 
         if let translated = OpenAIStreamEventTranslator.translate(eventType: frame.type, data: jsonData) {
             resetDecodeFailures()
@@ -69,6 +73,7 @@ public struct SSEEventDecoder {
                 translated,
                 responseID: responseID,
                 sequenceNumber: sequenceNumber,
+                itemID: itemID,
                 continuation: continuation
             )
         }

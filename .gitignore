@@ -10,6 +10,7 @@
 # Local release config
 .env*.local
 .local/build/
+ios/GlassGPT/Config/Local-Secrets.xcconfig
 
 # Build products
 DerivedData/

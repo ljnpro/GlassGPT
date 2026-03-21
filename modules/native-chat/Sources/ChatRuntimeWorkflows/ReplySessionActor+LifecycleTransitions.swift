@@ -22,7 +22,6 @@ extension ReplySessionActor {
                     route: route
                 )
             )
-            state.isThinking = false
 
         case let .beginRecoveryStream(streamID):
             activeStreamID = streamID
@@ -32,7 +31,6 @@ extension ReplySessionActor {
                 route: .gateway
             )
             state.lifecycle = .recoveringStream(cursor)
-            state.isThinking = false
 
         case .beginRecoveryPoll:
             activeStreamID = nil
@@ -57,7 +55,6 @@ extension ReplySessionActor {
             } else {
                 state.lifecycle = .failed(nil)
             }
-            state.isThinking = false
 
         case let .detachForBackground(usedBackgroundMode):
             activeStreamID = nil
@@ -98,7 +95,7 @@ extension ReplySessionActor {
 
         case .beginSubmitting, .beginUploadingAttachments, .beginStreaming,
              .recordResponseCreated, .recordSequenceUpdate,
-             .appendText, .appendThinking, .setThinking,
+             .appendText, .replaceText, .appendThinking, .beginAnswering, .setThinking,
              .startToolCall, .setToolCallStatus, .appendToolCode, .setToolCode,
              .addCitation, .addFilePathAnnotation, .mergeTerminalPayload:
             break

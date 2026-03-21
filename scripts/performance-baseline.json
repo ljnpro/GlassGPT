@@ -1,0 +1,10 @@
+{
+  "testByteCountFormatterThroughput": 0.015849500000000002,
+  "testRichTextAttributedStringBuilderThroughput": 0.0142965,
+  "testSSEFrameBufferFinishPendingThroughput": 0.0181555,
+  "testSSEFrameBufferIncrementalAppend": 0.0146135,
+  "testSSEFrameBufferThroughput": 0.1281715,
+  "testStreamEnvelopeDTODecodingThroughput": 0.015994500000000002,
+  "testStreamEventTranslationThroughput": 0.0237325,
+  "testStreamingTextParseThroughput": 0.01546
+}

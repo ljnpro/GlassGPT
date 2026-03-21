@@ -3,8 +3,8 @@
 
 Reads performance results from a JSON file and compares them against a
 baseline JSON file. Exits with code 1 if any metric regresses by more
-than 15%. Handles missing baselines gracefully by printing a warning
-and exiting with code 0.
+than 15%, if the baseline is missing, or if result/baseline metric keys
+do not match.
 
 Usage:
     python3 scripts/check_performance_regression.py [results_path] [baseline_path]
@@ -29,6 +29,14 @@ def load_json(path: str) -> dict | None:
         return None
     with open(path, encoding="utf-8") as fh:
         return json.load(fh)
+
+
+def numeric_metrics(payload: dict) -> dict[str, float]:
+    return {
+        key: float(value)
+        for key, value in payload.items()
+        if isinstance(value, (int, float))
+    }
 
 
 def resolve_path(
@@ -56,7 +64,7 @@ def print_comparison_table(
     print(header)
     print("-" * len(header))
 
-    all_keys = sorted(set(list(results.keys()) + list(baseline.keys())))
+    all_keys = sorted(set(numeric_metrics(results).keys()) | set(numeric_metrics(baseline).keys()))
     for key in all_keys:
         base_val = baseline.get(key)
         curr_val = results.get(key)
@@ -90,19 +98,31 @@ def main() -> int:
 
     baseline = load_json(baseline_path)
     if baseline is None:
-        print(
-            f"Warning: no baseline found at {baseline_path}. "
-            "Skipping regression check (first run)."
-        )
-        return 0
+        print(f"Error: performance baseline not found at {baseline_path}", file=sys.stderr)
+        return 1
+
+    result_metrics = numeric_metrics(results)
+    baseline_metrics = numeric_metrics(baseline)
+    missing_metrics = sorted(set(baseline_metrics.keys()) - set(result_metrics.keys()))
+    unexpected_metrics = sorted(set(result_metrics.keys()) - set(baseline_metrics.keys()))
+
+    if missing_metrics:
+        print("Missing performance metrics in results:", file=sys.stderr)
+        for metric in missing_metrics:
+            print(f"  {metric}", file=sys.stderr)
+        return 1
+
+    if unexpected_metrics:
+        print("Unexpected performance metrics without baseline:", file=sys.stderr)
+        for metric in unexpected_metrics:
+            print(f"  {metric}", file=sys.stderr)
+        return 1
 
     regressions: list[tuple[str, float, float, float]] = []
 
-    for key, curr_val in results.items():
-        if not isinstance(curr_val, (int, float)):
-            continue
-        base_val = baseline.get(key)
-        if base_val is None or not isinstance(base_val, (int, float)):
+    for key, curr_val in result_metrics.items():
+        base_val = baseline_metrics.get(key)
+        if base_val is None:
             continue
         if base_val <= 0:
             continue

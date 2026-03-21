@@ -50,6 +50,9 @@ extension SSEEventDecoder {
            !fullText.isEmpty {
             resetDecodeFailures()
             accumulatedText = fullText
+            if let itemID = envelope.itemID {
+                activeTextItemID = itemID
+            }
             emittedAnyOutput = true
         } else {
             recordDecodeFailure("SSE frame could not be decoded for event type \(frameType).")
@@ -91,7 +94,6 @@ extension SSEEventDecoder {
         do {
             return try JSONCoding.decode(ResponsesStreamEnvelopeDTO.self, from: data)
         } catch {
-            Self.logger.debug("SSE envelope decode failed: \(error.localizedDescription, privacy: .public)")
             return nil
         }
     }
@@ -102,10 +104,12 @@ extension SSEEventDecoder {
 
     mutating func recordDecodeFailure(_ message: String) {
         consecutiveDecodeFailures += 1
-        if consecutiveDecodeFailures >= 5 {
+        if shouldLogDecodeFailure(after: consecutiveDecodeFailures) {
             Self.logger.error("\(message, privacy: .public)")
-        } else {
-            Self.logger.debug("\(message, privacy: .public)")
         }
+    }
+
+    func shouldLogDecodeFailure(after count: Int) -> Bool {
+        count == Self.decodeFailureLogThreshold
     }
 }

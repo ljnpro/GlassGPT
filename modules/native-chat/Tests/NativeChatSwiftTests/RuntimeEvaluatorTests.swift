@@ -90,6 +90,34 @@ struct RuntimeEvaluatorTests {
         }
     }
 
+    @Test func `recovery fetch evaluator preserves incomplete results as incomplete terminal state`() {
+        let action = RecoveryFetchEvaluator.evaluate(
+            RecoveryFetchOutcome(
+                result: OpenAIResponseFetchResult(
+                    status: .incomplete,
+                    text: "Partial answer",
+                    thinking: "Partial reasoning",
+                    annotations: [],
+                    toolCalls: [],
+                    filePathAnnotations: [],
+                    errorMessage: "Max tokens reached."
+                ),
+                preferStreamingResume: true,
+                usedBackgroundMode: true,
+                lastSequenceNumber: 17
+            )
+        )
+
+        switch action {
+        case let .finish(result, errorMessage):
+            #expect(result.status == .incomplete)
+            #expect(result.text == "Partial answer")
+            #expect(errorMessage == "Max tokens reached.")
+        default:
+            Issue.record("Expected finish action, got \(String(describing: action))")
+        }
+    }
+
     @Test func `recovery stream evaluator retries direct stream after gateway timeout`() {
         let action = RecoveryStreamEvaluator.evaluate(
             RecoveryStreamOutcome(

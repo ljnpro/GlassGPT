@@ -2,6 +2,14 @@ import ChatPersistenceCore
 import GeneratedFilesCore
 import SwiftUI
 
+struct GeneratedPreviewPresentationState {
+    var isBlockingTouches = false
+    var presentedItem: FilePreviewItem?
+    var isDismissPending = false
+    var isShowing = false
+    var dismissTask: Task<Void, Never>?
+}
+
 extension ChatView {
     var sharedGeneratedFileBinding: Binding<SharedGeneratedFileItem?> {
         Binding(
@@ -34,46 +42,46 @@ extension ChatView {
     }
 
     var shouldShowGeneratedPreviewTouchShield: Bool {
-        presentedGeneratedPreviewItem != nil || isBlockingGeneratedPreviewTouches
+        generatedPreview.presentedItem != nil || generatedPreview.isBlockingTouches
     }
 
     func syncGeneratedPreviewPresentation() {
         guard let previewItem = generatedPreviewCandidate else {
-            guard !isGeneratedPreviewDismissPending else { return }
-            isShowingGeneratedPreview = false
-            presentedGeneratedPreviewItem = nil
-            isBlockingGeneratedPreviewTouches = false
+            guard !generatedPreview.isDismissPending else { return }
+            generatedPreview.isShowing = false
+            generatedPreview.presentedItem = nil
+            generatedPreview.isBlockingTouches = false
             return
         }
 
-        generatedPreviewDismissTask?.cancel()
-        generatedPreviewDismissTask = nil
-        presentedGeneratedPreviewItem = previewItem
-        isGeneratedPreviewDismissPending = false
-        isBlockingGeneratedPreviewTouches = false
-        if !isShowingGeneratedPreview {
-            isShowingGeneratedPreview = true
+        generatedPreview.dismissTask?.cancel()
+        generatedPreview.dismissTask = nil
+        generatedPreview.presentedItem = previewItem
+        generatedPreview.isDismissPending = false
+        generatedPreview.isBlockingTouches = false
+        if !generatedPreview.isShowing {
+            generatedPreview.isShowing = true
         }
     }
 
     func prepareGeneratedPreviewDismissal() {
-        guard presentedGeneratedPreviewItem != nil else { return }
-        guard !isGeneratedPreviewDismissPending else { return }
-        generatedPreviewDismissTask?.cancel()
-        generatedPreviewDismissTask = nil
-        isGeneratedPreviewDismissPending = true
-        isBlockingGeneratedPreviewTouches = true
+        guard generatedPreview.presentedItem != nil else { return }
+        guard !generatedPreview.isDismissPending else { return }
+        generatedPreview.dismissTask?.cancel()
+        generatedPreview.dismissTask = nil
+        generatedPreview.isDismissPending = true
+        generatedPreview.isBlockingTouches = true
     }
 
     func beginGeneratedPreviewDismissal() {
-        guard presentedGeneratedPreviewItem != nil else { return }
-        if !isGeneratedPreviewDismissPending {
+        guard generatedPreview.presentedItem != nil else { return }
+        if !generatedPreview.isDismissPending {
             prepareGeneratedPreviewDismissal()
         }
 
         viewModel.filePreviewItem = nil
 
-        generatedPreviewDismissTask = Task { @MainActor in
+        generatedPreview.dismissTask = Task { @MainActor in
             do {
                 try await Task.sleep(nanoseconds: generatedPreviewOverlayDismissDelay)
             } catch is CancellationError {
@@ -82,7 +90,7 @@ extension ChatView {
                 Loggers.app.error("[ChatView] Generated preview dismissal overlay delay failed: \(error.localizedDescription)")
             }
 
-            isShowingGeneratedPreview = false
+            generatedPreview.isShowing = false
 
             do {
                 try await Task.sleep(nanoseconds: generatedPreviewTouchCooldownDuration)
@@ -92,21 +100,21 @@ extension ChatView {
                 Loggers.app.error("[ChatView] Generated preview touch cooldown failed: \(error.localizedDescription)")
             }
 
-            presentedGeneratedPreviewItem = nil
-            isBlockingGeneratedPreviewTouches = false
-            isGeneratedPreviewDismissPending = false
-            generatedPreviewDismissTask = nil
+            generatedPreview.presentedItem = nil
+            generatedPreview.isBlockingTouches = false
+            generatedPreview.isDismissPending = false
+            generatedPreview.dismissTask = nil
         }
     }
 
     func handleGeneratedPreviewCoverDismiss() {
-        guard !isShowingGeneratedPreview else { return }
+        guard !generatedPreview.isShowing else { return }
 
-        if !isGeneratedPreviewDismissPending {
-            presentedGeneratedPreviewItem = nil
-            isBlockingGeneratedPreviewTouches = false
-            generatedPreviewDismissTask?.cancel()
-            generatedPreviewDismissTask = nil
+        if !generatedPreview.isDismissPending {
+            generatedPreview.presentedItem = nil
+            generatedPreview.isBlockingTouches = false
+            generatedPreview.dismissTask?.cancel()
+            generatedPreview.dismissTask = nil
             viewModel.filePreviewItem = nil
         }
     }

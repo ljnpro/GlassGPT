@@ -1,10 +1,12 @@
 import ChatDomain
 import Foundation
+import os
 import SwiftData
 
 /// SwiftData entity representing a single chat message within a ``Conversation``.
 @Model
 public final class Message {
+    package static let roleFallbackLogger = Logger(subsystem: "GlassGPT", category: "persistence")
     /// Unique identifier for this message.
     public var id: UUID
     /// Raw value of the ``MessageRole`` (e.g. "user", "assistant").
@@ -85,7 +87,7 @@ public final class Message {
 
     /// Typed accessor for the message role, derived from ``roleRawValue``.
     public var role: MessageRole {
-        get { MessageRole(rawValue: roleRawValue) ?? .user }
+        get { Self.resolvedRole(from: roleRawValue) }
         set { roleRawValue = newValue.rawValue }
     }
 
@@ -116,5 +118,21 @@ public final class Message {
     /// SHA-256 hex digest of all payload blobs, used for change detection.
     public var payloadRenderDigest: String {
         MessagePayloadStore.renderDigest(for: self)
+    }
+
+    package static func resolvedRole(
+        from rawValue: String,
+        onInvalid: ((String) -> Void)? = nil,
+        logFailure: Bool = true
+    ) -> MessageRole {
+        guard let role = MessageRole(rawValue: rawValue) else {
+            onInvalid?(rawValue)
+            if logFailure {
+                roleFallbackLogger.error("Unknown message role raw value: \(rawValue, privacy: .public)")
+            }
+            return .user
+        }
+
+        return role
     }
 }

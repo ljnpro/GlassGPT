@@ -199,7 +199,7 @@ extension OpenAIStreamEventTranslatorTests {
     @Test func `extraction helpers prefer structured content`() {
         let response = makeStructuredExtractionResponse()
 
-        #expect(OpenAIStreamEventTranslator.extractOutputText(from: response) == "top level text")
+        #expect(OpenAIStreamEventTranslator.extractOutputText(from: response) == "body")
         #expect(
             OpenAIStreamEventTranslator.extractReasoningText(from: response)
                 == "top levelplan summary step"
@@ -213,6 +213,46 @@ extension OpenAIStreamEventTranslatorTests {
         let annotations = OpenAIStreamEventTranslator.extractFilePathAnnotations(from: response)
         #expect(annotations.count == 1)
         #expect(annotations.first?.sandboxPath == "body")
+    }
+
+    @Test func `extraction helpers prefer final assistant message over earlier revisions`() {
+        let response = ResponsesResponseDTO(
+            output: [
+                ResponsesOutputItemDTO(
+                    type: "message",
+                    id: "msg_draft",
+                    status: "completed",
+                    phase: "draft",
+                    role: "assistant",
+                    content: [
+                        ResponsesContentPartDTO(
+                            type: "output_text",
+                            text: "Hi! How can I help?",
+                            annotations: nil
+                        )
+                    ]
+                ),
+                ResponsesOutputItemDTO(
+                    type: "message",
+                    id: "msg_final",
+                    status: "completed",
+                    phase: "final_answer",
+                    role: "assistant",
+                    content: [
+                        ResponsesContentPartDTO(
+                            type: "output_text",
+                            text: "Hello! What can I do for you today?",
+                            annotations: nil
+                        )
+                    ]
+                )
+            ]
+        )
+
+        #expect(
+            OpenAIStreamEventTranslator.extractOutputText(from: response)
+                == "Hello! What can I do for you today?"
+        )
     }
 
     @Test func `annotation helpers validate URL payloads`() {

@@ -113,6 +113,7 @@ jobs:
         include:
           - gate: architecture-tests
           - gate: core-tests
+          - gate: performance-tests
           - gate: ui-tests
             ui_filter: "shard-1"
             ui-tests-shard: 1

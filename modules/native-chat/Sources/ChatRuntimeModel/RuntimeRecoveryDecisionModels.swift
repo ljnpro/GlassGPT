@@ -16,6 +16,8 @@ public enum RuntimeRecoveryStatus: Equatable, Sendable {
     case inProgress
     /// The response completed successfully.
     case completed
+    /// The response ended before reaching a full completion state.
+    case incomplete
     /// The response terminated unsuccessfully or ambiguously.
     case failed
 }
@@ -34,6 +36,8 @@ public enum RuntimeRecoveryFetchAction: Equatable, Sendable {
 public enum RuntimeRecoveryTerminalState: Equatable, Sendable {
     /// The detached response completed successfully.
     case completed
+    /// The detached response ended early and may contain partial output.
+    case incomplete(String?)
     /// The detached response did not complete successfully.
     case failed(String?)
 }

@@ -122,7 +122,8 @@ extension ChatRecoveryCoordinator {
                     sessions.registerSession(
                         session,
                         execution: SessionExecutionState(service: services.serviceFactory()),
-                        visible: false
+                        visible: false,
+                        syncIfCurrentlyVisible: true
                     )
                     await pollResponseUntilTerminal(session: session, responseId: responseId)
                 }

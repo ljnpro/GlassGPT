@@ -17,8 +17,8 @@ struct SettingsAPIConfigurationSection: View {
                 .background(
                     GeometryReader { geometry in
                         Color.clear.preference(
-                            key: SettingsAPIKeyFieldFramePreferenceKey.self,
-                            value: geometry.frame(in: .named("settingsForm"))
+                            key: SettingsFieldFramePreferenceKey.self,
+                            value: [.apiKey: geometry.frame(in: .named("settingsForm"))]
                         )
                     }
                 )

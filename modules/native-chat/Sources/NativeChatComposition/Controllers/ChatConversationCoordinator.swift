@@ -131,7 +131,8 @@ package final class ChatConversationCoordinator {
         sessions.registerSession(
             session,
             execution: SessionExecutionState(service: services.serviceFactory()),
-            visible: true
+            visible: true,
+            syncIfCurrentlyVisible: true
         )
         Task { @MainActor [weak self] in
             guard let self else { return }

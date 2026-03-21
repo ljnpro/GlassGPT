@@ -8,6 +8,8 @@ public typealias APIMessage = ChatRequestMessage
 public enum StreamEvent: Sendable {
     /// An incremental text content delta.
     case textDelta(String)
+    /// A replacement text snapshot that supersedes previously streamed text.
+    case replaceText(String)
     /// An incremental reasoning/thinking content delta.
     case thinkingDelta(String)
     /// The model has entered its thinking phase.

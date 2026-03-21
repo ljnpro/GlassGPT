@@ -4,15 +4,16 @@ import UIKit
 
 enum SettingsFocusedField: Hashable {
     case apiKey
+    case cloudflareGatewayBaseURL
+    case cloudflareAIGToken
 }
 
-struct SettingsAPIKeyFieldFramePreferenceKey: PreferenceKey {
-    static let defaultValue: CGRect = .null
+struct SettingsFieldFramePreferenceKey: PreferenceKey {
+    static let defaultValue: [SettingsFocusedField: CGRect] = [:]
 
-    static func reduce(value: inout CGRect, nextValue: () -> CGRect) {
-        let nextFrame = nextValue()
-        if !nextFrame.isNull {
-            value = nextFrame
+    static func reduce(value: inout [SettingsFocusedField: CGRect], nextValue: () -> [SettingsFocusedField: CGRect]) {
+        for (field, frame) in nextValue() where !frame.isNull {
+            value[field] = frame
         }
     }
 }
@@ -34,7 +35,7 @@ public struct SettingsView: View {
     @State private var credentials: SettingsCredentialsStore
     @State private var defaults: SettingsDefaultsStore
     @State private var cache: SettingsCacheStore
-    @State private var apiKeyFieldFrame: CGRect = .null
+    @State private var fieldFrames: [SettingsFocusedField: CGRect] = [:]
     @FocusState private var focusedField: SettingsFocusedField?
     private let about: SettingsAboutInfo
 
@@ -70,11 +71,12 @@ public struct SettingsView: View {
                 SettingsAPIConfigurationSection(
                     viewModel: credentials,
                     focusedField: $focusedField,
-                    dismissKeyboard: dismissAPIKeyKeyboard
+                    dismissKeyboard: dismissKeyboard
                 )
                 SettingsCloudflareSection(
                     credentials: credentials,
-                    defaults: defaults
+                    defaults: defaults,
+                    focusedField: $focusedField
                 )
                 SettingsChatDefaultsSection(viewModel: defaults)
                 SettingsAppearanceSection(viewModel: defaults)
@@ -108,25 +110,26 @@ public struct SettingsView: View {
             .coordinateSpace(name: "settingsForm")
             .scrollDismissesKeyboard(.interactively)
             .accessibilityIdentifier("settings.form")
-            .onPreferenceChange(SettingsAPIKeyFieldFramePreferenceKey.self) { apiKeyFieldFrame = $0 }
+            .onPreferenceChange(SettingsFieldFramePreferenceKey.self) { fieldFrames = $0 }
             .simultaneousGesture(
                 SpatialTapGesture().onEnded { value in
-                    guard focusedField == .apiKey,
-                          !apiKeyFieldFrame.contains(value.location)
+                    guard let focusedField,
+                          let fieldFrame = fieldFrames[focusedField],
+                          !fieldFrame.contains(value.location)
                     else {
                         return
                     }
 
-                    dismissAPIKeyKeyboard()
+                    dismissKeyboard()
                 },
-                including: focusedField == .apiKey ? .all : .none
+                including: focusedField != nil ? .all : .none
             )
             .simultaneousGesture(
                 DragGesture(minimumDistance: 12).onChanged { _ in
-                    guard focusedField == .apiKey else { return }
-                    dismissAPIKeyKeyboard()
+                    guard focusedField != nil else { return }
+                    dismissKeyboard()
                 },
-                including: focusedField == .apiKey ? .all : .none
+                including: focusedField != nil ? .all : .none
             )
             .navigationTitle(String(localized: "Settings"))
             .task {
@@ -144,7 +147,7 @@ public struct SettingsView: View {
         "\(description): \(limit)."
     }
 
-    private func dismissAPIKeyKeyboard() {
+    private func dismissKeyboard() {
         focusedField = nil
         SettingsKeyboardDismisser.dismiss()
     }

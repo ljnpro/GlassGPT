@@ -67,6 +67,28 @@ public struct ResponsesReasoningDTO: Codable, Equatable, Sendable {
         self.text = text
         self.summary = summary
     }
+
+    private enum CodingKeys: String, CodingKey {
+        case text
+        case summary
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        text = try container.decodeIfPresent(String.self, forKey: .text)
+        do {
+            summary = try container.decodeIfPresent([ResponsesTextFragmentDTO].self, forKey: .summary)
+        } catch DecodingError.typeMismatch {
+            _ = try container.decodeIfPresent(String.self, forKey: .summary)
+            summary = nil
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encodeIfPresent(text, forKey: .text)
+        try container.encodeIfPresent(summary, forKey: .summary)
+    }
 }
 
 /// An annotation attached to response content (URL citation or file path).

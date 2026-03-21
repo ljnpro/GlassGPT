@@ -17,6 +17,7 @@ package func makeSettingsPresenter(
     configurationProvider: OpenAIConfigurationProvider,
     fileDownloadService: GeneratedFilesInfra.FileDownloadService,
     applyCloudflareConfiguration: @escaping @MainActor () -> Void,
+    logCredentialFailures: Bool = true,
     appVersionString: String? = nil,
     platformString: String? = nil
 ) -> SettingsPresenter {
@@ -50,7 +51,8 @@ package func makeSettingsPresenter(
     let credentials = SettingsCredentialsStore(
         apiKey: apiKeyStore.loadAPIKey() ?? "",
         controller: controller,
-        isCloudflareGatewayEnabled: { defaults.cloudflareEnabled }
+        isCloudflareGatewayEnabled: { defaults.cloudflareEnabled },
+        logFailures: logCredentialFailures
     )
 
     let cache = SettingsCacheStore(

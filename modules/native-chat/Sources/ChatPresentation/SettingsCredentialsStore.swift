@@ -29,19 +29,22 @@ public final class SettingsCredentialsStore {
     /// The custom Cloudflare gateway token being edited.
     public var customCloudflareAIGToken: String
 
-    private static let logger = Logger(subsystem: "GlassGPT", category: "settings")
-    private let controller: SettingsSceneController
-    private let isCloudflareGatewayEnabled: @MainActor () -> Bool
+    static let logger = Logger(subsystem: "GlassGPT", category: "settings")
+    let controller: SettingsSceneController
+    let isCloudflareGatewayEnabled: @MainActor () -> Bool
+    let logFailures: Bool
 
     /// Creates credential state with the stored API key and current gateway configuration.
     public init(
         apiKey: String,
         controller: SettingsSceneController,
-        isCloudflareGatewayEnabled: @escaping @MainActor () -> Bool
+        isCloudflareGatewayEnabled: @escaping @MainActor () -> Bool,
+        logFailures: Bool = true
     ) {
         self.apiKey = apiKey
         self.controller = controller
         self.isCloudflareGatewayEnabled = isCloudflareGatewayEnabled
+        self.logFailures = logFailures
         let cloudflareConfigurationMode = controller.loadCloudflareConfigurationMode()
         let customCloudflareGatewayBaseURL = controller.loadCustomCloudflareGatewayBaseURL()
         let customCloudflareAIGToken = controller.loadCustomCloudflareGatewayToken() ?? ""
@@ -77,7 +80,9 @@ public final class SettingsCredentialsStore {
                 self.cloudflareHealthStatus = cloudflareHealthStatus
             }
         } catch {
-            Self.logger.error("Failed to save API key: \(error.localizedDescription, privacy: .public)")
+            if logFailures {
+                Self.logger.error("Failed to save API key: \(error.localizedDescription, privacy: .public)")
+            }
         }
     }
 
@@ -105,110 +110,4 @@ public final class SettingsCredentialsStore {
         isValidating = false
     }
 
-    /// Performs a Cloudflare gateway health check and updates ``cloudflareHealthStatus``.
-    public func checkCloudflareHealth() async {
-        let gatewayEnabled = isCloudflareGatewayEnabled()
-        guard gatewayEnabled else {
-            cloudflareHealthStatus = .unknown
-            isCheckingCloudflareHealth = false
-            return
-        }
-
-        let localStatus = controller.resolveCloudflareHealth(
-            typedAPIKey: apiKey,
-            gatewayEnabled: gatewayEnabled,
-            configuration: currentCloudflareConfiguration()
-        )
-        guard localStatus == .unknown else {
-            cloudflareHealthStatus = localStatus
-            isCheckingCloudflareHealth = false
-            return
-        }
-
-        isCheckingCloudflareHealth = true
-        cloudflareHealthStatus = .checking
-        cloudflareHealthStatus = await controller.checkCloudflareHealth(
-            typedAPIKey: apiKey,
-            gatewayEnabled: gatewayEnabled,
-            configuration: currentCloudflareConfiguration()
-        )
-        isCheckingCloudflareHealth = false
-    }
-
-    /// Switches the locally selected Cloudflare configuration mode.
-    public func setCloudflareConfigurationMode(_ mode: CloudflareGatewayConfigurationMode) {
-        cloudflareConfigurationMode = mode
-        if mode == .default {
-            controller.persistCloudflareConfigurationMode(.default)
-        }
-        refreshCloudflareHealthStatus()
-    }
-
-    /// Saves the currently edited custom Cloudflare gateway configuration and activates it.
-    public func saveCustomCloudflareConfiguration() {
-        let trimmedGatewayBaseURL = customCloudflareGatewayBaseURL
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        let trimmedGatewayToken = customCloudflareAIGToken
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-
-        do {
-            try controller.saveCustomCloudflareConfiguration(
-                gatewayBaseURL: trimmedGatewayBaseURL,
-                gatewayToken: trimmedGatewayToken
-            )
-            cloudflareConfigurationMode = .custom
-            customCloudflareGatewayBaseURL = trimmedGatewayBaseURL
-            customCloudflareAIGToken = trimmedGatewayToken
-            refreshCloudflareHealthStatus()
-        } catch {
-            Self.logger.error("Failed to save custom Cloudflare configuration: \(error.localizedDescription, privacy: .public)")
-        }
-    }
-
-    /// Clears the saved custom Cloudflare gateway configuration while keeping custom mode active.
-    public func clearCustomCloudflareConfiguration() {
-        controller.clearCustomCloudflareConfiguration()
-        customCloudflareGatewayBaseURL = ""
-        customCloudflareAIGToken = ""
-        refreshCloudflareHealthStatus()
-    }
-
-    /// Recomputes local gateway health after the Cloudflare preference changes.
-    public func handleCloudflareGatewayChange(_ enabled: Bool) {
-        guard enabled else {
-            cloudflareHealthStatus = .unknown
-            isCheckingCloudflareHealth = false
-            return
-        }
-
-        refreshCloudflareHealthStatus()
-    }
-
-    /// Recomputes local gateway health for the current configuration preview.
-    public func refreshCloudflareHealthStatus() {
-        let gatewayEnabled = isCloudflareGatewayEnabled()
-        guard gatewayEnabled else {
-            cloudflareHealthStatus = .unknown
-            isCheckingCloudflareHealth = false
-            return
-        }
-
-        cloudflareHealthStatus = controller.resolveCloudflareHealth(
-            typedAPIKey: apiKey,
-            gatewayEnabled: gatewayEnabled,
-            configuration: currentCloudflareConfiguration()
-        )
-    }
-
-    private func currentCloudflareConfiguration(
-        mode: CloudflareGatewayConfigurationMode? = nil,
-        customGatewayBaseURL: String? = nil,
-        customGatewayToken: String? = nil
-    ) -> SettingsCloudflareConfiguration {
-        SettingsCloudflareConfiguration(
-            mode: mode ?? cloudflareConfigurationMode,
-            customGatewayBaseURL: customGatewayBaseURL ?? customCloudflareGatewayBaseURL,
-            customGatewayToken: customGatewayToken ?? customCloudflareAIGToken
-        )
-    }
 }

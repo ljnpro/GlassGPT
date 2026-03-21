@@ -6,6 +6,7 @@ export PYTHONDONTWRITEBYTECODE="${PYTHONDONTWRITEBYTECODE:-1}"
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 ENV_FILE="$ROOT_DIR/.local/publish.env"
 VERSIONS_XCCONFIG_PATH="${VERSIONS_XCCONFIG_PATH:-$ROOT_DIR/ios/GlassGPT/Config/Versions.xcconfig}"
+LOCAL_SECRETS_XCCONFIG_PATH="${LOCAL_SECRETS_XCCONFIG_PATH:-$ROOT_DIR/ios/GlassGPT/Config/Local-Secrets.xcconfig}"
 PROJECT_PATH="${XCODE_PROJECT_PATH:-$ROOT_DIR/ios/GlassGPT.xcodeproj}"
 SCHEME="${XCODE_SCHEME:-GlassGPT}"
 BUILD_DIR="${LOCAL_BUILD_DIR:-$ROOT_DIR/.local/build}"
@@ -148,12 +149,45 @@ function resolve_release_tag() {
   printf '%s\n' "$build_tag"
 }
 
+function resolve_cloudflare_aig_token() {
+  if [[ -n "${CLOUDFLARE_AIG_TOKEN:-}" ]]; then
+    printf '%s\n' "$CLOUDFLARE_AIG_TOKEN"
+    return 0
+  fi
+
+  if [[ ! -f "$LOCAL_SECRETS_XCCONFIG_PATH" ]]; then
+    return 0
+  fi
+
+  python3 - "$LOCAL_SECRETS_XCCONFIG_PATH" <<'PY'
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+for raw_line in path.read_text().splitlines():
+    line = raw_line.split("//", 1)[0].strip()
+    if not line or "=" not in line:
+        continue
+    key, value = [segment.strip() for segment in line.split("=", 1)]
+    if key != "CLOUDFLARE_AIG_TOKEN":
+        continue
+    print(value.strip().strip('"').strip("'"))
+    break
+PY
+}
+
 if [[ ! -f "$ENV_FILE" ]]; then
   echo "Missing env file: $ENV_FILE" >&2
   exit 1
 fi
 
 source "$ENV_FILE"
+
+CLOUDFLARE_AIG_TOKEN_EFFECTIVE="$(resolve_cloudflare_aig_token)"
+if [[ -z "$CLOUDFLARE_AIG_TOKEN_EFFECTIVE" ]]; then
+  echo "Missing Cloudflare AIG token. Set CLOUDFLARE_AIG_TOKEN or provide $LOCAL_SECRETS_XCCONFIG_PATH." >&2
+  exit 1
+fi
 
 if [[ -z "$TARGET_BRANCH" ]]; then
   TARGET_BRANCH="$(git -C "$ROOT_DIR" rev-parse --abbrev-ref HEAD)"
@@ -307,6 +341,7 @@ xcodebuild \
   -authenticationKeyPath "$KEY_PATH" \
   -authenticationKeyID "$ASC_API_KEY_ID" \
   -authenticationKeyIssuerID "$ASC_ISSUER_ID" \
+  "CLOUDFLARE_AIG_TOKEN=$CLOUDFLARE_AIG_TOKEN_EFFECTIVE" \
   "$XCODEBUILD_APPINTENTS_LINKER_SETTING" | tee "$ARCHIVE_LOG"
 python3 "$ROOT_DIR/scripts/sanitize_success_log.py" xcodebuild "$ARCHIVE_LOG"
 ensure_successful_log_has_content "$ARCHIVE_LOG" "Archive completed successfully."
@@ -346,6 +381,8 @@ actual_version = info["CFBundleShortVersionString"]
 actual_build = info["CFBundleVersion"]
 if actual_version != expected_version or actual_build != expected_build:
     raise SystemExit(f"IPA metadata mismatch. expected {expected_version} ({expected_build}), found {actual_version} ({actual_build})")
+if not info.get("CloudflareAIGToken"):
+    raise SystemExit("IPA metadata is missing CloudflareAIGToken.")
 print(f"Verified IPA version: {actual_version} ({actual_build})")
 PY
 

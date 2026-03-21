@@ -19,8 +19,12 @@ public enum ReplyRuntimeTransition: Sendable, Equatable {
     case recordSequenceUpdate(Int)
     /// Append a text delta to the reply buffer.
     case appendText(String)
+    /// Replace the current streamed text buffer.
+    case replaceText(String)
     /// Append a thinking/reasoning delta to the reply buffer.
     case appendThinking(String)
+    /// Transition from reasoning/tool activity into answer text.
+    case beginAnswering(text: String, replace: Bool)
     /// Set whether the model is currently in its thinking phase.
     case setThinking(Bool)
     /// Start tracking a new tool call with the given identifier and type.

@@ -112,6 +112,7 @@ extension ChatScreenStoreRuntimeTests {
         let resumeURL = try #require(relaunchStreamClient.recordedRequests.first?.url?.absoluteString)
         #expect(resumeURL.contains("starting_after=7"))
     }
+
 }
 
 // MARK: - Relaunch Test Helpers

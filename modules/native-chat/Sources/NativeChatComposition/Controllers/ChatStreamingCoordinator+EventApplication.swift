@@ -20,6 +20,10 @@ extension ChatStreamingCoordinator {
             context: ReplyStreamEventContext(
                 route: sessions.runtimeRoute(for: session),
                 wasThinking: sessions.cachedRuntimeState(for: session)?.isThinking ?? false,
+                hasActiveToolCalls: sessions.cachedRuntimeState(for: session)?
+                    .buffer
+                    .toolCalls
+                    .contains(where: { $0.status != .completed }) ?? false,
                 usedBackgroundMode: session.request.usesBackgroundMode
             )
         )

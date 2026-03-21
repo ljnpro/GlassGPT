@@ -58,15 +58,9 @@ public struct MessagePersistenceAdapter {
             if let thinking = result.thinking, !thinking.isEmpty {
                 message.thinking = thinking
             }
-            if !result.toolCalls.isEmpty {
-                MessagePayloadStore.setToolCalls(result.toolCalls, on: message)
-            }
-            if !result.annotations.isEmpty {
-                MessagePayloadStore.setAnnotations(result.annotations, on: message)
-            }
-            if !result.filePathAnnotations.isEmpty {
-                MessagePayloadStore.setFilePathAnnotations(result.filePathAnnotations, on: message)
-            }
+            MessagePayloadStore.setToolCalls(result.toolCalls, on: message)
+            MessagePayloadStore.setAnnotations(result.annotations, on: message)
+            MessagePayloadStore.setFilePathAnnotations(result.filePathAnnotations, on: message)
         }
 
         if message.content.isEmpty {

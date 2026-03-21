@@ -61,7 +61,9 @@ public enum ReplyRecoveryPlanner {
             .inProgress
         case .completed:
             .completed
-        case .failed, .incomplete, .unknown:
+        case .incomplete:
+            .incomplete
+        case .failed, .unknown:
             .failed
         }
     }

@@ -48,12 +48,15 @@ extension ChatRecoveryCoordinator {
                 ),
                 to: session
             )
-            sessions.syncVisibleState(from: session)
+            if visible {
+                sessions.bindVisibleSession(messageID: messageId)
+            } else {
+                sessions.syncVisibleState(from: session)
+            }
         }
 
         if visible {
             state.errorMessage = nil
-            sessions.bindVisibleSession(messageID: messageId)
         }
 
         let execution = ensureRecoveryExecution(for: messageId)
@@ -79,7 +82,8 @@ extension ChatRecoveryCoordinator {
         sessions.registerSession(
             created,
             execution: SessionExecutionState(service: services.serviceFactory()),
-            visible: visible
+            visible: false,
+            syncIfCurrentlyVisible: false
         )
         return created
     }

@@ -1,68 +1,111 @@
 import ChatDomain
 import CryptoKit
 import Foundation
+import os
 
 /// Encodes, decodes, and applies structured message payloads (citations, tool calls,
 /// file attachments, and file-path annotations) stored as binary blobs on ``Message``.
 public enum MessagePayloadStore {
+    private static let digestEncodingFailureSentinel = Data(#"{"payload_encoding_error":true}"#.utf8)
+    private static let logger = Logger(subsystem: "GlassGPT", category: "persistence")
     /// Decodes URL citations from binary data.
     public static func annotations(from data: Data?) -> [URLCitation] {
-        URLCitation.decode(data) ?? []
+        do {
+            return try decodedPayloadItems(URLCitation.self, from: data, label: "annotations")
+        } catch {
+            return []
+        }
     }
 
     /// Decodes tool call metadata from binary data.
     public static func toolCalls(from data: Data?) -> [ToolCallInfo] {
-        ToolCallInfo.decode(data) ?? []
+        do {
+            return try decodedPayloadItems(ToolCallInfo.self, from: data, label: "tool calls")
+        } catch {
+            return []
+        }
     }
 
     /// Decodes file attachments from binary data.
     public static func fileAttachments(from data: Data?) -> [FileAttachment] {
-        FileAttachment.decode(data) ?? []
+        do {
+            return try decodedPayloadItems(FileAttachment.self, from: data, label: "file attachments")
+        } catch {
+            return []
+        }
     }
 
     /// Decodes file-path annotations from binary data.
     public static func filePathAnnotations(from data: Data?) -> [FilePathAnnotation] {
-        FilePathAnnotation.decode(data) ?? []
+        do {
+            return try decodedPayloadItems(FilePathAnnotation.self, from: data, label: "file path annotations")
+        } catch {
+            return []
+        }
     }
 
     /// Encodes URL citations to binary data, returning `nil` for empty or nil input.
     public static func encodeAnnotations(_ items: [URLCitation]?) -> Data? {
-        URLCitation.encode(items)
+        do {
+            return try encodedPayloadData(items, label: "annotations")
+        } catch {
+            return nil
+        }
     }
 
     /// Encodes tool call metadata to binary data.
     public static func encodeToolCalls(_ items: [ToolCallInfo]?) -> Data? {
-        ToolCallInfo.encode(items)
+        do {
+            return try encodedPayloadData(items, label: "tool calls")
+        } catch {
+            return nil
+        }
     }
 
     /// Encodes file attachments to binary data.
     public static func encodeFileAttachments(_ items: [FileAttachment]?) -> Data? {
-        FileAttachment.encode(items)
+        do {
+            return try encodedPayloadData(items, label: "file attachments")
+        } catch {
+            return nil
+        }
     }
 
     /// Encodes file-path annotations to binary data.
     public static func encodeFilePathAnnotations(_ items: [FilePathAnnotation]?) -> Data? {
-        FilePathAnnotation.encode(items)
+        do {
+            return try encodedPayloadData(items, label: "file path annotations")
+        } catch {
+            return nil
+        }
     }
 
     /// Writes URL citations to the given message's `annotationsData` blob.
     public static func setAnnotations(_ items: [URLCitation], on message: Message) {
-        message.annotationsData = encodeAnnotations(items.isEmpty ? nil : items)
+        setPayload(items, label: "annotations") {
+            message.annotationsData = $0
+        }
     }
 
     /// Writes tool call metadata to the given message's `toolCallsData` blob.
     public static func setToolCalls(_ items: [ToolCallInfo], on message: Message) {
-        message.toolCallsData = encodeToolCalls(items.isEmpty ? nil : items)
+        setPayload(items, label: "tool calls") {
+            message.toolCallsData = $0
+        }
     }
 
     /// Writes file attachments to the given message's `fileAttachmentsData` blob.
     public static func setFileAttachments(_ items: [FileAttachment], on message: Message) {
-        message.fileAttachmentsData = encodeFileAttachments(items.isEmpty ? nil : items)
+        setPayload(items, label: "file attachments") {
+            message.fileAttachmentsData = $0
+        }
     }
 
     /// Writes file-path annotations to the given message's `filePathAnnotationsData` blob.
     public static func setFilePathAnnotations(_ items: [FilePathAnnotation], on message: Message) {
-        message.filePathAnnotationsData = encodeFilePathAnnotations(items.isEmpty ? nil : items)
+        setPayload(items, label: "file path annotations") {
+            message.filePathAnnotationsData = $0
+        }
     }
 
     /// Computes a SHA-256 hex digest of all payload fields on the given message.
@@ -91,13 +134,66 @@ public enum MessagePayloadStore {
         return digest.compactMap { String(format: "%02x", $0) }.joined()
     }
 
-    private static func canonicalData(for value: some Encodable) -> Data {
+    package static func canonicalData(
+        for value: some Encodable,
+        logFailure: Bool = true
+    ) -> Data {
         do {
             let encoder = JSONEncoder()
             encoder.outputFormatting = [.sortedKeys]
             return try encoder.encode(value)
         } catch {
-            return Data()
+            if logFailure {
+                logger.error("Failed to encode payload digest component: \(error.localizedDescription, privacy: .public)")
+            }
+            return digestEncodingFailureSentinel
+        }
+    }
+
+    package static func encodedPayloadData<T: PayloadCodable>(
+        _ items: [T]?,
+        label: String,
+        logFailure: Bool = true
+    ) throws(EncodingError) -> Data? {
+        do {
+            return try T.encodeOrThrow(items)
+        } catch {
+            if logFailure {
+                logger.error("Failed to encode \(label, privacy: .public): \(error.localizedDescription, privacy: .public)")
+            }
+            throw error
+        }
+    }
+
+    package static func decodedPayloadItems<T: PayloadCodable>(
+        _: T.Type,
+        from data: Data?,
+        label: String,
+        logFailure: Bool = true
+    ) throws(DecodingError) -> [T] {
+        do {
+            return try T.decodeOrThrow(data) ?? []
+        } catch {
+            if logFailure {
+                logger.error("Failed to decode \(label, privacy: .public): \(error.localizedDescription, privacy: .public)")
+            }
+            throw error
+        }
+    }
+
+    private static func setPayload<T: PayloadCodable>(
+        _ items: [T],
+        label: String,
+        assign: (Data?) -> Void
+    ) {
+        guard !items.isEmpty else {
+            assign(nil)
+            return
+        }
+
+        do {
+            assign(try encodedPayloadData(items, label: label))
+        } catch {
         }
     }
 }

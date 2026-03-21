@@ -6,7 +6,9 @@ extension ReplySessionActor {
         switch transition {
         case let .appendText(delta):
             state.buffer.text += delta
-            state.isThinking = false
+
+        case let .replaceText(text):
+            state.buffer.text = text
 
         case let .appendThinking(delta):
             state.buffer.thinking += delta
@@ -74,6 +76,21 @@ extension ReplySessionActor {
             if let filePathAnnotations, !filePathAnnotations.isEmpty {
                 state.buffer.filePathAnnotations = filePathAnnotations
             }
+            for index in state.buffer.toolCalls.indices where state.buffer.toolCalls[index].status != .completed {
+                state.buffer.toolCalls[index].status = .completed
+            }
+            state.isThinking = false
+
+        case let .beginAnswering(text, replace):
+            if replace {
+                state.buffer.text = text
+            } else {
+                state.buffer.text += text
+            }
+            for index in state.buffer.toolCalls.indices where state.buffer.toolCalls[index].status != .completed {
+                state.buffer.toolCalls[index].status = .completed
+            }
+            state.isThinking = false
 
         default:
             break

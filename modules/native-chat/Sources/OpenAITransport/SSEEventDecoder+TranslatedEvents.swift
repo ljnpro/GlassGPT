@@ -23,14 +23,22 @@ extension SSEEventDecoder {
         _ translated: StreamEvent,
         responseID: String?,
         sequenceNumber: Int?,
+        itemID: String?,
         continuation: AsyncStream<StreamEvent>.Continuation
     ) -> SSEEventTerminalResult {
         switch translated {
         case let .textDelta(delta):
             yieldResponseIdentifierIfNeeded(responseID, continuation: continuation)
             emittedAnyOutput = true
-            accumulatedText += delta
-            continuation.yield(.textDelta(delta))
+            continuation.yield(textEvent(delta: delta, itemID: itemID))
+            yieldSequenceIfNeeded(sequenceNumber, continuation: continuation)
+            return .continued
+
+        case let .replaceText(text):
+            yieldResponseIdentifierIfNeeded(responseID, continuation: continuation)
+            emittedAnyOutput = true
+            accumulatedText = text
+            continuation.yield(.replaceText(text))
             yieldSequenceIfNeeded(sequenceNumber, continuation: continuation)
             return .continued
 
@@ -101,5 +109,27 @@ extension SSEEventDecoder {
             yieldSequenceIfNeeded(sequenceNumber, continuation: continuation)
             return .continued
         }
+    }
+
+    mutating func textEvent(delta: String, itemID: String?) -> StreamEvent {
+        guard let itemID, !itemID.isEmpty else {
+            accumulatedText += delta
+            return .textDelta(delta)
+        }
+
+        defer { activeTextItemID = itemID }
+
+        guard let activeTextItemID else {
+            accumulatedText += delta
+            return .textDelta(delta)
+        }
+
+        guard activeTextItemID != itemID else {
+            accumulatedText += delta
+            return .textDelta(delta)
+        }
+
+        accumulatedText = delta
+        return .replaceText(delta)
     }
 }

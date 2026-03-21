@@ -1,36 +1,23 @@
 import ChatDomain
 import Foundation
 
-public extension OpenAIStreamEventTranslator {
-    /// Extracts the output text from a completed response.
-    /// - Parameter response: The response DTO.
-    /// - Returns: The concatenated output text, or `nil` if none is present.
+enum OpenAIResponseOutputExtractor {
     static func extractOutputText(from response: ResponsesResponseDTO) -> String? {
+        let joined = preferredMessageItems(from: response)
+            .compactMap(outputText(in:))
+            .joined()
+
+        if !joined.isEmpty {
+            return joined
+        }
+
         if let text = response.outputText, !text.isEmpty {
             return text
         }
 
-        guard let output = response.output else {
-            return nil
-        }
-
-        let joined = output
-            .compactMap { item -> String? in
-                guard item.type == "message", let content = item.content else { return nil }
-                let text = content
-                    .filter { $0.type == "output_text" }
-                    .compactMap(\.text)
-                    .joined()
-                return text.isEmpty ? nil : text
-            }
-            .joined()
-
-        return joined.isEmpty ? nil : joined
+        return nil
     }
 
-    /// Extracts the reasoning/thinking text from a completed response.
-    /// - Parameter response: The response DTO.
-    /// - Returns: The concatenated reasoning text, or `nil` if none is present.
     static func extractReasoningText(from response: ResponsesResponseDTO) -> String? {
         var texts: [String] = []
 
@@ -61,18 +48,16 @@ public extension OpenAIStreamEventTranslator {
         return joined.isEmpty ? nil : joined
     }
 
-    /// Extracts file path annotations from a completed response.
-    /// - Parameter response: The response DTO.
-    /// - Returns: An array of file path annotations found in the response.
     static func extractFilePathAnnotations(from response: ResponsesResponseDTO) -> [FilePathAnnotation] {
-        guard let output = response.output else {
+        let messageItems = preferredMessageItems(from: response)
+        guard !messageItems.isEmpty else {
             return []
         }
 
         var annotations: [FilePathAnnotation] = []
         var outputText = ""
 
-        for item in output where item.type == "message" {
+        for item in messageItems {
             guard let content = item.content else { continue }
 
             for part in content where part.type == "output_text" {
@@ -107,9 +92,6 @@ public extension OpenAIStreamEventTranslator {
         return annotations
     }
 
-    /// Extracts the error message from a failed or incomplete response.
-    /// - Parameter response: The response DTO.
-    /// - Returns: The error message, or `nil` if none is present.
     static func extractErrorMessage(from response: ResponsesResponseDTO) -> String? {
         if let message = response.error?.message, !message.isEmpty {
             return message
@@ -118,5 +100,50 @@ public extension OpenAIStreamEventTranslator {
             return message
         }
         return nil
+    }
+
+    static func preferredMessageItems(from response: ResponsesResponseDTO) -> [ResponsesOutputItemDTO] {
+        guard let output = response.output else {
+            return []
+        }
+
+        let messageItems = output.filter { item in
+            item.type == "message" && outputText(in: item) != nil
+        }
+
+        guard !messageItems.isEmpty else {
+            return []
+        }
+
+        if let finalAssistant = messageItems.last(where: {
+            $0.role == "assistant" && $0.phase == "final_answer"
+        }) {
+            return [finalAssistant]
+        }
+
+        if let completedAssistant = messageItems.last(where: {
+            $0.role == "assistant" && $0.status == "completed"
+        }) {
+            return [completedAssistant]
+        }
+
+        if let assistant = messageItems.last(where: { $0.role == "assistant" }) {
+            return [assistant]
+        }
+
+        if let lastMessage = messageItems.last {
+            return [lastMessage]
+        }
+
+        return []
+    }
+
+    static func outputText(in item: ResponsesOutputItemDTO) -> String? {
+        guard let content = item.content else { return nil }
+        let text = content
+            .filter { $0.type == "output_text" }
+            .compactMap(\.text)
+            .joined()
+        return text.isEmpty ? nil : text
     }
 }

@@ -15,6 +15,7 @@ extension ReplySessionActor {
 
         case let .beginStreaming(streamID, route):
             activeStreamID = streamID
+            state.buffer = ReplyBuffer(attachments: state.buffer.attachments)
             if let cursor = state.cursor {
                 state.lifecycle = .streaming(
                     StreamCursor(

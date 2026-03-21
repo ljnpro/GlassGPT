@@ -40,33 +40,25 @@ struct ChatVisibleSessionState {
 }
 
 enum SessionVisibilityCoordinator {
-    static func liveDraftMessageID(
-        visibleMessageID: UUID?,
-        messages: [Message]
-    ) -> UUID? {
-        guard let visibleMessageID,
-              messages.contains(where: { $0.id == visibleMessageID })
-        else {
-            return nil
-        }
-
-        return visibleMessageID
-    }
-
-    static func shouldShowDetachedStreamingBubble(
-        isStreaming: Bool,
-        liveDraftMessageID: UUID?
-    ) -> Bool {
-        isStreaming && liveDraftMessageID == nil
-    }
-
     @MainActor
     static func visibleState(
         from session: ReplySession,
         runtimeState: ReplyRuntimeState,
         draftMessage: Message?
     ) -> ChatVisibleSessionState {
-        ChatVisibleSessionState(
+        if let draftMessage,
+           shouldUseRecoverableDraftPlaceholder(
+               for: draftMessage,
+               runtimeState: runtimeState
+           ) {
+            return recoverableRuntimePlaceholderState(
+                for: draftMessage,
+                session: session,
+                runtimeState: runtimeState
+            )
+        }
+
+        return ChatVisibleSessionState(
             draftMessage: draftMessage,
             currentStreamingText: runtimeState.buffer.text,
             currentThinkingText: runtimeState.buffer.thinking,
@@ -91,5 +83,108 @@ enum SessionVisibilityCoordinator {
         var state = ChatVisibleSessionState.empty()
         state.draftMessage = clearDraft ? nil : draftMessage
         return state
+    }
+
+    static func recoverableDraftPlaceholderState(
+        for message: Message,
+        requestConfiguration: (ModelType, ReasoningEffort, ServiceTier)?
+    ) -> ChatVisibleSessionState {
+        ChatVisibleSessionState(
+            draftMessage: message,
+            currentStreamingText: message.content,
+            currentThinkingText: "",
+            activeToolCalls: placeholderToolCalls(from: message.toolCalls),
+            liveCitations: message.annotations,
+            liveFilePathAnnotations: message.filePathAnnotations,
+            lastSequenceNumber: message.lastSequenceNumber,
+            activeRequestModel: requestConfiguration?.0,
+            activeRequestEffort: requestConfiguration?.1,
+            activeRequestUsesBackgroundMode: message.usedBackgroundMode,
+            activeRequestServiceTier: requestConfiguration?.2 ?? .standard,
+            isStreaming: false,
+            isRecovering: true,
+            isThinking: false
+        )
+    }
+
+    @MainActor
+    static func apply(
+        _ visibleState: ChatVisibleSessionState,
+        to state: any ChatSessionCoordinatorStateAccess
+    ) {
+        state.draftMessage = visibleState.draftMessage
+        state.currentStreamingText = visibleState.currentStreamingText
+        state.currentThinkingText = visibleState.currentThinkingText
+        state.activeToolCalls = visibleState.activeToolCalls
+        state.liveCitations = visibleState.liveCitations
+        state.liveFilePathAnnotations = visibleState.liveFilePathAnnotations
+        state.lastSequenceNumber = visibleState.lastSequenceNumber
+        state.activeRequestModel = visibleState.activeRequestModel
+        state.activeRequestEffort = visibleState.activeRequestEffort
+        state.activeRequestUsesBackgroundMode = visibleState.activeRequestUsesBackgroundMode
+        state.activeRequestServiceTier = visibleState.activeRequestServiceTier
+        state.isStreaming = visibleState.isStreaming
+        state.isThinking = visibleState.isThinking
+        state.isRecovering = visibleState.isRecovering
+    }
+
+    private static func shouldUseRecoverableDraftPlaceholder(
+        for draftMessage: Message,
+        runtimeState: ReplyRuntimeState
+    ) -> Bool {
+        guard !draftMessage.isComplete,
+              draftMessage.responseId != nil,
+              !runtimeState.isStreaming
+        else {
+            return false
+        }
+
+        let draftHasVisibleState = !draftMessage.content.isEmpty ||
+            !((draftMessage.thinking ?? "").isEmpty) ||
+            !draftMessage.toolCalls.isEmpty ||
+            !draftMessage.annotations.isEmpty ||
+            !draftMessage.filePathAnnotations.isEmpty ||
+            draftMessage.lastSequenceNumber != nil
+
+        guard draftHasVisibleState else {
+            return false
+        }
+
+        guard runtimeState.isRecovering else {
+            return true
+        }
+
+        return !runtimeHasVisibleState(runtimeState)
+    }
+
+    private static func runtimeHasVisibleState(_ runtimeState: ReplyRuntimeState) -> Bool {
+        !runtimeState.buffer.text.isEmpty ||
+            !runtimeState.buffer.thinking.isEmpty ||
+            !runtimeState.buffer.toolCalls.isEmpty ||
+            !runtimeState.buffer.citations.isEmpty ||
+            !runtimeState.buffer.filePathAnnotations.isEmpty
+    }
+
+    private static func recoverableRuntimePlaceholderState(
+        for draftMessage: Message,
+        session: ReplySession,
+        runtimeState: ReplyRuntimeState
+    ) -> ChatVisibleSessionState {
+        ChatVisibleSessionState(
+            draftMessage: draftMessage,
+            currentStreamingText: draftMessage.content,
+            currentThinkingText: "",
+            activeToolCalls: placeholderToolCalls(from: draftMessage.toolCalls),
+            liveCitations: draftMessage.annotations,
+            liveFilePathAnnotations: draftMessage.filePathAnnotations,
+            lastSequenceNumber: draftMessage.lastSequenceNumber,
+            activeRequestModel: session.request.model,
+            activeRequestEffort: session.request.effort,
+            activeRequestUsesBackgroundMode: draftMessage.usedBackgroundMode,
+            activeRequestServiceTier: session.request.serviceTier,
+            isStreaming: runtimeState.isStreaming,
+            isRecovering: true,
+            isThinking: runtimeState.isThinking
+        )
     }
 }

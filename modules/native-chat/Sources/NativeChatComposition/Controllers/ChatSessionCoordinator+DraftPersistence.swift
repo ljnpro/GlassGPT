@@ -81,8 +81,9 @@ extension ChatSessionCoordinator {
         state.hapticService.impact(.medium, isEnabled: state.hapticsEnabled)
 
         if let pendingBackgroundCancellation {
-            Task { @MainActor [weak self] in
-                guard let self else { return }
+            guard let recovery else { return }
+            Task { @MainActor [weak self, recovery] in
+                guard self != nil else { return }
                 await recovery.cancelBackgroundResponseAndSync(
                     responseId: pendingBackgroundCancellation.responseId,
                     messageId: pendingBackgroundCancellation.messageId

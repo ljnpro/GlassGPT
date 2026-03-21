@@ -16,6 +16,8 @@ struct MessageBubble: View {
     var liveCitations: [URLCitation] = []
     var liveFilePathAnnotations: [FilePathAnnotation] = []
     var showsRecoveryIndicator = false
+    var isLiveThinking = false
+    var suppressesPersistedThinking = false
 
     // File preview handler
     var onSandboxLinkTap: ((String, FilePathAnnotation?) -> Void)?
@@ -35,6 +37,8 @@ struct MessageBubble: View {
         liveCitations: [URLCitation] = [],
         liveFilePathAnnotations: [FilePathAnnotation] = [],
         showsRecoveryIndicator: Bool = false,
+        isLiveThinking: Bool = false,
+        suppressesPersistedThinking: Bool = false,
         onSandboxLinkTap: ((String, FilePathAnnotation?) -> Void)? = nil
     ) {
         self.message = message
@@ -45,6 +49,8 @@ struct MessageBubble: View {
         self.liveCitations = liveCitations
         self.liveFilePathAnnotations = liveFilePathAnnotations
         self.showsRecoveryIndicator = showsRecoveryIndicator
+        self.isLiveThinking = isLiveThinking
+        self.suppressesPersistedThinking = suppressesPersistedThinking
         self.onSandboxLinkTap = onSandboxLinkTap
         renderKey = RenderKey(
             messageID: message.id,
@@ -61,7 +67,9 @@ struct MessageBubble: View {
             activeToolCalls: activeToolCalls,
             liveCitations: liveCitations,
             liveFilePathAnnotations: liveFilePathAnnotations,
-            showsRecoveryIndicator: showsRecoveryIndicator
+            showsRecoveryIndicator: showsRecoveryIndicator,
+            isLiveThinking: isLiveThinking,
+            suppressesPersistedThinking: suppressesPersistedThinking
         )
     }
 }

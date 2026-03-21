@@ -193,6 +193,7 @@ func makeTestSettingsScreenStoreHarness(
             configurationProvider: configurationProvider,
             fileDownloadService: fileDownloadService,
             applyCloudflareConfiguration: applyCloudflareConfiguration,
+            logCredentialFailures: false,
             appVersionString: currentReleaseVersionString(),
             platformString: "iOS 26.0 · Liquid Glass"
         ),

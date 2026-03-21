@@ -25,11 +25,7 @@ package struct ChatView: View {
     )
     @State var scrollRequestID = UUID()
     @State var streamingThinkingExpanded: Bool? = true
-    @State var isBlockingGeneratedPreviewTouches = false
-    @State var presentedGeneratedPreviewItem: FilePreviewItem?
-    @State var isGeneratedPreviewDismissPending = false
-    @State var isShowingGeneratedPreview = false
-    @State var generatedPreviewDismissTask: Task<Void, Never>?
+    @State var generatedPreview = GeneratedPreviewPresentationState()
 
     let generatedPreviewOverlayDismissDelay: UInt64 = 90_000_000
     let generatedPreviewTouchCooldownDuration: UInt64 = 1_000_000_000
@@ -114,14 +110,14 @@ package struct ChatView: View {
                     modelSelectorPresentation
                 }
                 .overFullScreenCover(
-                    isPresented: $isShowingGeneratedPreview,
+                    isPresented: $generatedPreview.isShowing,
                     interfaceStyle: modelSelectorInterfaceStyle,
                     onDismiss: handleGeneratedPreviewCoverDismiss
                 ) {
-                    if let previewItem = presentedGeneratedPreviewItem {
+                    if let previewItem = generatedPreview.presentedItem {
                         FilePreviewSheet(
                             previewItem: previewItem,
-                            isDismissPending: isGeneratedPreviewDismissPending,
+                            isDismissPending: generatedPreview.isDismissPending,
                             onBeginDismissInteraction: prepareGeneratedPreviewDismissal,
                             onRequestDismiss: beginGeneratedPreviewDismissal
                         )
@@ -169,15 +165,15 @@ package struct ChatView: View {
                     syncGeneratedPreviewPresentation()
                 }
                 .onDisappear {
-                    guard !isShowingGeneratedPreview else { return }
-                    generatedPreviewDismissTask?.cancel()
-                    generatedPreviewDismissTask = nil
-                    isBlockingGeneratedPreviewTouches = false
-                    presentedGeneratedPreviewItem = nil
-                    isGeneratedPreviewDismissPending = false
-                    isShowingGeneratedPreview = false
+                    guard !generatedPreview.isShowing else { return }
+                    generatedPreview.dismissTask?.cancel()
+                    generatedPreview.dismissTask = nil
+                    generatedPreview.isBlockingTouches = false
+                    generatedPreview.presentedItem = nil
+                    generatedPreview.isDismissPending = false
+                    generatedPreview.isShowing = false
                 }
-                .allowsHitTesting(presentedGeneratedPreviewItem == nil && !isBlockingGeneratedPreviewTouches)
+                .allowsHitTesting(generatedPreview.presentedItem == nil && !generatedPreview.isBlockingTouches)
             }
 
             if shouldShowGeneratedPreviewTouchShield {

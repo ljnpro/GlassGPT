@@ -105,7 +105,7 @@ extension ChatScreenStoreRuntimeTests {
         }
 
         try assertRecoveredMessage(in: store, content: "Partial response", thinking: "Keep this reasoning")
-        #expect(store.errorMessage == nil)
+        #expect(store.errorMessage == "This response is no longer resumable.")
         let requestedPaths = await transport.requestedPaths()
         #expect(requestedPaths == ["/v1/responses/resp_missing"])
     }
@@ -205,6 +205,58 @@ extension ChatScreenStoreRuntimeTests {
         let requestedPaths = await transport.requestedPaths()
         #expect(requestedPaths == ["/v1/responses/resp_hidden_resume"])
         #expect(streamClient.recordedRequests.isEmpty)
+    }
+
+    @Test func `recover response clears stale active tool calls when terminal fetch omits them`() async throws {
+        let streamClient = QueuedOpenAIStreamClient(scriptedStreams: [])
+        let transport = StubOpenAITransport()
+        let resumeURL = try #require(
+            URL(string: "https://api.test.openai.local/v1/responses/resp_clear_tools")
+        )
+        try await transport.enqueue(
+            data: makeFetchResponseData(
+                status: .completed,
+                text: "Recovered without tool metadata",
+                thinking: "Recovered cleanly"
+            ),
+            url: resumeURL
+        )
+
+        let store = try makeTestChatScreenStore(transport: transport, streamClient: streamClient)
+        let conversation = try seedConversation(in: store, title: "Clear Stale Tool Calls")
+        let draft = makeIncompleteDraft(
+            conversation: conversation,
+            content: "Partial response",
+            responseId: "resp_clear_tools",
+            lastSequenceNumber: 3,
+            usedBackgroundMode: true
+        )
+        MessagePayloadStore.setToolCalls(
+            [ToolCallInfo(id: "ws_1", type: .webSearch, status: .searching)],
+            on: draft
+        )
+        conversation.messages.append(draft)
+        store.modelContext.insert(draft)
+        try store.modelContext.save()
+
+        store.currentConversation = conversation
+        store.messages = [draft]
+        store.syncConversationProjection()
+
+        store.recoverResponse(
+            messageId: draft.id,
+            responseId: "resp_clear_tools",
+            preferStreamingResume: false,
+            visible: true
+        )
+
+        try await waitUntil {
+            self.latestAssistantMessage(in: store)?.isComplete == true
+        }
+
+        let recovered = try #require(latestAssistantMessage(in: store))
+        #expect(recovered.content == "Recovered without tool metadata")
+        #expect(recovered.toolCalls.isEmpty)
     }
 }
 

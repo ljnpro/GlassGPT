@@ -13,6 +13,12 @@ extension MessageBubble {
     }
 
     var displayedThinking: String? {
+        if suppressesPersistedThinking {
+            if let liveThinking, !liveThinking.isEmpty {
+                return liveThinking
+            }
+            return nil
+        }
         if let liveThinking, !liveThinking.isEmpty {
             return liveThinking
         }
@@ -73,7 +79,7 @@ extension MessageBubble {
     private var bubbleColumn: some View {
         VStack(alignment: message.role == .user ? .trailing : .leading, spacing: 8) {
             if message.role == .assistant, let thinking = displayedThinking, !thinking.isEmpty {
-                ThinkingView(text: thinking, isLive: isDisplayingLiveAssistantState)
+                ThinkingView(text: thinking, isLive: isLiveThinking)
             }
 
             if message.role == .user, !message.fileAttachments.isEmpty {

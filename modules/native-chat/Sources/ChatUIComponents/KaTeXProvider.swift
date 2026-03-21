@@ -29,10 +29,7 @@ public enum KaTeXProvider {
             return nil
         }
 
-        let content: String
-        do {
-            content = try String(contentsOf: url, encoding: .utf8)
-        } catch {
+        guard let content = loadContent(from: url) else {
             return nil
         }
 
@@ -49,10 +46,7 @@ public enum KaTeXProvider {
             return nil
         }
 
-        let content: String
-        do {
-            content = try String(contentsOf: url, encoding: .utf8)
-        } catch {
+        guard let content = loadContent(from: url) else {
             return nil
         }
 
@@ -62,5 +56,22 @@ public enum KaTeXProvider {
 
     static var isAvailable: Bool {
         cssContent != nil && jsContent != nil
+    }
+
+    package static func loadContent(
+        from url: URL,
+        onFailure: ((String) -> Void)? = nil,
+        logFailure: Bool = true
+    ) -> String? {
+        do {
+            return try String(contentsOf: url, encoding: .utf8)
+        } catch {
+            let message = "Failed to load KaTeX resource at \(url.path): \(error.localizedDescription)"
+            onFailure?(message)
+            if logFailure {
+                NSLog("%@", message)
+            }
+            return nil
+        }
     }
 }

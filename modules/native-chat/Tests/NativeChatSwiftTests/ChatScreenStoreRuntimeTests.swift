@@ -177,6 +177,63 @@ struct ChatScreenStoreRuntimeTests {
         #expect(!assistantMessage.content.contains("Response interrupted because the app was closed before completion."))
         #expect(!store.isStreaming)
     }
+
+    @Test func `suspending background session removes stale runtime before recovery begins`() async throws {
+        let streamClient = ControlledOpenAIStreamClient()
+        let store = try makeTestChatScreenStore(streamClient: streamClient)
+        let conversation = try seedConversation(
+            in: store,
+            title: "Suspend Runtime Cleanup",
+            backgroundModeEnabled: true
+        )
+
+        store.currentConversation = conversation
+        store.messages = []
+        store.backgroundModeEnabled = true
+        store.syncConversationProjection()
+
+        #expect(store.sendMessage(text: "Keep this runtime clean"))
+        try await waitUntil {
+            store.currentVisibleSession != nil && streamClient.activeStreamCount > 0
+        }
+
+        streamClient.yield(.responseCreated("resp_suspend_cleanup"))
+        streamClient.yield(.sequenceUpdate(6))
+        streamClient.yield(.thinkingStarted)
+        streamClient.yield(.thinkingDelta("Persisted reasoning"))
+        streamClient.yield(.textDelta("Persisted answer"))
+
+        try await waitUntil {
+            let message = self.latestAssistantMessage(in: store)
+            return message?.responseId == "resp_suspend_cleanup" &&
+                store.lastSequenceNumber == 6 &&
+                store.currentThinkingText == "Persisted reasoning" &&
+                store.currentStreamingText == "Persisted answer"
+        }
+
+        let replyID = AssistantReplyID(rawValue: sessionMessageID(for: store))
+        store.handleEnterBackground()
+        store.suspendActiveSessionsForAppBackground()
+
+        var runtimeStillRegistered = await store.runtimeRegistry.contains(replyID)
+        if runtimeStillRegistered {
+            for _ in 0 ..< 50 where runtimeStillRegistered {
+                try await Task.sleep(nanoseconds: 20_000_000)
+                await MainActor.run {}
+                runtimeStillRegistered = await store.runtimeRegistry.contains(replyID)
+            }
+        }
+
+        #expect(!runtimeStillRegistered)
+        let suspendedDraft = try #require(self.latestAssistantMessage(in: store))
+        #expect(suspendedDraft.content == "Persisted answer")
+        #expect(suspendedDraft.thinking == "Persisted reasoning")
+        #expect(suspendedDraft.responseId == "resp_suspend_cleanup")
+        #expect(suspendedDraft.lastSequenceNumber == 6)
+        #expect(!suspendedDraft.isComplete)
+        #expect(store.currentVisibleSession == nil)
+        #expect(!store.isStreaming)
+    }
 }
 
 // MARK: - Private Helpers

@@ -310,6 +310,8 @@ extension OpenAIStreamEventTranslatorTests {
             "responseCreated(\(id))"
         case let .sequenceUpdate(sequence):
             "sequenceUpdate(\(sequence))"
+        case let .replaceText(text):
+            "replaceText(\(text))"
         default:
             String(describing: event)
         }

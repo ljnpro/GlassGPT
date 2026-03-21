@@ -36,10 +36,27 @@ struct ChatSessionPlannerTests {
             )
         )
 
-        #expect(plan.transition == .appendText("hello"))
+        #expect(plan.transition == .beginAnswering(text: "hello", replace: false))
         #expect(plan.projection == .animated(.textAfterThinking))
-        #expect(plan.persistence == .saveIfNeeded)
+        #expect(plan.persistence == .saveNow)
         #expect(plan.responseMetadataUpdate == nil)
+        #expect(plan.outcome == .continued)
+    }
+
+    @Test func `reply stream event planner finishes active tool activity when answer text starts`() {
+        let plan = ReplyStreamEventPlanner.plan(
+            .replaceText("hello"),
+            context: ReplyStreamEventContext(
+                route: .direct,
+                wasThinking: false,
+                hasActiveToolCalls: true,
+                usedBackgroundMode: false
+            )
+        )
+
+        #expect(plan.transition == .beginAnswering(text: "hello", replace: true))
+        #expect(plan.projection == .animated(.activityUpdated))
+        #expect(plan.persistence == .saveNow)
         #expect(plan.outcome == .continued)
     }
 
@@ -78,7 +95,7 @@ struct ChatSessionPlannerTests {
         #expect(action == .startStream(lastSequenceNumber: 17))
     }
 
-    @Test func `reply recovery planner finishes failed responses with runtime terminal state`() {
+    @Test func `reply recovery planner preserves incomplete terminal state`() {
         let action = ReplyRecoveryPlanner.fetchAction(
             for: OpenAIResponseFetchResult(
                 status: .incomplete,
@@ -94,7 +111,7 @@ struct ChatSessionPlannerTests {
             lastSequenceNumber: 17
         )
 
-        #expect(action == .finish(.failed("Response did not complete.")))
+        #expect(action == .finish(.incomplete("Response did not complete.")))
     }
 
     @Test func `reply recovery planner prefers direct retry before polling when gateway resume stalls`() {

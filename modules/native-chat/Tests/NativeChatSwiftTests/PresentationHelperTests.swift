@@ -72,6 +72,22 @@ struct PresentationHelperTests {
         #expect(bubble.displayedContent == "Ignored live content")
     }
 
+    @Test func `message bubble suppresses persisted thinking during recovery placeholder rendering`() {
+        let message = Message(
+            role: .assistant,
+            content: "",
+            thinking: "Persisted reasoning"
+        )
+        let bubble = MessageBubble(
+            message: message,
+            liveContent: "",
+            liveThinking: nil,
+            suppressesPersistedThinking: true
+        )
+
+        #expect(bubble.displayedThinking == nil)
+    }
+
     @Test func `model selector metrics and short labels stay stable across idioms`() {
         let padMetrics = ModelSelectorSheet.Metrics(idiom: .pad)
         let phoneMetrics = ModelSelectorSheet.Metrics(idiom: .phone)
@@ -136,7 +152,7 @@ struct PresentationHelperTests {
         let missingURL = URL(fileURLWithPath: "/tmp/missing-generated-image.png")
         switch FilePreviewLoadingModel.loadGeneratedImagePreview(from: missingURL) {
         case .unavailable:
-            #expect(true)
+            ()
         default:
             Issue.record("Expected unavailable image preview")
         }
@@ -171,7 +187,7 @@ struct PresentationHelperTests {
         let missingURL = URL(fileURLWithPath: "/tmp/missing-generated-document.pdf")
         switch FilePreviewLoadingModel.loadGeneratedPDFPreview(from: missingURL) {
         case .unavailable:
-            #expect(true)
+            ()
         default:
             Issue.record("Expected unavailable PDF preview")
         }

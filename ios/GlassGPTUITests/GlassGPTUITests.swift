@@ -269,6 +269,33 @@ final class GlassGPTUITests: XCTestCase {
     }
 
     @MainActor
+    func testSettingsGatewayScenarioTapOutsideDismissesCustomGatewayKeyboard() {
+        let app = launchApp(scenario: "settingsGateway")
+
+        _ = openSettings(in: app)
+        let modeControl = app.segmentedControls["settings.cloudflareMode"]
+        XCTAssertTrue(modeControl.waitForExistence(timeout: 5))
+        let customModeButton = modeControl.buttons["Custom"]
+        XCTAssertTrue(customModeButton.waitForExistence(timeout: 5))
+        customModeButton.tap()
+        XCTAssertTrue(waitForSelection(of: customModeButton, timeout: 5))
+
+        let gatewayURLField = app.textFields["settings.cloudflareCustomURL"]
+        XCTAssertTrue(gatewayURLField.waitForExistence(timeout: 5))
+        gatewayURLField.tap()
+        gatewayURLField.typeText("https://gateway.tap.dismiss/v1")
+
+        let keyboard = app.keyboards.firstMatch
+        XCTAssertTrue(keyboard.waitForExistence(timeout: 5))
+
+        let connectionStatusLabel = app.staticTexts["Connection Status"]
+        XCTAssertTrue(connectionStatusLabel.waitForExistence(timeout: 5))
+        connectionStatusLabel.tap()
+
+        XCTAssertTrue(waitForNonExistence(of: keyboard, timeout: 5))
+    }
+
+    @MainActor
     func testSettingsScenarioReasoningEffortPickerOpensAvailableOptions() {
         let app = launchApp(scenario: "settings")
 

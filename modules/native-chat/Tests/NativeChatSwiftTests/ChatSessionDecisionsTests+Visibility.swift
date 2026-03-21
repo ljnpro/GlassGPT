@@ -271,6 +271,171 @@ extension ChatSessionDecisionsTests {
         #expect(!cleared.isStreaming)
     }
 
+    @Test func `session visibility coordinator preserves recoverable draft placeholder before recovery starts`() {
+        let session = makeReplySession()
+        let draft = Message(
+            role: .assistant,
+            content: "Persisted answer",
+            thinking: "Persisted reasoning",
+            isComplete: false
+        )
+        draft.responseId = "resp_visible"
+        draft.lastSequenceNumber = 11
+        draft.usedBackgroundMode = true
+        MessagePayloadStore.setToolCalls(
+            [ToolCallInfo(id: "ws_1", type: .webSearch, status: .searching)],
+            on: draft
+        )
+        let runtimeState = ReplyRuntimeState(
+            assistantReplyID: session.assistantReplyID,
+            messageID: session.messageID,
+            conversationID: session.conversationID,
+            lifecycle: .idle,
+            buffer: .init(),
+            isThinking: false
+        )
+
+        let visibleState = SessionVisibilityCoordinator.visibleState(
+            from: session,
+            runtimeState: runtimeState,
+            draftMessage: draft
+        )
+
+        #expect(visibleState.currentStreamingText == "Persisted answer")
+        #expect(visibleState.currentThinkingText.isEmpty)
+        #expect(visibleState.lastSequenceNumber == 11)
+        #expect(visibleState.isRecovering)
+        #expect(!visibleState.isThinking)
+        #expect(visibleState.activeToolCalls == [
+            ToolCallInfo(id: "ws_1", type: .webSearch, status: .completed)
+        ])
+    }
+
+    @Test func `session visibility coordinator keeps detached recoverable draft in recovering placeholder state`() {
+        let session = makeReplySession()
+        let draft = Message(
+            role: .assistant,
+            content: "Partial answer",
+            thinking: "Partial reasoning",
+            responseId: "resp_detached",
+            lastSequenceNumber: 7,
+            usedBackgroundMode: true,
+            isComplete: false
+        )
+        let runtimeState = ReplyRuntimeState(
+            assistantReplyID: session.assistantReplyID,
+            messageID: session.messageID,
+            conversationID: session.conversationID,
+            lifecycle: .detached(
+                DetachedRecoveryTicket(
+                    assistantReplyID: session.assistantReplyID,
+                    messageID: session.messageID,
+                    conversationID: session.conversationID,
+                    responseID: "resp_detached",
+                    lastSequenceNumber: 7,
+                    usedBackgroundMode: true,
+                    route: .direct
+                )
+            ),
+            buffer: ReplyBuffer(
+                text: "Partial answer",
+                thinking: "Partial reasoning"
+            ),
+            isThinking: false
+        )
+
+        let visibleState = SessionVisibilityCoordinator.visibleState(
+            from: session,
+            runtimeState: runtimeState,
+            draftMessage: draft
+        )
+
+        #expect(visibleState.currentStreamingText == "Partial answer")
+        #expect(visibleState.currentThinkingText.isEmpty)
+        #expect(visibleState.lastSequenceNumber == 7)
+        #expect(visibleState.isRecovering)
+        #expect(!visibleState.isThinking)
+    }
+
+    @Test func `session visibility coordinator preserves draft placeholder while recovery runtime is empty`() {
+        let session = makeReplySession()
+        let draft = Message(
+            role: .assistant,
+            content: "Recovered draft text",
+            thinking: "Recovered draft reasoning",
+            responseId: "resp_placeholder",
+            lastSequenceNumber: 5,
+            usedBackgroundMode: true,
+            isComplete: false
+        )
+        let runtimeState = ReplyRuntimeState(
+            assistantReplyID: session.assistantReplyID,
+            messageID: session.messageID,
+            conversationID: session.conversationID,
+            lifecycle: .recoveringStatus(
+                DetachedRecoveryTicket(
+                    assistantReplyID: session.assistantReplyID,
+                    messageID: session.messageID,
+                    conversationID: session.conversationID,
+                    responseID: "resp_placeholder",
+                    lastSequenceNumber: 5,
+                    usedBackgroundMode: true,
+                    route: .direct
+                )
+            ),
+            buffer: .init(),
+            isThinking: false
+        )
+
+        let visibleState = SessionVisibilityCoordinator.visibleState(
+            from: session,
+            runtimeState: runtimeState,
+            draftMessage: draft
+        )
+
+        #expect(visibleState.currentStreamingText == "Recovered draft text")
+        #expect(visibleState.currentThinkingText.isEmpty)
+        #expect(visibleState.isRecovering)
+        #expect(!visibleState.isThinking)
+    }
+
+    @Test func `session visibility coordinator applies only for the registered visible session in the active conversation`() {
+        let session = makeReplySession()
+
+        #expect(
+            SessionVisibilityCoordinator.canApplyVisibleState(
+                targetSession: session,
+                visibleMessageID: session.messageID,
+                currentConversationID: session.conversationID,
+                registeredSession: session
+            )
+        )
+        #expect(
+            !SessionVisibilityCoordinator.canApplyVisibleState(
+                targetSession: session,
+                visibleMessageID: UUID(),
+                currentConversationID: session.conversationID,
+                registeredSession: session
+            )
+        )
+        #expect(
+            !SessionVisibilityCoordinator.canApplyVisibleState(
+                targetSession: session,
+                visibleMessageID: session.messageID,
+                currentConversationID: UUID(),
+                registeredSession: session
+            )
+        )
+        #expect(
+            !SessionVisibilityCoordinator.canApplyVisibleState(
+                targetSession: session,
+                visibleMessageID: session.messageID,
+                currentConversationID: session.conversationID,
+                registeredSession: makeReplySession()
+            )
+        )
+    }
+
     @Test func `reply session snapshot reflects runtime snapshot`() {
         let session = makeReplySession()
         let runtimeState = ReplyRuntimeState(

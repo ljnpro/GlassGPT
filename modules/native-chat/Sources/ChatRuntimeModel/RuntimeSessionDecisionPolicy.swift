@@ -40,6 +40,8 @@ public enum RuntimeSessionDecisionPolicy {
         switch status {
         case .completed:
             .finish(.completed)
+        case .incomplete:
+            .finish(.incomplete(errorMessage))
         case .failed:
             .finish(.failed(errorMessage))
         case .queued, .inProgress:

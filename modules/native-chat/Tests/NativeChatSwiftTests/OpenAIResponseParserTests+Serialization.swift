@@ -187,6 +187,26 @@ extension OpenAIResponseParserTests {
             filePathAnnotations: []
         ))
     }
+
+    @Test func `message role fallback reports invalid raw value and defaults to user`() {
+        var invalidRawValue: String?
+
+        let resolvedRole = Message.resolvedRole(from: "ghost", onInvalid: { rawValue in
+            invalidRawValue = rawValue
+        }, logFailure: false)
+
+        #expect(resolvedRole == .user)
+        #expect(invalidRawValue == "ghost")
+    }
+
+    @Test func `payload store canonical data uses sentinel when encoding fails`() {
+        let data = MessagePayloadStore.canonicalData(
+            for: FailingDigestPayload(),
+            logFailure: false
+        )
+
+        #expect(data == Data(#"{"payload_encoding_error":true}"#.utf8))
+    }
 }
 
 // MARK: - Test Fixture Builders
@@ -349,5 +369,14 @@ extension OpenAIResponseParserTests {
                 uploadStatus: .uploaded
             )
         ]
+    }
+}
+
+private struct FailingDigestPayload: Encodable {
+    func encode(to _: Encoder) throws {
+        throw EncodingError.invalidValue(
+            "boom",
+            .init(codingPath: [], debugDescription: "intentional test failure")
+        )
     }
 }

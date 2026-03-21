@@ -37,8 +37,14 @@ public extension ReplySessionActor {
         case let .appendText(delta):
             applyTextBufferTransition(.appendText(delta))
 
+        case let .replaceText(text):
+            applyTextBufferTransition(.replaceText(text))
+
         case let .appendThinking(delta):
             applyTextBufferTransition(.appendThinking(delta))
+
+        case let .beginAnswering(text, replace):
+            applyToolTransition(.beginAnswering(text: text, replace: replace))
 
         case let .setThinking(isThinking):
             applyTextBufferTransition(.setThinking(isThinking))

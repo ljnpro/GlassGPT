@@ -8,9 +8,6 @@ public final class DefaultOpenAIConfigurationProvider: OpenAIConfigurationProvid
     /// The default Cloudflare AI Gateway base URL.
     public static let defaultCloudflareGatewayBaseURL =
         "https://gateway.ai.cloudflare.com/v1/887b39f387990e7ef89e400eb228e193/glass-gpt/openai"
-    /// The default bundled Cloudflare AI Gateway authorization token.
-    public static let defaultCloudflareAIGToken =
-        "W3AAxNEfdJNnhh-tT-w9TX4mPTLtU2_e_ox0Pwd7"
 
     private struct State {
         var cloudflareGatewayBaseURL: String
@@ -31,7 +28,7 @@ public final class DefaultOpenAIConfigurationProvider: OpenAIConfigurationProvid
     public init(
         directOpenAIBaseURL: String = DefaultOpenAIConfigurationProvider.defaultOpenAIBaseURL,
         cloudflareGatewayBaseURL: String = DefaultOpenAIConfigurationProvider.defaultCloudflareGatewayBaseURL,
-        cloudflareAIGToken: String = DefaultOpenAIConfigurationProvider.defaultCloudflareAIGToken,
+        cloudflareAIGToken: String = "",
         useCloudflareGateway: Bool = false
     ) {
         self.directOpenAIBaseURL = directOpenAIBaseURL

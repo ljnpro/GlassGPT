@@ -27,6 +27,8 @@ public extension StreamEvent {
         switch self {
         case let .textDelta(text):
             .textDelta(text)
+        case let .replaceText(text):
+            .replaceText(text)
         case let .thinkingDelta(text):
             .thinkingDelta(text)
         case .thinkingStarted:

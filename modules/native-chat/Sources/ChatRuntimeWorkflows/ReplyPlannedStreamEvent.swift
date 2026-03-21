@@ -41,6 +41,8 @@ enum ReplyPlannedStreamEvent {
             .sequenceUpdate(sequence)
         case let .textDelta(delta):
             .textDelta(delta)
+        case let .replaceText(text):
+            .replaceText(text)
         case let .thinkingDelta(delta):
             .thinkingDelta(delta)
         case .thinkingStarted:
@@ -126,6 +128,7 @@ enum ReplyContentStreamEvent {
     case responseCreated(String)
     case sequenceUpdate(Int)
     case textDelta(String)
+    case replaceText(String)
     case thinkingDelta(String)
     case thinkingStarted
     case thinkingFinished

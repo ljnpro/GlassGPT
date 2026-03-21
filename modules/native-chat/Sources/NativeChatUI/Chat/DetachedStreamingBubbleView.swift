@@ -101,7 +101,7 @@ package struct DetachedStreamingBubbleView: View, Equatable {
                 if !currentThinkingText.isEmpty {
                     ThinkingView(
                         text: currentThinkingText,
-                        isLive: isThinking || isStreaming,
+                        isLive: isThinking,
                         externalIsExpanded: $streamingThinkingExpanded
                     )
                     .transition(.opacity.combined(with: .move(edge: .top)))

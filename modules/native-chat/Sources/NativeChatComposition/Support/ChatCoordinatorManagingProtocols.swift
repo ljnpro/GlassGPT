@@ -30,7 +30,12 @@ protocol ChatSessionManaging: AnyObject {
     var currentVisibleSession: ReplySession? { get }
     var visibleSessionMessageID: UUID? { get }
     func makeRecoverySession(for message: Message) -> ReplySession?
-    func registerSession(_ session: ReplySession, execution: SessionExecutionState, visible: Bool)
+    func registerSession(
+        _ session: ReplySession,
+        execution: SessionExecutionState,
+        visible: Bool,
+        syncIfCurrentlyVisible: Bool
+    )
     func isSessionActive(_ session: ReplySession) -> Bool
     func bindVisibleSession(messageID: UUID?)
     func detachVisibleSessionBinding()

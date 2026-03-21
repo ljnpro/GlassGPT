@@ -9,22 +9,30 @@ final class PerformanceTests: XCTestCase {
     // MARK: - SSE Frame Buffer Throughput
 
     func testSSEFrameBufferThroughput() {
-        let sseChunk = (0 ..< 1000).map { iteration in
+        let sseChunk = (0 ..< 5000).map { iteration in
             "event: response.output_text.delta\ndata: {\"delta\":\"token_\(iteration)\",\"sequence_number\":\(iteration)}\n\n"
         }.joined()
+
+        var warmupBuffer = SSEFrameBuffer()
+        _ = warmupBuffer.append(sseChunk)
 
         measure {
             var buffer = SSEFrameBuffer()
             let frames = buffer.append(sseChunk)
-            XCTAssertEqual(frames.count, 1000)
+            XCTAssertEqual(frames.count, 5000)
         }
     }
 
     // MARK: - SSE Frame Buffer Incremental Append
 
     func testSSEFrameBufferIncrementalAppend() {
-        let chunks: [String] = (0 ..< 1000).map { iteration in
+        let chunks: [String] = (0 ..< 5000).map { iteration in
             "event: response.output_text.delta\ndata: {\"delta\":\"t\(iteration)\"}\n\n"
+        }
+
+        var warmupBuffer = SSEFrameBuffer()
+        for chunk in chunks {
+            _ = warmupBuffer.append(chunk)
         }
 
         measure {
@@ -33,7 +41,7 @@ final class PerformanceTests: XCTestCase {
             for chunk in chunks {
                 totalFrames += buffer.append(chunk).count
             }
-            XCTAssertEqual(totalFrames, 1000)
+            XCTAssertEqual(totalFrames, 5000)
         }
     }
 
@@ -47,10 +55,13 @@ final class PerformanceTests: XCTestCase {
         plus regular text to fill space. The quick brown fox jumps over the lazy dog.
         """
 
-        // Build a ~5,000 character string by repeating the block
-        let repetitions = 5000 / markdownBlock.count + 1
+        let targetLength = 20_000
+        let repetitions = targetLength / markdownBlock.count + 1
         let longMarkdown = String(repeating: markdownBlock, count: repetitions)
-        precondition(longMarkdown.count >= 5000)
+        precondition(longMarkdown.count >= targetLength)
+
+        let warmupResult = RichTextAttributedStringBuilder.parseRichText(longMarkdown)
+        XCTAssertFalse(warmupResult.characters.isEmpty)
 
         measure {
             let result = RichTextAttributedStringBuilder.parseRichText(longMarkdown)
@@ -65,7 +76,10 @@ final class PerformanceTests: XCTestCase {
         Here is some **bold** and *italic* streaming content with `code` \
         that arrives incrementally. More __bold__ text keeps flowing in.
         """
-        let longStreaming = String(repeating: streamingChunk, count: 40)
+        let longStreaming = String(repeating: streamingChunk, count: 200)
+
+        let warmupResult = RichTextAttributedStringBuilder.parseStreamingText(longStreaming)
+        XCTAssertFalse(warmupResult.characters.isEmpty)
 
         measure {
             let result = RichTextAttributedStringBuilder.parseStreamingText(longStreaming)
@@ -85,8 +99,15 @@ final class PerformanceTests: XCTestCase {
         """
         let jsonData = Data(jsonPayload.utf8)
 
+        let warmupEnvelope = try? JSONCoding.decode(
+            ResponsesStreamEnvelopeDTO.self,
+            from: jsonData
+        )
+        XCTAssertEqual(warmupEnvelope?.delta, "Hello world token")
+        XCTAssertEqual(warmupEnvelope?.sequenceNumber, 42)
+
         measure {
-            for _ in 0 ..< 1000 {
+            for _ in 0 ..< 5000 {
                 do {
                     let envelope = try JSONCoding.decode(
                         ResponsesStreamEnvelopeDTO.self,
@@ -109,8 +130,14 @@ final class PerformanceTests: XCTestCase {
         """
         let jsonData = Data(jsonPayload.utf8)
 
+        let warmupEvent = OpenAIStreamEventTranslator.translate(
+            eventType: "response.output_text.delta",
+            data: jsonData
+        )
+        XCTAssertNotNil(warmupEvent)
+
         measure {
-            for _ in 0 ..< 1000 {
+            for _ in 0 ..< 5000 {
                 let event = OpenAIStreamEventTranslator.translate(
                     eventType: "response.output_text.delta",
                     data: jsonData
@@ -123,12 +150,13 @@ final class PerformanceTests: XCTestCase {
     // MARK: - ByteCountFormatter
 
     func testByteCountFormatterThroughput() {
-        let byteCounts: [Int64] = (0 ..< 1000).map { frameIndex in
-            Int64(frameIndex) * 1024 * Int64.random(in: 1 ... 1024)
-        }
+        let byteCounts = deterministicByteCounts()
+        let formatter = SettingsPresenterByteCountFormatter.shared
+
+        let warmupResult = formatter.string(fromByteCount: byteCounts[0])
+        XCTAssertFalse(warmupResult.isEmpty)
 
         measure {
-            let formatter = SettingsPresenterByteCountFormatter.shared
             for byteCount in byteCounts {
                 let result = formatter.string(fromByteCount: byteCount)
                 XCTAssertFalse(result.isEmpty)
@@ -139,8 +167,13 @@ final class PerformanceTests: XCTestCase {
     // MARK: - SSE Frame Buffer Finish Pending
 
     func testSSEFrameBufferFinishPendingThroughput() {
+        var warmupBuffer = SSEFrameBuffer()
+        _ = warmupBuffer.append("event: response.output_text.delta\ndata: {\"delta\":\"hello\"}")
+        let warmupPending = warmupBuffer.finishPendingFrames()
+        XCTAssertEqual(warmupPending.count, 1)
+
         measure {
-            for _ in 0 ..< 1000 {
+            for _ in 0 ..< 5000 {
                 var buffer = SSEFrameBuffer()
                 _ = buffer.append("event: response.output_text.delta\ndata: {\"delta\":\"hello\"}")
                 let pending = buffer.finishPendingFrames()
@@ -148,6 +181,19 @@ final class PerformanceTests: XCTestCase {
             }
         }
     }
+}
+
+private func deterministicByteCounts() -> [Int64] {
+    var values = [Int64]()
+    values.reserveCapacity(5000)
+
+    for frameIndex in 0 ..< 5000 {
+        let base = Int64(frameIndex + 1) * 4096
+        let offset = Int64(frameIndex % 97) * 128
+        values.append(base + offset)
+    }
+
+    return values
 }
 
 // MARK: - ByteCountFormatter Helper

@@ -45,7 +45,7 @@ public final class ComposerHostingView: UIView {
 
     @available(*, unavailable)
     public required init?(coder _: NSCoder) {
-        fatalError("init(coder:) has not been implemented")
+        nil
     }
 
     override public func layoutSubviews() {

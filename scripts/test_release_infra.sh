@@ -64,6 +64,38 @@ function test_appintents_linker_setting() {
   echo "[PASS] AppIntents linker setting is pinned in CI and release scripts"
 }
 
+function test_cloudflare_release_token_is_externalized() {
+  if ! grep -Fq '<string>$(CLOUDFLARE_AIG_TOKEN)</string>' "$ROOT_DIR/ios/GlassGPT/Info.plist"; then
+    fail "Info.plist should source CloudflareAIGToken from a build setting instead of a committed token."
+  fi
+
+  if ! grep -Fq '#include? "Local-Secrets.xcconfig"' "$ROOT_DIR/ios/GlassGPT/Config/Project-Base.xcconfig"; then
+    fail "Project-Base.xcconfig should optionally include Local-Secrets.xcconfig for local Cloudflare credentials."
+  fi
+
+  if ! grep -Fq 'CLOUDFLARE_AIG_TOKEN =' "$ROOT_DIR/ios/GlassGPT/Config/Project-Base.xcconfig"; then
+    fail "Project-Base.xcconfig should define an empty default CLOUDFLARE_AIG_TOKEN build setting."
+  fi
+
+  if ! grep -Fq 'function resolve_cloudflare_aig_token()' "$ROOT_DIR/scripts/release_testflight.sh"; then
+    fail "release_testflight.sh should resolve the Cloudflare AIG token from env or local secrets."
+  fi
+
+  if ! grep -Fq 'Missing Cloudflare AIG token.' "$ROOT_DIR/scripts/release_testflight.sh"; then
+    fail "release_testflight.sh should fail fast when the Cloudflare AIG token is missing."
+  fi
+
+  if ! grep -Fq '"CLOUDFLARE_AIG_TOKEN=$CLOUDFLARE_AIG_TOKEN_EFFECTIVE"' "$ROOT_DIR/scripts/release_testflight.sh"; then
+    fail "release_testflight.sh should pass the resolved Cloudflare AIG token into the archive build."
+  fi
+
+  if ! grep -Fq 'IPA metadata is missing CloudflareAIGToken.' "$ROOT_DIR/scripts/release_testflight.sh"; then
+    fail "release_testflight.sh should verify the archived IPA still contains CloudflareAIGToken."
+  fi
+
+  echo "[PASS] Cloudflare release token is externalized and release-validated"
+}
+
 function test_lint_tool_version_is_pinned() {
   if ! grep -Fq 'REQUIRED_SWIFTLINT_VERSION="${REQUIRED_SWIFTLINT_VERSION:-0.63.2}"' "$ROOT_DIR/scripts/lint.sh"; then
     fail "lint.sh must pin the SwiftLint version used for strict linting."
@@ -461,6 +493,7 @@ CURRENT_PROJECT_VERSION = 20185
 ASC_ISSUER_ID=test
 ASC_API_KEY_PATH=$key_path
 ASC_API_KEY_FALLBACK_PATH=$key_path
+CLOUDFLARE_AIG_TOKEN=test-cloudflare-token
 "
 
   write_file "$repo_dir/README.md" 'base
@@ -550,8 +583,105 @@ function test_snapshot_recording_covers_hosted_references() {
   echo "[PASS] snapshot recording updates both snapshot suites"
 }
 
+function test_performance_regression_pipeline() {
+  local temp_dir output status
+  temp_dir="$(mktemp -d)"
+  trap 'rm -rf "$temp_dir"' RETURN
+
+  cat <<'EOF' >"$temp_dir/performance.log"
+/Applications/GlassGPT/modules/native-chat/Tests/NativeChatTests/PerformanceTests.swift:10: Test Case '-[NativeChatTests.PerformanceTests testAlpha]' measured [Time, seconds] average: 0.011, relative standard deviation: 5.000%, values: [0.010, 0.011, 0.012]
+/Applications/GlassGPT/modules/native-chat/Tests/NativeChatTests/PerformanceTests.swift:20: Test Case '-[NativeChatTests.PerformanceTests testBeta]' measured [Time, seconds] average: 0.021, relative standard deviation: 7.000%, values: [0.020, 0.021, 0.022]
+EOF
+
+  python3 "$ROOT_DIR/scripts/extract_performance_metrics.py" \
+    "$temp_dir/performance.log" \
+    "$temp_dir/results.json" >/dev/null
+
+  if ! grep -Fq '"testAlpha": 0.011' "$temp_dir/results.json"; then
+    fail "extract_performance_metrics.py should record the median for each performance test."
+  fi
+
+  if ! grep -Fq '"relative_stddev_percent": 7.0' "$temp_dir/results.json"; then
+    fail "extract_performance_metrics.py should preserve detail fields for debugging."
+  fi
+
+  cat <<'EOF' >"$temp_dir/baseline.json"
+{
+  "testAlpha": 0.011,
+  "testBeta": 0.021
+}
+EOF
+
+  python3 "$ROOT_DIR/scripts/check_performance_regression.py" \
+    "$temp_dir/results.json" \
+    "$temp_dir/baseline.json" >/dev/null
+
+  cat <<'EOF' >"$temp_dir/missing-result.json"
+{
+  "testAlpha": 0.011
+}
+EOF
+  set +e
+  output="$(python3 "$ROOT_DIR/scripts/check_performance_regression.py" \
+    "$temp_dir/missing-result.json" \
+    "$temp_dir/baseline.json" 2>&1)"
+  status=$?
+  set -e
+  if [[ $status -eq 0 ]]; then
+    fail "check_performance_regression.py should fail when a baseline metric is missing from results."
+  fi
+  if ! printf '%s\n' "$output" | grep -Fq 'Missing performance metrics in results:'; then
+    fail "check_performance_regression.py should report missing performance metrics explicitly."
+  fi
+
+  cat <<'EOF' >"$temp_dir/extra-result.json"
+{
+  "testAlpha": 0.011,
+  "testBeta": 0.021,
+  "testGamma": 0.031
+}
+EOF
+  set +e
+  output="$(python3 "$ROOT_DIR/scripts/check_performance_regression.py" \
+    "$temp_dir/extra-result.json" \
+    "$temp_dir/baseline.json" 2>&1)"
+  status=$?
+  set -e
+  if [[ $status -eq 0 ]]; then
+    fail "check_performance_regression.py should fail when results include metrics without a baseline."
+  fi
+  if ! printf '%s\n' "$output" | grep -Fq 'Unexpected performance metrics without baseline:'; then
+    fail "check_performance_regression.py should report unexpected performance metrics explicitly."
+  fi
+
+  if ! grep -Fq -- '-only-testing:NativeChatTests/PerformanceTests' "$ROOT_DIR/scripts/ci.sh"; then
+    fail "ci.sh performance-tests gate should run the dedicated performance suite."
+  fi
+
+  if ! grep -Fq 'extract_performance_metrics.py "$log_file" "$results_path"' "$ROOT_DIR/scripts/ci.sh"; then
+    fail "ci.sh performance-tests gate should extract metrics from the raw xcodebuild log."
+  fi
+
+  if ! grep -Fq 'scripts/performance-baseline.json' "$ROOT_DIR/scripts/ci.sh"; then
+    fail "ci.sh performance-tests gate should compare against the tracked performance baseline."
+  fi
+
+  if ! grep -Fq 'performance-tests coverage-report' "$ROOT_DIR/scripts/ci.sh"; then
+    fail "ci.sh default full run should include the performance-tests gate."
+  fi
+
+  if ! grep -Fq -- '- gate: performance-tests' "$ROOT_DIR/.github/workflows/ios.yml"; then
+    fail "ios.yml should include the performance-tests gate in the CI matrix."
+  fi
+
+  rm -rf "$temp_dir"
+  trap - RETURN
+  echo "[PASS] performance regression pipeline is enforced and script-covered"
+}
+
 test_check_warnings
 test_appintents_linker_setting
+test_cloudflare_release_token_is_externalized
 test_lint_tool_version_is_pinned
 test_xcodebuild_log_tail_guard
 test_build_gate_uses_concrete_destination
@@ -569,4 +699,5 @@ test_ui_runner_avoids_xctestrun_noise
 test_release_preflight
 test_release_tag_resolution_supports_repeat_builds
 test_snapshot_recording_covers_hosted_references
+test_performance_regression_pipeline
 echo "Release infrastructure tests passed."

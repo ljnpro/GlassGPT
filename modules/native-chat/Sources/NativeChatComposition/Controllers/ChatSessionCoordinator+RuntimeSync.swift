@@ -83,6 +83,7 @@ extension ChatSessionCoordinator {
         Task { @MainActor [weak self] in
             guard let self else { return }
             for session in sessions {
+                let assistantReplyID = session.assistantReplyID
                 saveSessionNow(session)
                 _ = await applyRuntimeTransition(
                     .detachForBackground(usedBackgroundMode: session.request.usesBackgroundMode),
@@ -93,7 +94,10 @@ extension ChatSessionCoordinator {
                 execution?.task?.cancel()
 
                 guard let message = conversations.findMessage(byId: session.messageID),
-                      let runtimeState = await runtimeState(for: session) else { continue }
+                      let runtimeState = await runtimeState(for: session) else {
+                    await services.runtimeRegistry.remove(assistantReplyID)
+                    continue
+                }
 
                 if runtimeState.responseID != nil {
                     message.isComplete = false
@@ -115,6 +119,8 @@ extension ChatSessionCoordinator {
                     message.conversation?.updatedAt = .now
                     conversations.upsertMessage(message)
                 }
+
+                await services.runtimeRegistry.remove(assistantReplyID)
             }
 
             conversations.saveContextIfPossible("suspendActiveSessionsForAppBackground")

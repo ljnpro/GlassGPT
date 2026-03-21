@@ -973,10 +973,70 @@ function gate_doc_completeness() {
 }
 
 function gate_performance_tests() {
-  log "Running performance regression check"
+  log "Running performance tests"
+  local label="nativechat-performance-tests"
+  local log_file="$CI_OUTPUT_DIR/${label}.log"
+  local result_bundle_path="$CI_OUTPUT_DIR/NativeChatPerformanceTests.xcresult"
+  local results_path="$CI_OUTPUT_DIR/performance.json"
+  local baseline_path="$ROOT_DIR/scripts/performance-baseline.json"
+  local report_path="$CI_OUTPUT_DIR/performance-report.txt"
+  local attempt=1
+  local command_status=0
+
+  if [[ ! -f "$baseline_path" ]]; then
+    echo "Missing performance baseline: $baseline_path" >&2
+    exit 1
+  fi
+
+  while (( attempt <= XCODEBUILD_RETRY_ATTEMPTS )); do
+    rm -f "$log_file"
+    : > "$log_file"
+    prepare_simulator_state
+    force_remove_path "$result_bundle_path"
+
+    set +e
+    (
+      cd "$ROOT_DIR/modules/native-chat"
+      xcodebuild \
+        -scheme NativeChat-Package \
+        -destination "$SIMULATOR_DEVICE_DESTINATION" \
+        -parallel-testing-enabled NO \
+        -test-timeouts-enabled YES \
+        -maximum-test-execution-time-allowance "$XCODE_TEST_TIMEOUT_ALLOWANCE" \
+        -resultBundlePath "$result_bundle_path" \
+        -only-testing:NativeChatTests/PerformanceTests \
+        test \
+        "$XCODEBUILD_APPINTENTS_LINKER_SETTING"
+    ) >"$log_file" 2>&1
+    command_status=$?
+    set -e
+
+    if (( command_status == 0 )); then
+      break
+    fi
+
+    if (( attempt >= XCODEBUILD_RETRY_ATTEMPTS )) || ! is_transient_xcresult_failure "$result_bundle_path"; then
+      echo "xcodebuild failed for ${label}. Log tail:" >&2
+      if [[ -f "$log_file" ]]; then
+        tail -n 80 "$log_file" >&2 || true
+      fi
+      return "$command_status"
+    fi
+
+    echo "Transient xcodebuild failure detected for ${label}; retrying (attempt ${attempt}/${XCODEBUILD_RETRY_ATTEMPTS})." >&2
+    (( attempt += 1 ))
+  done
+
+  python3 ./scripts/extract_performance_metrics.py "$log_file" "$results_path"
+  cp "$baseline_path" "$CI_OUTPUT_DIR/performance-baseline.json"
   python3 ./scripts/check_performance_regression.py \
-    "$CI_OUTPUT_DIR/performance.json" \
-    "$CI_OUTPUT_DIR/performance-baseline.json"
+    "$results_path" \
+    "$baseline_path" | tee "$report_path"
+
+  sanitize_successful_xcodebuild_log "$log_file"
+  ensure_successful_log_has_content "$log_file" "Completed ${label} successfully."
+  ./scripts/check_warnings.sh "$log_file"
+  echo "Completed ${label}. Log: $log_file"
 }
 
 function gate_localization_check() {
@@ -1074,7 +1134,7 @@ if [[ $# -gt 1 ]]; then
 fi
 
 if [[ $# -eq 0 || "$1" == "all" ]]; then
-  requested_gates=(ci-health lint python-lint format-check build architecture-tests core-tests ui-tests coverage-report maintainability source-share infra-safety module-boundary doc-build doc-completeness localization-check release-readiness)
+  requested_gates=(ci-health lint python-lint format-check build architecture-tests core-tests ui-tests performance-tests coverage-report maintainability source-share infra-safety module-boundary doc-build doc-completeness localization-check release-readiness)
 elif [[ "$1" == "help" || "$1" == "-h" || "$1" == "--help" ]]; then
   usage
   exit 0
