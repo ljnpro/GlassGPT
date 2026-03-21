@@ -12,6 +12,7 @@ BUILD_DIR="${LOCAL_BUILD_DIR:-$ROOT_DIR/.local/build}"
 EXPORT_OPTIONS="${EXPORT_OPTIONS_PLIST:-$ROOT_DIR/.local/export-options-app-store.plist}"
 REMOTE="${GITHUB_REMOTE:-origin}"
 REMOTE_REPO="${GITHUB_REPO_URL:-}"
+XCODEBUILD_APPINTENTS_LINKER_SETTING='OTHER_LDFLAGS=$(inherited) -framework AppIntents'
 
 function usage() {
   cat <<'EOF'
@@ -255,7 +256,8 @@ xcodebuild \
   -allowProvisioningUpdates \
   -authenticationKeyPath "$KEY_PATH" \
   -authenticationKeyID "$ASC_API_KEY_ID" \
-  -authenticationKeyIssuerID "$ASC_ISSUER_ID" | tee "$ARCHIVE_LOG"
+  -authenticationKeyIssuerID "$ASC_ISSUER_ID" \
+  "$XCODEBUILD_APPINTENTS_LINKER_SETTING" | tee "$ARCHIVE_LOG"
 
 echo "==> Exporting"
 xcodebuild \

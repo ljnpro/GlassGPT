@@ -9,16 +9,32 @@ function fail() {
 }
 
 function test_check_warnings() {
-  local temp_dir
+  local temp_dir output status
   temp_dir="$(mktemp -d)"
   trap 'rm -rf "$temp_dir"' RETURN
 
   printf 'Build completed successfully.\n' >"$temp_dir/no-warning.log"
   "$ROOT_DIR/scripts/check_warnings.sh" "$temp_dir/no-warning.log"
 
+  output="$(PATH="/usr/bin:/bin" "$ROOT_DIR/scripts/check_warnings.sh" "$temp_dir/no-warning.log" 2>&1)"
+  if [[ -n "$output" ]]; then
+    fail "check_warnings.sh should stay silent when using grep fallback."
+  fi
+
   printf 'ld: warning: test linker warning\n' >"$temp_dir/linker-warning.log"
   if "$ROOT_DIR/scripts/check_warnings.sh" "$temp_dir/linker-warning.log" >/dev/null 2>&1; then
     fail "check_warnings.sh should fail on linker warnings."
+  fi
+
+  set +e
+  output="$(PATH="/usr/bin:/bin" "$ROOT_DIR/scripts/check_warnings.sh" "$temp_dir/linker-warning.log" 2>&1)"
+  status=$?
+  set -e
+  if [[ $status -eq 0 ]]; then
+    fail "check_warnings.sh should fail on linker warnings without ripgrep."
+  fi
+  if printf '%s\n' "$output" | grep -q 'rg: command not found'; then
+    fail "check_warnings.sh should not require ripgrep on CI runners."
   fi
 
   printf '/tmp/File.swift:1:2: warning: test swift warning\n' >"$temp_dir/swift-warning.log"
@@ -29,6 +45,18 @@ function test_check_warnings() {
   rm -rf "$temp_dir"
   trap - RETURN
   echo "[PASS] check_warnings.sh catches general and Swift warnings"
+}
+
+function test_appintents_linker_setting() {
+  if ! grep -Fq 'OTHER_LDFLAGS=$(inherited) -framework AppIntents' "$ROOT_DIR/scripts/ci.sh"; then
+    fail "ci.sh must add the AppIntents linker setting to xcodebuild invocations."
+  fi
+
+  if ! grep -Fq 'OTHER_LDFLAGS=$(inherited) -framework AppIntents' "$ROOT_DIR/scripts/release_testflight.sh"; then
+    fail "release_testflight.sh must add the AppIntents linker setting when archiving."
+  fi
+
+  echo "[PASS] AppIntents linker setting is pinned in CI and release scripts"
 }
 
 function write_file() {
@@ -129,5 +157,6 @@ ASC_API_KEY_FALLBACK_PATH=$key_path
 }
 
 test_check_warnings
+test_appintents_linker_setting
 test_release_preflight
 echo "Release infrastructure tests passed."

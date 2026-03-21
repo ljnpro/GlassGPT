@@ -19,6 +19,7 @@ DEFAULT_RELEASE_BUILD="20185"
 XCODEBUILD_RETRY_ATTEMPTS="${XCODEBUILD_RETRY_ATTEMPTS:-5}"
 XCODE_TEST_TIMEOUT_ALLOWANCE="${XCODE_TEST_TIMEOUT_ALLOWANCE:-180}"
 SIMULATOR_BOOT_TIMEOUT_SECONDS="${SIMULATOR_BOOT_TIMEOUT_SECONDS:-60}"
+XCODEBUILD_APPINTENTS_LINKER_SETTING='OTHER_LDFLAGS=$(inherited) -framework AppIntents'
 SNAPSHOT_CASES=(
   testChatSnapshots
   testHistorySnapshots
@@ -295,26 +296,31 @@ function run_checked_xcodebuild_impl() {
   local workdir="$2"
   shift 2
 
+  local command=("$@")
   local log_file="$CI_OUTPUT_DIR/${label}.log"
   local result_bundle_path
-  result_bundle_path="$(find_requested_result_bundle_path "$@" || true)"
+  result_bundle_path="$(find_requested_result_bundle_path "${command[@]}" || true)"
   local attempt=1
   local command_status=0
+
+  if [[ "${command[0]}" == "xcodebuild" ]]; then
+    command+=("$XCODEBUILD_APPINTENTS_LINKER_SETTING")
+  fi
 
   while (( attempt <= XCODEBUILD_RETRY_ATTEMPTS )); do
     rm -f "$log_file"
     : > "$log_file"
     prepare_simulator_state
-    clear_requested_result_bundle "$@"
+    clear_requested_result_bundle "${command[@]}"
 
     set +e
     if [[ -n "$workdir" ]]; then
       (
         cd "$workdir"
-        "$@"
+        "${command[@]}"
       ) >"$log_file" 2>&1
     else
-      "$@" >"$log_file" 2>&1
+      "${command[@]}" >"$log_file" 2>&1
     fi
     command_status=$?
     set -e

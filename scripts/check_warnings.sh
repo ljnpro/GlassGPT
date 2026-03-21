@@ -13,9 +13,15 @@ if [[ ! -f "$log_file" ]]; then
   exit 1
 fi
 
-warning_lines="$(
-  rg --text --no-messages '^.*warning:' "$log_file" || true
-)"
+if command -v rg >/dev/null 2>&1; then
+  warning_lines="$(
+    rg --text --no-messages '^.*warning:' "$log_file" || true
+  )"
+else
+  warning_lines="$(
+    grep -E '^.*warning:' "$log_file" || true
+  )"
+fi
 
 if [[ -z "$warning_lines" ]]; then
   exit 0
