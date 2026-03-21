@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
 
-from pathlib import Path
 import re
 import sys
-
+from pathlib import Path
 
 IDERUNDESTINATION_PATTERN = re.compile(
     r"^\d{4}-\d{2}-\d{2} .* \[MT\] IDERunDestination: Supported platforms for the buildables in the current scheme is empty\.\n?$"
@@ -37,7 +36,9 @@ PACKAGING_SKIP_PATTERNS = (
         r"^\d{4}-\d{2}-\d{2} .* \[MT\] Skipping stripping extended attributes because the codesign step will strip them\.\n?$"
     ),
     re.compile(
-        r'^\d{4}-\d{2}-\d{2} .* \[MT\] Associated App Clip Identifiers Filter: Skipping because "com\.apple\.developer\.associated-appclip-app-identifiers" is not present\n?$'
+        r'^\d{4}-\d{2}-\d{2} .* \[MT\] Associated App Clip Identifiers Filter: '
+        r'Skipping because "com\.apple\.developer\.associated-appclip-app-identifiers" '
+        r'is not present\n?$'
     ),
 )
 
@@ -157,10 +158,7 @@ def main() -> int:
 
     lines = path.read_text(encoding="utf-8", errors="replace").splitlines(keepends=True)
 
-    if mode == "xcodebuild":
-        cleaned = sanitize_xcodebuild_log(lines)
-    else:
-        cleaned = sanitize_distribution_log(lines)
+    cleaned = sanitize_xcodebuild_log(lines) if mode == "xcodebuild" else sanitize_distribution_log(lines)
 
     path.write_text("".join(cleaned), encoding="utf-8")
     return 0
