@@ -408,6 +408,22 @@ ASC_API_KEY_FALLBACK_PATH=$key_path
   echo "[PASS] release_testflight.sh preflight guards main promotion topology"
 }
 
+function test_release_tag_resolution_supports_repeat_builds() {
+  if ! grep -Fq 'function resolve_release_tag()' "$ROOT_DIR/scripts/release_testflight.sh"; then
+    fail "release_testflight.sh should define resolve_release_tag for repeated marketing-version releases."
+  fi
+
+  if ! grep -Fq 'local build_tag="${base_tag}-build${build_number}"' "$ROOT_DIR/scripts/release_testflight.sh"; then
+    fail "release_testflight.sh should fall back to a build-specific tag when the marketing-version tag already exists."
+  fi
+
+  if ! grep -Fq 'RELEASE_TAG="$(resolve_release_tag "$VERSION" "$BUILD_NUMBER")"' "$ROOT_DIR/scripts/release_testflight.sh"; then
+    fail "release_testflight.sh should derive the release tag from the version/build combination."
+  fi
+
+  echo "[PASS] release_testflight.sh supports repeated builds for one marketing version"
+}
+
 test_check_warnings
 test_appintents_linker_setting
 test_lint_tool_version_is_pinned
@@ -422,4 +438,5 @@ test_simulator_lifecycle_uses_resolved_udid
 test_clean_outputs_removes_serial_probe_logs
 test_ui_runner_avoids_xctestrun_noise
 test_release_preflight
+test_release_tag_resolution_supports_repeat_builds
 echo "Release infrastructure tests passed."

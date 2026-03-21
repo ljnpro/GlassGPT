@@ -106,6 +106,29 @@ function sanitize_successful_distribution_log() {
   python3 "$ROOT_DIR/scripts/sanitize_success_log.py" distribution "$log_file"
 }
 
+function resolve_release_tag() {
+  local version="$1"
+  local build_number="$2"
+  local base_tag="v$version"
+  local build_tag="${base_tag}-build${build_number}"
+
+  if ! git -C "$ROOT_DIR" rev-parse --verify "$base_tag" >/dev/null 2>&1; then
+    printf '%s\n' "$base_tag"
+    return 0
+  fi
+
+  local base_tag_commit head_commit
+  base_tag_commit="$(git -C "$ROOT_DIR" rev-parse "${base_tag}^{commit}" 2>/dev/null)"
+  head_commit="$(git -C "$ROOT_DIR" rev-parse HEAD 2>/dev/null)"
+
+  if [[ "$base_tag_commit" == "$head_commit" ]]; then
+    printf '%s\n' "$base_tag"
+    return 0
+  fi
+
+  printf '%s\n' "$build_tag"
+}
+
 if [[ ! -f "$ENV_FILE" ]]; then
   echo "Missing env file: $ENV_FILE" >&2
   exit 1
@@ -239,7 +262,7 @@ ARCHIVE_LOG="$BUILD_DIR/archive-$VERSION.log"
 EXPORT_LOG="$BUILD_DIR/export-$VERSION.log"
 UPLOAD_LOG="$BUILD_DIR/upload-$VERSION.log"
 IPA_PATH="$EXPORT_PATH/GlassGPT.ipa"
-RELEASE_TAG="v$VERSION"
+RELEASE_TAG="$(resolve_release_tag "$VERSION" "$BUILD_NUMBER")"
 
 rm -rf "$ARCHIVE_PATH" "$EXPORT_PATH"
 
