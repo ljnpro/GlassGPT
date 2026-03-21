@@ -2,7 +2,6 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-SNAPSHOT_DIR="$ROOT_DIR/modules/native-chat/Tests/NativeChatTests/__Snapshots__/SnapshotViewTests"
 
 cd "$ROOT_DIR"
 
@@ -14,41 +13,57 @@ PY
 
 # Recording snapshots intentionally produces mismatches against committed references.
 # Keep going so we can copy the newly recorded images out of the simulator sandbox.
-RECORD_SNAPSHOTS=1 ./scripts/ci.sh snapshot-tests || true
+RECORD_SNAPSHOTS=1 ./scripts/ci.sh snapshot-tests,hosted-snapshot-tests || true
 
-python3 - "$SNAPSHOT_DIR" "$start_epoch" <<'PY'
-import os
+python3 - "$ROOT_DIR" "$start_epoch" <<'PY'
 import shutil
 import sys
 from pathlib import Path
 
-snapshot_dir = Path(sys.argv[1])
+root_dir = Path(sys.argv[1])
 start_epoch = float(sys.argv[2])
 simulator_root = Path.home() / "Library/Developer/CoreSimulator/Devices"
 
-latest_by_name: dict[str, Path] = {}
+destinations = {
+    "SnapshotViewTests": root_dir / "modules/native-chat/Tests/NativeChatTests/__Snapshots__/SnapshotViewTests",
+    "ViewHostingCoverageTests": root_dir / "modules/native-chat/Tests/NativeChatSwiftTests/__Snapshots__/ViewHostingCoverageTests",
+}
 
-for path in simulator_root.rglob("SnapshotViewTests/*.png"):
-    try:
-        stat = path.stat()
-    except FileNotFoundError:
-        continue
-    if stat.st_mtime < start_epoch:
-        continue
-    existing = latest_by_name.get(path.name)
-    if existing is None or stat.st_mtime > existing.stat().st_mtime:
-        latest_by_name[path.name] = path
+latest_by_suite: dict[str, dict[str, Path]] = {suite: {} for suite in destinations}
+direct_recorded_by_suite: dict[str, list[Path]] = {suite: [] for suite in destinations}
 
-if not latest_by_name:
-    raise SystemExit("No recorded snapshots were found in CoreSimulator temp directories.")
-
-snapshot_dir.mkdir(parents=True, exist_ok=True)
+for suite in destinations:
+    for path in simulator_root.rglob(f"{suite}/*.png"):
+        try:
+            stat = path.stat()
+        except FileNotFoundError:
+            continue
+        if stat.st_mtime < start_epoch:
+            continue
+        existing = latest_by_suite[suite].get(path.name)
+        if existing is None or stat.st_mtime > existing.stat().st_mtime:
+            latest_by_suite[suite][path.name] = path
 
 copied = 0
-for name, source in sorted(latest_by_name.items()):
-    destination = snapshot_dir / name
-    shutil.copy2(source, destination)
-    copied += 1
+for suite, snapshot_dir in destinations.items():
+    snapshot_dir.mkdir(parents=True, exist_ok=True)
 
-print(f"Recorded {copied} snapshot file(s) into {snapshot_dir}")
+    for name, source in sorted(latest_by_suite[suite].items()):
+        destination = snapshot_dir / name
+        shutil.copy2(source, destination)
+        copied += 1
+
+    for path in snapshot_dir.glob("*.png"):
+        try:
+            stat = path.stat()
+        except FileNotFoundError:
+            continue
+        if stat.st_mtime >= start_epoch and path.name not in latest_by_suite[suite]:
+            direct_recorded_by_suite[suite].append(path)
+            copied += 1
+
+if copied == 0:
+    raise SystemExit("No recorded snapshots were found in CoreSimulator temp directories or snapshot reference folders.")
+
+print(f"Recorded {copied} snapshot file(s) into snapshot reference directories")
 PY

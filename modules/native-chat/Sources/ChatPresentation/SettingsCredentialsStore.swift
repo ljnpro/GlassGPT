@@ -165,10 +165,9 @@ public final class SettingsCredentialsStore {
         }
     }
 
-    /// Clears the saved custom Cloudflare gateway configuration and returns to the default mode.
+    /// Clears the saved custom Cloudflare gateway configuration while keeping custom mode active.
     public func clearCustomCloudflareConfiguration() {
         controller.clearCustomCloudflareConfiguration()
-        cloudflareConfigurationMode = .default
         customCloudflareGatewayBaseURL = ""
         customCloudflareAIGToken = ""
         refreshCloudflareHealthStatus()

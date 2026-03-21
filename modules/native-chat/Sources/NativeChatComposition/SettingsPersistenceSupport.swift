@@ -67,7 +67,6 @@ struct SettingsPersistenceHandlerImpl: SettingsPersistenceHandler {
     func clearCustomCloudflareConfiguration() {
         settingsStore.customCloudflareGatewayBaseURL = ""
         cloudflareTokenStore.deleteAPIKey()
-        settingsStore.cloudflareGatewayConfigurationMode = .default
         applyCloudflareConfiguration()
     }
 }

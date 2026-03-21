@@ -107,7 +107,7 @@ public final class SettingsSceneController {
         )
     }
 
-    /// Clears the custom Cloudflare configuration and returns to the default mode.
+    /// Clears the saved custom Cloudflare configuration.
     public func clearCustomCloudflareConfiguration() {
         persistenceHandler.clearCustomCloudflareConfiguration()
     }

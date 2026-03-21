@@ -9,14 +9,21 @@ import NativeChatUITestSupport
 
 @main
 struct GlassGPTApp: App {
-    private let persistenceBootstrap = NativeChatPersistence.makeBootstrap(
-        bundleIdentifier: Bundle.main.bundleIdentifier
-    )
+    private let persistenceBootstrap: NativeChatPersistenceBootstrap
     private let launchStart: CFAbsoluteTime
     private let metricKitSubscriber = MetricKitSubscriber()
 
     init() {
         launchStart = CFAbsoluteTimeGetCurrent()
+        #if DEBUG
+        _ = UITestEnvironmentReset.performIfRequested(
+            arguments: ProcessInfo.processInfo.arguments,
+            bundleIdentifier: Bundle.main.bundleIdentifier
+        )
+        #endif
+        persistenceBootstrap = NativeChatPersistence.makeBootstrap(
+            bundleIdentifier: Bundle.main.bundleIdentifier
+        )
         MXMetricManager.shared.add(metricKitSubscriber)
     }
 

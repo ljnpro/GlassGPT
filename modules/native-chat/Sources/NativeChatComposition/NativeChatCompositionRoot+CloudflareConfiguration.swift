@@ -48,21 +48,22 @@ extension NativeChatCompositionRoot {
             .trimmingCharacters(in: .whitespacesAndNewlines)
         let persistedCustomToken = cloudflareTokenStore.loadAPIKey()?
             .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let hasCompleteCustomConfiguration = !persistedCustomBaseURL.isEmpty && !persistedCustomToken.isEmpty
 
         switch settingsStore.cloudflareGatewayConfigurationMode {
         case .default:
             provider.cloudflareGatewayBaseURL = defaults.gatewayBaseURL
             provider.cloudflareAIGToken = defaults.gatewayToken
         case .custom:
-            provider.cloudflareGatewayBaseURL = persistedCustomBaseURL.isEmpty
-                ? defaults.gatewayBaseURL
-                : persistedCustomBaseURL
-            provider.cloudflareAIGToken = persistedCustomToken.isEmpty
-                ? defaults.gatewayToken
-                : persistedCustomToken
+            provider.cloudflareGatewayBaseURL = persistedCustomBaseURL
+            provider.cloudflareAIGToken = persistedCustomToken
         }
 
         provider.useCloudflareGateway = settingsStore.cloudflareGatewayEnabled
+            && (
+                settingsStore.cloudflareGatewayConfigurationMode == .default
+                || hasCompleteCustomConfiguration
+            )
     }
 
     func resolvedConfigurationValue(

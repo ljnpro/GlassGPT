@@ -151,21 +151,22 @@ func makeTestSettingsScreenStoreHarness(
             .trimmingCharacters(in: .whitespacesAndNewlines)
         let persistedCustomToken = cloudflareTokenStore.loadAPIKey()?
             .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let hasCompleteCustomConfiguration = !persistedCustomBaseURL.isEmpty && !persistedCustomToken.isEmpty
 
         switch settingsStore.cloudflareGatewayConfigurationMode {
         case .default:
             configurationProvider.cloudflareGatewayBaseURL = defaultGatewayBaseURL
             configurationProvider.cloudflareAIGToken = defaultGatewayToken
         case .custom:
-            configurationProvider.cloudflareGatewayBaseURL = persistedCustomBaseURL.isEmpty
-                ? defaultGatewayBaseURL
-                : persistedCustomBaseURL
-            configurationProvider.cloudflareAIGToken = persistedCustomToken.isEmpty
-                ? defaultGatewayToken
-                : persistedCustomToken
+            configurationProvider.cloudflareGatewayBaseURL = persistedCustomBaseURL
+            configurationProvider.cloudflareAIGToken = persistedCustomToken
         }
 
         configurationProvider.useCloudflareGateway = settingsStore.cloudflareGatewayEnabled
+            && (
+                settingsStore.cloudflareGatewayConfigurationMode == .default
+                || hasCompleteCustomConfiguration
+            )
     }
 
     applyCloudflareConfiguration()

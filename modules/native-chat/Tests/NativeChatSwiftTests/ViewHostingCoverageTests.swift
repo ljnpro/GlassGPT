@@ -259,14 +259,19 @@ private func assertHostedSnapshot(
         RunLoop.main.run(until: Date().addingTimeInterval(delay))
     }
 
-    assertSnapshot(
-        of: controller,
-        as: .image(on: snapshotVariant.imageConfig(size: size)),
-        named: name,
-        file: file,
-        testName: testName,
-        line: line
-    )
+    let recordMode: SnapshotTestingConfiguration.Record =
+        ProcessInfo.processInfo.environment["RECORD_SNAPSHOTS"] == "1" ? .all : .missing
+
+    withSnapshotTesting(record: recordMode) {
+        assertSnapshot(
+            of: controller,
+            as: .image(on: snapshotVariant.imageConfig(size: size)),
+            named: name,
+            file: file,
+            testName: testName,
+            line: line
+        )
+    }
 }
 
 private struct SnapshotModelSelectorHost: View {

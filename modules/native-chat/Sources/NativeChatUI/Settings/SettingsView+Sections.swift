@@ -1,10 +1,12 @@
 import ChatDomain
 import ChatPresentation
+import ChatUIComponents
 import SwiftUI
 import UIKit
 
 struct SettingsChatDefaultsSection: View {
     @Bindable var viewModel: SettingsDefaultsStore
+    @State private var isReasoningEffortExpanded = false
 
     var body: some View {
         Section {
@@ -26,15 +28,11 @@ struct SettingsChatDefaultsSection: View {
             .accessibilityLabel(String(localized: "Default Flex Mode"))
             .accessibilityIdentifier("settings.defaultFlexMode")
 
-            Picker(String(localized: "Reasoning Effort"), selection: $viewModel.defaultEffort) {
-                ForEach(viewModel.availableDefaultEfforts) { effort in
-                    Text(effort.displayName).tag(effort)
-                }
-            }
-            .pickerStyle(.navigationLink)
-            .accessibilityLabel(String(localized: "Default reasoning effort"))
-            .accessibilityValue(viewModel.defaultEffort.displayName)
-            .accessibilityIdentifier("settings.defaultEffort")
+            SettingsInlineReasoningEffortControl(
+                selectedEffort: $viewModel.defaultEffort,
+                availableEfforts: viewModel.availableDefaultEfforts,
+                isExpanded: $isReasoningEffortExpanded
+            )
         } header: {
             Text(String(localized: "Chat Defaults"))
         } footer: {
@@ -47,6 +45,123 @@ struct SettingsChatDefaultsSection: View {
                 )
             )
         }
+    }
+}
+
+private struct SettingsInlineReasoningEffortControl: View {
+    @Binding var selectedEffort: ReasoningEffort
+    let availableEfforts: [ReasoningEffort]
+    @Binding var isExpanded: Bool
+
+    private let columns = [
+        GridItem(.adaptive(minimum: 92, maximum: 140), spacing: 10, alignment: .leading)
+    ]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: isExpanded ? 12 : 0) {
+            Button {
+                withAnimation(.spring(response: 0.28, dampingFraction: 0.84)) {
+                    isExpanded.toggle()
+                }
+            } label: {
+                HStack(spacing: 12) {
+                    Text(String(localized: "Reasoning Effort"))
+                        .foregroundStyle(.primary)
+
+                    Spacer(minLength: 12)
+
+                    HStack(spacing: 8) {
+                        Text(selectedEffort.displayName)
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(.primary)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 6)
+                            .singleFrameGlassCapsuleControl(
+                                tintOpacity: 0.02,
+                                borderWidth: 0.78,
+                                darkBorderOpacity: 0.14,
+                                lightBorderOpacity: 0.08
+                            )
+
+                        Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
+                            .font(.footnote.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 12)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+            }
+            .buttonStyle(GlassPressButtonStyle())
+            .accessibilityLabel(String(localized: "Default reasoning effort"))
+            .accessibilityValue(selectedEffort.displayName)
+            .accessibilityIdentifier("settings.defaultEffort")
+
+            if isExpanded {
+                LazyVGrid(columns: columns, alignment: .leading, spacing: 10) {
+                    ForEach(availableEfforts) { effort in
+                        effortButton(for: effort)
+                    }
+                }
+                .padding(.horizontal, 14)
+                .padding(.bottom, 12)
+                .transition(.move(edge: .top).combined(with: .opacity))
+            }
+        }
+        .modifier(
+            StableRoundedGlassModifier(
+                cornerRadius: 18,
+                interactive: true,
+                innerInset: 0.8,
+                stableFillOpacity: 0.045
+            )
+        )
+    }
+
+    @ViewBuilder
+    private func effortButton(for effort: ReasoningEffort) -> some View {
+        if effort == selectedEffort {
+            Button {
+                withAnimation(.spring(response: 0.28, dampingFraction: 0.84)) {
+                    selectedEffort = effort
+                    isExpanded = false
+                }
+            } label: {
+                optionLabel(for: effort, showsCheckmark: true)
+            }
+            .buttonStyle(.glassProminent)
+            .buttonBorderShape(.capsule)
+            .controlSize(.small)
+            .accessibilityIdentifier("settings.defaultEffortOption.\(effort.id)")
+        } else {
+            Button {
+                withAnimation(.spring(response: 0.28, dampingFraction: 0.84)) {
+                    selectedEffort = effort
+                    isExpanded = false
+                }
+            } label: {
+                optionLabel(for: effort, showsCheckmark: false)
+            }
+            .buttonStyle(.glass)
+            .buttonBorderShape(.capsule)
+            .controlSize(.small)
+            .accessibilityIdentifier("settings.defaultEffortOption.\(effort.id)")
+        }
+    }
+
+    private func optionLabel(for effort: ReasoningEffort, showsCheckmark: Bool) -> some View {
+        HStack(spacing: 6) {
+            if showsCheckmark {
+                Image(systemName: "checkmark")
+                    .font(.caption.weight(.bold))
+            }
+
+            Text(effort.displayName)
+                .font(.subheadline.weight(showsCheckmark ? .semibold : .medium))
+                .lineLimit(1)
+        }
+        .frame(maxWidth: .infinity)
     }
 }
 

@@ -248,6 +248,27 @@ EOF
   echo "[PASS] ci.sh sanitizes successful xcodebuild logs for known harmless noise"
 }
 
+function test_snapshot_gates_are_split_cleanly() {
+  local hosted_snapshot_block package_tests_block core_tests_block
+  hosted_snapshot_block="$(sed -n '/function gate_hosted_snapshot_tests()/,/^}/p' "$ROOT_DIR/scripts/ci.sh")"
+  package_tests_block="$(sed -n '/function gate_package_tests()/,/^}/p' "$ROOT_DIR/scripts/ci.sh")"
+  core_tests_block="$(sed -n '/function gate_core_tests()/,/^}/p' "$ROOT_DIR/scripts/ci.sh")"
+
+  if ! printf '%s\n' "$hosted_snapshot_block" | grep -Fq -- '-only-testing:NativeChatSwiftTests/ViewHostingCoverageTests'; then
+    fail "gate_hosted_snapshot_tests should run the hosted snapshot coverage suite directly."
+  fi
+
+  if ! printf '%s\n' "$package_tests_block" | grep -Fq -- '-skip-testing:NativeChatSwiftTests/ViewHostingCoverageTests'; then
+    fail "gate_package_tests should skip hosted snapshot tests once they have a dedicated gate."
+  fi
+
+  if ! printf '%s\n' "$core_tests_block" | grep -Fq 'gate_hosted_snapshot_tests'; then
+    fail "gate_core_tests should include the dedicated hosted snapshot gate."
+  fi
+
+  echo "[PASS] snapshot coverage is split cleanly between app, hosted, and logic suites"
+}
+
 function test_simulator_lifecycle_uses_resolved_udid() {
   local prepare_block recover_block
   prepare_block="$(sed -n '/function prepare_simulator_state()/,/^}/p' "$ROOT_DIR/scripts/ci.sh")"
@@ -424,6 +445,26 @@ function test_release_tag_resolution_supports_repeat_builds() {
   echo "[PASS] release_testflight.sh supports repeated builds for one marketing version"
 }
 
+function test_snapshot_recording_covers_hosted_references() {
+  if ! grep -Fq 'ProcessInfo.processInfo.environment["RECORD_SNAPSHOTS"] == "1" ? .all : .missing' "$ROOT_DIR/modules/native-chat/Tests/NativeChatSwiftTests/ViewHostingCoverageTests.swift"; then
+    fail "ViewHostingCoverageTests should honor RECORD_SNAPSHOTS when updating hosted references."
+  fi
+
+  if ! grep -Fq '"ViewHostingCoverageTests": root_dir / "modules/native-chat/Tests/NativeChatSwiftTests/__Snapshots__/ViewHostingCoverageTests"' "$ROOT_DIR/scripts/record_snapshots.sh"; then
+    fail "record_snapshots.sh should copy hosted snapshot references as well as XCTest snapshots."
+  fi
+
+  if ! grep -Fq 'snapshot-tests,hosted-snapshot-tests' "$ROOT_DIR/scripts/record_snapshots.sh"; then
+    fail "record_snapshots.sh should rerun both snapshot suites when refreshing references."
+  fi
+
+  if ! grep -Fq 'No recorded snapshots were found in CoreSimulator temp directories or snapshot reference folders.' "$ROOT_DIR/scripts/record_snapshots.sh"; then
+    fail "record_snapshots.sh should treat directly auto-recorded references as a successful refresh source."
+  fi
+
+  echo "[PASS] snapshot recording updates both snapshot suites"
+}
+
 test_check_warnings
 test_appintents_linker_setting
 test_lint_tool_version_is_pinned
@@ -434,9 +475,11 @@ test_workflow_pins_git_default_branch
 test_core_tests_skip_empty_app_tests_gate
 test_package_tests_skip_duplicate_architecture_bundle
 test_successful_xcodebuild_log_sanitizer
+test_snapshot_gates_are_split_cleanly
 test_simulator_lifecycle_uses_resolved_udid
 test_clean_outputs_removes_serial_probe_logs
 test_ui_runner_avoids_xctestrun_noise
 test_release_preflight
 test_release_tag_resolution_supports_repeat_builds
+test_snapshot_recording_covers_hosted_references
 echo "Release infrastructure tests passed."

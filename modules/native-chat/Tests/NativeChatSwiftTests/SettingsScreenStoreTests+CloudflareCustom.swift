@@ -137,7 +137,7 @@ extension SettingsScreenStoreTests {
         #expect(requests.first?.value(forHTTPHeaderField: "cf-aig-authorization") == nil)
     }
 
-    @Test func `clear custom cloudflare configuration returns to default provider values`() {
+    @Test func `clear custom cloudflare configuration keeps custom mode active and disables gateway routing`() {
         let harness = makeTestSettingsScreenStoreHarness(
             configurationProvider: RuntimeTestOpenAIConfigurationProvider(
                 cloudflareGatewayBaseURL: "https://gateway.default.local/v1",
@@ -146,16 +146,56 @@ extension SettingsScreenStoreTests {
             )
         )
         let credentials = harness.store.credentials
+        harness.store.defaults.cloudflareEnabled = true
         credentials.setCloudflareConfigurationMode(.custom)
         credentials.customCloudflareGatewayBaseURL = "https://gateway.custom.local/v1"
         credentials.customCloudflareAIGToken = "cf-custom-token"
         credentials.saveCustomCloudflareConfiguration()
         credentials.clearCustomCloudflareConfiguration()
-        #expect(credentials.cloudflareConfigurationMode == .default)
+        #expect(credentials.cloudflareConfigurationMode == .custom)
         #expect(credentials.customCloudflareGatewayBaseURL.isEmpty)
         #expect(credentials.customCloudflareAIGToken.isEmpty)
+        #expect(credentials.cloudflareHealthStatus == .unknown)
         #expect(harness.cloudflareTokenBackend.didDelete)
-        #expect(harness.configurationProvider.cloudflareGatewayBaseURL == "https://gateway.default.local/v1")
-        #expect(harness.configurationProvider.cloudflareAIGToken == "cf-default-token")
+        #expect(harness.configurationProvider.cloudflareGatewayBaseURL.isEmpty)
+        #expect(harness.configurationProvider.cloudflareAIGToken.isEmpty)
+        #expect(!harness.configurationProvider.useCloudflareGateway)
+    }
+
+    @Test func `cleared custom cloudflare configuration remains empty after presenter reload`() {
+        let initialConfigurationProvider = RuntimeTestOpenAIConfigurationProvider(
+            cloudflareGatewayBaseURL: "https://gateway.default.local/v1",
+            cloudflareAIGToken: "cf-default-token",
+            useCloudflareGateway: false
+        )
+        let harness = makeTestSettingsScreenStoreHarness(
+            configurationProvider: initialConfigurationProvider
+        )
+        let credentials = harness.store.credentials
+        harness.store.defaults.cloudflareEnabled = true
+        credentials.setCloudflareConfigurationMode(.custom)
+        credentials.customCloudflareGatewayBaseURL = "https://gateway.custom.local/v1"
+        credentials.customCloudflareAIGToken = "cf-custom-token"
+        credentials.saveCustomCloudflareConfiguration()
+        credentials.clearCustomCloudflareConfiguration()
+
+        let reloadedConfigurationProvider = RuntimeTestOpenAIConfigurationProvider(
+            cloudflareGatewayBaseURL: "https://gateway.default.local/v1",
+            cloudflareAIGToken: "cf-default-token",
+            useCloudflareGateway: false
+        )
+        let reloadedHarness = makeTestSettingsScreenStoreHarness(
+            settingsValueStore: harness.settingsValueStore,
+            apiKeyBackend: harness.apiKeyBackend,
+            cloudflareTokenBackend: harness.cloudflareTokenBackend,
+            configurationProvider: reloadedConfigurationProvider
+        )
+
+        #expect(reloadedHarness.store.credentials.cloudflareConfigurationMode == .custom)
+        #expect(reloadedHarness.store.credentials.customCloudflareGatewayBaseURL.isEmpty)
+        #expect(reloadedHarness.store.credentials.customCloudflareAIGToken.isEmpty)
+        #expect(reloadedHarness.configurationProvider.cloudflareGatewayBaseURL.isEmpty)
+        #expect(reloadedHarness.configurationProvider.cloudflareAIGToken.isEmpty)
+        #expect(!reloadedHarness.configurationProvider.useCloudflareGateway)
     }
 }

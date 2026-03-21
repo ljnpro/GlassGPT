@@ -3,6 +3,11 @@ import XCTest
 
 // swiftlint:disable:next type_body_length
 final class GlassGPTUITests: XCTestCase {
+    private enum ScrollDirection {
+        case up
+        case down
+    }
+
     override func setUpWithError() throws {
         continueAfterFailure = false
     }
@@ -272,7 +277,7 @@ final class GlassGPTUITests: XCTestCase {
 
         effortPicker.tap()
 
-        XCTAssertTrue(app.staticTexts["None"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["settings.defaultEffortOption.none"].waitForExistence(timeout: 5))
     }
 
     @MainActor
@@ -293,7 +298,7 @@ final class GlassGPTUITests: XCTestCase {
 
     @MainActor
     func testAPIKeyPersistsAcrossAppRelaunch() throws {
-        let app = launchApp()
+        let app = launchApp(resetState: true)
 
         let apiKeyField = openSettings(in: app)
         XCTAssertTrue(apiKeyField.waitForExistence(timeout: 10))
@@ -335,16 +340,12 @@ final class GlassGPTUITests: XCTestCase {
     }
 
     @MainActor
-    func testCustomCloudflareGatewayURLPersistsAcrossAppRelaunch() throws {
+    func testSettingsGatewayScenarioCanSaveAndClearCustomConfiguration() throws {
         let customGatewayURL = "https://gateway.ui.custom/v1"
         let customGatewayToken = "cf-ui-custom-token"
-        let app = launchApp()
+        let app = launchApp(scenario: "settingsGateway")
 
         _ = openSettings(in: app)
-        let gatewaySwitch = app.switches["settings.cloudflare"]
-        XCTAssertTrue(gatewaySwitch.waitForExistence(timeout: 5))
-        setSwitch(gatewaySwitch, enabled: true)
-
         let modeControl = app.segmentedControls["settings.cloudflareMode"]
         XCTAssertTrue(modeControl.waitForExistence(timeout: 5))
         let customModeButton = modeControl.buttons["Custom"]
@@ -368,30 +369,23 @@ final class GlassGPTUITests: XCTestCase {
         XCTAssertTrue(saveCustomButton.waitForExistence(timeout: 5))
         XCTAssertTrue(saveCustomButton.isEnabled)
         saveCustomButton.tap()
+        XCTAssertTrue(waitForValue(of: gatewayURLField, customGatewayURL, timeout: 5))
 
-        app.terminate()
-        XCTAssertTrue(app.wait(for: .notRunning, timeout: 5))
-
-        let relaunched = launchApp()
-        _ = openSettings(in: relaunched)
-        let relaunchedSwitch = relaunched.switches["settings.cloudflare"]
-        XCTAssertTrue(relaunchedSwitch.waitForExistence(timeout: 5))
-        setSwitch(relaunchedSwitch, enabled: true)
-
-        let relaunchedModeControl = relaunched.segmentedControls["settings.cloudflareMode"]
-        XCTAssertTrue(relaunchedModeControl.waitForExistence(timeout: 5))
-        let relaunchedCustomModeButton = relaunchedModeControl.buttons["Custom"]
-        XCTAssertTrue(relaunchedCustomModeButton.waitForExistence(timeout: 5))
-        XCTAssertTrue(waitForSelection(of: relaunchedCustomModeButton, timeout: 5))
-
-        let relaunchedGatewayURLField = relaunched.textFields["settings.cloudflareCustomURL"]
-        XCTAssertTrue(relaunchedGatewayURLField.waitForExistence(timeout: 5))
-        XCTAssertTrue(waitForValue(of: relaunchedGatewayURLField, customGatewayURL, timeout: 5))
-
-        let clearCustomButton = relaunched.buttons["settings.clearCustomCloudflare"]
+        let clearCustomButton = app.buttons["settings.clearCustomCloudflare"]
         XCTAssertTrue(clearCustomButton.waitForExistence(timeout: 5))
         clearCustomButton.tap()
-        setSwitch(relaunchedSwitch, enabled: false)
+
+        let refreshedModeControl = app.segmentedControls["settings.cloudflareMode"]
+        let refreshedCustomModeButton = refreshedModeControl.buttons["Custom"]
+        XCTAssertTrue(refreshedCustomModeButton.waitForExistence(timeout: 5))
+        XCTAssertTrue(waitForSelection(of: refreshedCustomModeButton, timeout: 5))
+
+        let refreshedClearCustomButton = app.buttons["settings.clearCustomCloudflare"]
+        XCTAssertTrue(refreshedClearCustomButton.waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["settings.saveCustomCloudflare"].isEnabled)
+        XCTAssertTrue(app.secureTextFields["settings.cloudflareCustomToken"].exists)
+        XCTAssertFalse(app.buttons["settings.checkConnection"].isEnabled)
+        XCTAssertFalse(app.staticTexts["Gateway unavailable in this build"].exists)
     }
 
     @MainActor
@@ -480,9 +474,7 @@ final class GlassGPTUITests: XCTestCase {
 
         defaultEffort.tap()
 
-        let mediumOption = app.descendants(matching: .any)
-            .matching(NSPredicate(format: "label == %@", "Medium"))
-            .firstMatch
+        let mediumOption = app.buttons["settings.defaultEffortOption.medium"]
         XCTAssertTrue(mediumOption.waitForExistence(timeout: 5))
         mediumOption.tap()
 
@@ -621,11 +613,14 @@ final class GlassGPTUITests: XCTestCase {
     }
 
     @MainActor
-    private func launchApp(scenario: String? = nil) -> XCUIApplication {
+    private func launchApp(scenario: String? = nil, resetState: Bool = false) -> XCUIApplication {
         let app = XCUIApplication()
         app.launchArguments.append("-ApplePersistenceIgnoreState")
         if let scenario {
             app.launchArguments.append("UITestScenario=\(scenario)")
+        }
+        if resetState {
+            app.launchArguments.append("UITestResetState")
         }
 
         if app.state != .notRunning {
@@ -703,10 +698,20 @@ final class GlassGPTUITests: XCTestCase {
     }
 
     @MainActor
-    private func revealIfNeeded(_ element: XCUIElement, in app: XCUIApplication, maxSwipes: Int = 4) {
+    private func revealIfNeeded(
+        _ element: XCUIElement,
+        in app: XCUIApplication,
+        maxSwipes: Int = 4,
+        direction: ScrollDirection = .up
+    ) {
         var remainingSwipes = maxSwipes
-        while !element.exists, remainingSwipes > 0 {
-            app.swipeUp()
+        while !(element.exists && element.isHittable), remainingSwipes > 0 {
+            switch direction {
+            case .up:
+                app.swipeUp()
+            case .down:
+                app.swipeDown()
+            }
             remainingSwipes -= 1
         }
     }

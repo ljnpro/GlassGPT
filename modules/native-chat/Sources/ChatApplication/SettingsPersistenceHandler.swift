@@ -31,6 +31,6 @@ package protocol SettingsPersistenceHandler {
         gatewayBaseURL: String,
         gatewayToken: String
     ) throws(PersistenceError)
-    /// Clears the custom Cloudflare gateway configuration and returns to the default mode.
+    /// Clears the saved custom Cloudflare gateway configuration.
     func clearCustomCloudflareConfiguration()
 }

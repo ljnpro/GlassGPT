@@ -137,6 +137,16 @@ final class SnapshotViewTests: XCTestCase {
         assertViewSnapshots(named: "settings-gateway-unavailable") {
             SettingsView(viewModel: unavailableGatewayViewModel)
         }
+
+        let customGatewayViewModel = makeSettingsSnapshotViewModel()
+        customGatewayViewModel.defaults.cloudflareEnabled = true
+        customGatewayViewModel.credentials.setCloudflareConfigurationMode(.custom)
+        customGatewayViewModel.credentials.customCloudflareGatewayBaseURL = ""
+        customGatewayViewModel.credentials.customCloudflareAIGToken = ""
+        customGatewayViewModel.credentials.cloudflareHealthStatus = .unknown
+        assertViewSnapshots(named: "settings-gateway-custom") {
+            SettingsView(viewModel: customGatewayViewModel)
+        }
     }
 
     func testModelSelectorPhoneLightSnapshot() {

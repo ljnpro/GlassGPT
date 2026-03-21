@@ -42,9 +42,15 @@ UI_TEST_CASES=(
   testHistoryScenarioShowsDeleteAllActionWhenSeeded
   testSettingsScenarioPersistsThemeSelectionWithinSession
   testSettingsGatewayScenarioShowsCloudflareControlsAndMissingKeyFeedback
+  testSettingsGatewayScenarioCustomModeShowsEditableGatewayFields
+  testSettingsGatewayScenarioCustomModeWaitsForInputBeforeStatusValidation
+  testSettingsGatewayScenarioCanSaveAndClearCustomConfiguration
   testSettingsScenarioCanSaveAndClearAPIKeyLocally
+  testSettingsScenarioReasoningEffortPickerOpensAvailableOptions
+  testFreshInstallScenarioChatDefaultsStartDisabled
   testEmptyScenarioWithoutAPIKeyKeepsShellUsable
   testAPIKeyPersistsAcrossAppRelaunch
+  testSettingsScenarioCanChangeDefaultReasoningEffort
   testSeededScenarioLoadsExistingConversationContent
   testSeededScenarioPreservesConversationAfterTabRoundTrip
   testStreamingScenarioCanOpenAndDismissModelSelector
@@ -527,6 +533,20 @@ function gate_snapshot_tests() {
     test
 }
 
+function gate_hosted_snapshot_tests() {
+  log "Running hosted snapshot tests"
+  run_checked_xcodebuild_in_dir nativechat-hosted-snapshot-tests "$ROOT_DIR/modules/native-chat" \
+    xcodebuild \
+    -scheme NativeChat-Package \
+    -destination "$SIMULATOR_DEVICE_DESTINATION" \
+    -parallel-testing-enabled NO \
+    -test-timeouts-enabled YES \
+    -maximum-test-execution-time-allowance "$XCODE_TEST_TIMEOUT_ALLOWANCE" \
+    -resultBundlePath "$CI_OUTPUT_DIR/NativeChatHostedSnapshotTests.xcresult" \
+    -only-testing:NativeChatSwiftTests/ViewHostingCoverageTests \
+    test
+}
+
 function gate_package_tests() {
   log "Running package logic coverage tests"
   run_checked_xcodebuild_in_dir nativechat-coverage-tests "$ROOT_DIR/modules/native-chat" \
@@ -540,6 +560,7 @@ function gate_package_tests() {
     -resultBundlePath "$CI_OUTPUT_DIR/NativeChatCoverageTests.xcresult" \
     -skip-testing:NativeChatArchitectureTests \
     -skip-testing:NativeChatTests/SnapshotViewTests \
+    -skip-testing:NativeChatSwiftTests/ViewHostingCoverageTests \
     test
 }
 
@@ -597,6 +618,10 @@ function gate_coverage_report() {
     coverage_sources+=("$CI_OUTPUT_DIR/NativeChatCoverageTests.xcresult")
   fi
 
+  if [[ -d "$CI_OUTPUT_DIR/NativeChatHostedSnapshotTests.xcresult" ]]; then
+    coverage_sources+=("$CI_OUTPUT_DIR/NativeChatHostedSnapshotTests.xcresult")
+  fi
+
   local ui_result
   shopt -s nullglob
   for ui_result in "$CI_OUTPUT_DIR"/glassgpt-ui-*.xcresult "$CI_OUTPUT_DIR"/glassgpt-ui-reinstall-*.xcresult; do
@@ -619,6 +644,7 @@ function gate_coverage_report() {
 
 function gate_core_tests() {
   gate_snapshot_tests
+  gate_hosted_snapshot_tests
   gate_package_tests
 }
 
@@ -958,6 +984,7 @@ function run_gate() {
     architecture-tests) gate_architecture_tests ;;
     app-tests) gate_app_tests ;;
     snapshot-tests) gate_snapshot_tests ;;
+    hosted-snapshot-tests) gate_hosted_snapshot_tests ;;
     package-tests) gate_package_tests ;;
     coverage-report) gate_coverage_report ;;
     core-tests) gate_core_tests ;;
@@ -975,7 +1002,7 @@ function run_gate() {
     release-readiness) assert_release_readiness ;;
     *)
       echo "Unknown gate: $gate" >&2
-      echo "Valid gates: ci-health, lint, python-lint, format-check, build, architecture-tests, app-tests, snapshot-tests, package-tests, coverage-report, core-tests, ui-tests, maintainability, source-share, infra-safety, module-boundary, doc-build, doc-completeness, performance-tests, localization-check, release-readiness" >&2
+      echo "Valid gates: ci-health, lint, python-lint, format-check, build, architecture-tests, app-tests, snapshot-tests, hosted-snapshot-tests, package-tests, coverage-report, core-tests, ui-tests, maintainability, source-share, infra-safety, module-boundary, doc-build, doc-completeness, performance-tests, localization-check, release-readiness" >&2
       exit 1
       ;;
   esac
@@ -984,7 +1011,7 @@ function run_gate() {
 function usage() {
   cat <<'EOF'
 Usage:
-  ./scripts/ci.sh [all|ci-health|lint|python-lint|format-check|build|architecture-tests|app-tests|snapshot-tests|package-tests|coverage-report|core-tests|ui-tests|maintainability|source-share|infra-safety|module-boundary|doc-build|doc-completeness|performance-tests|localization-check|release-readiness|comma-separated list]
+  ./scripts/ci.sh [all|ci-health|lint|python-lint|format-check|build|architecture-tests|app-tests|snapshot-tests|hosted-snapshot-tests|package-tests|coverage-report|core-tests|ui-tests|maintainability|source-share|infra-safety|module-boundary|doc-build|doc-completeness|performance-tests|localization-check|release-readiness|comma-separated list]
 
 Examples:
   ./scripts/ci.sh
