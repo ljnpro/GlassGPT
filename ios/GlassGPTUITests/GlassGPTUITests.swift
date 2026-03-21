@@ -127,6 +127,7 @@ final class GlassGPTUITests: XCTestCase {
 
         _ = openSettings(in: app)
         let themePicker = app.segmentedControls["settings.themePicker"]
+        revealIfNeeded(themePicker, in: app, maxSwipes: 6)
         XCTAssertTrue(themePicker.waitForExistence(timeout: 5))
 
         let darkSegment = themePicker.buttons["Dark"]
@@ -139,6 +140,7 @@ final class GlassGPTUITests: XCTestCase {
 
         app.tabBars.buttons["Settings"].tap()
         let refreshedThemePicker = app.segmentedControls["settings.themePicker"]
+        revealIfNeeded(refreshedThemePicker, in: app, maxSwipes: 6)
         XCTAssertTrue(refreshedThemePicker.waitForExistence(timeout: 5))
         XCTAssertTrue(waitForSelection(of: refreshedThemePicker.buttons["Dark"], timeout: 5))
     }
