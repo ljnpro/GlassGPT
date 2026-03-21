@@ -246,7 +246,7 @@ EOF
 2026-03-21 00:00:00 +0000 [MT] Skipping step: IDEDistributionAppThinningStep because it said so
 2026-03-21 00:00:00 +0000 [MT] Skipping stripping extended attributes because the codesign step will strip them.
 2026-03-21 00:00:00 +0000 [MT] Associated App Clip Identifiers Filter: Skipping because "com.apple.developer.associated-appclip-app-identifiers" is not present
-Retained packaging line
+/tmp/Foo.app: warning: retained distribution warning
 EOF
   python3 "$ROOT_DIR/scripts/sanitize_success_log.py" distribution "$temp_dir/Packaging.log"
 
@@ -254,8 +254,8 @@ EOF
     fail "sanitize_success_log.py should remove known harmless distribution skip/noise lines."
   fi
 
-  if ! grep -Fq 'Retained packaging line' "$temp_dir/Packaging.log"; then
-    fail "sanitize_success_log.py should preserve unrelated distribution output."
+  if ! grep -Fq '/tmp/Foo.app: warning: retained distribution warning' "$temp_dir/Packaging.log"; then
+    fail "sanitize_success_log.py should preserve distribution warnings after removing success noise."
   fi
 
   cat <<'EOF' >"$temp_dir/upload.log"
@@ -304,6 +304,10 @@ function test_release_upload_log_sanitizer() {
 
   if ! grep -Fq 'ensure_successful_log_has_content "$UPLOAD_LOG" "Upload completed successfully."' "$ROOT_DIR/scripts/release_testflight.sh"; then
     fail "release_testflight.sh should ensure upload logs stay non-empty after sanitization."
+  fi
+
+  if ! grep -Fq 'ensure_successful_log_has_content "$EXPORT_PATH/Packaging.log" "Distribution packaging completed successfully."' "$ROOT_DIR/scripts/release_testflight.sh"; then
+    fail "release_testflight.sh should ensure sanitized Packaging.log files keep a concise success summary."
   fi
 
   echo "[PASS] release_testflight.sh sanitizes successful upload logs"

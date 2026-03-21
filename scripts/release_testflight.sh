@@ -324,6 +324,7 @@ xcodebuild \
 python3 "$ROOT_DIR/scripts/sanitize_success_log.py" xcodebuild "$EXPORT_LOG"
 ensure_successful_log_has_content "$EXPORT_LOG" "Export completed successfully."
 sanitize_successful_distribution_log "$EXPORT_PATH/Packaging.log"
+ensure_successful_log_has_content "$EXPORT_PATH/Packaging.log" "Distribution packaging completed successfully."
 
 if [[ ! -f "$IPA_PATH" ]]; then
   echo "Missing IPA at $IPA_PATH" >&2

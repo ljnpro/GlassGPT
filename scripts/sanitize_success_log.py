@@ -223,7 +223,8 @@ def sanitize_distribution_log(lines: list[str]) -> list[str]:
     for line in lines:
         if any(pattern.match(line) for pattern in PACKAGING_SKIP_PATTERNS):
             continue
-        cleaned.append(line)
+        if any(pattern.match(line) for pattern in WARNING_PATTERNS):
+            cleaned.append(line)
 
     return collapse_blank_lines(cleaned)
 
