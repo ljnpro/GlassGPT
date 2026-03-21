@@ -36,6 +36,13 @@ package enum UITestScenarioLoader {
             )
             : ScenarioAPIKeyBackend()
         let apiKeyStore = PersistedAPIKeyStore(backend: apiKeyBackend)
+        let cloudflareTokenBackend: APIKeyPersisting = scenario.usesLiveKeychain
+            ? KeychainAPIKeyBackend(
+                service: KeychainAPIKeyBackend.defaultServiceIdentifier(bundleIdentifier: Bundle.main.bundleIdentifier),
+                account: KeychainAPIKeyBackend.cloudflareAIGTokenAccount,
+            )
+            : ScenarioAPIKeyBackend()
+        let cloudflareTokenStore = PersistedAPIKeyStore(backend: cloudflareTokenBackend)
 
         seedDefaultSettings(into: settingsStore)
         let configurationProvider = DefaultOpenAIConfigurationProvider(
@@ -44,6 +51,8 @@ package enum UITestScenarioLoader {
             cloudflareAIGToken: scenario == .settingsGateway ? "cf-ui-test-token" : "",
             useCloudflareGateway: false,
         )
+        let defaultGatewayBaseURL = configurationProvider.cloudflareGatewayBaseURL
+        let defaultGatewayToken = configurationProvider.cloudflareAIGToken
 
         clearAllConversations(in: modelContext)
         resetAPIKeyIfNeeded(for: scenario, store: apiKeyStore)
@@ -69,11 +78,33 @@ package enum UITestScenarioLoader {
         let settingsPresenter = makeSettingsPresenter(
             settingsStore: settingsStore,
             apiKeyStore: apiKeyStore,
+            cloudflareTokenStore: cloudflareTokenStore,
             openAIService: openAIService,
             requestBuilder: requestBuilder,
             transport: transport,
             configurationProvider: configurationProvider,
             fileDownloadService: GeneratedFilesInfra.FileDownloadService(configurationProvider: configurationProvider),
+            applyCloudflareConfiguration: {
+                let persistedCustomBaseURL = settingsStore.customCloudflareGatewayBaseURL
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                let persistedCustomToken = cloudflareTokenStore.loadAPIKey()?
+                    .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+
+                switch settingsStore.cloudflareGatewayConfigurationMode {
+                case .default:
+                    configurationProvider.cloudflareGatewayBaseURL = defaultGatewayBaseURL
+                    configurationProvider.cloudflareAIGToken = defaultGatewayToken
+                case .custom:
+                    configurationProvider.cloudflareGatewayBaseURL = persistedCustomBaseURL.isEmpty
+                        ? defaultGatewayBaseURL
+                        : persistedCustomBaseURL
+                    configurationProvider.cloudflareAIGToken = persistedCustomToken.isEmpty
+                        ? defaultGatewayToken
+                        : persistedCustomToken
+                }
+
+                configurationProvider.useCloudflareGateway = settingsStore.cloudflareGatewayEnabled
+            },
         )
 
         if scenario == .settingsGateway {

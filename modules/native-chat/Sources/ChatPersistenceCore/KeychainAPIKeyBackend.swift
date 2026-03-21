@@ -1,20 +1,90 @@
 import Foundation
 import Security
 
+/// Minimal keychain operations used by ``KeychainAPIKeyBackend``.
+package protocol KeychainAccessing: Sendable {
+    /// Updates an existing keychain item.
+    func update(
+        query: [CFString: Any],
+        attributes: [CFString: Any]
+    ) -> OSStatus
+    /// Adds a new keychain item.
+    func add(query: [CFString: Any]) -> OSStatus
+    /// Looks up a single keychain item and returns its data payload when present.
+    func copyMatching(query: [CFString: Any]) -> (status: OSStatus, data: Data?)
+    /// Deletes a matching keychain item.
+    @discardableResult
+    func delete(query: [CFString: Any]) -> OSStatus
+}
+
+/// Production ``KeychainAccessing`` implementation backed by the Security framework.
+package struct SystemKeychainAccess: KeychainAccessing {
+    /// Creates the system keychain adapter.
+    package init() {}
+
+    /// Updates an existing Security item.
+    package func update(
+        query: [CFString: Any],
+        attributes: [CFString: Any]
+    ) -> OSStatus {
+        SecItemUpdate(query as CFDictionary, attributes as CFDictionary)
+    }
+
+    /// Adds a Security item.
+    package func add(query: [CFString: Any]) -> OSStatus {
+        SecItemAdd(query as CFDictionary, nil)
+    }
+
+    /// Reads a single Security item and returns its data payload.
+    package func copyMatching(query: [CFString: Any]) -> (status: OSStatus, data: Data?) {
+        var item: CFTypeRef?
+        let status = SecItemCopyMatching(query as CFDictionary, &item)
+        return (status, item as? Data)
+    }
+
+    /// Deletes a matching Security item.
+    @discardableResult
+    package func delete(query: [CFString: Any]) -> OSStatus {
+        SecItemDelete(query as CFDictionary)
+    }
+}
+
 /// Low-level keychain backend that stores and retrieves the OpenAI API key as a generic password item.
 public struct KeychainAPIKeyBackend: Sendable {
     /// The keychain account name used for the API key item.
     public static let apiKeyAccount = "openai_api_key"
+    /// The keychain account name used for the Cloudflare AIG token item.
+    public static let cloudflareAIGTokenAccount = "cloudflare_aig_token"
     /// Fallback keychain service identifier when the bundle identifier is unavailable.
     public static let fallbackServiceIdentifier = "com.liquidglasschat"
     /// Keychain accessibility level applied to newly created items.
     public static let apiKeyAccessibility = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly as String
 
     private let service: String
+    private let account: String
+    private let keychain: any KeychainAccessing
 
     /// Creates a backend targeting the given keychain service identifier.
-    public init(service: String) {
+    public init(
+        service: String,
+        account: String = Self.apiKeyAccount
+    ) {
+        self.init(
+            service: service,
+            account: account,
+            keychain: SystemKeychainAccess()
+        )
+    }
+
+    /// Creates a backend with an injectable keychain adapter for tests and composition.
+    package init(
+        service: String,
+        account: String = Self.apiKeyAccount,
+        keychain: any KeychainAccessing
+    ) {
         self.service = service
+        self.account = account
+        self.keychain = keychain
     }
 
     /// Returns the bundle identifier when non-empty, otherwise falls back to ``fallbackServiceIdentifier``.
@@ -35,14 +105,14 @@ public struct KeychainAPIKeyBackend: Sendable {
         let query: [CFString: Any] = [
             kSecClass: kSecClassGenericPassword,
             kSecAttrService: service,
-            kSecAttrAccount: Self.apiKeyAccount
+            kSecAttrAccount: account
         ]
 
         let attributes: [CFString: Any] = [
             kSecValueData: data
         ]
 
-        let updateStatus = SecItemUpdate(query as CFDictionary, attributes as CFDictionary)
+        let updateStatus = keychain.update(query: query, attributes: attributes)
 
         switch updateStatus {
         case errSecSuccess:
@@ -51,7 +121,7 @@ public struct KeychainAPIKeyBackend: Sendable {
             var addQuery = query
             addQuery[kSecValueData] = data
             addQuery[kSecAttrAccessible] = Self.apiKeyAccessibility
-            let addStatus = SecItemAdd(addQuery as CFDictionary, nil)
+            let addStatus = keychain.add(query: addQuery)
             guard addStatus == errSecSuccess else {
                 throw .keychainFailure(addStatus)
             }
@@ -65,16 +135,16 @@ public struct KeychainAPIKeyBackend: Sendable {
         let query: [CFString: Any] = [
             kSecClass: kSecClassGenericPassword,
             kSecAttrService: service,
-            kSecAttrAccount: Self.apiKeyAccount,
+            kSecAttrAccount: account,
             kSecReturnData: true,
             kSecMatchLimit: kSecMatchLimitOne
         ]
 
-        var item: CFTypeRef?
-        let status = SecItemCopyMatching(query as CFDictionary, &item)
+        let result = keychain.copyMatching(query: query)
+        let status = result.status
 
         guard status == errSecSuccess,
-              let data = item as? Data,
+              let data = result.data,
               let value = String(data: data, encoding: .utf8)
         else {
             return nil
@@ -88,10 +158,10 @@ public struct KeychainAPIKeyBackend: Sendable {
         let query: [CFString: Any] = [
             kSecClass: kSecClassGenericPassword,
             kSecAttrService: service,
-            kSecAttrAccount: Self.apiKeyAccount
+            kSecAttrAccount: account
         ]
 
-        SecItemDelete(query as CFDictionary)
+        keychain.delete(query: query)
     }
 
     /// Errors originating from keychain operations.

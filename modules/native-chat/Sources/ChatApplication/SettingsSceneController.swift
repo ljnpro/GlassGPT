@@ -86,10 +86,12 @@ public final class SettingsSceneController {
     /// - Parameters:
     ///   - typedAPIKey: The key currently entered in the UI.
     ///   - gatewayEnabled: Whether Cloudflare gateway routing is enabled.
+    ///   - cloudflareConfiguration: The currently selected Cloudflare configuration.
     /// - Returns: A save outcome when the trimmed key is non-empty; otherwise `nil`.
     public func saveAPIKey(
         _ typedAPIKey: String,
-        gatewayEnabled: Bool
+        gatewayEnabled: Bool,
+        cloudflareConfiguration: SettingsCloudflareConfiguration
     ) throws(PersistenceError) -> SettingsAPIKeySaveOutcome? {
         let trimmedKey = typedAPIKey.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedKey.isEmpty else {
@@ -98,7 +100,11 @@ public final class SettingsSceneController {
 
         try credentialHandler.saveAPIKey(trimmedKey)
         let cloudflareHealthStatus = gatewayEnabled
-            ? resolveCloudflareHealth(typedAPIKey: trimmedKey, gatewayEnabled: gatewayEnabled)
+            ? resolveCloudflareHealth(
+                typedAPIKey: trimmedKey,
+                gatewayEnabled: gatewayEnabled,
+                configuration: cloudflareConfiguration
+            )
             : nil
         return SettingsAPIKeySaveOutcome(
             apiKey: trimmedKey,
@@ -107,9 +113,16 @@ public final class SettingsSceneController {
     }
 
     /// Removes the stored API key and resolves the resulting local Cloudflare state.
-    public func clearAPIKey(gatewayEnabled: Bool) -> CloudflareHealthStatus {
+    public func clearAPIKey(
+        gatewayEnabled: Bool,
+        cloudflareConfiguration: SettingsCloudflareConfiguration
+    ) -> CloudflareHealthStatus {
         credentialHandler.clearAPIKey()
-        return resolveCloudflareHealth(typedAPIKey: "", gatewayEnabled: gatewayEnabled)
+        return resolveCloudflareHealth(
+            typedAPIKey: "",
+            gatewayEnabled: gatewayEnabled,
+            configuration: cloudflareConfiguration
+        )
     }
 
     /// Validates the API key against the OpenAI API.
@@ -117,14 +130,66 @@ public final class SettingsSceneController {
         await credentialHandler.validateAPIKey(apiKey)
     }
 
+    /// Loads the persisted Cloudflare configuration mode.
+    public func loadCloudflareConfigurationMode() -> CloudflareGatewayConfigurationMode {
+        persistenceHandler.loadCloudflareConfigurationMode()
+    }
+
+    /// Loads the persisted custom Cloudflare gateway base URL.
+    public func loadCustomCloudflareGatewayBaseURL() -> String {
+        persistenceHandler.loadCustomCloudflareGatewayBaseURL()
+    }
+
+    /// Loads the persisted custom Cloudflare gateway token.
+    public func loadCustomCloudflareGatewayToken() -> String? {
+        persistenceHandler.loadCustomCloudflareGatewayToken()
+    }
+
+    /// Persists the active Cloudflare configuration mode.
+    public func persistCloudflareConfigurationMode(_ mode: CloudflareGatewayConfigurationMode) {
+        persistenceHandler.persistCloudflareConfigurationMode(mode)
+    }
+
+    /// Saves a custom Cloudflare configuration and activates it.
+    public func saveCustomCloudflareConfiguration(
+        gatewayBaseURL: String,
+        gatewayToken: String
+    ) throws(PersistenceError) {
+        try persistenceHandler.saveCustomCloudflareConfiguration(
+            gatewayBaseURL: gatewayBaseURL,
+            gatewayToken: gatewayToken
+        )
+    }
+
+    /// Clears the custom Cloudflare configuration and returns to the default mode.
+    public func clearCustomCloudflareConfiguration() {
+        persistenceHandler.clearCustomCloudflareConfiguration()
+    }
+
     /// Synchronously resolves the Cloudflare gateway health from local state.
-    public func resolveCloudflareHealth(typedAPIKey: String, gatewayEnabled: Bool) -> CloudflareHealthStatus {
-        credentialHandler.resolveCloudflareHealth(typedAPIKey: typedAPIKey, gatewayEnabled: gatewayEnabled)
+    public func resolveCloudflareHealth(
+        typedAPIKey: String,
+        gatewayEnabled: Bool,
+        configuration: SettingsCloudflareConfiguration
+    ) -> CloudflareHealthStatus {
+        credentialHandler.resolveCloudflareHealth(
+            typedAPIKey: typedAPIKey,
+            gatewayEnabled: gatewayEnabled,
+            configuration: configuration
+        )
     }
 
     /// Performs an async health check against the Cloudflare gateway.
-    public func checkCloudflareHealth(typedAPIKey: String, gatewayEnabled: Bool) async -> CloudflareHealthStatus {
-        await credentialHandler.checkCloudflareHealth(typedAPIKey: typedAPIKey, gatewayEnabled: gatewayEnabled)
+    public func checkCloudflareHealth(
+        typedAPIKey: String,
+        gatewayEnabled: Bool,
+        configuration: SettingsCloudflareConfiguration
+    ) async -> CloudflareHealthStatus {
+        await credentialHandler.checkCloudflareHealth(
+            typedAPIKey: typedAPIKey,
+            gatewayEnabled: gatewayEnabled,
+            configuration: configuration
+        )
     }
 
     /// Reads both generated-file cache buckets so the presenter can update one coherent snapshot.

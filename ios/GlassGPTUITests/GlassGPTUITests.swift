@@ -155,6 +155,25 @@ final class GlassGPTUITests: XCTestCase {
     }
 
     @MainActor
+    func testSettingsGatewayScenarioCustomModeShowsEditableGatewayFields() throws {
+        let app = launchApp(scenario: "settingsGateway")
+        _ = openSettings(in: app)
+
+        let modeControl = app.segmentedControls["settings.cloudflareMode"]
+        XCTAssertTrue(modeControl.waitForExistence(timeout: 5))
+
+        let customModeButton = modeControl.buttons["Custom"]
+        XCTAssertTrue(customModeButton.waitForExistence(timeout: 5))
+        customModeButton.tap()
+        XCTAssertTrue(waitForSelection(of: customModeButton, timeout: 5))
+
+        XCTAssertTrue(app.textFields["settings.cloudflareCustomURL"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.secureTextFields["settings.cloudflareCustomToken"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["settings.saveCustomCloudflare"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["settings.clearCustomCloudflare"].waitForExistence(timeout: 5))
+    }
+
+    @MainActor
     func testHistoryScenarioShowsDeleteAllActionWhenSeeded() throws {
         let app = launchApp(scenario: "history")
         openHistory(in: app)
@@ -186,6 +205,40 @@ final class GlassGPTUITests: XCTestCase {
         XCTAssertTrue(clearButton.waitForExistence(timeout: 2))
         clearButton.tap()
         XCTAssertFalse(saveButton.isEnabled)
+    }
+
+    @MainActor
+    func testSettingsScenarioTapOutsideDismissesAPIKeyKeyboard() throws {
+        let app = launchApp(scenario: "settings")
+
+        let apiKeyField = openSettings(in: app)
+        apiKeyField.tap()
+        apiKeyField.typeText("sk-keyboard-ui")
+
+        let keyboard = app.keyboards.firstMatch
+        XCTAssertTrue(keyboard.waitForExistence(timeout: 5))
+
+        let apiConfigurationHeader = app.staticTexts["API Configuration"]
+        XCTAssertTrue(apiConfigurationHeader.waitForExistence(timeout: 5))
+        apiConfigurationHeader.tap()
+
+        XCTAssertTrue(waitForNonExistence(of: keyboard, timeout: 5))
+    }
+
+    @MainActor
+    func testSettingsScenarioDragDismissesAPIKeyKeyboard() throws {
+        let app = launchApp(scenario: "settings")
+
+        let apiKeyField = openSettings(in: app)
+        apiKeyField.tap()
+        apiKeyField.typeText("sk-keyboard-ui")
+
+        let keyboard = app.keyboards.firstMatch
+        XCTAssertTrue(keyboard.waitForExistence(timeout: 5))
+
+        app.swipeUp()
+
+        XCTAssertTrue(waitForNonExistence(of: keyboard, timeout: 5))
     }
 
     @MainActor
@@ -245,6 +298,66 @@ final class GlassGPTUITests: XCTestCase {
         XCTAssertTrue(clearButton.waitForExistence(timeout: 5))
         clearButton.tap()
         XCTAssertFalse(relaunchedSaveButton.isEnabled)
+    }
+
+    @MainActor
+    func testCustomCloudflareGatewayURLPersistsAcrossAppRelaunch() throws {
+        let customGatewayURL = "https://gateway.ui.custom/v1"
+        let customGatewayToken = "cf-ui-custom-token"
+        let app = launchApp()
+
+        _ = openSettings(in: app)
+        let gatewaySwitch = app.switches["settings.cloudflare"]
+        XCTAssertTrue(gatewaySwitch.waitForExistence(timeout: 5))
+        setSwitch(gatewaySwitch, enabled: true)
+
+        let modeControl = app.segmentedControls["settings.cloudflareMode"]
+        XCTAssertTrue(modeControl.waitForExistence(timeout: 5))
+        let customModeButton = modeControl.buttons["Custom"]
+        XCTAssertTrue(customModeButton.waitForExistence(timeout: 5))
+        customModeButton.tap()
+        XCTAssertTrue(waitForSelection(of: customModeButton, timeout: 5))
+
+        let gatewayURLField = app.textFields["settings.cloudflareCustomURL"]
+        XCTAssertTrue(gatewayURLField.waitForExistence(timeout: 5))
+        gatewayURLField.tap()
+        clearText(in: gatewayURLField)
+        gatewayURLField.typeText(customGatewayURL)
+
+        let gatewayTokenField = app.secureTextFields["settings.cloudflareCustomToken"]
+        XCTAssertTrue(gatewayTokenField.waitForExistence(timeout: 5))
+        gatewayTokenField.tap()
+        clearText(in: gatewayTokenField)
+        gatewayTokenField.typeText(customGatewayToken)
+
+        let saveCustomButton = app.buttons["settings.saveCustomCloudflare"]
+        XCTAssertTrue(saveCustomButton.waitForExistence(timeout: 5))
+        XCTAssertTrue(saveCustomButton.isEnabled)
+        saveCustomButton.tap()
+
+        app.terminate()
+        XCTAssertTrue(app.wait(for: .notRunning, timeout: 5))
+
+        let relaunched = launchApp()
+        _ = openSettings(in: relaunched)
+        let relaunchedSwitch = relaunched.switches["settings.cloudflare"]
+        XCTAssertTrue(relaunchedSwitch.waitForExistence(timeout: 5))
+        setSwitch(relaunchedSwitch, enabled: true)
+
+        let relaunchedModeControl = relaunched.segmentedControls["settings.cloudflareMode"]
+        XCTAssertTrue(relaunchedModeControl.waitForExistence(timeout: 5))
+        let relaunchedCustomModeButton = relaunchedModeControl.buttons["Custom"]
+        XCTAssertTrue(relaunchedCustomModeButton.waitForExistence(timeout: 5))
+        XCTAssertTrue(waitForSelection(of: relaunchedCustomModeButton, timeout: 5))
+
+        let relaunchedGatewayURLField = relaunched.textFields["settings.cloudflareCustomURL"]
+        XCTAssertTrue(relaunchedGatewayURLField.waitForExistence(timeout: 5))
+        XCTAssertTrue(waitForValue(of: relaunchedGatewayURLField, customGatewayURL, timeout: 5))
+
+        let clearCustomButton = relaunched.buttons["settings.clearCustomCloudflare"]
+        XCTAssertTrue(clearCustomButton.waitForExistence(timeout: 5))
+        clearCustomButton.tap()
+        setSwitch(relaunchedSwitch, enabled: false)
     }
 
     @MainActor
@@ -505,9 +618,17 @@ final class GlassGPTUITests: XCTestCase {
     }
 
     @MainActor
+    private func setSwitch(_ element: XCUIElement, enabled: Bool) {
+        let currentValue = (element.value as? String) == "1"
+        if currentValue != enabled {
+            element.tap()
+        }
+    }
+
+    @MainActor
     private func revealIfNeeded(_ element: XCUIElement, in app: XCUIApplication, maxSwipes: Int = 4) {
         var remainingSwipes = maxSwipes
-        while !element.exists && remainingSwipes > 0 {
+        while !element.exists, remainingSwipes > 0 {
             app.swipeUp()
             remainingSwipes -= 1
         }

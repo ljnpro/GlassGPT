@@ -51,6 +51,7 @@ struct APIKeyStoreTests {
 
     @Test func `keychain service retains stable reinstall contract`() {
         #expect(KeychainAPIKeyBackend.apiKeyAccount == "openai_api_key")
+        #expect(KeychainAPIKeyBackend.cloudflareAIGTokenAccount == "cloudflare_aig_token")
         #expect(
             KeychainAPIKeyBackend.apiKeyAccessibility
                 == kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly as String
@@ -70,5 +71,94 @@ struct APIKeyStoreTests {
             KeychainAPIKeyBackend.defaultServiceIdentifier(bundleIdentifier: "   ")
                 == KeychainAPIKeyBackend.fallbackServiceIdentifier
         )
+    }
+
+    @Test func `cloudflare token keychain account remains isolated from API key account`() throws {
+        let service = "com.glassgpt.tests.keychain.\(UUID().uuidString)"
+        let keychain = InMemoryKeychainAccess()
+        let apiBackend = KeychainAPIKeyBackend(
+            service: service,
+            keychain: keychain
+        )
+        let cloudflareBackend = KeychainAPIKeyBackend(
+            service: service,
+            account: KeychainAPIKeyBackend.cloudflareAIGTokenAccount,
+            keychain: keychain
+        )
+
+        try apiBackend.saveAPIKey("sk-live-test")
+        try cloudflareBackend.saveAPIKey("cf-live-token")
+
+        #expect(apiBackend.loadAPIKey() == "sk-live-test")
+        #expect(cloudflareBackend.loadAPIKey() == "cf-live-token")
+
+        cloudflareBackend.deleteAPIKey()
+
+        #expect(apiBackend.loadAPIKey() == "sk-live-test")
+        #expect(cloudflareBackend.loadAPIKey() == nil)
+    }
+}
+
+private final class InMemoryKeychainAccess: KeychainAccessing, @unchecked Sendable {
+    private struct EntryKey: Hashable {
+        let service: String
+        let account: String
+    }
+
+    private var storage: [EntryKey: Data] = [:]
+
+    func update(
+        query: [CFString: Any],
+        attributes: [CFString: Any]
+    ) -> OSStatus {
+        guard let entryKey = entryKey(for: query),
+              storage[entryKey] != nil,
+              let value = attributes[kSecValueData] as? Data
+        else {
+            return errSecItemNotFound
+        }
+
+        storage[entryKey] = value
+        return errSecSuccess
+    }
+
+    func add(query: [CFString: Any]) -> OSStatus {
+        guard let entryKey = entryKey(for: query),
+              let value = query[kSecValueData] as? Data
+        else {
+            return errSecParam
+        }
+
+        storage[entryKey] = value
+        return errSecSuccess
+    }
+
+    func copyMatching(query: [CFString: Any]) -> (status: OSStatus, data: Data?) {
+        guard let entryKey = entryKey(for: query),
+              let value = storage[entryKey]
+        else {
+            return (errSecItemNotFound, nil)
+        }
+
+        return (errSecSuccess, value)
+    }
+
+    func delete(query: [CFString: Any]) -> OSStatus {
+        guard let entryKey = entryKey(for: query) else {
+            return errSecParam
+        }
+
+        storage.removeValue(forKey: entryKey)
+        return errSecSuccess
+    }
+
+    private func entryKey(for query: [CFString: Any]) -> EntryKey? {
+        guard let service = query[kSecAttrService] as? String,
+              let account = query[kSecAttrAccount] as? String
+        else {
+            return nil
+        }
+
+        return EntryKey(service: service, account: account)
     }
 }

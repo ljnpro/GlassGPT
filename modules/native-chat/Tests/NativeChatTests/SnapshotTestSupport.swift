@@ -244,7 +244,10 @@ func makeSettingsSnapshotViewModel() -> SettingsPresenter {
     let apiBackend = InMemoryAPIKeyBackend()
     let settingsStore = SettingsStore(valueStore: settingsValueStore)
     let apiKeyStore = PersistedAPIKeyStore(backend: apiBackend)
+    let cloudflareTokenStore = PersistedAPIKeyStore(backend: InMemoryAPIKeyBackend())
     let configurationProvider = RuntimeTestOpenAIConfigurationProvider()
+    let defaultGatewayBaseURL = configurationProvider.cloudflareGatewayBaseURL
+    let defaultGatewayToken = configurationProvider.cloudflareAIGToken
     let requestBuilder = OpenAIRequestBuilder(configuration: configurationProvider)
     let transport = StubOpenAITransport()
     let openAIService = OpenAIService(
@@ -257,11 +260,33 @@ func makeSettingsSnapshotViewModel() -> SettingsPresenter {
     return makeSettingsPresenter(
         settingsStore: settingsStore,
         apiKeyStore: apiKeyStore,
+        cloudflareTokenStore: cloudflareTokenStore,
         openAIService: openAIService,
         requestBuilder: requestBuilder,
         transport: transport,
         configurationProvider: configurationProvider,
         fileDownloadService: GeneratedFilesInfra.FileDownloadService(configurationProvider: configurationProvider),
+        applyCloudflareConfiguration: {
+            let persistedCustomBaseURL = settingsStore.customCloudflareGatewayBaseURL
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            let persistedCustomToken = cloudflareTokenStore.loadAPIKey()?
+                .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+
+            switch settingsStore.cloudflareGatewayConfigurationMode {
+            case .default:
+                configurationProvider.cloudflareGatewayBaseURL = defaultGatewayBaseURL
+                configurationProvider.cloudflareAIGToken = defaultGatewayToken
+            case .custom:
+                configurationProvider.cloudflareGatewayBaseURL = persistedCustomBaseURL.isEmpty
+                    ? defaultGatewayBaseURL
+                    : persistedCustomBaseURL
+                configurationProvider.cloudflareAIGToken = persistedCustomToken.isEmpty
+                    ? defaultGatewayToken
+                    : persistedCustomToken
+            }
+
+            configurationProvider.useCloudflareGateway = settingsStore.cloudflareGatewayEnabled
+        },
         appVersionString: snapshotAppVersionString,
         platformString: "iOS 26.0 · Liquid Glass"
     )

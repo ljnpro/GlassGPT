@@ -61,6 +61,10 @@ public final class SettingsStore {
         public static let hapticEnabled = "hapticEnabled"
         /// Key for the Cloudflare gateway toggle.
         public static let cloudflareGatewayEnabled = "cloudflareGatewayEnabled"
+        /// Key for the active Cloudflare gateway configuration mode.
+        public static let cloudflareGatewayConfigurationMode = "cloudflareGatewayConfigurationMode"
+        /// Key for the saved custom Cloudflare gateway base URL.
+        public static let customCloudflareGatewayBaseURL = "customCloudflareGatewayBaseURL"
     }
 
     private let valueStore: any SettingsValueStore
@@ -163,6 +167,31 @@ public final class SettingsStore {
         }
         set {
             valueStore.set(newValue, forKey: Keys.cloudflareGatewayEnabled)
+        }
+    }
+
+    /// The persisted Cloudflare gateway configuration mode. Defaults to `.default` if unset.
+    public var cloudflareGatewayConfigurationMode: CloudflareGatewayConfigurationMode {
+        get {
+            guard let rawValue = valueStore.string(forKey: Keys.cloudflareGatewayConfigurationMode),
+                  let mode = CloudflareGatewayConfigurationMode(rawValue: rawValue)
+            else {
+                return .default
+            }
+            return mode
+        }
+        set {
+            valueStore.set(newValue.rawValue, forKey: Keys.cloudflareGatewayConfigurationMode)
+        }
+    }
+
+    /// The persisted custom Cloudflare gateway base URL. Defaults to an empty string if unset.
+    public var customCloudflareGatewayBaseURL: String {
+        get {
+            valueStore.string(forKey: Keys.customCloudflareGatewayBaseURL) ?? ""
+        }
+        set {
+            valueStore.set(newValue, forKey: Keys.customCloudflareGatewayBaseURL)
         }
     }
 

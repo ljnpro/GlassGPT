@@ -8,17 +8,18 @@ public final class DefaultOpenAIConfigurationProvider: OpenAIConfigurationProvid
     /// The default Cloudflare AI Gateway base URL.
     public static let defaultCloudflareGatewayBaseURL =
         "https://gateway.ai.cloudflare.com/v1/887b39f387990e7ef89e400eb228e193/glass-gpt/openai"
+    /// The default bundled Cloudflare AI Gateway authorization token.
+    public static let defaultCloudflareAIGToken =
+        "W3AAxNEfdJNnhh-tT-w9TX4mPTLtU2_e_ox0Pwd7"
 
     private struct State {
+        var cloudflareGatewayBaseURL: String
+        var cloudflareAIGToken: String
         var useCloudflareGateway: Bool
     }
 
     /// The base URL for direct OpenAI API requests.
     public let directOpenAIBaseURL: String
-    /// The base URL for Cloudflare AI Gateway proxy requests.
-    public let cloudflareGatewayBaseURL: String
-    /// The Cloudflare AI Gateway authorization token.
-    public let cloudflareAIGToken: String
     private let state: OSAllocatedUnfairLock<State>
 
     /// Creates a new configuration provider.
@@ -30,17 +31,33 @@ public final class DefaultOpenAIConfigurationProvider: OpenAIConfigurationProvid
     public init(
         directOpenAIBaseURL: String = DefaultOpenAIConfigurationProvider.defaultOpenAIBaseURL,
         cloudflareGatewayBaseURL: String = DefaultOpenAIConfigurationProvider.defaultCloudflareGatewayBaseURL,
-        cloudflareAIGToken: String = "",
+        cloudflareAIGToken: String = DefaultOpenAIConfigurationProvider.defaultCloudflareAIGToken,
         useCloudflareGateway: Bool = false
     ) {
         self.directOpenAIBaseURL = directOpenAIBaseURL
-        self.cloudflareGatewayBaseURL = cloudflareGatewayBaseURL
-        self.cloudflareAIGToken = cloudflareAIGToken
         state = OSAllocatedUnfairLock(
             initialState: State(
+                cloudflareGatewayBaseURL: cloudflareGatewayBaseURL,
+                cloudflareAIGToken: cloudflareAIGToken,
                 useCloudflareGateway: useCloudflareGateway
             )
         )
+    }
+
+    /// The base URL for Cloudflare AI Gateway proxy requests. Thread-safe.
+    public var cloudflareGatewayBaseURL: String {
+        get { state.withLock { $0.cloudflareGatewayBaseURL } }
+        set {
+            state.withLock { $0.cloudflareGatewayBaseURL = newValue }
+        }
+    }
+
+    /// The Cloudflare AI Gateway authorization token. Thread-safe.
+    public var cloudflareAIGToken: String {
+        get { state.withLock { $0.cloudflareAIGToken } }
+        set {
+            state.withLock { $0.cloudflareAIGToken = newValue }
+        }
     }
 
     /// Whether to route API requests through the Cloudflare AI Gateway. Thread-safe.

@@ -11,6 +11,7 @@ public extension OpenAIRequestBuilder {
     ///   - backgroundModeEnabled: Whether background mode is enabled.
     ///   - serviceTier: The service tier for the request.
     ///   - vectorStoreIds: Optional vector store IDs for file search.
+    ///   - useDirectBaseURL: Whether to force the direct OpenAI endpoint.
     /// - Returns: A configured URL request for streaming.
     /// - Throws: ``OpenAIServiceError`` if URL or body encoding fails.
     func streamingRequest(
@@ -20,7 +21,8 @@ public extension OpenAIRequestBuilder {
         reasoningEffort: ReasoningEffort,
         backgroundModeEnabled: Bool,
         serviceTier: ServiceTier,
-        vectorStoreIds: [String] = []
+        vectorStoreIds: [String] = [],
+        useDirectBaseURL: Bool = false
     ) throws(OpenAIServiceError) -> URLRequest {
         try requestFactory.streamingRequest(
             apiKey: apiKey,
@@ -29,7 +31,8 @@ public extension OpenAIRequestBuilder {
             reasoningEffort: reasoningEffort,
             backgroundModeEnabled: backgroundModeEnabled,
             serviceTier: serviceTier,
-            vectorStoreIds: vectorStoreIds
+            vectorStoreIds: vectorStoreIds,
+            useDirectBaseURL: useDirectBaseURL
         )
     }
 

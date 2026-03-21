@@ -1,4 +1,5 @@
 import ChatApplication
+import ChatDomain
 import Foundation
 import Observation
 import os
@@ -21,6 +22,12 @@ public final class SettingsCredentialsStore {
     public var cloudflareHealthStatus: CloudflareHealthStatus
     /// Whether a Cloudflare health check is in progress.
     public var isCheckingCloudflareHealth = false
+    /// The currently selected Cloudflare configuration mode.
+    public var cloudflareConfigurationMode: CloudflareGatewayConfigurationMode
+    /// The custom Cloudflare gateway base URL being edited.
+    public var customCloudflareGatewayBaseURL: String
+    /// The custom Cloudflare gateway token being edited.
+    public var customCloudflareAIGToken: String
 
     private static let logger = Logger(subsystem: "GlassGPT", category: "settings")
     private let controller: SettingsSceneController
@@ -35,9 +42,21 @@ public final class SettingsCredentialsStore {
         self.apiKey = apiKey
         self.controller = controller
         self.isCloudflareGatewayEnabled = isCloudflareGatewayEnabled
+        let cloudflareConfigurationMode = controller.loadCloudflareConfigurationMode()
+        let customCloudflareGatewayBaseURL = controller.loadCustomCloudflareGatewayBaseURL()
+        let customCloudflareAIGToken = controller.loadCustomCloudflareGatewayToken() ?? ""
+        self.cloudflareConfigurationMode = cloudflareConfigurationMode
+        self.customCloudflareGatewayBaseURL = customCloudflareGatewayBaseURL
+        self.customCloudflareAIGToken = customCloudflareAIGToken
+        let cloudflareConfiguration = SettingsCloudflareConfiguration(
+            mode: cloudflareConfigurationMode,
+            customGatewayBaseURL: customCloudflareGatewayBaseURL,
+            customGatewayToken: customCloudflareAIGToken
+        )
         cloudflareHealthStatus = controller.resolveCloudflareHealth(
             typedAPIKey: apiKey,
-            gatewayEnabled: isCloudflareGatewayEnabled()
+            gatewayEnabled: isCloudflareGatewayEnabled(),
+            configuration: cloudflareConfiguration
         )
     }
 
@@ -46,7 +65,8 @@ public final class SettingsCredentialsStore {
         do {
             guard let outcome = try controller.saveAPIKey(
                 apiKey,
-                gatewayEnabled: isCloudflareGatewayEnabled()
+                gatewayEnabled: isCloudflareGatewayEnabled(),
+                cloudflareConfiguration: currentCloudflareConfiguration()
             ) else {
                 return
             }
@@ -66,7 +86,8 @@ public final class SettingsCredentialsStore {
         apiKey = ""
         isAPIKeyValid = nil
         cloudflareHealthStatus = controller.clearAPIKey(
-            gatewayEnabled: isCloudflareGatewayEnabled()
+            gatewayEnabled: isCloudflareGatewayEnabled(),
+            cloudflareConfiguration: currentCloudflareConfiguration()
         )
     }
 
@@ -95,7 +116,8 @@ public final class SettingsCredentialsStore {
 
         let localStatus = controller.resolveCloudflareHealth(
             typedAPIKey: apiKey,
-            gatewayEnabled: gatewayEnabled
+            gatewayEnabled: gatewayEnabled,
+            configuration: currentCloudflareConfiguration()
         )
         guard localStatus == .unknown else {
             cloudflareHealthStatus = localStatus
@@ -107,9 +129,49 @@ public final class SettingsCredentialsStore {
         cloudflareHealthStatus = .checking
         cloudflareHealthStatus = await controller.checkCloudflareHealth(
             typedAPIKey: apiKey,
-            gatewayEnabled: gatewayEnabled
+            gatewayEnabled: gatewayEnabled,
+            configuration: currentCloudflareConfiguration()
         )
         isCheckingCloudflareHealth = false
+    }
+
+    /// Switches the locally selected Cloudflare configuration mode.
+    public func setCloudflareConfigurationMode(_ mode: CloudflareGatewayConfigurationMode) {
+        cloudflareConfigurationMode = mode
+        if mode == .default {
+            controller.persistCloudflareConfigurationMode(.default)
+        }
+        refreshCloudflareHealthStatus()
+    }
+
+    /// Saves the currently edited custom Cloudflare gateway configuration and activates it.
+    public func saveCustomCloudflareConfiguration() {
+        let trimmedGatewayBaseURL = customCloudflareGatewayBaseURL
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedGatewayToken = customCloudflareAIGToken
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+
+        do {
+            try controller.saveCustomCloudflareConfiguration(
+                gatewayBaseURL: trimmedGatewayBaseURL,
+                gatewayToken: trimmedGatewayToken
+            )
+            cloudflareConfigurationMode = .custom
+            customCloudflareGatewayBaseURL = trimmedGatewayBaseURL
+            customCloudflareAIGToken = trimmedGatewayToken
+            refreshCloudflareHealthStatus()
+        } catch {
+            Self.logger.error("Failed to save custom Cloudflare configuration: \(error.localizedDescription, privacy: .public)")
+        }
+    }
+
+    /// Clears the saved custom Cloudflare gateway configuration and returns to the default mode.
+    public func clearCustomCloudflareConfiguration() {
+        controller.clearCustomCloudflareConfiguration()
+        cloudflareConfigurationMode = .default
+        customCloudflareGatewayBaseURL = ""
+        customCloudflareAIGToken = ""
+        refreshCloudflareHealthStatus()
     }
 
     /// Recomputes local gateway health after the Cloudflare preference changes.
@@ -120,9 +182,34 @@ public final class SettingsCredentialsStore {
             return
         }
 
+        refreshCloudflareHealthStatus()
+    }
+
+    /// Recomputes local gateway health for the current configuration preview.
+    public func refreshCloudflareHealthStatus() {
+        let gatewayEnabled = isCloudflareGatewayEnabled()
+        guard gatewayEnabled else {
+            cloudflareHealthStatus = .unknown
+            isCheckingCloudflareHealth = false
+            return
+        }
+
         cloudflareHealthStatus = controller.resolveCloudflareHealth(
             typedAPIKey: apiKey,
-            gatewayEnabled: enabled
+            gatewayEnabled: gatewayEnabled,
+            configuration: currentCloudflareConfiguration()
+        )
+    }
+
+    private func currentCloudflareConfiguration(
+        mode: CloudflareGatewayConfigurationMode? = nil,
+        customGatewayBaseURL: String? = nil,
+        customGatewayToken: String? = nil
+    ) -> SettingsCloudflareConfiguration {
+        SettingsCloudflareConfiguration(
+            mode: mode ?? cloudflareConfigurationMode,
+            customGatewayBaseURL: customGatewayBaseURL ?? customCloudflareGatewayBaseURL,
+            customGatewayToken: customGatewayToken ?? customCloudflareAIGToken
         )
     }
 }

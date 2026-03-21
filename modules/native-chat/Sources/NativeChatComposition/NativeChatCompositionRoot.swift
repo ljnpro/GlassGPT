@@ -50,11 +50,13 @@ package struct NativeChatCompositionRoot {
         let settingsPresenter = makeSettingsPresenter(
             settingsStore: settingsStore,
             apiKeyStore: services.apiKeyStore,
+            cloudflareTokenStore: services.cloudflareTokenStore,
             openAIService: services.openAIService,
             requestBuilder: services.requestBuilder,
             transport: services.transport,
             configurationProvider: services.configurationProvider,
-            fileDownloadService: services.fileDownloadService
+            fileDownloadService: services.fileDownloadService,
+            applyCloudflareConfiguration: services.applyCloudflareConfiguration
         )
         let store = NativeChatAppStore(
             chatController: chatController,
@@ -80,12 +82,34 @@ package struct NativeChatCompositionRoot {
     }
 
     private func makeCompositionServices(settingsStore: SettingsStore) -> CompositionServices {
+        let keychainService = KeychainAPIKeyBackend.defaultServiceIdentifier(
+            bundleIdentifier: Bundle.main.bundleIdentifier
+        )
         let apiKeyStore = PersistedAPIKeyStore(
             backend: KeychainAPIKeyBackend(
-                service: KeychainAPIKeyBackend.defaultServiceIdentifier(bundleIdentifier: Bundle.main.bundleIdentifier)
+                service: keychainService
             )
         )
-        let configurationProvider = makeConfigurationProvider(settingsStore: settingsStore)
+        let cloudflareTokenStore = PersistedAPIKeyStore(
+            backend: KeychainAPIKeyBackend(
+                service: keychainService,
+                account: KeychainAPIKeyBackend.cloudflareAIGTokenAccount
+            )
+        )
+        let cloudflareDefaults = makeCloudflareConfigurationDefaults()
+        let configurationProvider = makeConfigurationProvider(
+            settingsStore: settingsStore,
+            cloudflareTokenStore: cloudflareTokenStore,
+            defaults: cloudflareDefaults
+        )
+        let applyCloudflareConfiguration: @MainActor () -> Void = {
+            self.applyCloudflareConfiguration(
+                to: configurationProvider,
+                settingsStore: settingsStore,
+                cloudflareTokenStore: cloudflareTokenStore,
+                defaults: cloudflareDefaults
+            )
+        }
         let requestBuilder = OpenAIRequestBuilder(configuration: configurationProvider)
         let responseParser = OpenAIResponseParser()
         let transport = OpenAIURLSessionTransport(
@@ -102,12 +126,14 @@ package struct NativeChatCompositionRoot {
 
         return CompositionServices(
             apiKeyStore: apiKeyStore,
+            cloudflareTokenStore: cloudflareTokenStore,
             configurationProvider: configurationProvider,
             requestBuilder: requestBuilder,
             transport: transport,
             serviceFactory: serviceFactory,
             openAIService: serviceFactory(),
-            fileDownloadService: FileDownloadService(configurationProvider: configurationProvider)
+            fileDownloadService: FileDownloadService(configurationProvider: configurationProvider),
+            applyCloudflareConfiguration: applyCloudflareConfiguration
         )
     }
 
@@ -133,21 +159,66 @@ package struct NativeChatCompositionRoot {
     }
     #endif
 
-    private func makeConfigurationProvider(settingsStore: SettingsStore) -> DefaultOpenAIConfigurationProvider {
-        DefaultOpenAIConfigurationProvider(
+    private func makeConfigurationProvider(
+        settingsStore: SettingsStore,
+        cloudflareTokenStore: PersistedAPIKeyStore,
+        defaults: CloudflareRuntimeConfigurationDefaults
+    ) -> DefaultOpenAIConfigurationProvider {
+        let provider = DefaultOpenAIConfigurationProvider(
             directOpenAIBaseURL: DefaultOpenAIConfigurationProvider.defaultOpenAIBaseURL,
-            cloudflareGatewayBaseURL: resolvedConfigurationValue(
+            cloudflareGatewayBaseURL: defaults.gatewayBaseURL,
+            cloudflareAIGToken: defaults.gatewayToken,
+            useCloudflareGateway: settingsStore.cloudflareGatewayEnabled
+        )
+        applyCloudflareConfiguration(
+            to: provider,
+            settingsStore: settingsStore,
+            cloudflareTokenStore: cloudflareTokenStore,
+            defaults: defaults
+        )
+        return provider
+    }
+
+    private func makeCloudflareConfigurationDefaults() -> CloudflareRuntimeConfigurationDefaults {
+        CloudflareRuntimeConfigurationDefaults(
+            gatewayBaseURL: resolvedConfigurationValue(
                 infoKey: "CloudflareGatewayBaseURL",
                 environmentKey: "CLOUDFLARE_GATEWAY_BASE_URL",
                 fallback: DefaultOpenAIConfigurationProvider.defaultCloudflareGatewayBaseURL
             ),
-            cloudflareAIGToken: resolvedConfigurationValue(
+            gatewayToken: resolvedConfigurationValue(
                 infoKey: "CloudflareAIGToken",
                 environmentKey: "CLOUDFLARE_AIG_TOKEN",
-                fallback: ""
-            ),
-            useCloudflareGateway: settingsStore.cloudflareGatewayEnabled
+                fallback: DefaultOpenAIConfigurationProvider.defaultCloudflareAIGToken
+            )
         )
+    }
+
+    private func applyCloudflareConfiguration(
+        to provider: DefaultOpenAIConfigurationProvider,
+        settingsStore: SettingsStore,
+        cloudflareTokenStore: PersistedAPIKeyStore,
+        defaults: CloudflareRuntimeConfigurationDefaults
+    ) {
+        let persistedCustomBaseURL = settingsStore.customCloudflareGatewayBaseURL
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let persistedCustomToken = cloudflareTokenStore.loadAPIKey()?
+            .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+
+        switch settingsStore.cloudflareGatewayConfigurationMode {
+        case .default:
+            provider.cloudflareGatewayBaseURL = defaults.gatewayBaseURL
+            provider.cloudflareAIGToken = defaults.gatewayToken
+        case .custom:
+            provider.cloudflareGatewayBaseURL = persistedCustomBaseURL.isEmpty
+                ? defaults.gatewayBaseURL
+                : persistedCustomBaseURL
+            provider.cloudflareAIGToken = persistedCustomToken.isEmpty
+                ? defaults.gatewayToken
+                : persistedCustomToken
+        }
+
+        provider.useCloudflareGateway = settingsStore.cloudflareGatewayEnabled
     }
 
     private func resolvedConfigurationValue(
@@ -171,10 +242,17 @@ package struct NativeChatCompositionRoot {
 
 private struct CompositionServices {
     let apiKeyStore: PersistedAPIKeyStore
+    let cloudflareTokenStore: PersistedAPIKeyStore
     let configurationProvider: DefaultOpenAIConfigurationProvider
     let requestBuilder: OpenAIRequestBuilder
     let transport: OpenAIURLSessionTransport
     let serviceFactory: @MainActor () -> OpenAIService
     let openAIService: OpenAIService
     let fileDownloadService: FileDownloadService
+    let applyCloudflareConfiguration: @MainActor () -> Void
+}
+
+private struct CloudflareRuntimeConfigurationDefaults {
+    let gatewayBaseURL: String
+    let gatewayToken: String
 }

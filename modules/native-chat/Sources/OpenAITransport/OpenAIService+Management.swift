@@ -78,7 +78,10 @@ public extension OpenAIService {
     func validateAPIKey(_ apiKey: String) async -> Bool {
         let request: URLRequest
         do {
-            request = try requestBuilder.modelsRequest(apiKey: apiKey)
+            request = try requestBuilder.modelsRequest(
+                apiKey: apiKey,
+                useDirectBaseURL: true
+            )
         } catch {
             return false
         }
@@ -96,7 +99,10 @@ public extension OpenAIService {
     /// - Returns: A configured URL request, or `nil`.
     func modelsRequest(apiKey: String) -> URLRequest? {
         do {
-            return try requestBuilder.modelsRequest(apiKey: apiKey)
+            return try requestBuilder.modelsRequest(
+                apiKey: apiKey,
+                useDirectBaseURL: true
+            )
         } catch {
             return nil
         }

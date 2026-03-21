@@ -10,17 +10,16 @@ import OpenAITransport
 package func makeSettingsPresenter(
     settingsStore: SettingsStore,
     apiKeyStore: PersistedAPIKeyStore,
+    cloudflareTokenStore: PersistedAPIKeyStore,
     openAIService: OpenAIService,
     requestBuilder: OpenAIRequestBuilder,
     transport: OpenAIDataTransport,
     configurationProvider: OpenAIConfigurationProvider,
     fileDownloadService: GeneratedFilesInfra.FileDownloadService,
+    applyCloudflareConfiguration: @escaping @MainActor () -> Void,
     appVersionString: String? = nil,
     platformString: String? = nil
 ) -> SettingsPresenter {
-    let mutableConfigurationProvider = MutableConfigurationProviderBox(
-        provider: configurationProvider
-    )
     let diagnostics = makeSettingsPresenterDiagnostics(
         appVersionString: appVersionString,
         platformString: platformString
@@ -28,11 +27,13 @@ package func makeSettingsPresenter(
     let controller = makeSettingsSceneController(
         settingsStore: settingsStore,
         apiKeyStore: apiKeyStore,
+        cloudflareTokenStore: cloudflareTokenStore,
         openAIService: openAIService,
         requestBuilder: requestBuilder,
         transport: transport,
         fileDownloadService: fileDownloadService,
-        mutableConfigurationProvider: mutableConfigurationProvider
+        configurationProvider: configurationProvider,
+        applyCloudflareConfiguration: applyCloudflareConfiguration
     )
 
     let defaults = SettingsDefaultsStore(
@@ -73,15 +74,17 @@ package func makeSettingsPresenter(
 private func makeSettingsSceneController(
     settingsStore: SettingsStore,
     apiKeyStore: PersistedAPIKeyStore,
+    cloudflareTokenStore: PersistedAPIKeyStore,
     openAIService: OpenAIService,
     requestBuilder: OpenAIRequestBuilder,
     transport: OpenAIDataTransport,
     fileDownloadService: GeneratedFilesInfra.FileDownloadService,
-    mutableConfigurationProvider: MutableConfigurationProviderBox
+    configurationProvider: OpenAIConfigurationProvider,
+    applyCloudflareConfiguration: @escaping @MainActor () -> Void
 ) -> SettingsSceneController {
     let healthResolver = SettingsCloudflareHealthResolver(
         apiKeyStore: apiKeyStore,
-        loadConfigurationProvider: { mutableConfigurationProvider.provider }
+        loadConfigurationProvider: { configurationProvider }
     )
     let credentialHandler = SettingsCredentialHandlerImpl(
         apiKeyStore: apiKeyStore,
@@ -95,22 +98,12 @@ private func makeSettingsSceneController(
     )
     let persistenceHandler = SettingsPersistenceHandlerImpl(
         settingsStore: settingsStore,
-        applyCloudflareEnabled: { enabled in
-            mutableConfigurationProvider.provider.useCloudflareGateway = enabled
-        }
+        cloudflareTokenStore: cloudflareTokenStore,
+        applyCloudflareConfiguration: applyCloudflareConfiguration
     )
     return SettingsSceneController(
         credentialHandler: credentialHandler,
         cacheHandler: cacheHandler,
         persistenceHandler: persistenceHandler
     )
-}
-
-@MainActor
-private final class MutableConfigurationProviderBox {
-    var provider: OpenAIConfigurationProvider
-
-    init(provider: OpenAIConfigurationProvider) {
-        self.provider = provider
-    }
 }

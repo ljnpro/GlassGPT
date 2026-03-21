@@ -239,6 +239,7 @@ struct SettingsScreenStoreHarness {
     let store: SettingsPresenter
     let settingsValueStore: InMemorySettingsValueStore
     let apiKeyBackend: InMemoryAPIKeyBackend
+    let cloudflareTokenBackend: InMemoryAPIKeyBackend
     let configurationProvider: RuntimeTestOpenAIConfigurationProvider
     let transport: OpenAIDataTransport
 }

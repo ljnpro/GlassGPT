@@ -121,9 +121,55 @@ func makeTestSettingsScreenStoreHarness(
     )
     let apiBackend = InMemoryAPIKeyBackend()
     apiBackend.storedKey = apiKey
+    let cloudflareTokenBackend = InMemoryAPIKeyBackend()
 
+    return makeTestSettingsScreenStoreHarness(
+        settingsValueStore: settingsValueStore,
+        apiKeyBackend: apiBackend,
+        cloudflareTokenBackend: cloudflareTokenBackend,
+        configurationProvider: configurationProvider,
+        transport: transport
+    )
+}
+
+@MainActor
+func makeTestSettingsScreenStoreHarness(
+    settingsValueStore: InMemorySettingsValueStore,
+    apiKeyBackend: InMemoryAPIKeyBackend,
+    cloudflareTokenBackend: InMemoryAPIKeyBackend,
+    configurationProvider: RuntimeTestOpenAIConfigurationProvider
+        = RuntimeTestOpenAIConfigurationProvider(),
+    transport: OpenAIDataTransport = StubOpenAITransport()
+) -> SettingsScreenStoreHarness {
     let settingsStore = SettingsStore(valueStore: settingsValueStore)
-    let apiKeyStore = PersistedAPIKeyStore(backend: apiBackend)
+    let apiKeyStore = PersistedAPIKeyStore(backend: apiKeyBackend)
+    let cloudflareTokenStore = PersistedAPIKeyStore(backend: cloudflareTokenBackend)
+    let defaultGatewayBaseURL = configurationProvider.cloudflareGatewayBaseURL
+    let defaultGatewayToken = configurationProvider.cloudflareAIGToken
+    let applyCloudflareConfiguration: @MainActor @Sendable () -> Void = {
+        let persistedCustomBaseURL = settingsStore.customCloudflareGatewayBaseURL
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let persistedCustomToken = cloudflareTokenStore.loadAPIKey()?
+            .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+
+        switch settingsStore.cloudflareGatewayConfigurationMode {
+        case .default:
+            configurationProvider.cloudflareGatewayBaseURL = defaultGatewayBaseURL
+            configurationProvider.cloudflareAIGToken = defaultGatewayToken
+        case .custom:
+            configurationProvider.cloudflareGatewayBaseURL = persistedCustomBaseURL.isEmpty
+                ? defaultGatewayBaseURL
+                : persistedCustomBaseURL
+            configurationProvider.cloudflareAIGToken = persistedCustomToken.isEmpty
+                ? defaultGatewayToken
+                : persistedCustomToken
+        }
+
+        configurationProvider.useCloudflareGateway = settingsStore.cloudflareGatewayEnabled
+    }
+
+    applyCloudflareConfiguration()
+
     let requestBuilder = OpenAIRequestBuilder(configuration: configurationProvider)
     let openAIService = OpenAIService(
         requestBuilder: requestBuilder,
@@ -139,16 +185,19 @@ func makeTestSettingsScreenStoreHarness(
         store: makeSettingsPresenter(
             settingsStore: settingsStore,
             apiKeyStore: apiKeyStore,
+            cloudflareTokenStore: cloudflareTokenStore,
             openAIService: openAIService,
             requestBuilder: requestBuilder,
             transport: transport,
             configurationProvider: configurationProvider,
             fileDownloadService: fileDownloadService,
+            applyCloudflareConfiguration: applyCloudflareConfiguration,
             appVersionString: currentReleaseVersionString(),
             platformString: "iOS 26.0 · Liquid Glass"
         ),
         settingsValueStore: settingsValueStore,
-        apiKeyBackend: apiBackend,
+        apiKeyBackend: apiKeyBackend,
+        cloudflareTokenBackend: cloudflareTokenBackend,
         configurationProvider: configurationProvider,
         transport: transport
     )

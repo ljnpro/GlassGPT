@@ -28,7 +28,10 @@ public enum AppError: Error, Sendable {
         case let .runtime(message):
             message
         case .offline:
-            String(localized: "You are offline. Please check your connection and try again.")
+            NSLocalizedString(
+                "You are offline. Please check your connection and try again.",
+                comment: ""
+            )
         }
     }
 
@@ -52,15 +55,27 @@ public enum AppError: Error, Sendable {
     public var recoverySuggestion: String? {
         switch self {
         case .transport:
-            String(localized: "Check your API key and network connection.")
+            NSLocalizedString(
+                "Check your API key and network connection.",
+                comment: ""
+            )
         case .persistence:
-            String(localized: "Try restarting the app.")
+            NSLocalizedString(
+                "Try restarting the app.",
+                comment: ""
+            )
         case .fileDownload:
-            String(localized: "Check your network connection and try again.")
+            NSLocalizedString(
+                "Check your network connection and try again.",
+                comment: ""
+            )
         case .runtime:
             nil
         case .offline:
-            String(localized: "Connect to Wi-Fi or cellular data to continue.")
+            NSLocalizedString(
+                "Connect to Wi-Fi or cellular data to continue.",
+                comment: ""
+            )
         }
     }
 }

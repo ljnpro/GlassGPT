@@ -1,4 +1,5 @@
 import ChatDomain
+import ChatPersistenceCore
 
 /// Handler protocol for persisting user setting changes from the settings scene.
 @MainActor
@@ -17,4 +18,19 @@ package protocol SettingsPersistenceHandler {
     func persistHapticEnabled(_ enabled: Bool)
     /// Persists the Cloudflare gateway toggle state.
     func persistCloudflareEnabled(_ enabled: Bool)
+    /// Loads the persisted Cloudflare configuration mode.
+    func loadCloudflareConfigurationMode() -> CloudflareGatewayConfigurationMode
+    /// Loads the persisted custom Cloudflare gateway base URL.
+    func loadCustomCloudflareGatewayBaseURL() -> String
+    /// Loads the persisted custom Cloudflare gateway token.
+    func loadCustomCloudflareGatewayToken() -> String?
+    /// Persists the active Cloudflare configuration mode.
+    func persistCloudflareConfigurationMode(_ mode: CloudflareGatewayConfigurationMode)
+    /// Saves a custom Cloudflare gateway configuration and activates it.
+    func saveCustomCloudflareConfiguration(
+        gatewayBaseURL: String,
+        gatewayToken: String
+    ) throws(PersistenceError)
+    /// Clears the custom Cloudflare gateway configuration and returns to the default mode.
+    func clearCustomCloudflareConfiguration()
 }

@@ -466,6 +466,38 @@
         }
       }
     },
+    "Clear Custom": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Clear Custom"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "清除自定义"
+          }
+        }
+      }
+    },
+    "Clear custom Cloudflare configuration": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Clear custom Cloudflare configuration"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "清除自定义 Cloudflare 配置"
+          }
+        }
+      }
+    },
     "Clear Document Cache": {
       "localizations": {
         "en": {
@@ -558,6 +590,38 @@
           "stringUnit": {
             "state": "translated",
             "value": "Cloudflare 连接状态"
+          }
+        }
+      }
+    },
+    "Cloudflare AIG token": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cloudflare AIG token"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cloudflare AIG 令牌"
+          }
+        }
+      }
+    },
+    "Cloudflare gateway configuration": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cloudflare gateway configuration"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cloudflare 网关配置"
           }
         }
       }
@@ -734,6 +798,38 @@
           "stringUnit": {
             "state": "translated",
             "value": "当前配置"
+          }
+        }
+      }
+    },
+    "Custom Cloudflare gateway URL": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Custom Cloudflare gateway URL"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "自定义 Cloudflare 网关 URL"
+          }
+        }
+      }
+    },
+    "Custom Cloudflare gateway token": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Custom Cloudflare gateway token"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "自定义 Cloudflare 网关令牌"
           }
         }
       }
@@ -1154,6 +1250,22 @@
         }
       }
     },
+    "Gateway Configuration": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gateway Configuration"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "网关配置"
+          }
+        }
+      }
+    },
     "Generated PDFs and other files are cached automatically so old download links still open or share later. Maximum cache size": {
       "localizations": {
         "en": {
@@ -1214,6 +1326,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "触觉反馈"
+          }
+        }
+      }
+    },
+    "https://gateway.example/v1": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "https://gateway.example/v1"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "https://gateway.example/v1"
           }
         }
       }
@@ -2078,6 +2206,38 @@
           "stringUnit": {
             "state": "translated",
             "value": "保存 API 密钥"
+          }
+        }
+      }
+    },
+    "Save Custom": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Save Custom"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "保存自定义"
+          }
+        }
+      }
+    },
+    "Save custom Cloudflare configuration": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Save custom Cloudflare configuration"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "保存自定义 Cloudflare 配置"
           }
         }
       }

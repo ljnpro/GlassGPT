@@ -86,8 +86,10 @@ public final class OpenAIService {
     ) -> AsyncStream<StreamEvent> {
         cancelStream()
 
+        let primaryRequest: URLRequest
+        let fallbackRequest: URLRequest?
         do {
-            let request = try requestBuilder.streamingRequest(
+            primaryRequest = try requestBuilder.streamingRequest(
                 apiKey: apiKey,
                 messages: messages,
                 model: model,
@@ -96,12 +98,45 @@ public final class OpenAIService {
                 serviceTier: serviceTier,
                 vectorStoreIds: vectorStoreIds
             )
-
-            return streamClient.makeStream(request: request)
+            if requestBuilder.configuration.usesGatewayRouting {
+                fallbackRequest = try requestBuilder.streamingRequest(
+                    apiKey: apiKey,
+                    messages: messages,
+                    model: model,
+                    reasoningEffort: reasoningEffort,
+                    backgroundModeEnabled: backgroundModeEnabled,
+                    serviceTier: serviceTier,
+                    vectorStoreIds: vectorStoreIds,
+                    useDirectBaseURL: true
+                )
+            } else {
+                fallbackRequest = nil
+            }
         } catch {
             return AsyncStream { continuation in
                 continuation.yield(.error(.requestFailed("Failed to encode request")))
                 continuation.finish()
+            }
+        }
+
+        return AsyncStream(bufferingPolicy: .unbounded) { continuation in
+            let task = Task { @MainActor [weak self] in
+                guard let self else {
+                    continuation.finish()
+                    return
+                }
+                await forwardChatStream(
+                    primaryRequest: primaryRequest,
+                    fallbackRequest: fallbackRequest,
+                    continuation: continuation
+                )
+            }
+
+            continuation.onTermination = { @Sendable _ in
+                task.cancel()
+                Task { @MainActor [weak self] in
+                    self?.cancelStream()
+                }
             }
         }
     }
@@ -136,5 +171,60 @@ public final class OpenAIService {
                 continuation.finish()
             }
         }
+    }
+
+    private func forwardChatStream(
+        primaryRequest: URLRequest,
+        fallbackRequest: URLRequest?,
+        continuation: AsyncStream<StreamEvent>.Continuation
+    ) async {
+        let shouldRetryDirect = await relayStream(
+            request: primaryRequest,
+            continuation: continuation,
+            suppressInitialFailure: fallbackRequest != nil
+        )
+
+        guard !Task.isCancelled else {
+            continuation.finish()
+            return
+        }
+
+        if shouldRetryDirect, let fallbackRequest {
+            cancelStream()
+            _ = await relayStream(
+                request: fallbackRequest,
+                continuation: continuation,
+                suppressInitialFailure: false
+            )
+        }
+
+        continuation.finish()
+    }
+
+    private func relayStream(
+        request: URLRequest,
+        continuation: AsyncStream<StreamEvent>.Continuation,
+        suppressInitialFailure: Bool
+    ) async -> Bool {
+        var sawMeaningfulProgress = false
+
+        for await event in streamClient.makeStream(request: request) {
+            guard !Task.isCancelled else {
+                return false
+            }
+
+            switch event {
+            case .error, .connectionLost:
+                if suppressInitialFailure, !sawMeaningfulProgress {
+                    return true
+                }
+                continuation.yield(event)
+            default:
+                sawMeaningfulProgress = true
+                continuation.yield(event)
+            }
+        }
+
+        return false
     }
 }

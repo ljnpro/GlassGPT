@@ -167,6 +167,7 @@ let package = Package(
     name: "NativeChat",
     platforms: [
         .iOS("26.0"),
+        .macOS("15.0"),
     ],
     products: [
         .library(

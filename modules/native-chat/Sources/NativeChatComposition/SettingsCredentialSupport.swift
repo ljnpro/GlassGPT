@@ -8,18 +8,22 @@ struct SettingsCloudflareHealthResolver {
     let apiKeyStore: PersistedAPIKeyStore
     let loadConfigurationProvider: () -> OpenAIConfigurationProvider
 
-    func resolve(typedAPIKey: String, gatewayEnabled: Bool) -> CloudflareHealthStatus {
+    func resolve(
+        typedAPIKey: String,
+        gatewayEnabled: Bool,
+        configuration: SettingsCloudflareConfiguration
+    ) -> CloudflareHealthStatus {
         guard gatewayEnabled else {
             return .unknown
         }
 
-        let configurationProvider = loadConfigurationProvider()
-        let gatewayBaseURL = configurationProvider.cloudflareGatewayBaseURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        let gatewayConfiguration = effectiveGatewayConfiguration(for: configuration)
+        let gatewayBaseURL = gatewayConfiguration.baseURL
         guard !gatewayBaseURL.isEmpty else {
             return .gatewayUnavailable
         }
 
-        let gatewayToken = configurationProvider.cloudflareAIGToken.trimmingCharacters(in: .whitespacesAndNewlines)
+        let gatewayToken = gatewayConfiguration.token
         guard !gatewayToken.isEmpty else {
             return .gatewayUnavailable
         }
@@ -39,6 +43,24 @@ struct SettingsCloudflareHealthResolver {
         let typedKey = typedAPIKey.trimmingCharacters(in: .whitespacesAndNewlines)
         let storedKey = apiKeyStore.loadAPIKey()?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         return typedKey.isEmpty ? storedKey : typedKey
+    }
+
+    func effectiveGatewayConfiguration(
+        for configuration: SettingsCloudflareConfiguration
+    ) -> (baseURL: String, token: String) {
+        switch configuration.mode {
+        case .default:
+            let provider = loadConfigurationProvider()
+            return (
+                provider.cloudflareGatewayBaseURL.trimmingCharacters(in: .whitespacesAndNewlines),
+                provider.cloudflareAIGToken.trimmingCharacters(in: .whitespacesAndNewlines)
+            )
+        case .custom:
+            return (
+                configuration.customGatewayBaseURL.trimmingCharacters(in: .whitespacesAndNewlines),
+                configuration.customGatewayToken.trimmingCharacters(in: .whitespacesAndNewlines)
+            )
+        }
     }
 
     private func isValidGatewayModelsURL(_ baseURL: String) -> Bool {
@@ -77,12 +99,28 @@ struct SettingsCredentialHandlerImpl: SettingsCredentialHandler {
         await openAIService.validateAPIKey(apiKey)
     }
 
-    func resolveCloudflareHealth(typedAPIKey: String, gatewayEnabled: Bool) -> CloudflareHealthStatus {
-        healthResolver.resolve(typedAPIKey: typedAPIKey, gatewayEnabled: gatewayEnabled)
+    func resolveCloudflareHealth(
+        typedAPIKey: String,
+        gatewayEnabled: Bool,
+        configuration: SettingsCloudflareConfiguration
+    ) -> CloudflareHealthStatus {
+        healthResolver.resolve(
+            typedAPIKey: typedAPIKey,
+            gatewayEnabled: gatewayEnabled,
+            configuration: configuration
+        )
     }
 
-    func checkCloudflareHealth(typedAPIKey: String, gatewayEnabled: Bool) async -> CloudflareHealthStatus {
-        let localStatus = healthResolver.resolve(typedAPIKey: typedAPIKey, gatewayEnabled: gatewayEnabled)
+    func checkCloudflareHealth(
+        typedAPIKey: String,
+        gatewayEnabled: Bool,
+        configuration: SettingsCloudflareConfiguration
+    ) async -> CloudflareHealthStatus {
+        let localStatus = healthResolver.resolve(
+            typedAPIKey: typedAPIKey,
+            gatewayEnabled: gatewayEnabled,
+            configuration: configuration
+        )
         guard localStatus == .unknown else {
             return localStatus
         }
@@ -95,11 +133,18 @@ struct SettingsCredentialHandlerImpl: SettingsCredentialHandler {
             return .invalidGatewayURL
         }
 
-        let configurationProvider = healthResolver.loadConfigurationProvider()
         var request = gatewayRequest
-        let gatewayBaseURL = configurationProvider.cloudflareGatewayBaseURL
-            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let gatewayConfiguration = healthResolver.effectiveGatewayConfiguration(
+            for: configuration
+        )
+        let gatewayBaseURL = gatewayConfiguration.baseURL
         request.url = URL(string: "\(gatewayBaseURL)/models")
+        request.setValue(
+            gatewayConfiguration.token.isEmpty
+                ? nil
+                : "Bearer \(gatewayConfiguration.token)",
+            forHTTPHeaderField: "cf-aig-authorization"
+        )
 
         do {
             let (data, response) = try await transport.data(for: request)

@@ -45,10 +45,18 @@ public extension OpenAIRequestBuilder {
     }
 
     /// Builds a request for listing available models.
-    /// - Parameter apiKey: The API key for authentication.
+    /// - Parameters:
+    ///   - apiKey: The API key for authentication.
+    ///   - useDirectBaseURL: Whether to force the direct OpenAI endpoint.
     /// - Returns: A configured URL request.
     /// - Throws: If URL construction fails.
-    func modelsRequest(apiKey: String) throws(OpenAIServiceError) -> URLRequest {
-        try requestFactory.modelsRequest(apiKey: apiKey)
+    func modelsRequest(
+        apiKey: String,
+        useDirectBaseURL: Bool = false
+    ) throws(OpenAIServiceError) -> URLRequest {
+        try requestFactory.modelsRequest(
+            apiKey: apiKey,
+            useDirectBaseURL: useDirectBaseURL
+        )
     }
 }

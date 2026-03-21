@@ -227,6 +227,7 @@ struct SettingsScreenStoreHarness {
     let store: SettingsPresenter
     let settingsValueStore: InMemorySettingsValueStore
     let apiKeyBackend: InMemoryAPIKeyBackend
+    let cloudflareTokenBackend: InMemoryAPIKeyBackend
     let configurationProvider: RuntimeTestOpenAIConfigurationProvider
     let transport: OpenAIDataTransport
 }
@@ -359,6 +360,8 @@ func makeTestSettingsScreenStoreHarness(
 
     let settingsStore = SettingsStore(valueStore: settingsValueStore)
     let apiKeyStore = PersistedAPIKeyStore(backend: apiBackend)
+    let cloudflareTokenBackend = InMemoryAPIKeyBackend()
+    let cloudflareTokenStore = PersistedAPIKeyStore(backend: cloudflareTokenBackend)
     let requestBuilder = OpenAIRequestBuilder(configuration: configurationProvider)
     let openAIService = OpenAIService(
         requestBuilder: requestBuilder,
@@ -367,21 +370,46 @@ func makeTestSettingsScreenStoreHarness(
         transport: transport
     )
     let fileDownloadService = GeneratedFilesInfra.FileDownloadService(configurationProvider: configurationProvider)
+    let defaultGatewayBaseURL = configurationProvider.cloudflareGatewayBaseURL
+    let defaultGatewayToken = configurationProvider.cloudflareAIGToken
 
     return SettingsScreenStoreHarness(
         store: makeSettingsPresenter(
             settingsStore: settingsStore,
             apiKeyStore: apiKeyStore,
+            cloudflareTokenStore: cloudflareTokenStore,
             openAIService: openAIService,
             requestBuilder: requestBuilder,
             transport: transport,
             configurationProvider: configurationProvider,
             fileDownloadService: fileDownloadService,
+            applyCloudflareConfiguration: {
+                let persistedCustomBaseURL = settingsStore.customCloudflareGatewayBaseURL
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                let persistedCustomToken = cloudflareTokenStore.loadAPIKey()?
+                    .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+
+                switch settingsStore.cloudflareGatewayConfigurationMode {
+                case .default:
+                    configurationProvider.cloudflareGatewayBaseURL = defaultGatewayBaseURL
+                    configurationProvider.cloudflareAIGToken = defaultGatewayToken
+                case .custom:
+                    configurationProvider.cloudflareGatewayBaseURL = persistedCustomBaseURL.isEmpty
+                        ? defaultGatewayBaseURL
+                        : persistedCustomBaseURL
+                    configurationProvider.cloudflareAIGToken = persistedCustomToken.isEmpty
+                        ? defaultGatewayToken
+                        : persistedCustomToken
+                }
+
+                configurationProvider.useCloudflareGateway = settingsStore.cloudflareGatewayEnabled
+            },
             appVersionString: currentReleaseVersionString(),
             platformString: "iOS 26.0 · Liquid Glass"
         ),
         settingsValueStore: settingsValueStore,
         apiKeyBackend: apiBackend,
+        cloudflareTokenBackend: cloudflareTokenBackend,
         configurationProvider: configurationProvider,
         transport: transport
     )

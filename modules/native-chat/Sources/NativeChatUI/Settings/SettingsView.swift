@@ -1,11 +1,41 @@
 import ChatPresentation
 import SwiftUI
+import UIKit
+
+enum SettingsFocusedField: Hashable {
+    case apiKey
+}
+
+struct SettingsAPIKeyFieldFramePreferenceKey: PreferenceKey {
+    static let defaultValue: CGRect = .null
+
+    static func reduce(value: inout CGRect, nextValue: () -> CGRect) {
+        let nextFrame = nextValue()
+        if !nextFrame.isNull {
+            value = nextFrame
+        }
+    }
+}
+
+@MainActor
+private enum SettingsKeyboardDismisser {
+    static func dismiss() {
+        UIApplication.shared.sendAction(
+            #selector(UIResponder.resignFirstResponder),
+            to: nil,
+            from: nil,
+            for: nil
+        )
+    }
+}
 
 /// Main settings screen with API key, Cloudflare gateway, chat defaults, appearance, and cache management.
 public struct SettingsView: View {
     @State private var credentials: SettingsCredentialsStore
     @State private var defaults: SettingsDefaultsStore
     @State private var cache: SettingsCacheStore
+    @State private var apiKeyFieldFrame: CGRect = .null
+    @FocusState private var focusedField: SettingsFocusedField?
     private let about: SettingsAboutInfo
 
     /// Creates a settings view backed by the given presenter.
@@ -37,7 +67,11 @@ public struct SettingsView: View {
 
         NavigationStack {
             Form {
-                SettingsAPIConfigurationSection(viewModel: credentials)
+                SettingsAPIConfigurationSection(
+                    viewModel: credentials,
+                    focusedField: $focusedField,
+                    dismissKeyboard: dismissAPIKeyKeyboard
+                )
                 SettingsCloudflareSection(
                     credentials: credentials,
                     defaults: defaults
@@ -71,6 +105,27 @@ public struct SettingsView: View {
                     platformString: about.platformString
                 )
             }
+            .coordinateSpace(name: "settingsForm")
+            .scrollDismissesKeyboard(.interactively)
+            .accessibilityIdentifier("settings.form")
+            .onPreferenceChange(SettingsAPIKeyFieldFramePreferenceKey.self) { apiKeyFieldFrame = $0 }
+            .simultaneousGesture(
+                SpatialTapGesture().onEnded { value in
+                    guard focusedField == .apiKey,
+                          !apiKeyFieldFrame.contains(value.location)
+                    else {
+                        return
+                    }
+
+                    dismissAPIKeyKeyboard()
+                }
+            )
+            .simultaneousGesture(
+                DragGesture(minimumDistance: 12).onChanged { _ in
+                    guard focusedField == .apiKey else { return }
+                    dismissAPIKeyKeyboard()
+                }
+            )
             .navigationTitle(String(localized: "Settings"))
             .task {
                 await cache.refreshAll()
@@ -85,6 +140,11 @@ public struct SettingsView: View {
 
     private func cacheFooterText(description: String, limit: String) -> String {
         "\(description): \(limit)."
+    }
+
+    private func dismissAPIKeyKeyboard() {
+        focusedField = nil
+        SettingsKeyboardDismisser.dismiss()
     }
 
     private var saveConfirmationBinding: Binding<Bool> {

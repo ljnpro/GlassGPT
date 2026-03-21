@@ -13,7 +13,15 @@ package protocol SettingsCredentialHandler {
     /// Validates the API key against the OpenAI API.
     func validateAPIKey(_ apiKey: String) async -> Bool
     /// Synchronously resolves the Cloudflare gateway health based on local state.
-    func resolveCloudflareHealth(typedAPIKey: String, gatewayEnabled: Bool) -> CloudflareHealthStatus
+    func resolveCloudflareHealth(
+        typedAPIKey: String,
+        gatewayEnabled: Bool,
+        configuration: SettingsCloudflareConfiguration
+    ) -> CloudflareHealthStatus
     /// Performs an async health check against the Cloudflare gateway.
-    func checkCloudflareHealth(typedAPIKey: String, gatewayEnabled: Bool) async -> CloudflareHealthStatus
+    func checkCloudflareHealth(
+        typedAPIKey: String,
+        gatewayEnabled: Bool,
+        configuration: SettingsCloudflareConfiguration
+    ) async -> CloudflareHealthStatus
 }

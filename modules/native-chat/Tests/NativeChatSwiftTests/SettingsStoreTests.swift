@@ -16,6 +16,8 @@ struct SettingsStoreTests {
         #expect(store.appTheme == .system)
         #expect(store.hapticEnabled == true)
         #expect(store.cloudflareGatewayEnabled == false)
+        #expect(store.cloudflareGatewayConfigurationMode == .default)
+        #expect(store.customCloudflareGatewayBaseURL.isEmpty)
     }
 
     @Test func `unsupported effort falls back to selected model default`() {
@@ -43,5 +45,18 @@ struct SettingsStoreTests {
         #expect(configuration.reasoningEffort == .medium)
         #expect(configuration.backgroundModeEnabled == true)
         #expect(configuration.serviceTier == .flex)
+    }
+
+    @Test func `cloudflare custom configuration persists across store reloads`() {
+        let valueStore = InMemorySettingsValueStore()
+        let store = SettingsStore(valueStore: valueStore)
+
+        store.cloudflareGatewayConfigurationMode = .custom
+        store.customCloudflareGatewayBaseURL = "https://gateway.custom.example/v1"
+
+        let reloadedStore = SettingsStore(valueStore: valueStore)
+
+        #expect(reloadedStore.cloudflareGatewayConfigurationMode == .custom)
+        #expect(reloadedStore.customCloudflareGatewayBaseURL == "https://gateway.custom.example/v1")
     }
 }
