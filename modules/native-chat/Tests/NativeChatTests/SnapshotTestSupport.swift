@@ -19,7 +19,6 @@ enum SnapshotTestThemeVariant: CaseIterable {
     case phoneDark
     case padLight
     case padDark
-
     var appTheme: AppTheme {
         switch self {
         case .phoneLight, .padLight:
@@ -63,7 +62,6 @@ enum SnapshotTestThemeVariant: CaseIterable {
             $0.displayScale = 3
             $0.userInterfaceStyle = style
         })
-
         return ViewImageConfig(
             safeArea: UIEdgeInsets(top: 59, left: 0, bottom: 34, right: 0),
             size: CGSize(width: 393, height: 852),
@@ -79,7 +77,6 @@ enum SnapshotTestThemeVariant: CaseIterable {
             $0.displayScale = 2
             $0.userInterfaceStyle = style
         })
-
         return ViewImageConfig(
             safeArea: UIEdgeInsets(top: 24, left: 0, bottom: 20, right: 0),
             size: CGSize(width: 1024, height: 1366),
@@ -89,7 +86,6 @@ enum SnapshotTestThemeVariant: CaseIterable {
 }
 
 private let snapshotAppVersionString = "9.9.9 (99999)"
-
 @MainActor
 func assertViewSnapshots(
     named baseName: String,
@@ -109,12 +105,9 @@ func assertViewSnapshots(
                 UserDefaults.standard.removeObject(forKey: SettingsStore.Keys.appTheme)
             }
         }
-
         UserDefaults.standard.set(variant.appTheme.rawValue, forKey: SettingsStore.Keys.appTheme)
-
         let hostedView = makeView()
             .preferredColorScheme(variant.appTheme.colorScheme)
-
         let controller = UIHostingController(rootView: hostedView)
         let canvasSize = variant.imageConfig.size ?? CGSize(width: 1, height: 1)
         controller.loadViewIfNeeded()
@@ -124,11 +117,9 @@ func assertViewSnapshots(
         controller.view.frame = CGRect(origin: .zero, size: canvasSize)
         controller.view.setNeedsLayout()
         controller.view.layoutIfNeeded()
-
         if delay > 0 {
             pumpMainRunLoop(for: delay)
         }
-
         assertSnapshot(
             of: controller,
             as: .image(on: variant.imageConfig),
@@ -148,14 +139,12 @@ func makeSnapshotChatScreenStore(hasAPIKey: Bool = false) throws -> ChatControll
     settingsValueStore.set(AppTheme.light.rawValue, forKey: SettingsStore.Keys.appTheme)
     settingsValueStore.set(false, forKey: SettingsStore.Keys.defaultBackgroundModeEnabled)
     settingsValueStore.set(false, forKey: SettingsStore.Keys.cloudflareGatewayEnabled)
-
     let apiBackend = InMemoryAPIKeyBackend()
     apiBackend.storedKey = hasAPIKey ? "sk-snapshot" : nil
     let settingsStore = SettingsStore(valueStore: settingsValueStore)
     let apiKeyStore = PersistedAPIKeyStore(backend: apiBackend)
     let configurationProvider = RuntimeTestOpenAIConfigurationProvider()
     let transport = StubOpenAITransport()
-
     return ChatController(
         modelContext: context,
         settingsStore: settingsStore,
@@ -175,7 +164,6 @@ func makeConversationSamples(in viewModel: ChatController) -> Conversation {
         backgroundModeEnabled: false,
         serviceTierRawValue: ServiceTier.standard.rawValue
     )
-
     let userMessage = Message(
         role: .user,
         content: "Can you prepare a zero-diff refactor release plan?"
@@ -201,11 +189,9 @@ func makeConversationSamples(in viewModel: ChatController) -> Conversation {
             )
         ]
     )
-
     conversation.messages = [userMessage, assistantMessage]
     userMessage.conversation = conversation
     assistantMessage.conversation = conversation
-
     viewModel.currentConversation = conversation
     viewModel.messages = [userMessage, assistantMessage]
     return conversation
@@ -240,7 +226,6 @@ func makeSettingsSnapshotViewModel() -> SettingsPresenter {
     settingsValueStore.set(AppTheme.light.rawValue, forKey: SettingsStore.Keys.appTheme)
     settingsValueStore.set(true, forKey: SettingsStore.Keys.hapticEnabled)
     settingsValueStore.set(false, forKey: SettingsStore.Keys.cloudflareGatewayEnabled)
-
     let apiBackend = InMemoryAPIKeyBackend()
     let settingsStore = SettingsStore(valueStore: settingsValueStore)
     let apiKeyStore = PersistedAPIKeyStore(backend: apiBackend)
@@ -256,7 +241,6 @@ func makeSettingsSnapshotViewModel() -> SettingsPresenter {
         streamClient: QueuedOpenAIStreamClient(scriptedStreams: []),
         transport: transport
     )
-
     return makeSettingsPresenter(
         settingsStore: settingsStore,
         apiKeyStore: apiKeyStore,
@@ -271,7 +255,6 @@ func makeSettingsSnapshotViewModel() -> SettingsPresenter {
                 .trimmingCharacters(in: .whitespacesAndNewlines)
             let persistedCustomToken = cloudflareTokenStore.loadAPIKey()?
                 .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-
             switch settingsStore.cloudflareGatewayConfigurationMode {
             case .default:
                 configurationProvider.cloudflareGatewayBaseURL = defaultGatewayBaseURL
@@ -284,7 +267,6 @@ func makeSettingsSnapshotViewModel() -> SettingsPresenter {
                     ? defaultGatewayToken
                     : persistedCustomToken
             }
-
             configurationProvider.useCloudflareGateway = settingsStore.cloudflareGatewayEnabled
         },
         appVersionString: snapshotAppVersionString,
@@ -296,7 +278,6 @@ func makeSettingsSnapshotViewModel() -> SettingsPresenter {
 func makeHistorySnapshotContainer() throws -> ModelContainer {
     let container = try makeInMemoryModelContainer()
     let context = ModelContext(container)
-
     for offset in 0 ..< 4 {
         let conversation = Conversation(
             title: "Conversation \(offset + 1)",
@@ -316,7 +297,6 @@ func makeHistorySnapshotContainer() throws -> ModelContainer {
         context.insert(conversation)
         context.insert(message)
     }
-
     try context.save()
     return container
 }
@@ -353,10 +333,8 @@ func makeSnapshotImageFile() throws -> URL {
     let image = renderer.image { context in
         UIColor.systemIndigo.setFill()
         context.fill(CGRect(x: 0, y: 0, width: 1200, height: 900))
-
         UIColor.white.setFill()
         context.fill(CGRect(x: 80, y: 120, width: 1040, height: 620))
-
         let title = "Generated Chart" as NSString
         let attributes: [NSAttributedString.Key: Any] = [
             .font: UIFont.systemFont(ofSize: 72, weight: .bold),
@@ -364,11 +342,9 @@ func makeSnapshotImageFile() throws -> URL {
         ]
         title.draw(at: CGPoint(x: 120, y: 180), withAttributes: attributes)
     }
-
     guard let data = image.pngData() else {
         throw NativeChatTestError.saveFailed
     }
-
     let url = FileManager.default.temporaryDirectory
         .appendingPathComponent("snapshot-preview-image.png")
     try data.write(to: url, options: .atomic)
@@ -381,14 +357,12 @@ func makeSnapshotPDFFile() throws -> URL {
     let renderer = UIGraphicsPDFRenderer(bounds: bounds)
     let data = renderer.pdfData { context in
         context.beginPage()
-
         let title = "Quarterly Report" as NSString
         let titleAttributes: [NSAttributedString.Key: Any] = [
             .font: UIFont.systemFont(ofSize: 28, weight: .bold),
             .foregroundColor: UIColor.black
         ]
         title.draw(at: CGPoint(x: 48, y: 52), withAttributes: titleAttributes)
-
         let body = "The release completed successfully and all zero-diff parity checks passed." as NSString
         let bodyAttributes: [NSAttributedString.Key: Any] = [
             .font: UIFont.systemFont(ofSize: 18, weight: .regular),
@@ -399,7 +373,6 @@ func makeSnapshotPDFFile() throws -> URL {
             withAttributes: bodyAttributes
         )
     }
-
     let url = FileManager.default.temporaryDirectory
         .appendingPathComponent("snapshot-preview-document.pdf")
     try data.write(to: url, options: .atomic)

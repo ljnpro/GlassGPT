@@ -12,9 +12,8 @@ struct StreamTerminalEvaluatorEdgeCaseTests {
 
     @Test func `completed takes precedence over recovery ID`() {
         let action = StreamTerminalEvaluator.evaluate(
-            StreamTerminalOutcome(
+            makeStreamTerminalOutcome(
                 didComplete: true,
-                connectionLost: false,
                 pendingRecoveryResponseID: "resp_pending",
                 stateResponseID: "resp_state",
                 pendingError: "should be ignored",
@@ -30,15 +29,9 @@ struct StreamTerminalEvaluatorEdgeCaseTests {
 
     @Test func `completed takes precedence over connection loss`() {
         let action = StreamTerminalEvaluator.evaluate(
-            StreamTerminalOutcome(
+            makeStreamTerminalOutcome(
                 didComplete: true,
                 connectionLost: true,
-                pendingRecoveryResponseID: nil,
-                stateResponseID: nil,
-                pendingError: nil,
-                hasBufferContent: false,
-                lastSequenceNumber: nil,
-                usesBackgroundMode: false,
                 canRetryConnection: true
             )
         )
@@ -50,16 +43,10 @@ struct StreamTerminalEvaluatorEdgeCaseTests {
 
     @Test func `recover uses pending recovery ID over state ID`() {
         let action = StreamTerminalEvaluator.evaluate(
-            StreamTerminalOutcome(
-                didComplete: false,
-                connectionLost: false,
+            makeStreamTerminalOutcome(
                 pendingRecoveryResponseID: "resp_pending",
                 stateResponseID: "resp_state",
-                pendingError: nil,
-                hasBufferContent: false,
-                lastSequenceNumber: 5,
-                usesBackgroundMode: false,
-                canRetryConnection: false
+                lastSequenceNumber: 5
             )
         )
 
@@ -74,16 +61,9 @@ struct StreamTerminalEvaluatorEdgeCaseTests {
 
     @Test func `recover falls back to state ID when pending is nil`() {
         let action = StreamTerminalEvaluator.evaluate(
-            StreamTerminalOutcome(
-                didComplete: false,
-                connectionLost: false,
-                pendingRecoveryResponseID: nil,
+            makeStreamTerminalOutcome(
                 stateResponseID: "resp_state_only",
-                pendingError: nil,
-                hasBufferContent: false,
-                lastSequenceNumber: nil,
-                usesBackgroundMode: true,
-                canRetryConnection: false
+                usesBackgroundMode: true
             )
         )
 
@@ -98,15 +78,10 @@ struct StreamTerminalEvaluatorEdgeCaseTests {
 
     @Test func `recover passes nil sequence number`() {
         let action = StreamTerminalEvaluator.evaluate(
-            StreamTerminalOutcome(
-                didComplete: false,
+            makeStreamTerminalOutcome(
                 connectionLost: true,
                 pendingRecoveryResponseID: "resp_123",
-                stateResponseID: nil,
-                pendingError: nil,
                 hasBufferContent: true,
-                lastSequenceNumber: nil,
-                usesBackgroundMode: false,
                 canRetryConnection: true
             )
         )
@@ -122,13 +97,9 @@ struct StreamTerminalEvaluatorEdgeCaseTests {
 
     @Test func `recover takes precedence over retry connection`() {
         let action = StreamTerminalEvaluator.evaluate(
-            StreamTerminalOutcome(
-                didComplete: false,
+            makeStreamTerminalOutcome(
                 connectionLost: true,
                 pendingRecoveryResponseID: "resp_abc",
-                stateResponseID: nil,
-                pendingError: nil,
-                hasBufferContent: false,
                 lastSequenceNumber: 7,
                 usesBackgroundMode: true,
                 canRetryConnection: true
@@ -148,17 +119,7 @@ struct StreamTerminalEvaluatorEdgeCaseTests {
 
     @Test func `retry connection requires both connection lost and can retry`() {
         let action = StreamTerminalEvaluator.evaluate(
-            StreamTerminalOutcome(
-                didComplete: false,
-                connectionLost: true,
-                pendingRecoveryResponseID: nil,
-                stateResponseID: nil,
-                pendingError: nil,
-                hasBufferContent: false,
-                lastSequenceNumber: nil,
-                usesBackgroundMode: false,
-                canRetryConnection: true
-            )
+            makeStreamTerminalOutcome(connectionLost: true, canRetryConnection: true)
         )
 
         #expect(action == .retryConnection)
@@ -166,17 +127,7 @@ struct StreamTerminalEvaluatorEdgeCaseTests {
 
     @Test func `connection lost without can retry skips to partial or remove`() {
         let action = StreamTerminalEvaluator.evaluate(
-            StreamTerminalOutcome(
-                didComplete: false,
-                connectionLost: true,
-                pendingRecoveryResponseID: nil,
-                stateResponseID: nil,
-                pendingError: nil,
-                hasBufferContent: true,
-                lastSequenceNumber: nil,
-                usesBackgroundMode: false,
-                canRetryConnection: false
-            )
+            makeStreamTerminalOutcome(connectionLost: true, hasBufferContent: true)
         )
 
         #expect(action == .finalizePartial)
@@ -184,17 +135,7 @@ struct StreamTerminalEvaluatorEdgeCaseTests {
 
     @Test func `can retry without connection lost skips to partial or remove`() {
         let action = StreamTerminalEvaluator.evaluate(
-            StreamTerminalOutcome(
-                didComplete: false,
-                connectionLost: false,
-                pendingRecoveryResponseID: nil,
-                stateResponseID: nil,
-                pendingError: nil,
-                hasBufferContent: true,
-                lastSequenceNumber: nil,
-                usesBackgroundMode: false,
-                canRetryConnection: true
-            )
+            makeStreamTerminalOutcome(hasBufferContent: true, canRetryConnection: true)
         )
 
         #expect(action == .finalizePartial)
@@ -204,17 +145,7 @@ struct StreamTerminalEvaluatorEdgeCaseTests {
 
     @Test func `finalize partial when buffer has content`() {
         let action = StreamTerminalEvaluator.evaluate(
-            StreamTerminalOutcome(
-                didComplete: false,
-                connectionLost: false,
-                pendingRecoveryResponseID: nil,
-                stateResponseID: nil,
-                pendingError: "some error",
-                hasBufferContent: true,
-                lastSequenceNumber: nil,
-                usesBackgroundMode: false,
-                canRetryConnection: false
-            )
+            makeStreamTerminalOutcome(pendingError: "some error", hasBufferContent: true)
         )
 
         #expect(action == .finalizePartial)
@@ -224,17 +155,7 @@ struct StreamTerminalEvaluatorEdgeCaseTests {
 
     @Test func `remove empty message with pending error`() {
         let action = StreamTerminalEvaluator.evaluate(
-            StreamTerminalOutcome(
-                didComplete: false,
-                connectionLost: false,
-                pendingRecoveryResponseID: nil,
-                stateResponseID: nil,
-                pendingError: "Rate limit exceeded",
-                hasBufferContent: false,
-                lastSequenceNumber: nil,
-                usesBackgroundMode: false,
-                canRetryConnection: false
-            )
+            makeStreamTerminalOutcome(pendingError: "Rate limit exceeded")
         )
 
         #expect(action == .removeEmptyMessage(errorMessage: "Rate limit exceeded"))
@@ -242,17 +163,7 @@ struct StreamTerminalEvaluatorEdgeCaseTests {
 
     @Test func `remove empty message with connection lost fallback`() {
         let action = StreamTerminalEvaluator.evaluate(
-            StreamTerminalOutcome(
-                didComplete: false,
-                connectionLost: true,
-                pendingRecoveryResponseID: nil,
-                stateResponseID: nil,
-                pendingError: nil,
-                hasBufferContent: false,
-                lastSequenceNumber: nil,
-                usesBackgroundMode: false,
-                canRetryConnection: false
-            )
+            makeStreamTerminalOutcome(connectionLost: true)
         )
 
         #expect(
@@ -263,38 +174,43 @@ struct StreamTerminalEvaluatorEdgeCaseTests {
     }
 
     @Test func `remove empty message with nil error when not connection lost`() {
-        let action = StreamTerminalEvaluator.evaluate(
-            StreamTerminalOutcome(
-                didComplete: false,
-                connectionLost: false,
-                pendingRecoveryResponseID: nil,
-                stateResponseID: nil,
-                pendingError: nil,
-                hasBufferContent: false,
-                lastSequenceNumber: nil,
-                usesBackgroundMode: false,
-                canRetryConnection: false
-            )
-        )
+        let action = StreamTerminalEvaluator.evaluate(makeStreamTerminalOutcome())
 
         #expect(action == .removeEmptyMessage(errorMessage: nil))
     }
 
     @Test func `pending error takes precedence over connection lost fallback`() {
         let action = StreamTerminalEvaluator.evaluate(
-            StreamTerminalOutcome(
-                didComplete: false,
+            makeStreamTerminalOutcome(
                 connectionLost: true,
-                pendingRecoveryResponseID: nil,
-                stateResponseID: nil,
-                pendingError: "Server error 500",
-                hasBufferContent: false,
-                lastSequenceNumber: nil,
-                usesBackgroundMode: false,
-                canRetryConnection: false
+                pendingError: "Server error 500"
             )
         )
 
         #expect(action == .removeEmptyMessage(errorMessage: "Server error 500"))
     }
+}
+
+private func makeStreamTerminalOutcome(
+    didComplete: Bool = false,
+    connectionLost: Bool = false,
+    pendingRecoveryResponseID: String? = nil,
+    stateResponseID: String? = nil,
+    pendingError: String? = nil,
+    hasBufferContent: Bool = false,
+    lastSequenceNumber: Int? = nil,
+    usesBackgroundMode: Bool = false,
+    canRetryConnection: Bool = false
+) -> StreamTerminalOutcome {
+    StreamTerminalOutcome(
+        didComplete: didComplete,
+        connectionLost: connectionLost,
+        pendingRecoveryResponseID: pendingRecoveryResponseID,
+        stateResponseID: stateResponseID,
+        pendingError: pendingError,
+        hasBufferContent: hasBufferContent,
+        lastSequenceNumber: lastSequenceNumber,
+        usesBackgroundMode: usesBackgroundMode,
+        canRetryConnection: canRetryConnection
+    )
 }

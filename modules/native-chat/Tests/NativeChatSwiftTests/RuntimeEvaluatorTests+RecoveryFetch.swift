@@ -1,3 +1,4 @@
+import ChatDomain
 import ChatRuntimeWorkflows
 import Foundation
 import OpenAITransport
@@ -28,18 +29,8 @@ struct RecoveryFetchEvaluatorEdgeCaseTests {
     // MARK: - Nil Result Path
 
     @Test func `poll when result is nil`() {
-        // This exercises the guard-else path where fetchResult is nil
-        // but fetchError is also nil (defensive edge case).
         let outcome = RecoveryFetchOutcome(
-            result: OpenAIResponseFetchResult(
-                status: .queued,
-                text: "",
-                thinking: nil,
-                annotations: [],
-                toolCalls: [],
-                filePathAnnotations: [],
-                errorMessage: nil
-            ),
+            result: makeRecoveryFetchResult(status: .queued),
             preferStreamingResume: false,
             usedBackgroundMode: false,
             lastSequenceNumber: nil
@@ -57,19 +48,13 @@ struct RecoveryFetchEvaluatorEdgeCaseTests {
     // MARK: - Completed Status
 
     @Test func `finish with no error for completed response`() {
-        let result = OpenAIResponseFetchResult(
-            status: .completed,
-            text: "Full response text",
-            thinking: "Some reasoning",
-            annotations: [],
-            toolCalls: [],
-            filePathAnnotations: [],
-            errorMessage: nil
-        )
-
         let action = RecoveryFetchEvaluator.evaluate(
             RecoveryFetchOutcome(
-                result: result,
+                result: makeRecoveryFetchResult(
+                    status: .completed,
+                    text: "Full response text",
+                    thinking: "Some reasoning"
+                ),
                 preferStreamingResume: false,
                 usedBackgroundMode: false,
                 lastSequenceNumber: nil
@@ -88,19 +73,12 @@ struct RecoveryFetchEvaluatorEdgeCaseTests {
     // MARK: - Failed Status
 
     @Test func `finish with error for failed response`() {
-        let result = OpenAIResponseFetchResult(
-            status: .failed,
-            text: "",
-            thinking: nil,
-            annotations: [],
-            toolCalls: [],
-            filePathAnnotations: [],
-            errorMessage: "Rate limit exceeded"
-        )
-
         let action = RecoveryFetchEvaluator.evaluate(
             RecoveryFetchOutcome(
-                result: result,
+                result: makeRecoveryFetchResult(
+                    status: .failed,
+                    errorMessage: "Rate limit exceeded"
+                ),
                 preferStreamingResume: true,
                 usedBackgroundMode: true,
                 lastSequenceNumber: 5
@@ -117,19 +95,9 @@ struct RecoveryFetchEvaluatorEdgeCaseTests {
     }
 
     @Test func `finish with fallback error for incomplete response`() {
-        let result = OpenAIResponseFetchResult(
-            status: .incomplete,
-            text: "partial",
-            thinking: nil,
-            annotations: [],
-            toolCalls: [],
-            filePathAnnotations: [],
-            errorMessage: nil
-        )
-
         let action = RecoveryFetchEvaluator.evaluate(
             RecoveryFetchOutcome(
-                result: result,
+                result: makeRecoveryFetchResult(status: .incomplete, text: "partial"),
                 preferStreamingResume: false,
                 usedBackgroundMode: false,
                 lastSequenceNumber: nil
@@ -147,19 +115,9 @@ struct RecoveryFetchEvaluatorEdgeCaseTests {
     // MARK: - InProgress with Streaming Resume
 
     @Test func `start stream when in progress with streaming resume`() {
-        let result = OpenAIResponseFetchResult(
-            status: .inProgress,
-            text: "",
-            thinking: nil,
-            annotations: [],
-            toolCalls: [],
-            filePathAnnotations: [],
-            errorMessage: nil
-        )
-
         let action = RecoveryFetchEvaluator.evaluate(
             RecoveryFetchOutcome(
-                result: result,
+                result: makeRecoveryFetchResult(status: .inProgress),
                 preferStreamingResume: true,
                 usedBackgroundMode: true,
                 lastSequenceNumber: 42
@@ -175,19 +133,9 @@ struct RecoveryFetchEvaluatorEdgeCaseTests {
     }
 
     @Test func `poll when in progress without streaming resume`() {
-        let result = OpenAIResponseFetchResult(
-            status: .inProgress,
-            text: "",
-            thinking: nil,
-            annotations: [],
-            toolCalls: [],
-            filePathAnnotations: [],
-            errorMessage: nil
-        )
-
         let action = RecoveryFetchEvaluator.evaluate(
             RecoveryFetchOutcome(
-                result: result,
+                result: makeRecoveryFetchResult(status: .inProgress),
                 preferStreamingResume: false,
                 usedBackgroundMode: false,
                 lastSequenceNumber: nil
@@ -203,19 +151,9 @@ struct RecoveryFetchEvaluatorEdgeCaseTests {
     }
 
     @Test func `poll when in progress with resume pref but no background mode`() {
-        let result = OpenAIResponseFetchResult(
-            status: .inProgress,
-            text: "",
-            thinking: nil,
-            annotations: [],
-            toolCalls: [],
-            filePathAnnotations: [],
-            errorMessage: nil
-        )
-
         let action = RecoveryFetchEvaluator.evaluate(
             RecoveryFetchOutcome(
-                result: result,
+                result: makeRecoveryFetchResult(status: .inProgress),
                 preferStreamingResume: true,
                 usedBackgroundMode: false,
                 lastSequenceNumber: 10
@@ -231,19 +169,9 @@ struct RecoveryFetchEvaluatorEdgeCaseTests {
     }
 
     @Test func `poll when in progress with resume pref but no sequence number`() {
-        let result = OpenAIResponseFetchResult(
-            status: .inProgress,
-            text: "",
-            thinking: nil,
-            annotations: [],
-            toolCalls: [],
-            filePathAnnotations: [],
-            errorMessage: nil
-        )
-
         let action = RecoveryFetchEvaluator.evaluate(
             RecoveryFetchOutcome(
-                result: result,
+                result: makeRecoveryFetchResult(status: .inProgress),
                 preferStreamingResume: true,
                 usedBackgroundMode: true,
                 lastSequenceNumber: nil
@@ -261,19 +189,9 @@ struct RecoveryFetchEvaluatorEdgeCaseTests {
     // MARK: - Queued Status
 
     @Test func `poll for queued response without background mode`() {
-        let result = OpenAIResponseFetchResult(
-            status: .queued,
-            text: "",
-            thinking: nil,
-            annotations: [],
-            toolCalls: [],
-            filePathAnnotations: [],
-            errorMessage: nil
-        )
-
         let action = RecoveryFetchEvaluator.evaluate(
             RecoveryFetchOutcome(
-                result: result,
+                result: makeRecoveryFetchResult(status: .queued),
                 preferStreamingResume: false,
                 usedBackgroundMode: false,
                 lastSequenceNumber: nil
@@ -291,19 +209,12 @@ struct RecoveryFetchEvaluatorEdgeCaseTests {
     // MARK: - Unknown Status
 
     @Test func `finish for unknown status`() {
-        let result = OpenAIResponseFetchResult(
-            status: .unknown,
-            text: "",
-            thinking: nil,
-            annotations: [],
-            toolCalls: [],
-            filePathAnnotations: [],
-            errorMessage: "Unknown status"
-        )
-
         let action = RecoveryFetchEvaluator.evaluate(
             RecoveryFetchOutcome(
-                result: result,
+                result: makeRecoveryFetchResult(
+                    status: .unknown,
+                    errorMessage: "Unknown status"
+                ),
                 preferStreamingResume: false,
                 usedBackgroundMode: false,
                 lastSequenceNumber: nil
@@ -321,4 +232,24 @@ struct RecoveryFetchEvaluatorEdgeCaseTests {
 
 private enum StubFetchError: Error {
     case networkTimeout
+}
+
+private func makeRecoveryFetchResult(
+    status: OpenAIResponseFetchResult.Status,
+    text: String = "",
+    thinking: String? = nil,
+    annotations: [URLCitation] = [],
+    toolCalls: [ToolCallInfo] = [],
+    filePathAnnotations: [FilePathAnnotation] = [],
+    errorMessage: String? = nil
+) -> OpenAIResponseFetchResult {
+    OpenAIResponseFetchResult(
+        status: status,
+        text: text,
+        thinking: thinking,
+        annotations: annotations,
+        toolCalls: toolCalls,
+        filePathAnnotations: filePathAnnotations,
+        errorMessage: errorMessage
+    )
 }

@@ -138,6 +138,7 @@ let boundaryTargets: [Target] = [
             "NativeChatUI",
         ],
         path: "Sources/NativeChatComposition",
+        resources: [.process("Resources")],
     ),
     .target(
         name: "NativeChat",
@@ -233,6 +234,7 @@ let package = Package(
                 .product(name: "SnapshotTesting", package: "swift-snapshot-testing"),
             ],
             path: "Tests/NativeChatSwiftTests",
+            exclude: ["__Snapshots__"],
         ),
         .testTarget(
             name: "NativeChatTests",

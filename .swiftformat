@@ -3,7 +3,7 @@
 --trimwhitespace always
 --importgrouping testable-bottom
 --trailing-commas never
---disable wrapMultilineStatementBraces
+--disable wrapMultilineStatementBraces,modifierOrder
 --decimalgrouping 3,6
 --header strip
 --ifdef no-indent

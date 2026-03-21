@@ -1,11 +1,32 @@
 import Foundation
 
 package extension MarkdownContentView {
+    private enum CodeBlockParseResult {
+        case block(language: String?, code: String, nextIndex: Int)
+        case fallback(nextIndex: Int)
+    }
+
+    private enum LatexBlockParseResult {
+        case block(content: String, nextIndex: Int)
+        case fallback(prefix: String, nextIndex: Int)
+    }
+
     // MARK: - Parsing
 
     /// First pass: extract code blocks and LaTeX blocks from raw text.
     /// Returns a mix of code/latex blocks and raw text chunks.
     func parseBlocks(_ input: String) -> [BlockPart] {
+        let firstPass = parsePrimaryBlocks(input)
+        guard !firstPass.isEmpty else {
+            return [.richText(id: 0, segments: [.text(input)])]
+        }
+
+        let finalParts = expandRichTextParts(firstPass)
+        let result = reindexBlockParts(finalParts)
+        return result.isEmpty ? [.richText(id: 0, segments: [.text(input)])] : result
+    }
+
+    private func parsePrimaryBlocks(_ input: String) -> [BlockPart] {
         var firstPass: [BlockPart] = []
         var inlineBuffer = ""
         let chars = Array(input)
@@ -27,89 +48,45 @@ package extension MarkdownContentView {
         }
 
         while index < count {
-            if index + 2 < count, chars[index] == "`", chars[index + 1] == "`", chars[index + 2] == "`" {
+            if let parsed = consumeCodeBlock(chars, index: index, count: count) {
                 flushInline()
-                let start = index + 3
-                var langEnd = start
-                while langEnd < count, chars[langEnd] != "\n" {
-                    langEnd += 1
-                }
-
-                let lang = String(chars[start ..< langEnd]).trimmingCharacters(in: .whitespaces)
-                let codeStart = min(langEnd + 1, count)
-
-                var codeEnd = codeStart
-                var found = false
-                while codeEnd + 2 < count {
-                    if chars[codeEnd] == "`", chars[codeEnd + 1] == "`", chars[codeEnd + 2] == "`" {
-                        found = true
-                        break
-                    }
-                    codeEnd += 1
-                }
-
-                if found {
-                    let code = String(chars[codeStart ..< codeEnd])
-                    firstPass.append(.codeBlock(id: makeID(), language: lang.isEmpty ? nil : lang, code: code))
-                    index = codeEnd + 3
-                    if index < count, chars[index] == "\n" {
-                        index += 1
-                    }
-                } else {
+                switch parsed {
+                case let .block(language, code, nextIndex):
+                    firstPass.append(.codeBlock(id: makeID(), language: language, code: code))
+                    index = nextIndex
+                case let .fallback(nextIndex):
                     inlineBuffer += "```"
-                    index = start
+                    index = nextIndex
                 }
                 continue
             }
 
-            if index + 1 < count, chars[index] == "\\", chars[index + 1] == "[" {
+            if let parsed = consumeEscapedLatexBlock(chars, index: index, count: count) {
                 flushInline()
-                let start = index + 2
-                var end = start
-                var found = false
-                while end + 1 < count {
-                    if chars[end] == "\\", chars[end + 1] == "]" {
-                        found = true
-                        break
+                switch parsed {
+                case let .block(content, nextIndex):
+                    if !content.isEmpty {
+                        firstPass.append(.latexBlock(id: makeID(), content: content))
                     }
-                    end += 1
-                }
-
-                if found {
-                    let latex = String(chars[start ..< end]).trimmingCharacters(in: .whitespacesAndNewlines)
-                    if !latex.isEmpty {
-                        firstPass.append(.latexBlock(id: makeID(), content: latex))
-                    }
-                    index = end + 2
-                } else {
-                    inlineBuffer.append("\\[")
-                    index = start
+                    index = nextIndex
+                case let .fallback(prefix, nextIndex):
+                    inlineBuffer.append(prefix)
+                    index = nextIndex
                 }
                 continue
             }
 
-            if index + 1 < count, chars[index] == "$", chars[index + 1] == "$" {
+            if let parsed = consumeDollarLatexBlock(chars, index: index, count: count) {
                 flushInline()
-                let start = index + 2
-                var end = start
-                var found = false
-                while end + 1 < count {
-                    if chars[end] == "$", chars[end + 1] == "$" {
-                        found = true
-                        break
+                switch parsed {
+                case let .block(content, nextIndex):
+                    if !content.isEmpty {
+                        firstPass.append(.latexBlock(id: makeID(), content: content))
                     }
-                    end += 1
-                }
-
-                if found {
-                    let latex = String(chars[start ..< end]).trimmingCharacters(in: .whitespacesAndNewlines)
-                    if !latex.isEmpty {
-                        firstPass.append(.latexBlock(id: makeID(), content: latex))
-                    }
-                    index = end + 2
-                } else {
-                    inlineBuffer.append("$$")
-                    index = start
+                    index = nextIndex
+                case let .fallback(prefix, nextIndex):
+                    inlineBuffer.append(prefix)
+                    index = nextIndex
                 }
                 continue
             }
@@ -119,12 +96,108 @@ package extension MarkdownContentView {
         }
 
         flushInline()
+        return firstPass
+    }
 
-        if firstPass.isEmpty {
-            return [.richText(id: 0, segments: [.text(input)])]
+    private func consumeCodeBlock(
+        _ chars: [Character],
+        index: Int,
+        count: Int
+    ) -> CodeBlockParseResult? {
+        guard index + 2 < count, chars[index] == "`", chars[index + 1] == "`", chars[index + 2] == "`" else {
+            return nil
         }
 
+        let start = index + 3
+        var languageEnd = start
+        while languageEnd < count, chars[languageEnd] != "\n" {
+            languageEnd += 1
+        }
+
+        let language = String(chars[start ..< languageEnd]).trimmingCharacters(in: .whitespaces)
+        let codeStart = min(languageEnd + 1, count)
+        var codeEnd = codeStart
+
+        while codeEnd + 2 < count {
+            if chars[codeEnd] == "`", chars[codeEnd + 1] == "`", chars[codeEnd + 2] == "`" {
+                var nextIndex = codeEnd + 3
+                if nextIndex < count, chars[nextIndex] == "\n" {
+                    nextIndex += 1
+                }
+                return .block(
+                    language: language.isEmpty ? nil : language,
+                    code: String(chars[codeStart ..< codeEnd]),
+                    nextIndex: nextIndex
+                )
+            }
+            codeEnd += 1
+        }
+
+        return .fallback(nextIndex: start)
+    }
+
+    private func consumeEscapedLatexBlock(
+        _ chars: [Character],
+        index: Int,
+        count: Int
+    ) -> LatexBlockParseResult? {
+        guard index + 1 < count, chars[index] == "\\", chars[index + 1] == "[" else {
+            return nil
+        }
+
+        let start = index + 2
+        var end = start
+        while end + 1 < count {
+            if chars[end] == "\\", chars[end + 1] == "]" {
+                let content = String(chars[start ..< end]).trimmingCharacters(in: .whitespacesAndNewlines)
+                return .block(content: content, nextIndex: end + 2)
+            }
+            end += 1
+        }
+
+        return .fallback(prefix: "\\[", nextIndex: start)
+    }
+
+    private func consumeDollarLatexBlock(
+        _ chars: [Character],
+        index: Int,
+        count: Int
+    ) -> LatexBlockParseResult? {
+        guard index + 1 < count, chars[index] == "$", chars[index + 1] == "$" else {
+            return nil
+        }
+
+        let start = index + 2
+        var end = start
+        while end + 1 < count {
+            if chars[end] == "$", chars[end + 1] == "$" {
+                let content = String(chars[start ..< end]).trimmingCharacters(in: .whitespacesAndNewlines)
+                return .block(content: content, nextIndex: end + 2)
+            }
+            end += 1
+        }
+
+        return .fallback(prefix: "$$", nextIndex: start)
+    }
+
+    private func expandRichTextParts(_ firstPass: [BlockPart]) -> [BlockPart] {
         var finalParts: [BlockPart] = []
+        var nextID = 0
+
+        func makeID() -> Int {
+            defer { nextID += 1 }
+            return nextID
+        }
+
+        func flushLineBuffer(_ lineBuffer: inout [String]) {
+            let joined = lineBuffer.joined(separator: "\n")
+            if !joined.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                let segs = parseInlineSegments(joined)
+                finalParts.append(.richText(id: makeID(), segments: segs))
+            }
+            lineBuffer = []
+        }
+
         for part in firstPass {
             switch part {
             case let .richText(_, segments):
@@ -138,37 +211,33 @@ package extension MarkdownContentView {
                 let lines = rawText.components(separatedBy: "\n")
                 var lineBuffer: [String] = []
 
-                func flushLineBuffer() {
-                    let joined = lineBuffer.joined(separator: "\n")
-                    if !joined.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                        let segs = parseInlineSegments(joined)
-                        finalParts.append(.richText(id: makeID(), segments: segs))
-                    }
-                    lineBuffer = []
-                }
-
                 for line in lines {
                     let trimmed = line.trimmingCharacters(in: .whitespaces)
                     if let headingMatch = detectHeading(trimmed) {
-                        flushLineBuffer()
+                        flushLineBuffer(&lineBuffer)
                         finalParts.append(.heading(id: makeID(), level: headingMatch.level, text: headingMatch.text))
                     } else if isHorizontalRule(trimmed) {
-                        flushLineBuffer()
+                        flushLineBuffer(&lineBuffer)
                         finalParts.append(.horizontalRule(id: makeID()))
                     } else {
                         lineBuffer.append(line)
                     }
                 }
-                flushLineBuffer()
+                flushLineBuffer(&lineBuffer)
 
             default:
                 finalParts.append(part)
             }
         }
 
+        return finalParts
+    }
+
+    private func reindexBlockParts(_ parts: [BlockPart]) -> [BlockPart] {
         var result: [BlockPart] = []
         var finalID = 0
-        for part in finalParts {
+
+        for part in parts {
             switch part {
             case let .richText(_, segments):
                 result.append(.richText(id: finalID, segments: segments))
@@ -184,6 +253,6 @@ package extension MarkdownContentView {
             finalID += 1
         }
 
-        return result.isEmpty ? [.richText(id: 0, segments: [.text(input)])] : result
+        return result
     }
 }

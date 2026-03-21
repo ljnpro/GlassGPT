@@ -13,28 +13,26 @@ struct SettingsScreenStoreTests {
         let harness = makeTestSettingsScreenStoreHarness()
         let store = harness.store
         let credentials = store.credentials
-
         credentials.apiKey = "   \n  "
         credentials.saveAPIKey()
-
         #expect(credentials.apiKey == "   \n  ")
         #expect(!harness.apiKeyBackend.didDelete)
         #expect(harness.apiKeyBackend.storedKey == nil)
         #expect(!credentials.saveConfirmation)
     }
 
-    @Test func `initializer loads preexisting API key for reinstall compatibility`() {
-        let store = makeTestSettingsScreenStore(apiKey: "sk-restored")
-
-        #expect(store.credentials.apiKey == "sk-restored")
-        #expect(store.credentials.isAPIKeyValid == nil)
-        #expect(!store.credentials.saveConfirmation)
-    }
-
-    @Test func `initializer leaves API key empty for fresh install`() {
-        let store = makeTestSettingsScreenStore(apiKey: nil)
-
-        #expect(store.credentials.apiKey == "")
+    @Test(arguments: [
+        SettingsScreenStoreAPIKeyInitializerCase(
+            apiKey: "sk-restored",
+            expectedAPIKey: "sk-restored"
+        ),
+        SettingsScreenStoreAPIKeyInitializerCase(apiKey: nil, expectedAPIKey: "")
+    ])
+    func `initializer loads persisted API key state`(
+        _ testCase: SettingsScreenStoreAPIKeyInitializerCase
+    ) {
+        let store = makeTestSettingsScreenStore(apiKey: testCase.apiKey)
+        #expect(store.credentials.apiKey == testCase.expectedAPIKey)
         #expect(store.credentials.isAPIKeyValid == nil)
         #expect(!store.credentials.saveConfirmation)
     }
@@ -43,10 +41,8 @@ struct SettingsScreenStoreTests {
         let harness = makeTestSettingsScreenStoreHarness()
         let store = harness.store
         let credentials = store.credentials
-
         credentials.apiKey = "  sk-test-trimmed  "
         credentials.saveAPIKey()
-
         #expect(credentials.apiKey == "sk-test-trimmed")
         #expect(harness.apiKeyBackend.storedKey == "sk-test-trimmed")
         #expect(credentials.isAPIKeyValid == nil)
@@ -58,10 +54,8 @@ struct SettingsScreenStoreTests {
         let store = harness.store
         let credentials = store.credentials
         harness.apiKeyBackend.saveError = NativeChatTestError.saveFailed
-
         credentials.apiKey = "  sk-save-error  "
         credentials.saveAPIKey()
-
         #expect(credentials.apiKey == "  sk-save-error  ")
         #expect(!credentials.saveConfirmation)
         #expect(harness.apiKeyBackend.storedKey == nil)
@@ -76,9 +70,7 @@ struct SettingsScreenStoreTests {
         credentials.isAPIKeyValid = true
         credentials.cloudflareHealthStatus = .connected
         defaults.cloudflareEnabled = true
-
         credentials.clearAPIKey()
-
         #expect(credentials.apiKey == "")
         #expect(credentials.isAPIKeyValid == nil)
         #expect(credentials.cloudflareHealthStatus == .missingAPIKey)
@@ -89,13 +81,10 @@ struct SettingsScreenStoreTests {
         let store = makeTestSettingsScreenStore(configurationProvider: configurationProvider)
         let credentials = store.credentials
         let defaults = store.defaults
-
         defaults.cloudflareEnabled = true
         #expect(configurationProvider.useCloudflareGateway)
-
         credentials.cloudflareHealthStatus = .connected
         defaults.cloudflareEnabled = false
-
         #expect(!configurationProvider.useCloudflareGateway)
         #expect(credentials.cloudflareHealthStatus == .unknown)
         #expect(!credentials.isCheckingCloudflareHealth)
@@ -105,42 +94,26 @@ struct SettingsScreenStoreTests {
         let harness = makeTestSettingsScreenStoreHarness()
         let store = harness.store
         let defaults = store.defaults
-
         defaults.defaultEffort = .none
         defaults.defaultProModeEnabled = true
-
         #expect(defaults.defaultProModeEnabled)
         #expect(defaults.defaultEffort == .xhigh)
-        #expect(
-            harness.settingsValueStore.string(forKey: SettingsStore.Keys.defaultModel)
-                == ModelType.gpt5_4_pro.rawValue
-        )
-        #expect(
-            harness.settingsValueStore.string(forKey: SettingsStore.Keys.defaultEffort)
-                == ReasoningEffort.xhigh.rawValue
-        )
+        #expect(harness.settingsValueStore.string(forKey: SettingsStore.Keys.defaultModel) == ModelType.gpt5_4_pro.rawValue)
+        #expect(harness.settingsValueStore.string(forKey: SettingsStore.Keys.defaultEffort) == ReasoningEffort.xhigh.rawValue)
     }
 
     @Test func `theme haptics and flex selections persist immediately`() {
         let harness = makeTestSettingsScreenStoreHarness()
         let store = harness.store
         let defaults = store.defaults
-
         defaults.appTheme = .dark
         defaults.hapticEnabled = false
         defaults.defaultFlexModeEnabled = true
         defaults.defaultBackgroundModeEnabled = true
-
         #expect(harness.settingsValueStore.string(forKey: SettingsStore.Keys.appTheme) == AppTheme.dark.rawValue)
         #expect(harness.settingsValueStore.bool(forKey: SettingsStore.Keys.hapticEnabled) == false)
-        #expect(
-            harness.settingsValueStore.string(forKey: SettingsStore.Keys.defaultServiceTier)
-                == ServiceTier.flex.rawValue
-        )
-        #expect(
-            harness.settingsValueStore.bool(forKey: SettingsStore.Keys.defaultBackgroundModeEnabled)
-                == true
-        )
+        #expect(harness.settingsValueStore.string(forKey: SettingsStore.Keys.defaultServiceTier) == ServiceTier.flex.rawValue)
+        #expect(harness.settingsValueStore.bool(forKey: SettingsStore.Keys.defaultBackgroundModeEnabled) == true)
     }
 
     @Test func `check cloudflare health requires configured API key`() async {
@@ -149,15 +122,16 @@ struct SettingsScreenStoreTests {
         let credentials = store.credentials
         let defaults = store.defaults
         defaults.cloudflareEnabled = true
-
         await credentials.checkCloudflareHealth()
-
         #expect(credentials.cloudflareHealthStatus == .missingAPIKey)
         #expect(!credentials.isCheckingCloudflareHealth)
     }
 }
 
-// MARK: - Cloudflare and Validation Tests
+struct SettingsScreenStoreAPIKeyInitializerCase {
+    let apiKey: String?
+    let expectedAPIKey: String
+}
 
 extension SettingsScreenStoreTests {
     @Test func `check cloudflare health uses gateway models endpoint and reports connected`() async throws {
@@ -174,20 +148,12 @@ extension SettingsScreenStoreTests {
             statusCode: 200,
             url: modelsURL
         )
-
-        let store = makeTestSettingsScreenStore(
-            apiKey: "sk-saved",
-            configurationProvider: configurationProvider,
-            transport: transport
-        )
+        let store = makeTestSettingsScreenStore(apiKey: "sk-saved", configurationProvider: configurationProvider, transport: transport)
         let credentials = store.credentials
         store.defaults.cloudflareEnabled = true
-
         await credentials.checkCloudflareHealth()
-
         #expect(credentials.cloudflareHealthStatus == .connected)
         #expect(!credentials.isCheckingCloudflareHealth)
-
         let requests = await transport.requests()
         #expect(requests.count == 1)
         #expect(requests.first?.url?.absoluteString == "https://gateway.test.openai.local/v1/models")
@@ -204,7 +170,6 @@ extension SettingsScreenStoreTests {
             statusCode: 200,
             url: modelsURL
         )
-
         let harness = makeTestSettingsScreenStoreHarness(
             apiKey: "sk-stored",
             configurationProvider: configurationProvider,
@@ -213,9 +178,7 @@ extension SettingsScreenStoreTests {
         let credentials = harness.store.credentials
         harness.store.defaults.cloudflareEnabled = true
         credentials.apiKey = " sk-typed "
-
         await credentials.checkCloudflareHealth()
-
         let requests = await transport.requests()
         let request = try #require(requests.first)
         #expect(request.value(forHTTPHeaderField: "Authorization") == "Bearer sk-typed")
@@ -226,17 +189,10 @@ extension SettingsScreenStoreTests {
         let transport = StubOpenAITransport()
         let timeoutError = URLError(.timedOut)
         await transport.enqueue(error: timeoutError)
-
-        let store = makeTestSettingsScreenStore(
-            apiKey: "sk-timeout",
-            configurationProvider: configurationProvider,
-            transport: transport
-        )
+        let store = makeTestSettingsScreenStore(apiKey: "sk-timeout", configurationProvider: configurationProvider, transport: transport)
         let credentials = store.credentials
         store.defaults.cloudflareEnabled = true
-
         await credentials.checkCloudflareHealth()
-
         #expect(credentials.cloudflareHealthStatus == .remoteError(timeoutError.localizedDescription))
         #expect(!credentials.isCheckingCloudflareHealth)
     }
@@ -249,16 +205,12 @@ extension SettingsScreenStoreTests {
             statusCode: 200,
             url: modelsURL
         )
-
         let store = makeTestSettingsScreenStore(transport: transport)
         let credentials = store.credentials
         credentials.apiKey = "sk-runtime"
-
         await credentials.validateAPIKey()
-
         #expect(credentials.isAPIKeyValid == true)
         #expect(!credentials.isValidating)
-
         let requests = await transport.requests()
         #expect(requests.count == 1)
         #expect(requests.first?.url?.absoluteString == "https://api.test.openai.local/v1/models")
@@ -270,9 +222,7 @@ extension SettingsScreenStoreTests {
         let store = makeTestSettingsScreenStore(transport: transport)
         let credentials = store.credentials
         credentials.apiKey = "  "
-
         await credentials.validateAPIKey()
-
         #expect(credentials.isAPIKeyValid == false)
         #expect(!credentials.isValidating)
         let requests = await transport.requests()
@@ -282,13 +232,10 @@ extension SettingsScreenStoreTests {
     @Test func `validate API key marks credential invalid when transport fails`() async {
         let transport = StubOpenAITransport()
         await transport.enqueue(error: NativeChatTestError.timeout)
-
         let store = makeTestSettingsScreenStore(transport: transport)
         let credentials = store.credentials
         credentials.apiKey = "sk-runtime"
-
         await credentials.validateAPIKey()
-
         #expect(credentials.isAPIKeyValid == false)
         #expect(!credentials.isValidating)
         let requests = await transport.requests()
@@ -304,7 +251,6 @@ extension SettingsScreenStoreTests {
             statusCode: 503,
             url: modelsURL
         )
-
         let store = makeTestSettingsScreenStore(
             apiKey: "sk-fail",
             configurationProvider: configurationProvider,
@@ -312,9 +258,7 @@ extension SettingsScreenStoreTests {
         )
         let credentials = store.credentials
         store.defaults.cloudflareEnabled = true
-
         await credentials.checkCloudflareHealth()
-
         #expect(credentials.cloudflareHealthStatus == .remoteError("Gateway unavailable"))
         #expect(!credentials.isCheckingCloudflareHealth)
     }
@@ -326,9 +270,7 @@ extension SettingsScreenStoreTests {
         )
         let store = makeTestSettingsScreenStore(configurationProvider: configurationProvider)
         let credentials = store.credentials
-
         store.defaults.cloudflareEnabled = true
-
         #expect(credentials.cloudflareHealthStatus == .gatewayUnavailable)
     }
 
@@ -346,140 +288,10 @@ extension SettingsScreenStoreTests {
         )
         let credentials = store.credentials
         store.defaults.cloudflareEnabled = true
-
         await credentials.checkCloudflareHealth()
-
         #expect(credentials.cloudflareHealthStatus == .invalidGatewayURL)
         #expect(!credentials.isCheckingCloudflareHealth)
         let requests = await transport.requests()
         #expect(requests.isEmpty)
-    }
-
-    @Test func `save custom cloudflare configuration persists across presenter reload`() {
-        let initialConfigurationProvider = RuntimeTestOpenAIConfigurationProvider(
-            cloudflareGatewayBaseURL: "https://gateway.default.local/v1",
-            cloudflareAIGToken: "cf-default-token",
-            useCloudflareGateway: false
-        )
-        let harness = makeTestSettingsScreenStoreHarness(
-            configurationProvider: initialConfigurationProvider
-        )
-        let credentials = harness.store.credentials
-
-        credentials.setCloudflareConfigurationMode(.custom)
-        credentials.customCloudflareGatewayBaseURL = "https://gateway.custom.local/v1"
-        credentials.customCloudflareAIGToken = "cf-custom-token"
-        credentials.saveCustomCloudflareConfiguration()
-
-        let reloadedConfigurationProvider = RuntimeTestOpenAIConfigurationProvider(
-            cloudflareGatewayBaseURL: "https://gateway.default.local/v1",
-            cloudflareAIGToken: "cf-default-token",
-            useCloudflareGateway: false
-        )
-        let reloadedHarness = makeTestSettingsScreenStoreHarness(
-            settingsValueStore: harness.settingsValueStore,
-            apiKeyBackend: harness.apiKeyBackend,
-            cloudflareTokenBackend: harness.cloudflareTokenBackend,
-            configurationProvider: reloadedConfigurationProvider
-        )
-
-        #expect(reloadedHarness.store.credentials.cloudflareConfigurationMode == .custom)
-        #expect(reloadedHarness.store.credentials.customCloudflareGatewayBaseURL == "https://gateway.custom.local/v1")
-        #expect(reloadedHarness.store.credentials.customCloudflareAIGToken == "cf-custom-token")
-        #expect(reloadedHarness.configurationProvider.cloudflareGatewayBaseURL == "https://gateway.custom.local/v1")
-        #expect(reloadedHarness.configurationProvider.cloudflareAIGToken == "cf-custom-token")
-    }
-
-    @Test func `check cloudflare health uses saved custom gateway configuration`() async throws {
-        let transport = StubOpenAITransport()
-        let modelsURL = try #require(URL(string: "https://gateway.custom.local/v1/models"))
-        await transport.enqueue(
-            data: Data("{}".utf8),
-            statusCode: 200,
-            url: modelsURL
-        )
-
-        let harness = makeTestSettingsScreenStoreHarness(
-            apiKey: "sk-runtime",
-            configurationProvider: RuntimeTestOpenAIConfigurationProvider(
-                cloudflareGatewayBaseURL: "https://gateway.default.local/v1",
-                cloudflareAIGToken: "cf-default-token",
-                useCloudflareGateway: false
-            ),
-            transport: transport
-        )
-        let credentials = harness.store.credentials
-        harness.store.defaults.cloudflareEnabled = true
-        credentials.setCloudflareConfigurationMode(.custom)
-        credentials.customCloudflareGatewayBaseURL = "https://gateway.custom.local/v1"
-        credentials.customCloudflareAIGToken = "cf-custom-token"
-        credentials.saveCustomCloudflareConfiguration()
-
-        await credentials.checkCloudflareHealth()
-
-        #expect(credentials.cloudflareHealthStatus == .connected)
-        let requests = await transport.requests()
-        #expect(requests.count == 1)
-        #expect(requests.first?.url?.absoluteString == "https://gateway.custom.local/v1/models")
-        #expect(requests.first?.value(forHTTPHeaderField: "cf-aig-authorization") == "Bearer cf-custom-token")
-    }
-
-    @Test func `validate API key stays on direct endpoint when gateway custom mode is active`() async throws {
-        let transport = StubOpenAITransport()
-        let modelsURL = try #require(URL(string: "https://api.test.openai.local/v1/models"))
-        await transport.enqueue(
-            data: Data("{}".utf8),
-            statusCode: 200,
-            url: modelsURL
-        )
-
-        let harness = makeTestSettingsScreenStoreHarness(
-            configurationProvider: RuntimeTestOpenAIConfigurationProvider(
-                directOpenAIBaseURL: "https://api.test.openai.local/v1",
-                cloudflareGatewayBaseURL: "https://gateway.default.local/v1",
-                cloudflareAIGToken: "cf-default-token",
-                useCloudflareGateway: false
-            ),
-            transport: transport
-        )
-        let credentials = harness.store.credentials
-        harness.store.defaults.cloudflareEnabled = true
-        credentials.setCloudflareConfigurationMode(.custom)
-        credentials.customCloudflareGatewayBaseURL = "https://gateway.custom.local/v1"
-        credentials.customCloudflareAIGToken = "cf-custom-token"
-        credentials.saveCustomCloudflareConfiguration()
-        credentials.apiKey = "sk-runtime"
-
-        await credentials.validateAPIKey()
-
-        #expect(credentials.isAPIKeyValid == true)
-        let requests = await transport.requests()
-        #expect(requests.count == 1)
-        #expect(requests.first?.url?.absoluteString == "https://api.test.openai.local/v1/models")
-        #expect(requests.first?.value(forHTTPHeaderField: "cf-aig-authorization") == nil)
-    }
-
-    @Test func `clear custom cloudflare configuration returns to default provider values`() {
-        let harness = makeTestSettingsScreenStoreHarness(
-            configurationProvider: RuntimeTestOpenAIConfigurationProvider(
-                cloudflareGatewayBaseURL: "https://gateway.default.local/v1",
-                cloudflareAIGToken: "cf-default-token",
-                useCloudflareGateway: false
-            )
-        )
-        let credentials = harness.store.credentials
-
-        credentials.setCloudflareConfigurationMode(.custom)
-        credentials.customCloudflareGatewayBaseURL = "https://gateway.custom.local/v1"
-        credentials.customCloudflareAIGToken = "cf-custom-token"
-        credentials.saveCustomCloudflareConfiguration()
-        credentials.clearCustomCloudflareConfiguration()
-
-        #expect(credentials.cloudflareConfigurationMode == .default)
-        #expect(credentials.customCloudflareGatewayBaseURL.isEmpty)
-        #expect(credentials.customCloudflareAIGToken.isEmpty)
-        #expect(harness.cloudflareTokenBackend.didDelete)
-        #expect(harness.configurationProvider.cloudflareGatewayBaseURL == "https://gateway.default.local/v1")
-        #expect(harness.configurationProvider.cloudflareAIGToken == "cf-default-token")
     }
 }

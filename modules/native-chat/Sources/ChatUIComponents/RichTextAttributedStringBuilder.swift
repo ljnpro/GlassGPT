@@ -99,96 +99,39 @@ public enum RichTextAttributedStringBuilder {
         }
 
         while index < count {
-            if chars[index] == "`" {
-                var end = index + 1
-                while end < count, chars[end] != "`" {
-                    end += 1
-                }
-                if end < count {
-                    flushCurrent()
-                    let codeContent = String(chars[(index + 1) ..< end])
-                    var chunk = AttributedString(codeContent)
-                    chunk.font = style.codeFont
-                    if let codeBackgroundColor = style.codeBackgroundColor {
-                        chunk.backgroundColor = codeBackgroundColor
-                    }
-                    result += chunk
-                    index = end + 1
-                    continue
-                }
+            if let parsed = consumeCodeSpan(chars, index: index, style: style) {
+                flushCurrent()
+                result += parsed.chunk
+                index = parsed.nextIndex
+                continue
             }
 
-            if index + 2 < count && chars[index] == "*" && chars[index + 1] == "*" && chars[index + 2] == "*" {
-                var end = index + 3
-                while end + 2 < count {
-                    if chars[end] == "*", chars[end + 1] == "*", chars[end + 2] == "*" { break }
-                    end += 1
-                }
-                if end + 2 < count {
-                    flushCurrent()
-                    let content = String(chars[(index + 3) ..< end])
-                    var chunk = AttributedString(content)
-                    chunk.font = style.boldItalicFont
-                    result += chunk
-                    index = end + 3
-                    continue
-                }
+            if let parsed = consumeBoldItalicSpan(chars, index: index, style: style) {
+                flushCurrent()
+                result += parsed.chunk
+                index = parsed.nextIndex
+                continue
             }
 
-            if index + 1 < count && chars[index] == "*" && chars[index + 1] == "*" {
-                var end = index + 2
-                while end + 1 < count {
-                    if chars[end] == "*", chars[end + 1] == "*" { break }
-                    end += 1
-                }
-                if end + 1 < count {
-                    flushCurrent()
-                    let content = String(chars[(index + 2) ..< end])
-                    var chunk = AttributedString(content)
-                    chunk.font = style.boldFont
-                    result += chunk
-                    index = end + 2
-                    continue
-                }
+            if let parsed = consumeBoldSpan(chars, index: index, style: style) {
+                flushCurrent()
+                result += parsed.chunk
+                index = parsed.nextIndex
+                continue
             }
 
-            if style.supportsUnderscoreBold,
-               index + 1 < count,
-               chars[index] == "_" && chars[index + 1] == "_" {
-                var end = index + 2
-                while end + 1 < count {
-                    if chars[end] == "_", chars[end + 1] == "_" { break }
-                    end += 1
-                }
-                if end + 1 < count {
-                    flushCurrent()
-                    let content = String(chars[(index + 2) ..< end])
-                    var chunk = AttributedString(content)
-                    chunk.font = style.boldFont
-                    result += chunk
-                    index = end + 2
-                    continue
-                }
+            if let parsed = consumeUnderscoreBoldSpan(chars, index: index, style: style) {
+                flushCurrent()
+                result += parsed.chunk
+                index = parsed.nextIndex
+                continue
             }
 
-            if chars[index] == "*" || chars[index] == "_" {
-                let marker = chars[index]
-                if index + 1 < count, chars[index + 1] != marker {
-                    var end = index + 1
-                    while end < count {
-                        if chars[end] == marker, end + 1 >= count || chars[end + 1] != marker { break }
-                        end += 1
-                    }
-                    if end < count {
-                        flushCurrent()
-                        let content = String(chars[(index + 1) ..< end])
-                        var chunk = AttributedString(content)
-                        chunk.font = style.italicFont
-                        result += chunk
-                        index = end + 1
-                        continue
-                    }
-                }
+            if let parsed = consumeItalicSpan(chars, index: index, style: style) {
+                flushCurrent()
+                result += parsed.chunk
+                index = parsed.nextIndex
+                continue
             }
 
             currentText.append(chars[index])
@@ -197,5 +140,133 @@ public enum RichTextAttributedStringBuilder {
 
         flushCurrent()
         return result
+    }
+
+    private static func consumeCodeSpan(
+        _ chars: [Character],
+        index: Int,
+        style: Style
+    ) -> (chunk: AttributedString, nextIndex: Int)? {
+        guard chars[index] == "`" else { return nil }
+
+        var end = index + 1
+        while end < chars.count, chars[end] != "`" {
+            end += 1
+        }
+        guard end < chars.count else { return nil }
+
+        var chunk = AttributedString(String(chars[(index + 1) ..< end]))
+        chunk.font = style.codeFont
+        if let codeBackgroundColor = style.codeBackgroundColor {
+            chunk.backgroundColor = codeBackgroundColor
+        }
+        return (chunk, end + 1)
+    }
+
+    private static func consumeBoldItalicSpan(
+        _ chars: [Character],
+        index: Int,
+        style: Style
+    ) -> (chunk: AttributedString, nextIndex: Int)? {
+        guard index + 2 < chars.count,
+              chars[index] == "*",
+              chars[index + 1] == "*",
+              chars[index + 2] == "*" else {
+            return nil
+        }
+
+        var end = index + 3
+        while end + 2 < chars.count {
+            if chars[end] == "*", chars[end + 1] == "*", chars[end + 2] == "*" {
+                break
+            }
+            end += 1
+        }
+        guard end + 2 < chars.count else { return nil }
+
+        let content = String(chars[(index + 3) ..< end])
+        return (styledChunk(content, font: style.boldItalicFont), end + 3)
+    }
+
+    private static func consumeBoldSpan(
+        _ chars: [Character],
+        index: Int,
+        style: Style
+    ) -> (chunk: AttributedString, nextIndex: Int)? {
+        guard index + 1 < chars.count,
+              chars[index] == "*",
+              chars[index + 1] == "*" else {
+            return nil
+        }
+
+        var end = index + 2
+        while end + 1 < chars.count {
+            if chars[end] == "*", chars[end + 1] == "*" {
+                break
+            }
+            end += 1
+        }
+        guard end + 1 < chars.count else { return nil }
+
+        let content = String(chars[(index + 2) ..< end])
+        return (styledChunk(content, font: style.boldFont), end + 2)
+    }
+
+    private static func consumeUnderscoreBoldSpan(
+        _ chars: [Character],
+        index: Int,
+        style: Style
+    ) -> (chunk: AttributedString, nextIndex: Int)? {
+        guard style.supportsUnderscoreBold,
+              index + 1 < chars.count,
+              chars[index] == "_",
+              chars[index + 1] == "_" else {
+            return nil
+        }
+
+        var end = index + 2
+        while end + 1 < chars.count {
+            if chars[end] == "_", chars[end + 1] == "_" {
+                break
+            }
+            end += 1
+        }
+        guard end + 1 < chars.count else { return nil }
+
+        let content = String(chars[(index + 2) ..< end])
+        return (styledChunk(content, font: style.boldFont), end + 2)
+    }
+
+    private static func consumeItalicSpan(
+        _ chars: [Character],
+        index: Int,
+        style: Style
+    ) -> (chunk: AttributedString, nextIndex: Int)? {
+        guard chars[index] == "*" || chars[index] == "_" else {
+            return nil
+        }
+
+        let marker = chars[index]
+        guard index + 1 < chars.count, chars[index + 1] != marker else {
+            return nil
+        }
+
+        var end = index + 1
+        while end < chars.count {
+            if chars[end] == marker, end + 1 >= chars.count || chars[end + 1] != marker {
+                break
+            }
+            end += 1
+        }
+        guard end < chars.count else { return nil }
+
+        let content = String(chars[(index + 1) ..< end])
+        return (styledChunk(content, font: style.italicFont), end + 1)
+    }
+
+    private static func styledChunk(_ content: String, font: Font) -> AttributedString {
+        var chunk = AttributedString(content)
+        chunk.font = font
+        return chunk
     }
 }

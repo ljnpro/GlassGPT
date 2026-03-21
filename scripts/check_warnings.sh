@@ -15,11 +15,11 @@ fi
 
 if command -v rg >/dev/null 2>&1; then
   warning_lines="$(
-    rg --text --no-messages '^.*warning:' "$log_file" || true
+    rg --text --no-messages '(^.*warning:|^--- xcodebuild: WARNING:)' "$log_file" || true
   )"
 else
   warning_lines="$(
-    grep -E '^.*warning:' "$log_file" || true
+    grep -E '(^.*warning:|^--- xcodebuild: WARNING:)' "$log_file" || true
   )"
 fi
 

@@ -89,7 +89,8 @@ public enum NativeChatPersistence {
     static func createPersistentContainer(
         makePersistentContainer: () throws -> ModelContainer,
         preserveExistingStore: () -> StoreRecoveryOutcome,
-        makeFallbackContainer: () -> ModelContainer?
+        makeFallbackContainer: () -> ModelContainer?,
+        logError: (String) -> Void = { Loggers.persistence.error($0) }
     ) -> NativeChatPersistenceBootstrap {
         let signpostID = persistenceSignposter.makeSignpostID()
         let signpostState = persistenceSignposter.beginInterval("CreatePersistentContainer", id: signpostID)
@@ -102,12 +103,12 @@ public enum NativeChatPersistence {
                 startupErrorDescription: nil
             )
         } catch {
-            Loggers.persistence.error("[NativeChatPersistence] Initial persistent container creation failed: \(error.localizedDescription)")
+            logError("[NativeChatPersistence] Initial persistent container creation failed: \(error.localizedDescription)")
         }
 
         let preservationResult = preserveExistingStore()
         if let message = preservationResult.failureMessage {
-            Loggers.persistence.error("[NativeChatPersistence] \(message)")
+            logError("[NativeChatPersistence] \(message)")
         }
 
         do {
@@ -117,7 +118,7 @@ public enum NativeChatPersistence {
                 startupErrorDescription: nil
             )
         } catch {
-            Loggers.persistence.error("[NativeChatPersistence] Persistent container retry failed: \(error.localizedDescription)")
+            logError("[NativeChatPersistence] Persistent container retry failed: \(error.localizedDescription)")
         }
 
         if let inMemoryContainer = makeFallbackContainer() {
@@ -138,6 +139,7 @@ public enum NativeChatPersistence {
     }
 
     private static func makeContainer() throws -> ModelContainer {
+        try ensureApplicationSupportDirectoryExists()
         let configuration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
         return try ModelContainer(for: schema, configurations: [configuration])
     }
@@ -194,5 +196,20 @@ public enum NativeChatPersistence {
         } catch {
             return .failed("Failed to preserve existing store for recovery: \(error.localizedDescription)")
         }
+    }
+
+    static func ensureApplicationSupportDirectoryExists(
+        fileManager: FileManager = .default,
+        appSupportURL: URL? = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
+    ) throws {
+        guard let appSupportURL else {
+            throw CocoaError(.fileNoSuchFile)
+        }
+
+        try fileManager.createDirectory(
+            at: appSupportURL,
+            withIntermediateDirectories: true,
+            attributes: nil
+        )
     }
 }

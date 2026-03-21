@@ -21,23 +21,23 @@ private let sseDecoderSignposter = OSSignposter(subsystem: "GlassGPT", category:
 /// Tracks accumulated text, thinking content, response IDs, and terminal states across
 /// the lifetime of a single streaming session.
 public struct SSEEventDecoder {
-    private static let logger = Logger(subsystem: "GlassGPT", category: "sse")
+    static let logger = Logger(subsystem: "GlassGPT", category: "sse")
     /// The accumulated output text from all text deltas.
-    public private(set) var accumulatedText = ""
+    public internal(set) var accumulatedText = ""
     /// The accumulated reasoning/thinking text.
-    public private(set) var accumulatedThinking = ""
+    public internal(set) var accumulatedThinking = ""
     /// File path annotations accumulated during the stream.
-    public private(set) var accumulatedFilePathAnnotations: [FilePathAnnotation] = []
+    public internal(set) var accumulatedFilePathAnnotations: [FilePathAnnotation] = []
     /// Whether the model is currently in its thinking phase.
-    public private(set) var thinkingActive = false
+    public internal(set) var thinkingActive = false
     /// Whether any output (text or thinking) has been emitted.
-    public private(set) var emittedAnyOutput = false
+    public internal(set) var emittedAnyOutput = false
     /// Whether a terminal event (completed, incomplete, or error) has been received.
-    public private(set) var sawTerminalEvent = false
+    public internal(set) var sawTerminalEvent = false
     /// The response ID that has been emitted, if any.
-    public private(set) var emittedResponseID: String?
+    public internal(set) var emittedResponseID: String?
     /// The number of malformed frames seen in a row.
-    private(set) var consecutiveDecodeFailures = 0
+    var consecutiveDecodeFailures = 0
 
     /// Creates a new empty SSE event decoder.
     public init() {}
@@ -65,120 +65,21 @@ public struct SSEEventDecoder {
 
         if let translated = OpenAIStreamEventTranslator.translate(eventType: frame.type, data: jsonData) {
             resetDecodeFailures()
-            switch translated {
-            case let .textDelta(delta):
-                yieldResponseIdentifierIfNeeded(responseID, continuation: continuation)
-                emittedAnyOutput = true
-                accumulatedText += delta
-                continuation.yield(.textDelta(delta))
-                yieldSequenceIfNeeded(sequenceNumber, continuation: continuation)
-                return .continued
-
-            case let .thinkingDelta(delta):
-                yieldResponseIdentifierIfNeeded(responseID, continuation: continuation)
-                if !thinkingActive {
-                    thinkingActive = true
-                    continuation.yield(.thinkingStarted)
-                }
-                emittedAnyOutput = true
-                accumulatedThinking += delta
-                continuation.yield(.thinkingDelta(delta))
-                yieldSequenceIfNeeded(sequenceNumber, continuation: continuation)
-                return .continued
-
-            case .thinkingFinished:
-                yieldResponseIdentifierIfNeeded(responseID, continuation: continuation)
-                yieldThinkingFinishedIfNeeded(continuation: continuation)
-                yieldSequenceIfNeeded(sequenceNumber, continuation: continuation)
-                return .continued
-
-            case let .responseCreated(responseId):
-                yieldResponseIdentifierIfNeeded(responseId, continuation: continuation)
-                yieldSequenceIfNeeded(sequenceNumber, continuation: continuation)
-                return .continued
-
-            case .sequenceUpdate:
-                yieldResponseIdentifierIfNeeded(responseID, continuation: continuation)
-                yieldSequenceIfNeeded(sequenceNumber, continuation: continuation)
-                return .continued
-
-            case let .filePathAnnotationAdded(annotation):
-                yieldResponseIdentifierIfNeeded(responseID, continuation: continuation)
-                accumulatedFilePathAnnotations.append(annotation)
-                continuation.yield(.filePathAnnotationAdded(annotation))
-                yieldSequenceIfNeeded(sequenceNumber, continuation: continuation)
-                return .continued
-
-            case let .completed(fullText, fullThinking, filePathAnnotations):
-                yieldResponseIdentifierIfNeeded(responseID, continuation: continuation)
-                sawTerminalEvent = true
-                updateTerminalState(
-                    fullText: fullText,
-                    fullThinking: fullThinking,
-                    filePathAnnotations: filePathAnnotations
-                )
-                return .terminalCompleted
-
-            case let .incomplete(fullText, fullThinking, filePathAnnotations, message):
-                yieldResponseIdentifierIfNeeded(responseID, continuation: continuation)
-                sawTerminalEvent = true
-                updateTerminalState(
-                    fullText: fullText,
-                    fullThinking: fullThinking,
-                    filePathAnnotations: filePathAnnotations
-                )
-                return .terminalIncomplete(message)
-
-            case let .error(error):
-                yieldResponseIdentifierIfNeeded(responseID, continuation: continuation)
-                sawTerminalEvent = true
-                continuation.yield(.error(error))
-                return .terminalError
-
-            default:
-                yieldResponseIdentifierIfNeeded(responseID, continuation: continuation)
-                continuation.yield(translated)
-                yieldSequenceIfNeeded(sequenceNumber, continuation: continuation)
-                return .continued
-            }
+            return handleTranslatedEvent(
+                translated,
+                responseID: responseID,
+                sequenceNumber: sequenceNumber,
+                continuation: continuation
+            )
         }
 
-        switch frame.type {
-        case "response.output_text.done":
-            yieldResponseIdentifierIfNeeded(responseID, continuation: continuation)
-            if let envelope = decodeEnvelope(from: jsonData),
-               let fullText = envelope.text,
-               !fullText.isEmpty {
-                resetDecodeFailures()
-                accumulatedText = fullText
-                emittedAnyOutput = true
-            } else {
-                recordDecodeFailure("SSE frame could not be decoded for event type \(frame.type).")
-            }
-            yieldSequenceIfNeeded(sequenceNumber, continuation: continuation)
-            return .continued
-
-        case "response.queued",
-             "response.in_progress",
-             "response.output_item.added",
-             "response.output_item.done",
-             "response.content_part.added",
-             "response.content_part.done",
-             "response.reasoning_summary_part.added",
-             "response.reasoning_summary_part.done":
-            resetDecodeFailures()
-            yieldResponseIdentifierIfNeeded(responseID, continuation: continuation)
-            yieldSequenceIfNeeded(sequenceNumber, continuation: continuation)
-            return .continued
-
-        default:
-            if decodeEnvelope(from: jsonData) == nil {
-                recordDecodeFailure("SSE frame could not be decoded for event type \(frame.type).")
-            } else {
-                resetDecodeFailures()
-            }
-            return .continued
-        }
+        return handleUntranslatedFrame(
+            frameType: frame.type,
+            jsonData: jsonData,
+            responseID: responseID,
+            sequenceNumber: sequenceNumber,
+            continuation: continuation
+        )
     }
 
     /// Emits a thinking-finished event if thinking is currently active, then deactivates thinking.
@@ -199,61 +100,5 @@ public struct SSEEventDecoder {
     /// The accumulated file path annotations for terminal events, or `nil` if empty.
     public var terminalFilePathAnnotations: [FilePathAnnotation]? {
         accumulatedFilePathAnnotations.isEmpty ? nil : accumulatedFilePathAnnotations
-    }
-
-    private mutating func updateTerminalState(
-        fullText: String,
-        fullThinking: String?,
-        filePathAnnotations: [FilePathAnnotation]?
-    ) {
-        if !fullText.isEmpty {
-            accumulatedText = fullText
-        }
-        if let fullThinking, !fullThinking.isEmpty {
-            accumulatedThinking = fullThinking
-        }
-        if let filePathAnnotations, !filePathAnnotations.isEmpty {
-            accumulatedFilePathAnnotations = filePathAnnotations
-        }
-        emittedAnyOutput = emittedAnyOutput || !accumulatedText.isEmpty || !accumulatedThinking.isEmpty
-    }
-
-    private func yieldSequenceIfNeeded(
-        _ sequenceNumber: Int?,
-        continuation: AsyncStream<StreamEvent>.Continuation
-    ) {
-        guard let sequenceNumber else { return }
-        continuation.yield(.sequenceUpdate(sequenceNumber))
-    }
-
-    private mutating func yieldResponseIdentifierIfNeeded(
-        _ responseID: String?,
-        continuation: AsyncStream<StreamEvent>.Continuation
-    ) {
-        guard let responseID, !responseID.isEmpty, responseID != emittedResponseID else { return }
-        emittedResponseID = responseID
-        continuation.yield(.responseCreated(responseID))
-    }
-
-    private func decodeEnvelope(from data: Data) -> ResponsesStreamEnvelopeDTO? {
-        do {
-            return try JSONCoding.decode(ResponsesStreamEnvelopeDTO.self, from: data)
-        } catch {
-            Self.logger.debug("SSE envelope decode failed: \(error.localizedDescription, privacy: .public)")
-            return nil
-        }
-    }
-
-    private mutating func resetDecodeFailures() {
-        consecutiveDecodeFailures = 0
-    }
-
-    private mutating func recordDecodeFailure(_ message: String) {
-        consecutiveDecodeFailures += 1
-        if consecutiveDecodeFailures >= 5 {
-            Self.logger.error("\(message, privacy: .public)")
-        } else {
-            Self.logger.debug("\(message, privacy: .public)")
-        }
     }
 }

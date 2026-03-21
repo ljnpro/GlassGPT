@@ -144,7 +144,7 @@ public final class AudioSessionManager: NSObject, Sendable {
 
 extension AudioSessionManager: AVAudioPlayerDelegate {
     /// Called when audio playback finishes.
-    public nonisolated func audioPlayerDidFinishPlaying(_: AVAudioPlayer, successfully _: Bool) {
+    nonisolated public func audioPlayerDidFinishPlaying(_: AVAudioPlayer, successfully _: Bool) {
         Task { @MainActor in
             self.state = .idle
             self.audioPlayer = nil

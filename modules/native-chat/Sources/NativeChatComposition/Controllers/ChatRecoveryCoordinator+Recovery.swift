@@ -21,17 +21,7 @@ extension ChatRecoveryCoordinator {
         guard !storedAPIKey.isEmpty else { return }
         guard let message = conversations.findMessage(byId: messageId) else { return }
 
-        let session: ReplySession
-        if let existing = services.sessionRegistry.session(for: messageId) {
-            session = existing
-        } else if let created = sessions.makeRecoverySession(for: message) {
-            session = created
-            sessions.registerSession(
-                created,
-                execution: SessionExecutionState(service: services.serviceFactory()),
-                visible: visible
-            )
-        } else {
+        guard let session = makeRecoverySession(for: message, visible: visible) else {
             return
         }
 
@@ -66,78 +56,147 @@ extension ChatRecoveryCoordinator {
             sessions.bindVisibleSession(messageID: messageId)
         }
 
+        let execution = ensureRecoveryExecution(for: messageId)
+        startRecoveryFetchTask(
+            execution: execution,
+            message: message,
+            session: session,
+            responseId: responseId,
+            preferStreamingResume: preferStreamingResume,
+            visible: visible
+        )
+    }
+
+    private func makeRecoverySession(for message: Message, visible: Bool) -> ReplySession? {
+        if let existing = services.sessionRegistry.session(for: message.id) {
+            return existing
+        }
+
+        guard let created = sessions.makeRecoverySession(for: message) else {
+            return nil
+        }
+
+        sessions.registerSession(
+            created,
+            execution: SessionExecutionState(service: services.serviceFactory()),
+            visible: visible
+        )
+        return created
+    }
+
+    private func ensureRecoveryExecution(for messageId: UUID) -> SessionExecutionState {
         let execution = services.sessionRegistry.execution(for: messageId) ?? SessionExecutionState(service: services.serviceFactory())
         services.sessionRegistry.registerExecution(execution, for: messageId) { existing in
             existing.task?.cancel()
             existing.service.cancelStream()
         }
-
         execution.task?.cancel()
+        return execution
+    }
+
+    private func startRecoveryFetchTask(
+        execution: SessionExecutionState,
+        message: Message,
+        session: ReplySession,
+        responseId: String,
+        preferStreamingResume: Bool,
+        visible: Bool
+    ) {
         execution.task = Task { @MainActor [weak self] in
             guard let self else { return }
             guard sessions.isSessionActive(session) else { return }
             let apiKey = resultApplier.activeAPIKey(for: session)
+            let fetchOutcome = await makeRecoveryFetchOutcome(
+                execution: execution,
+                responseId: responseId,
+                apiKey: apiKey,
+                preferStreamingResume: preferStreamingResume,
+                usedBackgroundMode: message.usedBackgroundMode,
+                lastSequenceNumber: message.lastSequenceNumber
+            )
+            await handleRecoveryFetchOutcome(
+                fetchOutcome,
+                for: message,
+                session: session,
+                responseId: responseId,
+                apiKey: apiKey,
+                visible: visible
+            )
+        }
+    }
 
-            // Collect facts from the fetch attempt
-            let fetchOutcome: RecoveryFetchOutcome
-            do {
-                let result = try await execution.service.fetchResponse(responseId: responseId, apiKey: apiKey)
-                fetchOutcome = RecoveryFetchOutcome(
-                    result: result,
-                    preferStreamingResume: preferStreamingResume,
-                    usedBackgroundMode: message.usedBackgroundMode,
-                    lastSequenceNumber: message.lastSequenceNumber
-                )
-            } catch {
-                fetchOutcome = RecoveryFetchOutcome(
-                    error: error,
-                    preferStreamingResume: preferStreamingResume,
-                    usedBackgroundMode: message.usedBackgroundMode,
-                    lastSequenceNumber: message.lastSequenceNumber
-                )
+    private func makeRecoveryFetchOutcome(
+        execution: SessionExecutionState,
+        responseId: String,
+        apiKey: String,
+        preferStreamingResume: Bool,
+        usedBackgroundMode: Bool,
+        lastSequenceNumber: Int?
+    ) async -> RecoveryFetchOutcome {
+        do {
+            let result = try await execution.service.fetchResponse(responseId: responseId, apiKey: apiKey)
+            return RecoveryFetchOutcome(
+                result: result,
+                preferStreamingResume: preferStreamingResume,
+                usedBackgroundMode: usedBackgroundMode,
+                lastSequenceNumber: lastSequenceNumber
+            )
+        } catch {
+            return RecoveryFetchOutcome(
+                error: error,
+                preferStreamingResume: preferStreamingResume,
+                usedBackgroundMode: usedBackgroundMode,
+                lastSequenceNumber: lastSequenceNumber
+            )
+        }
+    }
+
+    private func handleRecoveryFetchOutcome(
+        _ fetchOutcome: RecoveryFetchOutcome,
+        for message: Message,
+        session: ReplySession,
+        responseId: String,
+        apiKey: String,
+        visible: Bool
+    ) async {
+        let action = RecoveryFetchEvaluator.evaluate(fetchOutcome)
+
+        switch action {
+        case let .finish(result, errorMessage):
+            if visible, let errorMessage {
+                state.errorMessage = errorMessage
             }
+            resultApplier.finishRecovery(
+                for: message,
+                session: session,
+                result: result,
+                fallbackText: resultApplier.recoveryFallbackText(for: message, session: session),
+                fallbackThinking: resultApplier.recoveryFallbackThinking(for: message, session: session)
+            )
 
-            // Runtime evaluator decides the next action
-            let action = RecoveryFetchEvaluator.evaluate(fetchOutcome)
+        case let .startStream(lastSequenceNumber):
+            await startStreamingRecovery(
+                session: session,
+                responseId: responseId,
+                lastSeq: lastSequenceNumber,
+                apiKey: apiKey,
+                useDirectEndpoint: false
+            )
 
-            // Composition dispatches the decided action
-            switch action {
-            case let .finish(result, errorMessage):
-                if visible, let errorMessage {
-                    state.errorMessage = errorMessage
-                }
-                resultApplier.finishRecovery(
-                    for: message,
-                    session: session,
-                    result: result,
-                    fallbackText: resultApplier.recoveryFallbackText(for: message, session: session),
-                    fallbackThinking: resultApplier.recoveryFallbackThinking(for: message, session: session)
-                )
+        case .poll:
+            await pollResponseUntilTerminal(session: session, responseId: responseId)
 
-            case let .startStream(lastSequenceNumber):
-                await startStreamingRecovery(
-                    session: session,
-                    responseId: responseId,
-                    lastSeq: lastSequenceNumber,
-                    apiKey: apiKey,
-                    useDirectEndpoint: false
-                )
-
-            case .poll:
-                await pollResponseUntilTerminal(session: session, responseId: responseId)
-
-            case let .handleError(error):
-                if resultApplier.handleUnrecoverableRecoveryError(
-                    error,
-                    for: message,
-                    responseId: responseId,
-                    session: session,
-                    visible: visible
-                ) {
-                    return
-                }
-                await pollResponseUntilTerminal(session: session, responseId: responseId)
+        case let .handleError(error):
+            if resultApplier.handleUnrecoverableRecoveryError(
+                error,
+                for: message,
+                responseId: responseId,
+                session: session,
+                visible: visible
+            ) {
+                return
             }
+            await pollResponseUntilTerminal(session: session, responseId: responseId)
         }
     }
 }

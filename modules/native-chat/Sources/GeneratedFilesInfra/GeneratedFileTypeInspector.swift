@@ -1,48 +1,58 @@
 import Foundation
 
 enum GeneratedFileTypeInspector {
+    private static let mimeTypeExtensions: [String: String] = [
+        "image/png": "png",
+        "image/jpeg": "jpg",
+        "image/gif": "gif",
+        "image/svg+xml": "svg",
+        "image/webp": "webp",
+        "image/bmp": "bmp",
+        "image/tiff": "tiff",
+        "image/x-icon": "ico",
+        "application/pdf": "pdf",
+        "text/plain": "txt",
+        "text/csv": "csv",
+        "text/tab-separated-values": "tsv",
+        "text/html": "html",
+        "text/markdown": "md",
+        "application/json": "json",
+        "application/geo+json": "geojson",
+        "application/xml": "xml",
+        "text/xml": "xml",
+        "application/yaml": "yaml",
+        "text/yaml": "yaml",
+        "application/x-yaml": "yml",
+        "application/toml": "toml",
+        "application/zip": "zip",
+        "application/gzip": "gz",
+        "application/x-bzip2": "bz2",
+        "application/x-xz": "xz",
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": "xlsx",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "docx",
+        "application/vnd.openxmlformats-officedocument.presentationml.presentation": "pptx",
+        "application/vnd.oasis.opendocument.spreadsheet": "ods",
+        "application/vnd.oasis.opendocument.text": "odt",
+        "application/vnd.oasis.opendocument.presentation": "odp",
+        "audio/wav": "wav",
+        "audio/x-wav": "wav",
+        "audio/mpeg": "mp3",
+        "audio/ogg": "ogg",
+        "audio/flac": "flac"
+    ]
+
     static func extensionForMimeType(_ mimeType: String) -> String? {
         let lower = mimeType.lowercased()
-        switch lower {
-        case "image/png": return "png"
-        case "image/jpeg": return "jpg"
-        case "image/gif": return "gif"
-        case "image/svg+xml": return "svg"
-        case "image/webp": return "webp"
-        case "image/bmp": return "bmp"
-        case "image/tiff": return "tiff"
-        case "image/x-icon": return "ico"
-        case "application/pdf": return "pdf"
-        case "text/plain": return "txt"
-        case "text/csv": return "csv"
-        case "text/tab-separated-values": return "tsv"
-        case "text/html": return "html"
-        case "text/markdown": return "md"
-        case "application/json": return "json"
-        case "application/geo+json": return "geojson"
-        case "application/xml", "text/xml": return "xml"
-        case "application/yaml", "text/yaml": return "yaml"
-        case "application/x-yaml": return "yml"
-        case "application/toml": return "toml"
-        case "application/zip": return "zip"
-        case "application/gzip": return "gz"
-        case "application/x-bzip2": return "bz2"
-        case "application/x-xz": return "xz"
-        case "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": return "xlsx"
-        case "application/vnd.openxmlformats-officedocument.wordprocessingml.document": return "docx"
-        case "application/vnd.openxmlformats-officedocument.presentationml.presentation": return "pptx"
-        case "application/vnd.oasis.opendocument.spreadsheet": return "ods"
-        case "application/vnd.oasis.opendocument.text": return "odt"
-        case "application/vnd.oasis.opendocument.presentation": return "odp"
-        case "audio/wav", "audio/x-wav": return "wav"
-        case "audio/mpeg": return "mp3"
-        case "audio/ogg": return "ogg"
-        case "audio/flac": return "flac"
-        default:
-            if lower.hasPrefix("text/") { return "txt" }
-            if lower.hasPrefix("image/") { return lower.replacingOccurrences(of: "image/", with: "") }
-            return nil
+        if let extensionName = mimeTypeExtensions[lower] {
+            return extensionName
         }
+        if lower.hasPrefix("text/") {
+            return "txt"
+        }
+        if lower.hasPrefix("image/") {
+            return String(lower.dropFirst("image/".count))
+        }
+        return nil
     }
 
     static func extensionForFileSignature(_ data: Data) -> String? {

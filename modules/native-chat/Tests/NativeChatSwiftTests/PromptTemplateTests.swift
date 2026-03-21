@@ -14,15 +14,15 @@ struct PromptTemplateTests {
 
     @Test func `descriptor equality`() {
         let id = UUID()
-        let a = PromptTemplateDescriptor(id: id, name: "A", systemPrompt: "p1")
-        let b = PromptTemplateDescriptor(id: id, name: "A", systemPrompt: "p1")
-        #expect(a == b)
+        let lhs = PromptTemplateDescriptor(id: id, name: "A", systemPrompt: "p1")
+        let rhs = PromptTemplateDescriptor(id: id, name: "A", systemPrompt: "p1")
+        #expect(lhs == rhs)
     }
 
     @Test func `descriptor inequality`() {
-        let a = PromptTemplateDescriptor(name: "A", systemPrompt: "p1")
-        let b = PromptTemplateDescriptor(name: "B", systemPrompt: "p2")
-        #expect(a != b)
+        let lhs = PromptTemplateDescriptor(name: "A", systemPrompt: "p1")
+        let rhs = PromptTemplateDescriptor(name: "B", systemPrompt: "p2")
+        #expect(lhs != rhs)
     }
 
     @Test func `default is not built in`() {

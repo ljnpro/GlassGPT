@@ -36,14 +36,9 @@ public extension OpenAIRequestFactory {
     }
 }
 
-/// Internal DTO for encoding image generation requests.
 struct ImageGenerationRequestDTO: Encodable {
-    /// The image generation model identifier.
     let model: String
-    /// The text prompt describing the desired image.
     let prompt: String
-    /// The image dimensions (e.g., "1024x1024").
     let size: String
-    /// The image quality level.
     let quality: String
 }

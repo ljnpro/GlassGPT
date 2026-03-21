@@ -27,14 +27,14 @@ struct AppIntentDescriptorTests {
     }
 
     @Test func `descriptor equality`() {
-        let a = AppIntentDescriptor(identifier: "test", title: "Test", description: "desc")
-        let b = AppIntentDescriptor(identifier: "test", title: "Test", description: "desc")
-        #expect(a == b)
+        let lhs = AppIntentDescriptor(identifier: "test", title: "Test", description: "desc")
+        let rhs = AppIntentDescriptor(identifier: "test", title: "Test", description: "desc")
+        #expect(lhs == rhs)
     }
 
     @Test func `descriptor inequality`() {
-        let a = AppIntentDescriptor(identifier: "a", title: "A", description: "d")
-        let b = AppIntentDescriptor(identifier: "b", title: "B", description: "d")
-        #expect(a != b)
+        let lhs = AppIntentDescriptor(identifier: "a", title: "A", description: "d")
+        let rhs = AppIntentDescriptor(identifier: "b", title: "B", description: "d")
+        #expect(lhs != rhs)
     }
 }

@@ -20,19 +20,16 @@ public extension OpenAIRequestFactory {
         var body = Data()
         let crlf = Data("\r\n".utf8)
 
-        // Model field
         body.append(Data("--\(boundary)\r\n".utf8))
         body.append(Data("Content-Disposition: form-data; name=\"model\"\r\n\r\n".utf8))
         body.append(Data("\(model)\r\n".utf8))
 
-        // Audio file field
         body.append(Data("--\(boundary)\r\n".utf8))
         body.append(Data("Content-Disposition: form-data; name=\"file\"; filename=\"audio.m4a\"\r\n".utf8))
         body.append(Data("Content-Type: audio/m4a\r\n\r\n".utf8))
         body.append(audioData)
         body.append(crlf)
 
-        // Closing boundary
         body.append(Data("--\(boundary)--\r\n".utf8))
 
         return try request(
@@ -80,12 +77,8 @@ public extension OpenAIRequestFactory {
     }
 }
 
-/// Internal DTO for encoding TTS speech requests.
 struct SpeechRequestDTO: Encodable {
-    /// The TTS model identifier.
     let model: String
-    /// The text to synthesize.
     let input: String
-    /// The voice identifier.
     let voice: String
 }

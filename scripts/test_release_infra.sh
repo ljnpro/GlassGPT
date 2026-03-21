@@ -42,6 +42,11 @@ function test_check_warnings() {
     fail "check_warnings.sh should fail on Swift warnings."
   fi
 
+  printf '%s\n' '--- xcodebuild: WARNING: Using the first of multiple matching destinations:' >"$temp_dir/xcodebuild-warning.log"
+  if "$ROOT_DIR/scripts/check_warnings.sh" "$temp_dir/xcodebuild-warning.log" >/dev/null 2>&1; then
+    fail "check_warnings.sh should fail on xcodebuild destination warnings."
+  fi
+
   rm -rf "$temp_dir"
   trap - RETURN
   echo "[PASS] check_warnings.sh catches general and Swift warnings"
@@ -57,6 +62,151 @@ function test_appintents_linker_setting() {
   fi
 
   echo "[PASS] AppIntents linker setting is pinned in CI and release scripts"
+}
+
+function test_lint_tool_version_is_pinned() {
+  if ! grep -Fq 'REQUIRED_SWIFTLINT_VERSION="${REQUIRED_SWIFTLINT_VERSION:-0.63.2}"' "$ROOT_DIR/scripts/lint.sh"; then
+    fail "lint.sh must pin the SwiftLint version used for strict linting."
+  fi
+
+  if grep -Fq 'brew install swiftlint' "$ROOT_DIR/scripts/lint.sh"; then
+    fail "lint.sh should not auto-install an unpinned SwiftLint version."
+  fi
+
+  echo "[PASS] lint.sh pins the strict SwiftLint toolchain version"
+}
+
+function test_xcodebuild_log_tail_guard() {
+  if ! grep -Fq 'if [[ -f "$log_file" ]]; then' "$ROOT_DIR/scripts/ci.sh"; then
+    fail "ci.sh must guard xcodebuild log tail output when a retry occurs before the log file exists."
+  fi
+
+  echo "[PASS] ci.sh guards retry log tail output when logs are missing"
+}
+
+function test_build_gate_uses_concrete_destination() {
+  local build_block
+  build_block="$(sed -n '/function gate_build()/,/^}/p' "$ROOT_DIR/scripts/ci.sh")"
+
+  if ! printf '%s\n' "$build_block" | grep -Fq -- '-destination "$SIMULATOR_DEVICE_DESTINATION"'; then
+    fail "gate_build should use a concrete simulator destination to avoid ambiguous xcodebuild destination warnings."
+  fi
+
+  if printf '%s\n' "$build_block" | grep -Fq -- '-sdk iphonesimulator'; then
+    fail "gate_build should not rely on -sdk iphonesimulator alone because it emits destination warnings."
+  fi
+
+  echo "[PASS] build gate pins a concrete simulator destination"
+}
+
+function test_format_check_excludes_docc() {
+  if ! grep -Fq -- 'swiftformat --lint --quiet --filelist "$filelist"' "$ROOT_DIR/scripts/ci.sh"; then
+    fail "ci.sh format-check must lint an explicit Swift file list in quiet mode."
+  fi
+
+  if ! grep -Fq -- "-name '*.swift'" "$ROOT_DIR/scripts/ci.sh"; then
+    fail "ci.sh format-check must restrict the file list to Swift sources."
+  fi
+
+  if ! grep -Fq -- "SwiftFormat lint passed." "$ROOT_DIR/scripts/ci.sh"; then
+    fail "ci.sh format-check should write a concise success summary instead of repeated config-noise lines."
+  fi
+
+  echo "[PASS] ci.sh format-check lints only explicit Swift sources"
+}
+
+function test_core_tests_skip_empty_app_tests_gate() {
+  local core_tests_block
+  core_tests_block="$(sed -n '/function gate_core_tests()/,/^}/p' "$ROOT_DIR/scripts/ci.sh")"
+  if printf '%s\n' "$core_tests_block" | grep -Fq 'gate_app_tests'; then
+    fail "gate_core_tests should not invoke app-tests when no non-snapshot app tests are defined."
+  fi
+
+  if ! grep -Fq "No non-snapshot app unit tests are currently defined; snapshot coverage runs in snapshot-tests." "$ROOT_DIR/scripts/ci.sh"; then
+    fail "ci.sh should explain when app-tests is intentionally empty."
+  fi
+
+  echo "[PASS] core-tests no longer routes through the empty app-tests gate"
+}
+
+function test_package_tests_skip_duplicate_architecture_bundle() {
+  local package_tests_block
+  package_tests_block="$(sed -n '/function gate_package_tests()/,/^}/p' "$ROOT_DIR/scripts/ci.sh")"
+
+  if ! printf '%s\n' "$package_tests_block" | grep -Fq -- '-skip-testing:NativeChatArchitectureTests'; then
+    fail "gate_package_tests should skip NativeChatArchitectureTests because architecture-tests already covers that bundle."
+  fi
+
+  echo "[PASS] package-tests avoids rerunning the architecture bundle"
+}
+
+function test_successful_xcodebuild_log_sanitizer() {
+  if ! grep -Fq 'function sanitize_successful_xcodebuild_log()' "$ROOT_DIR/scripts/ci.sh"; then
+    fail "ci.sh must define a sanitizer for successful xcodebuild logs."
+  fi
+
+  if ! grep -Fq 'sanitize_successful_xcodebuild_log "$log_file"' "$ROOT_DIR/scripts/ci.sh"; then
+    fail "ci.sh must sanitize successful xcodebuild logs before warning checks run."
+  fi
+
+  if ! grep -Fq "and lines[i + 3].startswith(\"◇ Test run started.\")" "$ROOT_DIR/scripts/ci.sh"; then
+    fail "ci.sh should only remove the empty XCTest prelude when it is immediately followed by Swift Testing output."
+  fi
+
+  if ! grep -Fq 'IDERunDestination:' "$ROOT_DIR/scripts/ci.sh"; then
+    fail "ci.sh should remove the known xcodebuild IDERunDestination noise from successful logs."
+  fi
+
+  if ! grep -Fq 'IOSurfaceClientSetSurfaceNotify failed e00002c7' "$ROOT_DIR/scripts/ci.sh"; then
+    fail "ci.sh should remove the known IOSurface snapshot noise from successful logs."
+  fi
+
+  local architecture_tests_block
+  architecture_tests_block="$(sed -n '/function gate_architecture_tests()/,/^}/p' "$ROOT_DIR/scripts/ci.sh")"
+  if ! printf '%s\n' "$architecture_tests_block" | grep -Fq 'sanitize_successful_xcodebuild_log "$log_file"'; then
+    fail "gate_architecture_tests should sanitize its successful log before warning checks run."
+  fi
+
+  echo "[PASS] ci.sh sanitizes successful xcodebuild logs for known harmless noise"
+}
+
+function test_clean_outputs_removes_serial_probe_logs() {
+  if ! grep -Fq "find \"\$CI_OUTPUT_DIR\" -maxdepth 1 -name '*-serial-probe.log' -delete" "$ROOT_DIR/scripts/ci.sh"; then
+    fail "ci.sh clean_outputs must remove stale serial probe logs."
+  fi
+
+  echo "[PASS] ci.sh cleans stale serial-probe logs"
+}
+
+function test_ui_runner_avoids_xctestrun_noise() {
+  local ui_case_block
+  ui_case_block="$(sed -n '/function run_ui_test_case()/,/^}/p' "$ROOT_DIR/scripts/ci.sh")"
+
+  if ! grep -Fq 'function ensure_ui_test_build_artifacts()' "$ROOT_DIR/scripts/ci.sh"; then
+    fail "ci.sh should prepare UI build artifacts without depending on a .xctestrun path."
+  fi
+
+  if printf '%s\n' "$ui_case_block" | grep -Fq 'test-without-building'; then
+    fail "run_ui_test_case should no longer use test-without-building because it emits noisy IDERunDestination logs."
+  fi
+
+  if printf '%s\n' "$ui_case_block" | grep -Fq -- '-xctestrun'; then
+    fail "run_ui_test_case should no longer route UI tests through -xctestrun."
+  fi
+
+  if ! printf '%s\n' "$ui_case_block" | grep -Fq -- '-project "$XCODE_PROJECT"'; then
+    fail "run_ui_test_case should invoke xcodebuild with the project to keep logs clean."
+  fi
+
+  if ! printf '%s\n' "$ui_case_block" | grep -Fq -- '-scheme "$SCHEME"'; then
+    fail "run_ui_test_case should invoke xcodebuild with the scheme to keep logs clean."
+  fi
+
+  if ! printf '%s\n' "$ui_case_block" | grep -Fq -- '-derivedDataPath "$CI_DERIVED_DATA_DIR"'; then
+    fail "run_ui_test_case should reuse the prepared UI derived data."
+  fi
+
+  echo "[PASS] ci.sh runs UI cases directly from the prepared project/scheme without xctestrun noise"
 }
 
 function write_file() {
@@ -158,5 +308,14 @@ ASC_API_KEY_FALLBACK_PATH=$key_path
 
 test_check_warnings
 test_appintents_linker_setting
+test_lint_tool_version_is_pinned
+test_xcodebuild_log_tail_guard
+test_build_gate_uses_concrete_destination
+test_format_check_excludes_docc
+test_core_tests_skip_empty_app_tests_gate
+test_package_tests_skip_duplicate_architecture_bundle
+test_successful_xcodebuild_log_sanitizer
+test_clean_outputs_removes_serial_probe_logs
+test_ui_runner_avoids_xctestrun_noise
 test_release_preflight
 echo "Release infrastructure tests passed."
