@@ -191,9 +191,9 @@ extension SourceTargetBoundaryTests {
         let valueStore = MemoryStore()
         let store = SettingsStore(valueStore: valueStore)
 
-        #expect(store.defaultModel == .gpt5_4_pro)
-        #expect(store.defaultEffort == .xhigh)
-        #expect(store.defaultConversationConfiguration.model == .gpt5_4_pro)
+        #expect(store.defaultModel == .gpt5_4)
+        #expect(store.defaultEffort == .high)
+        #expect(store.defaultConversationConfiguration.model == .gpt5_4)
 
         valueStore.set(ModelType.gpt5_4_pro.rawValue, forKey: SettingsStore.Keys.defaultModel)
         valueStore.set(ReasoningEffort.low.rawValue, forKey: SettingsStore.Keys.defaultEffort)

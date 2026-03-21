@@ -4,6 +4,44 @@ import Testing
 @testable import NativeChatComposition
 
 extension SettingsScreenStoreTests {
+    @Test func `custom cloudflare mode stays neutral until custom credentials are complete`() {
+        let harness = makeTestSettingsScreenStoreHarness(
+            configurationProvider: RuntimeTestOpenAIConfigurationProvider(
+                cloudflareGatewayBaseURL: "",
+                cloudflareAIGToken: "",
+                useCloudflareGateway: false
+            )
+        )
+        let credentials = harness.store.credentials
+        harness.store.defaults.cloudflareEnabled = true
+
+        credentials.setCloudflareConfigurationMode(.custom)
+
+        #expect(credentials.cloudflareHealthStatus == .unknown)
+    }
+
+    @Test func `checking custom cloudflare health with incomplete configuration skips transport`() async {
+        let transport = StubOpenAITransport()
+        let harness = makeTestSettingsScreenStoreHarness(
+            apiKey: "sk-runtime",
+            configurationProvider: RuntimeTestOpenAIConfigurationProvider(
+                cloudflareGatewayBaseURL: "",
+                cloudflareAIGToken: "",
+                useCloudflareGateway: false
+            ),
+            transport: transport
+        )
+        let credentials = harness.store.credentials
+        harness.store.defaults.cloudflareEnabled = true
+        credentials.setCloudflareConfigurationMode(.custom)
+
+        await credentials.checkCloudflareHealth()
+
+        #expect(credentials.cloudflareHealthStatus == .unknown)
+        let requests = await transport.requests()
+        #expect(requests.isEmpty)
+    }
+
     @Test func `save custom cloudflare configuration persists across presenter reload`() {
         let initialConfigurationProvider = RuntimeTestOpenAIConfigurationProvider(
             cloudflareGatewayBaseURL: "https://gateway.default.local/v1",

@@ -19,13 +19,17 @@ struct SettingsCloudflareHealthResolver {
 
         let gatewayConfiguration = effectiveGatewayConfiguration(for: configuration)
         let gatewayBaseURL = gatewayConfiguration.baseURL
-        guard !gatewayBaseURL.isEmpty else {
-            return .gatewayUnavailable
-        }
-
         let gatewayToken = gatewayConfiguration.token
-        guard !gatewayToken.isEmpty else {
-            return .gatewayUnavailable
+
+        switch configuration.mode {
+        case .default:
+            guard !gatewayBaseURL.isEmpty, !gatewayToken.isEmpty else {
+                return .gatewayUnavailable
+            }
+        case .custom:
+            guard !gatewayBaseURL.isEmpty, !gatewayToken.isEmpty else {
+                return .unknown
+            }
         }
 
         guard isValidGatewayModelsURL(gatewayBaseURL) else {
@@ -121,6 +125,14 @@ struct SettingsCredentialHandlerImpl: SettingsCredentialHandler {
             gatewayEnabled: gatewayEnabled,
             configuration: configuration
         )
+        let gatewayConfiguration = healthResolver.effectiveGatewayConfiguration(
+            for: configuration
+        )
+        if configuration.mode == .custom,
+           (gatewayConfiguration.baseURL.isEmpty || gatewayConfiguration.token.isEmpty)
+        {
+            return .unknown
+        }
         guard localStatus == .unknown else {
             return localStatus
         }
@@ -134,9 +146,6 @@ struct SettingsCredentialHandlerImpl: SettingsCredentialHandler {
         }
 
         var request = gatewayRequest
-        let gatewayConfiguration = healthResolver.effectiveGatewayConfiguration(
-            for: configuration
-        )
         let gatewayBaseURL = gatewayConfiguration.baseURL
         request.url = URL(string: "\(gatewayBaseURL)/models")
         request.setValue(

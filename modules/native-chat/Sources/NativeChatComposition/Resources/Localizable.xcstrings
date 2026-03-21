@@ -1271,13 +1271,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Generated PDFs and other files are cached automatically so old download links still open or share later. Maximum cache size"
+            "value": "Files are cached so older links still open or share. Max cache size"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "生成的 PDF 和其他文件会自动缓存，以便旧的下载链接之后仍可打开或分享。最大缓存大小"
+            "value": "文件会缓存，旧链接仍可打开或分享。最大缓存大小"
           }
         }
       }
@@ -1287,13 +1287,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Generated images are cached automatically so old download links still open later. Maximum cache size"
+            "value": "Images are cached so older links still open. Max cache size"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "生成的图片会自动缓存，以便旧的下载链接之后仍可打开。最大缓存大小"
+            "value": "图片会缓存，旧链接仍可打开。最大缓存大小"
           }
         }
       }
@@ -1527,13 +1527,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Lower cost, but slower and less consistent response times."
+            "value": "Lower cost, lower priority."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "成本更低，但响应更慢且一致性较差。"
+            "value": "更省成本，优先级更低。"
           }
         }
       }
@@ -2151,13 +2151,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Route API requests through Cloudflare's global edge network for improved reliability and analytics."
+            "value": "Route requests through Cloudflare Gateway."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "通过 Cloudflare 的全球边缘网络路由 API 请求，以提升可靠性并提供分析能力。"
+            "value": "通过 Cloudflare Gateway 路由请求。"
           }
         }
       }
@@ -2407,13 +2407,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Slower initial response, but better resume for long-running generations."
+            "value": "Better for long-running tasks."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "初始响应更慢，但对于长时间运行的生成任务有更好的恢复能力。"
+            "value": "更适合长任务。"
           }
         }
       }
@@ -2551,13 +2551,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Switches between GPT-5.4 and GPT-5.4 Pro."
+            "value": "Use GPT-5.4 Pro."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "在 GPT-5.4 与 GPT-5.4 Pro 之间切换。"
+            "value": "使用 GPT-5.4 Pro。"
           }
         }
       }
@@ -2599,13 +2599,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "These defaults are applied only when you start a new chat. Existing conversations keep their own model, background, and pricing settings."
+            "value": "Applies to new chats only."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "这些默认值仅在开始新对话时应用。现有对话会保留各自的模型、后台和计费设置。"
+            "value": "仅用于新对话。"
           }
         }
       }
@@ -2791,13 +2791,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Your API key is stored securely in the device Keychain."
+            "value": "Stored securely in Keychain."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "您的 API 密钥会安全存储在设备的钥匙串中。"
+            "value": "安全存于钥匙串。"
           }
         }
       }

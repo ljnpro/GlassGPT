@@ -102,6 +102,15 @@ struct SettingsScreenStoreTests {
         #expect(harness.settingsValueStore.string(forKey: SettingsStore.Keys.defaultEffort) == ReasoningEffort.xhigh.rawValue)
     }
 
+    @Test func `fresh settings defaults keep pro background and flex disabled`() {
+        let store = makeTestSettingsScreenStore()
+        let defaults = store.defaults
+
+        #expect(!defaults.defaultProModeEnabled)
+        #expect(!defaults.defaultBackgroundModeEnabled)
+        #expect(!defaults.defaultFlexModeEnabled)
+    }
+
     @Test func `theme haptics and flex selections persist immediately`() {
         let harness = makeTestSettingsScreenStoreHarness()
         let store = harness.store

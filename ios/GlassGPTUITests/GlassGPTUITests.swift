@@ -174,6 +174,26 @@ final class GlassGPTUITests: XCTestCase {
     }
 
     @MainActor
+    func testSettingsGatewayScenarioCustomModeWaitsForInputBeforeStatusValidation() throws {
+        let app = launchApp(scenario: "settingsGateway")
+        _ = openSettings(in: app)
+
+        let modeControl = app.segmentedControls["settings.cloudflareMode"]
+        XCTAssertTrue(modeControl.waitForExistence(timeout: 5))
+
+        let customModeButton = modeControl.buttons["Custom"]
+        XCTAssertTrue(customModeButton.waitForExistence(timeout: 5))
+        customModeButton.tap()
+        XCTAssertTrue(waitForSelection(of: customModeButton, timeout: 5))
+
+        let checkConnectionButton = app.buttons["settings.checkConnection"]
+        XCTAssertTrue(checkConnectionButton.waitForExistence(timeout: 5))
+        XCTAssertFalse(checkConnectionButton.isEnabled)
+        XCTAssertFalse(app.staticTexts["Gateway unavailable in this build"].exists)
+        XCTAssertFalse(app.staticTexts["Not checked"].exists)
+    }
+
+    @MainActor
     func testHistoryScenarioShowsDeleteAllActionWhenSeeded() throws {
         let app = launchApp(scenario: "history")
         openHistory(in: app)
@@ -239,6 +259,20 @@ final class GlassGPTUITests: XCTestCase {
         app.swipeUp()
 
         XCTAssertTrue(waitForNonExistence(of: keyboard, timeout: 5))
+    }
+
+    @MainActor
+    func testSettingsScenarioReasoningEffortPickerOpensAvailableOptions() throws {
+        let app = launchApp(scenario: "settings")
+
+        _ = openSettings(in: app)
+        let effortPicker = app.descendants(matching: .any).matching(identifier: "settings.defaultEffort").firstMatch
+        revealIfNeeded(effortPicker, in: app)
+        XCTAssertTrue(effortPicker.waitForExistence(timeout: 5))
+
+        effortPicker.tap()
+
+        XCTAssertTrue(app.staticTexts["None"].waitForExistence(timeout: 5))
     }
 
     @MainActor
@@ -410,6 +444,49 @@ final class GlassGPTUITests: XCTestCase {
         XCTAssertTrue(apiKeyField.waitForExistence(timeout: 10))
         XCTAssertTrue(saveButton.waitForExistence(timeout: 5))
         XCTAssertFalse(saveButton.isEnabled)
+    }
+
+    @MainActor
+    func testFreshInstallScenarioChatDefaultsStartDisabled() throws {
+        let app = launchApp(scenario: "freshInstall")
+
+        _ = openSettings(in: app)
+        let proToggle = app.switches["settings.defaultProMode"]
+        revealIfNeeded(proToggle, in: app)
+        XCTAssertTrue(proToggle.waitForExistence(timeout: 5))
+
+        let backgroundToggle = app.switches["settings.defaultBackgroundMode"]
+        let flexToggle = app.switches["settings.defaultFlexMode"]
+        XCTAssertTrue(backgroundToggle.waitForExistence(timeout: 5))
+        XCTAssertTrue(flexToggle.waitForExistence(timeout: 5))
+        XCTAssertEqual(proToggle.value as? String, "0")
+        XCTAssertEqual(backgroundToggle.value as? String, "0")
+        XCTAssertEqual(flexToggle.value as? String, "0")
+
+        let defaultEffort = defaultEffortControl(in: app)
+        XCTAssertTrue(defaultEffort.waitForExistence(timeout: 5))
+        XCTAssertTrue(waitForValue(of: defaultEffort, "High", timeout: 5))
+    }
+
+    @MainActor
+    func testSettingsScenarioCanChangeDefaultReasoningEffort() throws {
+        let app = launchApp(scenario: "freshInstall")
+
+        _ = openSettings(in: app)
+        let defaultEffort = defaultEffortControl(in: app)
+        revealIfNeeded(defaultEffort, in: app)
+        XCTAssertTrue(defaultEffort.waitForExistence(timeout: 5))
+        XCTAssertTrue(waitForValue(of: defaultEffort, "High", timeout: 5))
+
+        defaultEffort.tap()
+
+        let mediumOption = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "label == %@", "Medium"))
+            .firstMatch
+        XCTAssertTrue(mediumOption.waitForExistence(timeout: 5))
+        mediumOption.tap()
+
+        XCTAssertTrue(waitForValue(of: defaultEffort, "Medium", timeout: 5))
     }
 
     @MainActor
@@ -660,6 +737,13 @@ final class GlassGPTUITests: XCTestCase {
         let apiKeyField = app.secureTextFields["settings.apiKey"]
         XCTAssertTrue(apiKeyField.waitForExistence(timeout: 5))
         return apiKeyField
+    }
+
+    @MainActor
+    private func defaultEffortControl(in app: XCUIApplication) -> XCUIElement {
+        app.descendants(matching: .any)
+            .matching(identifier: "settings.defaultEffort")
+            .firstMatch
     }
 
     @MainActor

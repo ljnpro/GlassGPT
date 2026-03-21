@@ -74,13 +74,13 @@ public final class SettingsStore {
         self.valueStore = valueStore
     }
 
-    /// The user's preferred default model. Falls back to `.gpt5_4_pro` if unset.
+    /// The user's preferred default model. Falls back to `.gpt5_4` if unset.
     public var defaultModel: ModelType {
         get {
             guard let raw = valueStore.string(forKey: Keys.defaultModel),
                   let model = ModelType(rawValue: raw)
             else {
-                return .gpt5_4_pro
+                return .gpt5_4
             }
             return model
         }
@@ -92,13 +92,13 @@ public final class SettingsStore {
     /// The user's preferred reasoning effort, clamped to the current model's available efforts.
     public var defaultEffort: ReasoningEffort {
         get {
+            let resolvedModel = defaultModel
             guard let raw = valueStore.string(forKey: Keys.defaultEffort),
                   let effort = ReasoningEffort(rawValue: raw)
             else {
-                return .xhigh
+                return resolvedModel.defaultEffort
             }
 
-            let resolvedModel = defaultModel
             let correctedEffort = resolvedModel.availableEfforts.contains(effort) ? effort : resolvedModel.defaultEffort
             if correctedEffort != effort {
                 valueStore.set(correctedEffort.rawValue, forKey: Keys.defaultEffort)

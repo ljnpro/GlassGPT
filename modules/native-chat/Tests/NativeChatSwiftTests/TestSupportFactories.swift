@@ -99,8 +99,8 @@ private func makeDefaultSettingsValueStore(
     cloudflareEnabled: Bool
 ) -> InMemorySettingsValueStore {
     let store = InMemorySettingsValueStore()
-    store.set(ModelType.gpt5_4_pro.rawValue, forKey: SettingsStore.Keys.defaultModel)
-    store.set(ReasoningEffort.xhigh.rawValue, forKey: SettingsStore.Keys.defaultEffort)
+    store.set(ModelType.gpt5_4.rawValue, forKey: SettingsStore.Keys.defaultModel)
+    store.set(ReasoningEffort.high.rawValue, forKey: SettingsStore.Keys.defaultEffort)
     store.set(false, forKey: SettingsStore.Keys.defaultBackgroundModeEnabled)
     store.set(ServiceTier.standard.rawValue, forKey: SettingsStore.Keys.defaultServiceTier)
     store.set(AppTheme.light.rawValue, forKey: SettingsStore.Keys.appTheme)

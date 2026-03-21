@@ -31,7 +31,9 @@ struct SettingsChatDefaultsSection: View {
                     Text(effort.displayName).tag(effort)
                 }
             }
+            .pickerStyle(.navigationLink)
             .accessibilityLabel(String(localized: "Default reasoning effort"))
+            .accessibilityValue(viewModel.defaultEffort.displayName)
             .accessibilityIdentifier("settings.defaultEffort")
         } header: {
             Text(String(localized: "Chat Defaults"))

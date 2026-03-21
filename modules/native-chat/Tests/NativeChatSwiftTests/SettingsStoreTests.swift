@@ -6,11 +6,11 @@ import Testing
 @testable import NativeChatComposition
 
 struct SettingsStoreTests {
-    @Test func `defaults match current app behavior`() {
+    @Test func `defaults match first install behavior`() {
         let store = SettingsStore(valueStore: InMemorySettingsValueStore())
 
-        #expect(store.defaultModel == .gpt5_4_pro)
-        #expect(store.defaultEffort == .xhigh)
+        #expect(store.defaultModel == .gpt5_4)
+        #expect(store.defaultEffort == .high)
         #expect(store.defaultServiceTier == .standard)
         #expect(store.defaultBackgroundModeEnabled == false)
         #expect(store.appTheme == .system)

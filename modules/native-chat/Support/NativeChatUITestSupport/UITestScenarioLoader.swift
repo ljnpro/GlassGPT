@@ -142,8 +142,8 @@ package enum UITestScenarioLoader {
     }
 
     private static func seedDefaultSettings(into settingsStore: SettingsStore) {
-        settingsStore.defaultModel = .gpt5_4_pro
-        settingsStore.defaultEffort = .xhigh
+        settingsStore.defaultModel = .gpt5_4
+        settingsStore.defaultEffort = .high
         settingsStore.defaultBackgroundModeEnabled = false
         settingsStore.defaultServiceTier = .standard
         settingsStore.appTheme = .light

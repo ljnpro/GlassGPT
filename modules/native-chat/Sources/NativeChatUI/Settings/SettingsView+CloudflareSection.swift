@@ -89,10 +89,12 @@ struct SettingsCloudflareSection: View {
 
                     VStack(alignment: .leading, spacing: 2) {
                         Text(String(localized: "Connection Status"))
-                        Text(statusText)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .multilineTextAlignment(.leading)
+                        if let statusText {
+                            Text(statusText)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .multilineTextAlignment(.leading)
+                        }
                     }
 
                     Spacer()
@@ -104,7 +106,7 @@ struct SettingsCloudflareSection: View {
                     }
                 }
                 .accessibilityElement(children: .combine)
-                .accessibilityLabel(String(localized: "Cloudflare connection status") + ": \(statusText)")
+                .accessibilityLabel(statusAccessibilityLabel)
                 .accessibilityIdentifier("settings.cloudflareStatus")
 
                 Button(String(localized: "Check Connection")) {
@@ -113,7 +115,7 @@ struct SettingsCloudflareSection: View {
                     }
                 }
                 .buttonStyle(.glass)
-                .disabled(credentials.isCheckingCloudflareHealth)
+                .disabled(credentials.isCheckingCloudflareHealth || isCustomConfigurationIncomplete)
                 .accessibilityLabel(String(localized: "Check Cloudflare connection"))
                 .accessibilityIdentifier("settings.checkConnection")
             }
@@ -139,7 +141,27 @@ struct SettingsCloudflareSection: View {
         }
     }
 
-    private var statusText: String {
+    private var isCustomConfigurationIncomplete: Bool {
+        guard credentials.cloudflareConfigurationMode == .custom else {
+            return false
+        }
+
+        return credentials.customCloudflareGatewayBaseURL
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .isEmpty
+            || credentials.customCloudflareAIGToken
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .isEmpty
+    }
+
+    private var statusText: String? {
+        if credentials.cloudflareConfigurationMode == .custom,
+           isCustomConfigurationIncomplete,
+           credentials.cloudflareHealthStatus == .unknown
+        {
+            return nil
+        }
+
         switch credentials.cloudflareHealthStatus {
         case .connected:
             String(localized: "Connected")
@@ -156,5 +178,13 @@ struct SettingsCloudflareSection: View {
         case .unknown:
             String(localized: "Not checked")
         }
+    }
+
+    private var statusAccessibilityLabel: String {
+        guard let statusText else {
+            return String(localized: "Cloudflare connection status")
+        }
+
+        return String(localized: "Cloudflare connection status") + ": \(statusText)"
     }
 }
