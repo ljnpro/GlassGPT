@@ -188,6 +188,10 @@ function test_successful_xcodebuild_log_sanitizer() {
     fail "ci.sh should delegate successful xcodebuild log cleanup to the shared sanitizer."
   fi
 
+  if ! grep -Fq 'ensure_successful_log_has_content "$log_file" "Completed ${label} successfully."' "$ROOT_DIR/scripts/ci.sh"; then
+    fail "ci.sh should write a concise fallback summary when a successful xcodebuild log sanitizes to empty output."
+  fi
+
   local architecture_tests_block
   architecture_tests_block="$(sed -n '/function gate_architecture_tests()/,/^}/p' "$ROOT_DIR/scripts/ci.sh")"
   if ! printf '%s\n' "$architecture_tests_block" | grep -Fq 'sanitize_successful_xcodebuild_log "$log_file"'; then
@@ -199,12 +203,17 @@ function test_successful_xcodebuild_log_sanitizer() {
   trap 'rm -rf "$temp_dir"' RETURN
 
   cat <<'EOF' >"$temp_dir/xcodebuild.log"
+Command line invocation:
+    /Applications/Xcode.app/Contents/Developer/usr/bin/xcodebuild test
 2026-03-21 00:00:00.000 [MT] IDERunDestination: Supported platforms for the buildables in the current scheme is empty.
 IOSurfaceClientSetSurfaceNotify failed e00002c7
 Test Suite 'All tests' started at 2026-03-21 00:00:00.000
 Test Suite 'All tests' passed at 2026-03-21 00:00:00.000
 Executed 0 tests, with 0 failures (0 unexpected) in 0.000 (0.000) seconds
 ◇ Test run started.
+Writing result bundle at path:
+	/tmp/example.xcresult
+note: Removed stale file '/tmp/example'
     cd /Applications/GlassGPT/ios
     /Applications/Xcode.app/Contents/Developer/usr/bin/appintentsmetadataprocessor --force
 2026-03-21 00:00:00.000 appintentsmetadataprocessor[1:2] Starting appintentsmetadataprocessor export
@@ -213,16 +222,23 @@ Executed 0 tests, with 0 failures (0 unexpected) in 0.000 (0.000) seconds
     /Applications/Xcode.app/Contents/Developer/usr/bin/appintentsnltrainingprocessor --archive-ssu-assets
 2026-03-21 00:00:00.000 appintentsnltrainingprocessor[1:2] Parsing options for appintentsnltrainingprocessor
 2026-03-21 00:00:00.000 appintentsnltrainingprocessor[1:2] No AppShortcuts found - Skipping.
-Retained line
 EOF
   python3 "$ROOT_DIR/scripts/sanitize_success_log.py" xcodebuild "$temp_dir/xcodebuild.log"
 
-  if grep -Eq 'IDERunDestination|IOSurfaceClientSetSurfaceNotify|appintentsmetadataprocessor|appintentsnltrainingprocessor|No AppShortcuts found - Skipping|skipping writing output' "$temp_dir/xcodebuild.log"; then
-    fail "sanitize_success_log.py should remove known harmless xcodebuild skip/noise lines."
+  if grep -Eq 'Command line invocation|IDERunDestination|IOSurfaceClientSetSurfaceNotify|appintentsmetadataprocessor|appintentsnltrainingprocessor|No AppShortcuts found - Skipping|skipping writing output|^note:' "$temp_dir/xcodebuild.log"; then
+    fail "sanitize_success_log.py should remove known harmless xcodebuild skip and compile-noise lines."
   fi
 
-  if ! grep -Fq 'Retained line' "$temp_dir/xcodebuild.log"; then
-    fail "sanitize_success_log.py should preserve unrelated xcodebuild output."
+  if ! grep -Fq 'Writing result bundle at path:' "$temp_dir/xcodebuild.log"; then
+    fail "sanitize_success_log.py should retain the xcresult location for successful tests."
+  fi
+
+  if ! grep -Fq '/tmp/example.xcresult' "$temp_dir/xcodebuild.log"; then
+    fail "sanitize_success_log.py should retain the result bundle path for successful tests."
+  fi
+
+  if ! grep -Fq 'Test completed successfully.' "$temp_dir/xcodebuild.log"; then
+    fail "sanitize_success_log.py should collapse successful test logs to a concise summary."
   fi
 
   cat <<'EOF' >"$temp_dir/Packaging.log"
@@ -242,10 +258,55 @@ EOF
     fail "sanitize_success_log.py should preserve unrelated distribution output."
   fi
 
+  cat <<'EOF' >"$temp_dir/upload.log"
+Running altool at path '/Applications/Xcode.app/Contents/SharedFrameworks/ContentDelivery.framework/Resources/altool'...
+
+2026-03-21 00:00:00.000  INFO: [ContentDelivery.Uploader.000000000]
+==========================================
+UPLOAD SUCCEEDED with no errors
+Delivery UUID: 1234-5678
+Transferred 42 bytes in 0.001 seconds (0.3MB/s, 2.4Mbps)
+==========================================
+No errors uploading archive at '/tmp/GlassGPT.ipa'.
+EOF
+  python3 "$ROOT_DIR/scripts/sanitize_success_log.py" upload "$temp_dir/upload.log"
+
+  if grep -Eq 'altool|INFO:|with no errors|No errors uploading archive|====' "$temp_dir/upload.log"; then
+    fail "sanitize_success_log.py should strip upload success noise while keeping the useful summary."
+  fi
+
+  if ! grep -Fq 'UPLOAD SUCCEEDED' "$temp_dir/upload.log"; then
+    fail "sanitize_success_log.py should retain a concise upload success marker."
+  fi
+
+  if ! grep -Fq 'Delivery UUID: 1234-5678' "$temp_dir/upload.log"; then
+    fail "sanitize_success_log.py should retain the upload delivery UUID."
+  fi
+
   rm -rf "$temp_dir"
   trap - RETURN
 
   echo "[PASS] ci.sh sanitizes successful xcodebuild logs for known harmless noise"
+}
+
+function test_release_upload_log_sanitizer() {
+  if ! grep -Fq 'function sanitize_successful_upload_log()' "$ROOT_DIR/scripts/release_testflight.sh"; then
+    fail "release_testflight.sh should define a dedicated upload log sanitizer."
+  fi
+
+  if ! grep -Fq 'sanitize_successful_upload_log "$UPLOAD_LOG"' "$ROOT_DIR/scripts/release_testflight.sh"; then
+    fail "release_testflight.sh should sanitize successful upload logs."
+  fi
+
+  if ! grep -Fq 'sanitize_success_log.py" upload "$log_file"' "$ROOT_DIR/scripts/release_testflight.sh"; then
+    fail "release_testflight.sh should delegate upload log cleanup to the shared sanitizer."
+  fi
+
+  if ! grep -Fq 'ensure_successful_log_has_content "$UPLOAD_LOG" "Upload completed successfully."' "$ROOT_DIR/scripts/release_testflight.sh"; then
+    fail "release_testflight.sh should ensure upload logs stay non-empty after sanitization."
+  fi
+
+  echo "[PASS] release_testflight.sh sanitizes successful upload logs"
 }
 
 function test_snapshot_gates_are_split_cleanly() {
@@ -475,6 +536,7 @@ test_workflow_pins_git_default_branch
 test_core_tests_skip_empty_app_tests_gate
 test_package_tests_skip_duplicate_architecture_bundle
 test_successful_xcodebuild_log_sanitizer
+test_release_upload_log_sanitizer
 test_snapshot_gates_are_split_cleanly
 test_simulator_lifecycle_uses_resolved_udid
 test_clean_outputs_removes_serial_probe_logs

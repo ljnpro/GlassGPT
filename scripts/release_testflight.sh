@@ -106,6 +106,25 @@ function sanitize_successful_distribution_log() {
   python3 "$ROOT_DIR/scripts/sanitize_success_log.py" distribution "$log_file"
 }
 
+function sanitize_successful_upload_log() {
+  local log_file="$1"
+
+  [[ -f "$log_file" ]] || return 0
+
+  python3 "$ROOT_DIR/scripts/sanitize_success_log.py" upload "$log_file"
+}
+
+function ensure_successful_log_has_content() {
+  local log_file="$1"
+  local summary="$2"
+
+  [[ -f "$log_file" ]] || return 0
+
+  if [[ ! -s "$log_file" ]]; then
+    printf '%s\n' "$summary" > "$log_file"
+  fi
+}
+
 function resolve_release_tag() {
   local version="$1"
   local build_number="$2"
@@ -290,6 +309,7 @@ xcodebuild \
   -authenticationKeyIssuerID "$ASC_ISSUER_ID" \
   "$XCODEBUILD_APPINTENTS_LINKER_SETTING" | tee "$ARCHIVE_LOG"
 python3 "$ROOT_DIR/scripts/sanitize_success_log.py" xcodebuild "$ARCHIVE_LOG"
+ensure_successful_log_has_content "$ARCHIVE_LOG" "Archive completed successfully."
 
 echo "==> Exporting"
 xcodebuild \
@@ -302,6 +322,7 @@ xcodebuild \
   -authenticationKeyID "$ASC_API_KEY_ID" \
   -authenticationKeyIssuerID "$ASC_ISSUER_ID" | tee "$EXPORT_LOG"
 python3 "$ROOT_DIR/scripts/sanitize_success_log.py" xcodebuild "$EXPORT_LOG"
+ensure_successful_log_has_content "$EXPORT_LOG" "Export completed successfully."
 sanitize_successful_distribution_log "$EXPORT_PATH/Packaging.log"
 
 if [[ ! -f "$IPA_PATH" ]]; then
@@ -337,6 +358,8 @@ UPLOAD_OUTPUT="$(
     --apiIssuer "$ASC_ISSUER_ID" \
     2>&1 | tee "$UPLOAD_LOG"
 )"
+sanitize_successful_upload_log "$UPLOAD_LOG"
+ensure_successful_log_has_content "$UPLOAD_LOG" "Upload completed successfully."
 DELIVERY_UUID="$(printf '%s\n' "$UPLOAD_OUTPUT" | awk -F'Delivery UUID: ' '/Delivery UUID:/ {print $2}' | tail -1)"
 
 if [[ -z "$DELIVERY_UUID" && -f "$UPLOAD_LOG" ]]; then

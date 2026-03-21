@@ -372,6 +372,17 @@ function sanitize_successful_xcodebuild_log() {
   python3 "$ROOT_DIR/scripts/sanitize_success_log.py" xcodebuild "$log_file"
 }
 
+function ensure_successful_log_has_content() {
+  local log_file="$1"
+  local summary="$2"
+
+  [[ -f "$log_file" ]] || return 0
+
+  if [[ ! -s "$log_file" ]]; then
+    printf '%s\n' "$summary" > "$log_file"
+  fi
+}
+
 function run_checked_xcodebuild_impl() {
   local label="$1"
   local workdir="$2"
@@ -408,6 +419,7 @@ function run_checked_xcodebuild_impl() {
 
     if (( command_status == 0 )); then
       sanitize_successful_xcodebuild_log "$log_file"
+      ensure_successful_log_has_content "$log_file" "Completed ${label} successfully."
       ./scripts/check_warnings.sh "$log_file"
       echo "Completed ${label}. Log: $log_file"
       return 0
