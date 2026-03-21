@@ -28,6 +28,9 @@ jobs:
         with:
           python-version: '3.14'
 
+      - name: Install Ruff
+        run: python3 -m pip install ruff
+
       - name: Print toolchain versions
         run: |
           xcodebuild -version
