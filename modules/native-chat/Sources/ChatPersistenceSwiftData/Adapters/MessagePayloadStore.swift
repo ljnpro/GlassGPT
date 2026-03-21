@@ -82,28 +82,28 @@ public enum MessagePayloadStore {
 
     /// Writes URL citations to the given message's `annotationsData` blob.
     public static func setAnnotations(_ items: [URLCitation], on message: Message) {
-        setPayload(items, label: "annotations") {
+        setPayload(items, existingData: message.annotationsData, label: "annotations") {
             message.annotationsData = $0
         }
     }
 
     /// Writes tool call metadata to the given message's `toolCallsData` blob.
     public static func setToolCalls(_ items: [ToolCallInfo], on message: Message) {
-        setPayload(items, label: "tool calls") {
+        setPayload(items, existingData: message.toolCallsData, label: "tool calls") {
             message.toolCallsData = $0
         }
     }
 
     /// Writes file attachments to the given message's `fileAttachmentsData` blob.
     public static func setFileAttachments(_ items: [FileAttachment], on message: Message) {
-        setPayload(items, label: "file attachments") {
+        setPayload(items, existingData: message.fileAttachmentsData, label: "file attachments") {
             message.fileAttachmentsData = $0
         }
     }
 
     /// Writes file-path annotations to the given message's `filePathAnnotationsData` blob.
     public static func setFilePathAnnotations(_ items: [FilePathAnnotation], on message: Message) {
-        setPayload(items, label: "file path annotations") {
+        setPayload(items, existingData: message.filePathAnnotationsData, label: "file path annotations") {
             message.filePathAnnotationsData = $0
         }
     }
@@ -181,20 +181,30 @@ public enum MessagePayloadStore {
         }
     }
 
-    private static func setPayload<T: PayloadCodable>(
+    package static func storedPayloadData<T: PayloadCodable>(
         _ items: [T],
+        existingData: Data?,
         label: String,
-        assign: (Data?) -> Void
-    ) {
+        logFailure: Bool = true
+    ) -> Data? {
         guard !items.isEmpty else {
-            assign(nil)
-            return
+            return nil
         }
 
         do {
-            assign(try encodedPayloadData(items, label: label))
+            return try encodedPayloadData(items, label: label, logFailure: logFailure)
         } catch {
+            return existingData
         }
+    }
+
+    private static func setPayload<T: PayloadCodable>(
+        _ items: [T],
+        existingData: Data?,
+        label: String,
+        assign: (Data?) -> Void
+    ) {
+        assign(storedPayloadData(items, existingData: existingData, label: label))
     }
 }
 
