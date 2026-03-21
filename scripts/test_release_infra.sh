@@ -131,6 +131,25 @@ function test_format_check_excludes_docc() {
   echo "[PASS] ci.sh format-check lints only explicit Swift sources"
 }
 
+function test_workflow_pins_git_default_branch() {
+  local workflow
+  workflow="$ROOT_DIR/.github/workflows/ios.yml"
+
+  if ! grep -Fq 'GIT_CONFIG_COUNT: 1' "$workflow"; then
+    fail "ios.yml must export a Git config count so checkout inherits the initial branch override."
+  fi
+
+  if ! grep -Fq 'GIT_CONFIG_KEY_0: init.defaultBranch' "$workflow"; then
+    fail "ios.yml must set init.defaultBranch for checkout to avoid Git default-branch hint noise."
+  fi
+
+  if ! grep -Fq 'GIT_CONFIG_VALUE_0: main' "$workflow"; then
+    fail "ios.yml must pin the initial Git branch to main for checkout."
+  fi
+
+  echo "[PASS] ios.yml pins the checkout Git default branch"
+}
+
 function test_core_tests_skip_empty_app_tests_gate() {
   local core_tests_block
   core_tests_block="$(sed -n '/function gate_core_tests()/,/^}/p' "$ROOT_DIR/scripts/ci.sh")"
@@ -352,6 +371,7 @@ test_lint_tool_version_is_pinned
 test_xcodebuild_log_tail_guard
 test_build_gate_uses_concrete_destination
 test_format_check_excludes_docc
+test_workflow_pins_git_default_branch
 test_core_tests_skip_empty_app_tests_gate
 test_package_tests_skip_duplicate_architecture_bundle
 test_successful_xcodebuild_log_sanitizer
