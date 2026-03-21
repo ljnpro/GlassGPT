@@ -3,10 +3,6 @@ set -euo pipefail
 
 export PYTHONDONTWRITEBYTECODE="${PYTHONDONTWRITEBYTECODE:-1}"
 
-python3 -c "import sys; assert sys.version_info >= (3, 14), f'Python 3.14+ required, got {sys.version}'"
-swift_version="$(swift --version 2>&1)"
-[[ "$swift_version" == *"6.2"* ]] || { echo "Swift 6.2+ required"; exit 1; }
-
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 CI_OUTPUT_DIR="$ROOT_DIR/.local/build/ci"
 CI_DERIVED_DATA_DIR="$CI_OUTPUT_DIR/DerivedData"
