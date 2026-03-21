@@ -5,6 +5,55 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- A GitHub push checklist documenting the verified PAT-based push, remote-run watching, and log-audit flow for this repository
+
+### Changed
+
+- Release readiness now defaults to the version values in `Versions.xcconfig` instead of stale hardcoded expectations
+- Successful release packaging logs are sanitized down to a clean summary so release artifacts stay free of warning-like noise
+
+## [4.10.3] - 2026-03-21
+
+### Changed
+
+- Repeated TestFlight submissions for the `4.10.3` line now accept new build numbers without forcing a marketing version bump
+- Release infrastructure tests now cover sanitized packaging logs and repeated-release version handling
+
+## [4.10.2] - 2026-03-21
+
+### Added
+
+- Inline settings coverage for the Cloudflare custom gateway form, plus deterministic UI-test environment reset support for repeated settings scenarios
+
+### Changed
+
+- The reasoning effort control now expands inline in Settings instead of pushing to a separate picker screen
+- Cloudflare custom configuration keeps the custom mode active while clearing saved values, matching the intended form behavior
+- Snapshot, UI, and release-infra coverage were expanded so settings regressions are caught before shipping
+
+## [4.10.1] - 2026-03-21
+
+### Fixed
+
+- Settings relaunch no longer regresses API-key verification when Cloudflare routing is enabled
+- Cloudflare gateway status copy now returns the correct built-in status instead of showing the wrong unavailable state
+- Settings persistence now retains the corrected Cloudflare custom configuration path across reloads
+
+## [4.10.0] - 2026-03-21
+
+### Added
+
+- Cloudflare gateway configuration modes with persisted custom URL and token support, plus direct-route API-key validation and first-stream gateway fallback handling
+- Split transport, runtime, and composition support types that keep `ReplySessionActor`, request factories, and composition wiring aligned with the 4.10 module boundaries
+
+### Changed
+
+- Runtime, settings, and CI wiring were stabilized for the 4.10 release line, including stricter release-infrastructure checks and cleaner production composition boundaries
+
 ## [4.9.1] - 2026-03-20
 
 ### Added
@@ -87,7 +136,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - APP_INTENTS_METADATA_TOOL_SEARCH_PATHS build setting to suppress vendor warnings (Phase J)
 - check_warnings.sh now checks only source-file warnings, eliminating exception patterns (Phase J)
 
-## [Unreleased] - 4.8.0
+## [4.8.0] - 2026-03-18
 
 ### Added
 - Full API documentation with doc comments on all public symbols
@@ -142,9 +191,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - Migrated from React Native / Expo to fully native Swift and SwiftUI
 
-[Unreleased]: https://github.com/ljnpro/GlassGPT/compare/v4.8.2...HEAD
-[4.9.0]: https://github.com/ljnpro/GlassGPT/compare/v4.8.2...HEAD
+[Unreleased]: https://github.com/ljnpro/GlassGPT/compare/v4.10.3...HEAD
+[4.10.3]: https://github.com/ljnpro/GlassGPT/compare/v4.10.2...v4.10.3
+[4.10.2]: https://github.com/ljnpro/GlassGPT/compare/v4.10.1...v4.10.2
+[4.10.1]: https://github.com/ljnpro/GlassGPT/compare/0d96eab19deb26571a93107626fa982725563805...v4.10.1
+[4.10.0]: https://github.com/ljnpro/GlassGPT/compare/d70aef5...0d96eab19deb26571a93107626fa982725563805
+[4.9.1]: https://github.com/ljnpro/GlassGPT/compare/v4.9.0...d70aef5
+[4.9.0]: https://github.com/ljnpro/GlassGPT/compare/v4.8.2...v4.9.0
 [4.8.2]: https://github.com/ljnpro/GlassGPT/compare/v4.8.1...v4.8.2
+[4.8.1]: https://github.com/ljnpro/GlassGPT/compare/v4.8.0...v4.8.1
+[4.8.0]: https://github.com/ljnpro/GlassGPT/compare/v4.7.0...v4.8.0
 [4.7.0]: https://github.com/ljnpro/GlassGPT/compare/v4.6.0...v4.7.0
 [4.6.0]: https://github.com/ljnpro/GlassGPT/compare/v4.5.0...v4.6.0
 [4.5.0]: https://github.com/ljnpro/GlassGPT/releases/tag/v4.5.0
