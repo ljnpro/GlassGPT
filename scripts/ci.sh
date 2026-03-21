@@ -13,7 +13,9 @@ VERSIONS_XCCONFIG_PATH="$ROOT_DIR/ios/GlassGPT/Config/Versions.xcconfig"
 APP_BUNDLE_IDENTIFIER="space.manus.liquid.glass.chat.t20260308214621"
 UI_TEST_RUNNER_BUNDLE_IDENTIFIER="${APP_BUNDLE_IDENTIFIER}UITests.xctrunner"
 SIMULATOR_DEVICE_NAME="${SIMULATOR_DEVICE_NAME:-iPhone 17}"
-SIMULATOR_DEVICE_DESTINATION="platform=iOS Simulator,name=${SIMULATOR_DEVICE_NAME}"
+SIMULATOR_RUNTIME_IDENTIFIER="${SIMULATOR_RUNTIME_IDENTIFIER:-}"
+SIM_UDID="${SIM_UDID:-}"
+SIMULATOR_DEVICE_DESTINATION=""
 DEFAULT_RELEASE_VERSION="4.10.0"
 DEFAULT_RELEASE_BUILD="20185"
 XCODEBUILD_RETRY_ATTEMPTS="${XCODEBUILD_RETRY_ATTEMPTS:-5}"
@@ -80,6 +82,75 @@ function search_quiet() {
     grep -Eq -- "$pattern" "$@"
   fi
 }
+
+function resolve_simulator_device() {
+  local selection
+  selection="$(python3 - "$SIMULATOR_DEVICE_NAME" "$SIMULATOR_RUNTIME_IDENTIFIER" "$SIM_UDID" <<'PY'
+import json
+import re
+import subprocess
+import sys
+
+requested_name = sys.argv[1]
+requested_runtime = sys.argv[2]
+requested_udid = sys.argv[3]
+
+result = subprocess.run(
+    ["xcrun", "simctl", "list", "devices", "available", "--json"],
+    check=True,
+    capture_output=True,
+    text=True,
+)
+payload = json.loads(result.stdout)
+candidates = []
+
+for runtime_identifier, devices in payload.get("devices", {}).items():
+    if not runtime_identifier.startswith("com.apple.CoreSimulator.SimRuntime.iOS-"):
+        continue
+
+    runtime_version = tuple(int(component) for component in re.findall(r"\d+", runtime_identifier))
+    if requested_runtime and requested_runtime not in {runtime_identifier, runtime_identifier.split(".")[-1]}:
+        continue
+
+    for device in devices:
+        if not device.get("isAvailable"):
+            continue
+        if requested_udid:
+            if device.get("udid") != requested_udid:
+                continue
+        elif device.get("name") != requested_name:
+            continue
+
+        candidates.append(
+            (
+                runtime_version,
+                device.get("state") == "Booted",
+                device["udid"],
+                device["name"],
+                runtime_identifier,
+            )
+        )
+
+if not candidates:
+    raise SystemExit(
+        f"Unable to resolve an available iOS simulator for name={requested_name!r} runtime={requested_runtime!r} udid={requested_udid!r}."
+    )
+
+candidates.sort(reverse=True)
+_, _, selected_udid, selected_name, selected_runtime = candidates[0]
+print(selected_udid)
+print(selected_name)
+print(selected_runtime)
+PY
+)"
+
+  SIM_UDID="$(printf '%s\n' "$selection" | sed -n '1p')"
+  SIMULATOR_DEVICE_NAME="$(printf '%s\n' "$selection" | sed -n '2p')"
+  SIMULATOR_RUNTIME_IDENTIFIER="$(printf '%s\n' "$selection" | sed -n '3p')"
+  SIMULATOR_DEVICE_DESTINATION="platform=iOS Simulator,id=${SIM_UDID}"
+}
+
+resolve_simulator_device
 
 function clean_stale_xctestrun() {
   local derived_data="${DERIVED_DATA_PATH:-$HOME/Library/Developer/Xcode/DerivedData}"
@@ -165,16 +236,16 @@ function prepare_simulator_state() {
   pkill -f 'xcodebuild .* -scheme NativeChat ' >/dev/null 2>&1 || true
   sleep 1
   xcrun simctl shutdown all >/dev/null 2>&1 || true
-  xcrun simctl boot "$SIMULATOR_DEVICE_NAME" >/dev/null 2>&1 || true
-  python3 - "$SIMULATOR_DEVICE_NAME" "$SIMULATOR_BOOT_TIMEOUT_SECONDS" <<'PY' >/dev/null 2>&1 || true
+  xcrun simctl boot "$SIM_UDID" >/dev/null 2>&1 || true
+  python3 - "$SIM_UDID" "$SIMULATOR_BOOT_TIMEOUT_SECONDS" <<'PY' >/dev/null 2>&1 || true
 import subprocess
 import sys
 import time
 
-device_name = sys.argv[1]
+device_udid = sys.argv[1]
 timeout_seconds = float(sys.argv[2])
 process = subprocess.Popen(
-    ["xcrun", "simctl", "bootstatus", device_name, "-b"],
+    ["xcrun", "simctl", "bootstatus", device_udid, "-b"],
     stdout=subprocess.DEVNULL,
     stderr=subprocess.DEVNULL,
 )
@@ -190,8 +261,8 @@ while True:
     time.sleep(1)
 PY
   sleep 2
-  xcrun simctl uninstall "$SIMULATOR_DEVICE_NAME" "$APP_BUNDLE_IDENTIFIER" >/dev/null 2>&1 || true
-  xcrun simctl uninstall "$SIMULATOR_DEVICE_NAME" "$UI_TEST_RUNNER_BUNDLE_IDENTIFIER" >/dev/null 2>&1 || true
+  xcrun simctl uninstall "$SIM_UDID" "$APP_BUNDLE_IDENTIFIER" >/dev/null 2>&1 || true
+  xcrun simctl uninstall "$SIM_UDID" "$UI_TEST_RUNNER_BUNDLE_IDENTIFIER" >/dev/null 2>&1 || true
 }
 
 function recover_simulator_runtime() {
@@ -199,7 +270,7 @@ function recover_simulator_runtime() {
   pkill -9 -f CoreSimulatorService >/dev/null 2>&1 || true
   sleep 2
   xcrun simctl shutdown all >/dev/null 2>&1 || true
-  xcrun simctl erase "$SIMULATOR_DEVICE_NAME" >/dev/null 2>&1 || true
+  xcrun simctl erase "$SIM_UDID" >/dev/null 2>&1 || true
   prepare_simulator_state
 }
 

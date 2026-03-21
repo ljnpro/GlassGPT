@@ -96,6 +96,18 @@ function test_build_gate_uses_concrete_destination() {
     fail "gate_build should not rely on -sdk iphonesimulator alone because it emits destination warnings."
   fi
 
+  if ! grep -Fq 'function resolve_simulator_device()' "$ROOT_DIR/scripts/ci.sh"; then
+    fail "ci.sh must resolve a concrete simulator before invoking xcodebuild gates."
+  fi
+
+  if ! grep -Fq 'xcrun", "simctl", "list", "devices", "available", "--json"' "$ROOT_DIR/scripts/ci.sh"; then
+    fail "ci.sh must resolve simulator devices from simctl JSON to avoid ambiguous name-only selection."
+  fi
+
+  if ! grep -Fq 'SIMULATOR_DEVICE_DESTINATION="platform=iOS Simulator,id=${SIM_UDID}"' "$ROOT_DIR/scripts/ci.sh"; then
+    fail "ci.sh must pass a simulator id-based destination once the device is resolved."
+  fi
+
   echo "[PASS] build gate pins a concrete simulator destination"
 }
 
@@ -168,6 +180,30 @@ function test_successful_xcodebuild_log_sanitizer() {
   fi
 
   echo "[PASS] ci.sh sanitizes successful xcodebuild logs for known harmless noise"
+}
+
+function test_simulator_lifecycle_uses_resolved_udid() {
+  local prepare_block recover_block
+  prepare_block="$(sed -n '/function prepare_simulator_state()/,/^}/p' "$ROOT_DIR/scripts/ci.sh")"
+  recover_block="$(sed -n '/function recover_simulator_runtime()/,/^}/p' "$ROOT_DIR/scripts/ci.sh")"
+
+  if ! printf '%s\n' "$prepare_block" | grep -Fq 'xcrun simctl boot "$SIM_UDID"'; then
+    fail "prepare_simulator_state should boot the resolved simulator UDID."
+  fi
+
+  if ! printf '%s\n' "$prepare_block" | grep -Fq 'xcrun simctl uninstall "$SIM_UDID" "$APP_BUNDLE_IDENTIFIER"'; then
+    fail "prepare_simulator_state should uninstall the app from the resolved simulator UDID."
+  fi
+
+  if ! printf '%s\n' "$prepare_block" | grep -Fq '["xcrun", "simctl", "bootstatus", device_udid, "-b"]'; then
+    fail "prepare_simulator_state should wait on bootstatus for the resolved simulator UDID."
+  fi
+
+  if ! printf '%s\n' "$recover_block" | grep -Fq 'xcrun simctl erase "$SIM_UDID"'; then
+    fail "recover_simulator_runtime should erase the resolved simulator UDID."
+  fi
+
+  echo "[PASS] simulator lifecycle uses the resolved UDID consistently"
 }
 
 function test_clean_outputs_removes_serial_probe_logs() {
@@ -315,6 +351,7 @@ test_format_check_excludes_docc
 test_core_tests_skip_empty_app_tests_gate
 test_package_tests_skip_duplicate_architecture_bundle
 test_successful_xcodebuild_log_sanitizer
+test_simulator_lifecycle_uses_resolved_udid
 test_clean_outputs_removes_serial_probe_logs
 test_ui_runner_avoids_xctestrun_noise
 test_release_preflight
