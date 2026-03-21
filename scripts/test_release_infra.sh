@@ -403,7 +403,7 @@ ASC_API_KEY_FALLBACK_PATH=$key_path
   git -C "$repo_dir" checkout codex/stable-4.10 >/dev/null 2>&1
 
   set +e
-  output="$("$repo_dir/scripts/release_testflight.sh" 4.10.0 20185 --branch codex/stable-4.10 --preflight-only 2>&1)"
+  output="$(env -u PUSH_RELEASE "$repo_dir/scripts/release_testflight.sh" 4.10.0 20185 --branch codex/stable-4.10 --preflight-only 2>&1)"
   status=$?
   set -e
   if [[ $status -eq 0 ]]; then
@@ -413,13 +413,13 @@ ASC_API_KEY_FALLBACK_PATH=$key_path
     fail "release_testflight.sh did not report the non-fast-forward main promotion preflight failure."
   fi
 
-  "$repo_dir/scripts/release_testflight.sh" 4.10.0 20185 \
+  env -u PUSH_RELEASE "$repo_dir/scripts/release_testflight.sh" 4.10.0 20185 \
     --branch codex/stable-4.10 \
     --preserve-main-as codex/stable-4.9 \
     --force-main-with-lease \
     --preflight-only >/dev/null
 
-  "$repo_dir/scripts/release_testflight.sh" 4.10.0 20185 \
+  env -u PUSH_RELEASE "$repo_dir/scripts/release_testflight.sh" 4.10.0 20185 \
     --branch codex/stable-4.10 \
     --skip-main-promotion \
     --preflight-only >/dev/null
