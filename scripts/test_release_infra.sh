@@ -104,8 +104,12 @@ function test_build_gate_uses_concrete_destination() {
     fail "ci.sh must resolve simulator devices from simctl JSON to avoid ambiguous name-only selection."
   fi
 
-  if ! grep -Fq 'SIMULATOR_DEVICE_DESTINATION="platform=iOS Simulator,id=${SIM_UDID}"' "$ROOT_DIR/scripts/ci.sh"; then
-    fail "ci.sh must pass a simulator id-based destination once the device is resolved."
+  if ! grep -Fq 'SIMULATOR_ARCH="${SIMULATOR_ARCH:-$(uname -m)}"' "$ROOT_DIR/scripts/ci.sh"; then
+    fail "ci.sh must resolve the simulator destination architecture from the current host."
+  fi
+
+  if ! grep -Fq 'SIMULATOR_DEVICE_DESTINATION="platform=iOS Simulator,arch=${SIMULATOR_ARCH},id=${SIM_UDID}"' "$ROOT_DIR/scripts/ci.sh"; then
+    fail "ci.sh must pass a simulator destination pinned by architecture and id once the device is resolved."
   fi
 
   echo "[PASS] build gate pins a concrete simulator destination"
