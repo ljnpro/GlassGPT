@@ -1,8 +1,8 @@
-import ChatDomain
-import ChatPersistenceSwiftData
 import Foundation
 import OpenAITransport
 import Testing
+@testable import ChatDomain
+@testable import ChatPersistenceSwiftData
 @testable import NativeChatComposition
 
 // MARK: - Action Queries and Output Fallbacks
@@ -207,6 +207,28 @@ extension OpenAIResponseParserTests {
 
         #expect(data == Data(#"{"payload_encoding_error":true}"#.utf8))
     }
+
+    @Test func `payload codable throwing helpers surface encoding and decoding failures`() {
+        #expect(throws: EncodingError.self) {
+            _ = try FailingPayload.encodeOrThrow([FailingPayload()])
+        }
+
+        #expect(throws: DecodingError.self) {
+            let _: [URLCitation]? = try URLCitation.decodeOrThrow(Data("not-json".utf8))
+        }
+    }
+
+    @Test func `payload store keeps existing data when replacement encoding fails`() {
+        let existing = Data("preserve-me".utf8)
+        let stored = MessagePayloadStore.storedPayloadData(
+            [FailingPayload()],
+            existingData: existing,
+            label: "test payload",
+            logFailure: false
+        )
+
+        #expect(stored == existing)
+    }
 }
 
 // MARK: - Test Fixture Builders
@@ -377,6 +399,23 @@ private struct FailingDigestPayload: Encodable {
         throw EncodingError.invalidValue(
             "boom",
             .init(codingPath: [], debugDescription: "intentional test failure")
+        )
+    }
+}
+
+private struct FailingPayload: PayloadCodable {
+    func encode(to _: Encoder) throws {
+        throw EncodingError.invalidValue(
+            "boom",
+            .init(codingPath: [], debugDescription: "intentional payload failure")
+        )
+    }
+
+    init() {}
+
+    init(from _: Decoder) throws {
+        throw DecodingError.dataCorrupted(
+            .init(codingPath: [], debugDescription: "intentional payload decode failure")
         )
     }
 }

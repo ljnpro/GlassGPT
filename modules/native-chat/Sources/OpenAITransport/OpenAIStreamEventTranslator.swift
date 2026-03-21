@@ -123,19 +123,19 @@ public enum OpenAIStreamEventTranslator {
         return nil
     }
 
-    static func extractOutputText(from response: ResponsesResponseDTO) -> String? {
+    public static func extractOutputText(from response: ResponsesResponseDTO) -> String? {
         OpenAIResponseOutputExtractor.extractOutputText(from: response)
     }
 
-    static func extractReasoningText(from response: ResponsesResponseDTO) -> String? {
+    public static func extractReasoningText(from response: ResponsesResponseDTO) -> String? {
         OpenAIResponseOutputExtractor.extractReasoningText(from: response)
     }
 
-    static func extractFilePathAnnotations(from response: ResponsesResponseDTO) -> [FilePathAnnotation] {
+    public static func extractFilePathAnnotations(from response: ResponsesResponseDTO) -> [FilePathAnnotation] {
         OpenAIResponseOutputExtractor.extractFilePathAnnotations(from: response)
     }
 
-    static func extractErrorMessage(from response: ResponsesResponseDTO) -> String? {
+    public static func extractErrorMessage(from response: ResponsesResponseDTO) -> String? {
         OpenAIResponseOutputExtractor.extractErrorMessage(from: response)
     }
 
