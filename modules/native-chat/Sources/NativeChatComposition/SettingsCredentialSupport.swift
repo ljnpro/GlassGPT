@@ -129,8 +129,7 @@ struct SettingsCredentialHandlerImpl: SettingsCredentialHandler {
             for: configuration
         )
         if configuration.mode == .custom,
-           (gatewayConfiguration.baseURL.isEmpty || gatewayConfiguration.token.isEmpty)
-        {
+           gatewayConfiguration.baseURL.isEmpty || gatewayConfiguration.token.isEmpty {
             return .unknown
         }
         guard localStatus == .unknown else {

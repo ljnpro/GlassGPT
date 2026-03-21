@@ -157,8 +157,7 @@ struct SettingsCloudflareSection: View {
     private var statusText: String? {
         if credentials.cloudflareConfigurationMode == .custom,
            isCustomConfigurationIncomplete,
-           credentials.cloudflareHealthStatus == .unknown
-        {
+           credentials.cloudflareHealthStatus == .unknown {
             return nil
         }
 
