@@ -976,6 +976,30 @@ EOF
   echo "[PASS] performance regression pipeline is enforced and script-covered"
 }
 
+function test_python_lint_uses_runner_ruff_resolution() {
+  if ! grep -Fq 'function run_ruff()' "$ROOT_DIR/scripts/ci.sh"; then
+    fail "ci.sh should centralize Ruff invocation behind run_ruff."
+  fi
+
+  if ! grep -Fq 'if command -v ruff >/dev/null 2>&1; then' "$ROOT_DIR/scripts/ci.sh"; then
+    fail "run_ruff should prefer the Ruff executable when it is present on PATH."
+  fi
+
+  if ! grep -Fq 'if [[ -n "${pythonLocation:-}" ]] && [[ -x "$pythonLocation/bin/python3" ]]; then' "$ROOT_DIR/scripts/ci.sh"; then
+    fail "run_ruff should fall back to the setup-python interpreter when pythonLocation is available."
+  fi
+
+  if ! grep -Fq 'run_ruff check scripts/' "$ROOT_DIR/scripts/ci.sh"; then
+    fail "gate_python_lint should invoke Ruff through run_ruff."
+  fi
+
+  if ! grep -Fq '"$pythonLocation/bin/python3" -m pip install ruff' "$ROOT_DIR/.github/workflows/ios.yml"; then
+    fail "ios.yml should install Ruff into the setup-python toolchain."
+  fi
+
+  echo "[PASS] python lint resolves Ruff through the runner toolchain"
+}
+
 function test_ui_test_shards_are_split_cleanly() {
   if ! grep -Fq 'source "$ROOT_DIR/scripts/lib_ui_test_sharding.sh"' "$ROOT_DIR/scripts/ci.sh"; then
     fail "ci.sh should source the shared UI test sharding library."
@@ -1056,5 +1080,6 @@ test_release_tag_resolution_supports_repeat_builds
 test_snapshot_recording_covers_hosted_references
 test_single_flight_guards_prevent_overlapping_local_runs
 test_performance_regression_pipeline
+test_python_lint_uses_runner_ruff_resolution
 test_ui_test_shards_are_split_cleanly
 echo "Release infrastructure tests passed."

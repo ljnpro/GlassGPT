@@ -57,6 +57,20 @@ function search_quiet() {
   fi
 }
 
+function run_ruff() {
+  if command -v ruff >/dev/null 2>&1; then
+    ruff "$@"
+    return
+  fi
+
+  if [[ -n "${pythonLocation:-}" ]] && [[ -x "$pythonLocation/bin/python3" ]]; then
+    "$pythonLocation/bin/python3" -m ruff "$@"
+    return
+  fi
+
+  python3 -m ruff "$@"
+}
+
 function resolve_simulator_device() {
   local selection
   selection="$(python3 - "$SIMULATOR_DEVICE_NAME" "$SIMULATOR_RUNTIME_IDENTIFIER" "$SIM_UDID" <<'PY'
@@ -977,7 +991,7 @@ function gate_format_check() {
 
 function gate_python_lint() {
   log "Running Python lint gate"
-  python3 -m ruff check scripts/
+  run_ruff check scripts/
 }
 
 function gate_ci_health() {
