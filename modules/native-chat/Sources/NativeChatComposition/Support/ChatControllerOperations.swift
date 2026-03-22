@@ -48,6 +48,10 @@ extension ChatController {
         sessionCoordinator.suspendActiveSessionsForAppBackground()
     }
 
+    func suspendActiveSessionsForAppBackgroundNow() async {
+        await sessionCoordinator.suspendActiveSessionsForAppBackgroundNow()
+    }
+
     func cancelGeneratedFilePrefetches(_ requests: Set<GeneratedFilePrefetchRequest>) {
         Task {
             for request in requests {

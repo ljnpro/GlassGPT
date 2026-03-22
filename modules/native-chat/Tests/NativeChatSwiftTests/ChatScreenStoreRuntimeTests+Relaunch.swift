@@ -147,7 +147,7 @@ extension ChatScreenStoreRuntimeTests {
         }
 
         initialStore.handleEnterBackground()
-        initialStore.suspendActiveSessionsForAppBackground()
+        await initialStore.suspendActiveSessionsForAppBackgroundNow()
 
         let relaunchTransport = StubOpenAITransport()
         let streamURL = try #require(
@@ -260,7 +260,7 @@ extension ChatScreenStoreRuntimeTests {
         }
 
         store.handleEnterBackground()
-        store.suspendActiveSessionsForAppBackground()
+        await store.suspendActiveSessionsForAppBackgroundNow()
 
         let suspendedMessage = try #require(latestAssistantMessage(in: store))
         #expect(suspendedMessage.responseId == responseId)
@@ -296,7 +296,7 @@ extension ChatScreenStoreRuntimeTests {
         }
 
         store.handleEnterBackground()
-        store.suspendActiveSessionsForAppBackground()
+        await store.suspendActiveSessionsForAppBackgroundNow()
 
         let suspendedMessage = try #require(latestAssistantMessage(in: store))
         #expect(suspendedMessage.responseId == responseId)

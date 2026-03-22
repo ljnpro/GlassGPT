@@ -7,6 +7,7 @@ ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 CI_OUTPUT_DIR="$ROOT_DIR/.local/build/ci"
 CI_DERIVED_DATA_DIR="$CI_OUTPUT_DIR/DerivedData"
 CI_SOURCE_PACKAGES_DIR="$CI_OUTPUT_DIR/SourcePackages"
+CI_COMPLETION_NOTICES_FILE="$CI_OUTPUT_DIR/completion-notices.txt"
 XCODE_PROJECT="$ROOT_DIR/ios/GlassGPT.xcodeproj"
 SCHEME="GlassGPT"
 VERSIONS_XCCONFIG_PATH="$ROOT_DIR/ios/GlassGPT/Config/Versions.xcconfig"
@@ -200,7 +201,7 @@ function is_transient_xcodebuild_failure() {
   fi
 
   search_quiet \
-    'Application failed preflight checks|reason: Busy \("Application failed preflight checks"\)|Simulator device failed to launch|Lost connection to test runner|Unable to boot device in current state|Failed to background test runner|Invalid device state|Failed to launch app with identifier|server died|mkstemp: No such file or directory|database is locked|Early unexpected exit, operation never finished bootstrapping|Test crashed with signal kill before establishing connection|Application info provider \(FBSApplicationLibrary\) returned nil|CoreSimulatorService connection interrupted|Connection interrupted|Restarting after unexpected exit, crash, or test timeout|There are no test bundles available to test|killed' \
+    'Application failed preflight checks|reason: Busy \("Application failed preflight checks"\)|Simulator device failed to launch|Lost connection to test runner|Unable to boot device in current state|Failed to background test runner|Invalid device state|Failed to launch app with identifier|server died|mkstemp: No such file or directory|database is locked|Early unexpected exit, operation never finished bootstrapping|Test crashed with signal kill before establishing connection|Application info provider \(FBSApplicationLibrary\) returned nil|CoreSimulatorService connection interrupted|Connection interrupted|Restarting after unexpected exit, crash, or test timeout|There are no test bundles available to test|Could not resolve package dependencies|Failed to clone repository|Could not resolve host: github.com|remote end hung up unexpectedly|Connection timed out|network connection was lost|killed' \
     "$log_file"
 }
 
@@ -349,6 +350,75 @@ function ensure_successful_log_has_content() {
   fi
 }
 
+function emit_completion_notice() {
+  local label="$1"
+  local log_file="$2"
+  local notice="Completed ${label}. Log: $log_file"
+
+  if [[ -f "$CI_COMPLETION_NOTICES_FILE" ]] && grep -Fxq -- "$notice" "$CI_COMPLETION_NOTICES_FILE"; then
+    return 0
+  fi
+
+  echo "$notice"
+  printf '%s\n' "$notice" >> "$CI_COMPLETION_NOTICES_FILE"
+}
+
+function run_report_command() {
+  local report_path="$1"
+  local success_summary="${2:-}"
+  shift 2
+
+  local temp_report="${report_path}.tmp"
+  local status=0
+
+  rm -f "$temp_report"
+
+  set +e
+  "$@" >"$temp_report" 2>&1
+  status=$?
+  set -e
+
+  mv "$temp_report" "$report_path"
+
+  if (( status != 0 )); then
+    cat "$report_path" >&2
+    return "$status"
+  fi
+
+  if [[ -z "$success_summary" ]]; then
+    success_summary="$(
+      awk 'NF { line = $0 } END { if (line != "") print line }' "$report_path"
+    )"
+  fi
+
+  if [[ -n "$success_summary" ]]; then
+    echo "$success_summary"
+  fi
+}
+
+function run_infra_safety_report() {
+  python3 ./scripts/check_infra_safety.py
+
+  local signpost_count
+  signpost_count=$(grep -r 'OSSignposter\|signposter\.beginInterval\|signposter\.endInterval' \
+    modules/native-chat/Sources/ | grep -v '//' | wc -l | tr -d ' ')
+  if (( signpost_count < 12 )); then
+    echo "Signpost count ($signpost_count) below minimum (12)." >&2
+    return 1
+  fi
+}
+
+function run_doc_build_report() {
+  for module in ChatDomain OpenAITransport ChatRuntimeWorkflows; do
+    if [[ ! -d "modules/native-chat/Sources/$module/$module.docc" ]]; then
+      echo "DocC catalog missing for $module" >&2
+      return 1
+    fi
+    echo "OK: $module DocC catalog present"
+  done
+  echo "Documentation catalogs verified"
+}
+
 function run_checked_xcodebuild_impl() {
   local label="$1"
   local workdir="$2"
@@ -387,7 +457,7 @@ function run_checked_xcodebuild_impl() {
       sanitize_successful_xcodebuild_log "$log_file"
       ensure_successful_log_has_content "$log_file" "Completed ${label} successfully."
       ./scripts/check_warnings.sh "$log_file"
-      echo "Completed ${label}. Log: $log_file"
+      emit_completion_notice "$label" "$log_file"
       return 0
     fi
 
@@ -448,6 +518,23 @@ if not matches:
     sys.exit(1)
 print(" ".join(matches))
 PY
+}
+
+function resolve_performance_baseline_path() {
+  local default_baseline="$ROOT_DIR/scripts/performance-baseline.json"
+  local github_actions_baseline="$ROOT_DIR/scripts/performance-baseline-github-actions.json"
+
+  if [[ -n "${PERFORMANCE_BASELINE_PATH:-}" ]]; then
+    printf '%s\n' "$PERFORMANCE_BASELINE_PATH"
+    return 0
+  fi
+
+  if [[ "${GITHUB_ACTIONS:-false}" == "true" && -f "$github_actions_baseline" ]]; then
+    printf '%s\n' "$github_actions_baseline"
+    return 0
+  fi
+
+  printf '%s\n' "$default_baseline"
 }
 
 function gate_lint() {
@@ -544,41 +631,18 @@ function gate_package_tests() {
 
 function gate_architecture_tests() {
   log "Running architecture tests"
-  local label="nativechat-architecture-tests"
-  local log_file="$CI_OUTPUT_DIR/${label}.log"
   local result_bundle_path="$CI_OUTPUT_DIR/NativeChatArchitectureTests.xcresult"
-  local command_status
 
-  rm -f "$log_file"
-  : > "$log_file"
   force_remove_path "$result_bundle_path"
-
-  set +e
-  (
-    cd "$ROOT_DIR/modules/native-chat"
+  run_checked_xcodebuild_in_dir nativechat-architecture-tests "$ROOT_DIR/modules/native-chat" \
     xcodebuild \
-      -scheme NativeChat-Package \
-      -destination "$SIMULATOR_DEVICE_DESTINATION" \
-      -parallel-testing-enabled NO \
-      -resultBundlePath "$result_bundle_path" \
-      -only-testing:NativeChatArchitectureTests \
-      test \
-      "$XCODEBUILD_APPINTENTS_LINKER_SETTING"
-  ) >"$log_file" 2>&1
-  command_status=$?
-  set -e
-
-  if (( command_status != 0 )); then
-    echo "xcodebuild failed for ${label}. Log tail:" >&2
-    if [[ -f "$log_file" ]]; then
-      tail -n 80 "$log_file" >&2 || true
-    fi
-    return "$command_status"
-  fi
-
-  sanitize_successful_xcodebuild_log "$log_file"
-  ./scripts/check_warnings.sh "$log_file"
-  echo "Completed ${label}. Log: $log_file"
+    -scheme NativeChat-Package \
+    -clonedSourcePackagesDirPath "$CI_SOURCE_PACKAGES_DIR" \
+    -destination "$SIMULATOR_DEVICE_DESTINATION" \
+    -parallel-testing-enabled NO \
+    -resultBundlePath "$result_bundle_path" \
+    -only-testing:NativeChatArchitectureTests \
+    test
 }
 
 function gate_coverage_report() {
@@ -841,38 +905,35 @@ function assert_release_readiness() {
 
 function gate_maintainability() {
   log "Running maintainability gate"
-  MAX_NON_UI_SWIFT_LINES=285 \
-  MAX_UI_SWIFT_LINES=285 \
-  MAX_SCREEN_STORE_SWIFT_LINES=180 \
-  MAX_TRY_OPTIONAL=0 \
-  MAX_STRINGLY_TYPED_JSON=0 \
-  MAX_JSON_SERIALIZATION=0 \
-  MAX_FATAL_ERRORS=0 \
-  MAX_PRECONDITION_FAILURES=0 \
-  MAX_UNCHECKED_SENDABLE=0 \
-  MAX_SWIFTLINT_DISABLES=0 \
-  MAX_NON_UI_FAMILY_LINES=700 \
-  MAX_CONTROLLER_CLUSTER_LINES=3950 \
-    python3 ./scripts/check_maintainability.py | tee "$CI_OUTPUT_DIR/maintainability-report.txt"
+  run_report_command "$CI_OUTPUT_DIR/maintainability-report.txt" "" \
+    env \
+      MAX_NON_UI_SWIFT_LINES=285 \
+      MAX_UI_SWIFT_LINES=285 \
+      MAX_SCREEN_STORE_SWIFT_LINES=180 \
+      MAX_TRY_OPTIONAL=0 \
+      MAX_STRINGLY_TYPED_JSON=0 \
+      MAX_JSON_SERIALIZATION=0 \
+      MAX_FATAL_ERRORS=0 \
+      MAX_PRECONDITION_FAILURES=0 \
+      MAX_UNCHECKED_SENDABLE=0 \
+      MAX_SWIFTLINT_DISABLES=0 \
+      MAX_NON_UI_FAMILY_LINES=700 \
+      MAX_CONTROLLER_CLUSTER_LINES=3950 \
+      python3 ./scripts/check_maintainability.py
 }
 
 function gate_source_share() {
   log "Running source-share gate"
-  SOURCE_SHARE_SUMMARY_JSON="$CI_OUTPUT_DIR/source-share.json" \
-  MIN_SOURCE_SHARE_PERCENT="${MIN_SOURCE_SHARE_PERCENT:-17.0}" \
-    python3 ./scripts/check_source_share.py | tee "$CI_OUTPUT_DIR/source-share-report.txt"
+  run_report_command "$CI_OUTPUT_DIR/source-share-report.txt" "" \
+    env \
+      SOURCE_SHARE_SUMMARY_JSON="$CI_OUTPUT_DIR/source-share.json" \
+      MIN_SOURCE_SHARE_PERCENT="${MIN_SOURCE_SHARE_PERCENT:-17.0}" \
+      python3 ./scripts/check_source_share.py
 }
 
 function gate_infra_safety() {
   log "Running infra-safety gate"
-  python3 ./scripts/check_infra_safety.py | tee "$CI_OUTPUT_DIR/infra-safety-report.txt"
-
-  signpost_count=$(grep -r 'OSSignposter\|signposter\.beginInterval\|signposter\.endInterval' \
-    modules/native-chat/Sources/ | grep -v '//' | wc -l | tr -d ' ')
-  if (( signpost_count < 12 )); then
-    echo "Signpost count ($signpost_count) below minimum (12)." >&2
-    exit 1
-  fi
+  run_report_command "$CI_OUTPUT_DIR/infra-safety-report.txt" "" run_infra_safety_report
 }
 
 function gate_format_check() {
@@ -916,32 +977,27 @@ function gate_python_lint() {
 
 function gate_ci_health() {
   log "Running ci-health gate"
-  python3 ./scripts/check_ci_health.py | tee "$CI_OUTPUT_DIR/ci-health-report.txt"
-  ./scripts/test_release_infra.sh | tee "$CI_OUTPUT_DIR/release-infra-report.txt"
+  run_report_command "$CI_OUTPUT_DIR/ci-health-report.txt" "CI health gate passed." \
+    python3 ./scripts/check_ci_health.py
+  run_report_command "$CI_OUTPUT_DIR/release-infra-report.txt" "Release infrastructure tests passed." \
+    ./scripts/test_release_infra.sh
 }
 
 function gate_module_boundary() {
   log "Running module-boundary gate"
-  python3 ./scripts/check_module_boundaries.py | tee "$CI_OUTPUT_DIR/module-boundary-report.txt"
+  run_report_command "$CI_OUTPUT_DIR/module-boundary-report.txt" "" \
+    python3 ./scripts/check_module_boundaries.py
 }
 
 function gate_doc_build() {
   log "Building documentation catalogs"
-  {
-    for module in ChatDomain OpenAITransport ChatRuntimeWorkflows; do
-      if [[ ! -d "modules/native-chat/Sources/$module/$module.docc" ]]; then
-        echo "DocC catalog missing for $module" >&2
-        exit 1
-      fi
-      echo "OK: $module DocC catalog present"
-    done
-    echo "Documentation catalogs verified"
-  } | tee "$CI_OUTPUT_DIR/doc-build-report.txt"
+  run_report_command "$CI_OUTPUT_DIR/doc-build-report.txt" "" run_doc_build_report
 }
 
 function gate_doc_completeness() {
   log "Running doc-completeness gate"
-  python3 ./scripts/check_doc_completeness.py | tee "$CI_OUTPUT_DIR/doc-completeness-report.txt"
+  run_report_command "$CI_OUTPUT_DIR/doc-completeness-report.txt" "" \
+    python3 ./scripts/check_doc_completeness.py
 }
 
 function gate_performance_tests() {
@@ -950,10 +1006,12 @@ function gate_performance_tests() {
   local log_file="$CI_OUTPUT_DIR/${label}.log"
   local result_bundle_path="$CI_OUTPUT_DIR/NativeChatPerformanceTests.xcresult"
   local results_path="$CI_OUTPUT_DIR/performance.json"
-  local baseline_path="$ROOT_DIR/scripts/performance-baseline.json"
+  local baseline_path
   local report_path="$CI_OUTPUT_DIR/performance-report.txt"
   local attempt=1
   local command_status=0
+
+  baseline_path="$(resolve_performance_baseline_path)"
 
   if [[ ! -f "$baseline_path" ]]; then
     echo "Missing performance baseline: $baseline_path" >&2
@@ -971,6 +1029,7 @@ function gate_performance_tests() {
       cd "$ROOT_DIR/modules/native-chat"
       xcodebuild \
         -scheme NativeChat-Package \
+        -clonedSourcePackagesDirPath "$CI_SOURCE_PACKAGES_DIR" \
         -destination "$SIMULATOR_DEVICE_DESTINATION" \
         -parallel-testing-enabled NO \
         -test-timeouts-enabled YES \
@@ -1001,19 +1060,21 @@ function gate_performance_tests() {
 
   python3 ./scripts/extract_performance_metrics.py "$log_file" "$results_path"
   cp "$baseline_path" "$CI_OUTPUT_DIR/performance-baseline.json"
-  python3 ./scripts/check_performance_regression.py \
-    "$results_path" \
-    "$baseline_path" | tee "$report_path"
+  run_report_command "$report_path" "" \
+    python3 ./scripts/check_performance_regression.py \
+      "$results_path" \
+      "$baseline_path"
 
   sanitize_successful_xcodebuild_log "$log_file"
   ensure_successful_log_has_content "$log_file" "Completed ${label} successfully."
   ./scripts/check_warnings.sh "$log_file"
-  echo "Completed ${label}. Log: $log_file"
+  emit_completion_notice "$label" "$log_file"
 }
 
 function gate_localization_check() {
   log "Running localization check"
-  python3 ./scripts/check_localization.py | tee "$CI_OUTPUT_DIR/localization-report.txt"
+  run_report_command "$CI_OUTPUT_DIR/localization-report.txt" "" \
+    python3 ./scripts/check_localization.py
 }
 
 function run_gate() {
@@ -1065,29 +1126,9 @@ EOF
 
 function clean_outputs() {
   find "$CI_OUTPUT_DIR" -maxdepth 1 -name '*.xcresult' -exec rm -rf {} + >/dev/null 2>&1 || true
-  rm -f \
-    "$CI_OUTPUT_DIR/ci-health-report.txt" \
-    "$CI_OUTPUT_DIR/glassgpt-build.log" \
-    "$CI_OUTPUT_DIR/glassgpt-unit-tests.log" \
-    "$CI_OUTPUT_DIR/glassgpt-ui-tests.log" \
-    "$CI_OUTPUT_DIR/glassgpt-ui-build-for-testing.log" \
-    "$CI_OUTPUT_DIR/nativechat-architecture-tests.log" \
-    "$CI_OUTPUT_DIR/nativechat-coverage-tests.log" \
-    "$CI_OUTPUT_DIR/coverage-report.txt" \
-    "$CI_OUTPUT_DIR/coverage-production.txt" \
-    "$CI_OUTPUT_DIR/coverage-production.json" \
-    "$CI_OUTPUT_DIR/format-check-report.txt" \
-    "$CI_OUTPUT_DIR/maintainability-report.txt" \
-    "$CI_OUTPUT_DIR/source-share-report.txt" \
-    "$CI_OUTPUT_DIR/source-share.json" \
-    "$CI_OUTPUT_DIR/infra-safety-report.txt" \
-    "$CI_OUTPUT_DIR/module-boundary-report.txt" \
-    "$CI_OUTPUT_DIR/doc-build-report.txt" \
-    "$CI_OUTPUT_DIR/doc-completeness-report.txt" \
-    "$CI_OUTPUT_DIR/localization-report.txt"
+  find "$CI_OUTPUT_DIR" -maxdepth 1 -type f \( -name '*.log' -o -name '*.txt' -o -name '*.json' \) -delete
   find "$CI_OUTPUT_DIR" -maxdepth 1 -name 'glassgpt-snapshot-*.log' -delete
   find "$CI_OUTPUT_DIR" -maxdepth 1 -name '*-serial-probe.log' -delete
-  rm -f "$CI_OUTPUT_DIR/glassgpt-snapshot-suite.log"
   find "$CI_OUTPUT_DIR" -maxdepth 1 -name 'glassgpt-ui-*.log' -delete
   find "$CI_OUTPUT_DIR" -maxdepth 1 -name 'test*.xcresult' -exec rm -rf {} + >/dev/null 2>&1 || true
   force_remove_path "$CI_OUTPUT_DIR/snapshot-suite.xcresult"
@@ -1127,3 +1168,5 @@ for gate in "${requested_gates[@]}"; do
   pre_gate_hook "$gate" "$gate_index" "$gate_total"
   run_gate "$gate"
 done
+
+rm -f "$CI_COMPLETION_NOTICES_FILE"

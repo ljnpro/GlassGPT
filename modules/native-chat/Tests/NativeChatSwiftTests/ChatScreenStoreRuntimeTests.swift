@@ -213,7 +213,7 @@ struct ChatScreenStoreRuntimeTests {
 
         let replyID = AssistantReplyID(rawValue: sessionMessageID(for: store))
         store.handleEnterBackground()
-        store.suspendActiveSessionsForAppBackground()
+        await store.suspendActiveSessionsForAppBackgroundNow()
 
         var runtimeStillRegistered = await store.runtimeRegistry.contains(replyID)
         if runtimeStillRegistered {

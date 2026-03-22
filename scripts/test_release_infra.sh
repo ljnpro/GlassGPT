@@ -124,6 +124,22 @@ function test_xcodebuild_log_tail_guard() {
   echo "[PASS] ci.sh guards retry log tail output when logs are missing"
 }
 
+function test_xcodebuild_retry_covers_package_resolution_failures() {
+  if ! grep -Fq 'Could not resolve package dependencies' "$ROOT_DIR/scripts/ci.sh"; then
+    fail "ci.sh should treat package resolution failures as transient xcodebuild failures."
+  fi
+
+  if ! grep -Fq 'Failed to clone repository' "$ROOT_DIR/scripts/ci.sh"; then
+    fail "ci.sh should retry transient SPM clone failures."
+  fi
+
+  if ! grep -Fq 'Could not resolve host: github.com' "$ROOT_DIR/scripts/ci.sh"; then
+    fail "ci.sh should retry transient DNS failures while resolving packages."
+  fi
+
+  echo "[PASS] ci.sh retries transient package resolution failures"
+}
+
 function test_build_gate_uses_concrete_destination() {
   local build_block
   build_block="$(sed -n '/function gate_build()/,/^}/p' "$ROOT_DIR/scripts/ci.sh")"
@@ -232,10 +248,22 @@ function test_successful_xcodebuild_log_sanitizer() {
     fail "ci.sh should write a concise fallback summary when a successful xcodebuild log sanitizes to empty output."
   fi
 
+  if ! grep -Fq 'function emit_completion_notice()' "$ROOT_DIR/scripts/ci.sh"; then
+    fail "ci.sh should centralize completion notices so successful gates do not emit duplicate completion lines."
+  fi
+
+  if ! grep -Fq 'emit_completion_notice "$label" "$log_file"' "$ROOT_DIR/scripts/ci.sh"; then
+    fail "ci.sh should route successful gate completion output through the shared notice helper."
+  fi
+
   local architecture_tests_block
   architecture_tests_block="$(sed -n '/function gate_architecture_tests()/,/^}/p' "$ROOT_DIR/scripts/ci.sh")"
-  if ! printf '%s\n' "$architecture_tests_block" | grep -Fq 'sanitize_successful_xcodebuild_log "$log_file"'; then
-    fail "gate_architecture_tests should sanitize its successful log before warning checks run."
+  if ! printf '%s\n' "$architecture_tests_block" | grep -Fq 'run_checked_xcodebuild_in_dir nativechat-architecture-tests "$ROOT_DIR/modules/native-chat"'; then
+    fail "gate_architecture_tests should use the shared xcodebuild wrapper for consistent retries and log sanitization."
+  fi
+
+  if ! printf '%s\n' "$architecture_tests_block" | grep -Fq -- '-clonedSourcePackagesDirPath "$CI_SOURCE_PACKAGES_DIR"'; then
+    fail "gate_architecture_tests should reuse the shared SourcePackages cache path."
   fi
 
   local temp_dir
@@ -327,6 +355,44 @@ EOF
   trap - RETURN
 
   echo "[PASS] ci.sh sanitizes successful xcodebuild logs for known harmless noise"
+}
+
+function test_success_report_gates_stay_quiet() {
+  if ! grep -Fq 'function run_report_command()' "$ROOT_DIR/scripts/ci.sh"; then
+    fail "ci.sh should centralize success-path report capture so verbose reports stay in files."
+  fi
+
+  if ! grep -Fq 'run_report_command "$CI_OUTPUT_DIR/ci-health-report.txt" "CI health gate passed."' "$ROOT_DIR/scripts/ci.sh"; then
+    fail "gate_ci_health should capture its detailed report to file and print only a concise summary."
+  fi
+
+  if ! grep -Fq 'run_report_command "$CI_OUTPUT_DIR/release-infra-report.txt" "Release infrastructure tests passed."' "$ROOT_DIR/scripts/ci.sh"; then
+    fail "gate_ci_health should keep release infrastructure details in a file and print only a concise summary."
+  fi
+
+  if ! grep -Fq 'run_report_command "$CI_OUTPUT_DIR/maintainability-report.txt"' "$ROOT_DIR/scripts/ci.sh"; then
+    fail "gate_maintainability should write its detailed report to file through the shared helper."
+  fi
+
+  if ! grep -Fq 'run_report_command "$CI_OUTPUT_DIR/source-share-report.txt"' "$ROOT_DIR/scripts/ci.sh"; then
+    fail "gate_source_share should write its detailed report to file through the shared helper."
+  fi
+
+  if ! grep -Fq 'run_report_command "$CI_OUTPUT_DIR/module-boundary-report.txt"' "$ROOT_DIR/scripts/ci.sh"; then
+    fail "gate_module_boundary should write its detailed report to file through the shared helper."
+  fi
+
+  local performance_tests_block
+  performance_tests_block="$(sed -n '/function gate_performance_tests()/,/^}/p' "$ROOT_DIR/scripts/ci.sh")"
+  if ! printf '%s\n' "$performance_tests_block" | grep -Fq 'run_report_command "$report_path" ""'; then
+    fail "gate_performance_tests should keep the metric table in a report file and print only the success summary."
+  fi
+
+  if ! grep -Fq 'rm -f "$CI_COMPLETION_NOTICES_FILE"' "$ROOT_DIR/scripts/ci.sh"; then
+    fail "ci.sh should clean its internal completion-notice bookkeeping after a successful run."
+  fi
+
+  echo "[PASS] ci.sh keeps success-path report output concise"
 }
 
 function test_release_upload_log_sanitizer() {
@@ -729,6 +795,28 @@ EOF
     fail "ci.sh performance-tests gate should compare against the tracked performance baseline."
   fi
 
+  if ! grep -Fq 'function resolve_performance_baseline_path()' "$ROOT_DIR/scripts/ci.sh"; then
+    fail "ci.sh should centralize performance baseline selection."
+  fi
+
+  if ! grep -Fq 'baseline_path="$(resolve_performance_baseline_path)"' "$ROOT_DIR/scripts/ci.sh"; then
+    fail "ci.sh should resolve the performance baseline through the shared selector."
+  fi
+
+  if ! grep -Fq 'performance-baseline-github-actions.json' "$ROOT_DIR/scripts/ci.sh"; then
+    fail "ci.sh should support a dedicated GitHub Actions performance baseline."
+  fi
+
+  if [[ ! -f "$ROOT_DIR/scripts/performance-baseline-github-actions.json" ]]; then
+    fail "The GitHub Actions performance baseline file should exist."
+  fi
+
+  local performance_tests_block
+  performance_tests_block="$(sed -n '/function gate_performance_tests()/,/^}/p' "$ROOT_DIR/scripts/ci.sh")"
+  if ! printf '%s\n' "$performance_tests_block" | grep -Fq -- '-clonedSourcePackagesDirPath "$CI_SOURCE_PACKAGES_DIR"'; then
+    fail "gate_performance_tests should reuse the shared SourcePackages cache path."
+  fi
+
   if ! grep -Fq 'performance-tests coverage-report' "$ROOT_DIR/scripts/ci.sh"; then
     fail "ci.sh default full run should include the performance-tests gate."
   fi
@@ -800,12 +888,14 @@ test_appintents_linker_setting
 test_cloudflare_release_token_is_externalized
 test_lint_tool_version_is_pinned
 test_xcodebuild_log_tail_guard
+test_xcodebuild_retry_covers_package_resolution_failures
 test_build_gate_uses_concrete_destination
 test_format_check_excludes_docc
 test_workflow_pins_git_default_branch
 test_core_tests_skip_empty_app_tests_gate
 test_package_tests_skip_duplicate_architecture_bundle
 test_successful_xcodebuild_log_sanitizer
+test_success_report_gates_stay_quiet
 test_release_upload_log_sanitizer
 test_release_readiness_defaults_to_versions_file
 test_snapshot_gates_are_split_cleanly

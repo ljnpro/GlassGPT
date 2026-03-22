@@ -88,6 +88,11 @@ public actor RuntimeRegistryActor {
         sessions.removeValue(forKey: replyID)
     }
 
+    /// Removes all currently registered reply sessions.
+    public func removeAll() {
+        sessions.removeAll()
+    }
+
     /// Returns all currently registered reply identifiers.
     /// - Returns: An array of active reply identifiers.
     public func activeReplyIDs() -> [AssistantReplyID] {

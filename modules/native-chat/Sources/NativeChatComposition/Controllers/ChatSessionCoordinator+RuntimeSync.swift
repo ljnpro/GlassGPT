@@ -6,6 +6,68 @@ import Foundation
 
 @MainActor
 extension ChatSessionCoordinator {
+    func suspendActiveSessionsForAppBackground() {
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            await suspendActiveSessionsForAppBackgroundNow()
+        }
+    }
+
+    func suspendActiveSessionsForAppBackgroundNow() async {
+        let sessions = services.sessionRegistry.allSessions
+        services.cancelGeneratedFilePrefetches(services.generatedFilePrefetchRegistry.cancelAll())
+        guard !sessions.isEmpty else { return }
+
+        for session in sessions {
+            let assistantReplyID = session.assistantReplyID
+            saveSessionNow(session)
+            _ = await applyRuntimeTransition(
+                .detachForBackground(usedBackgroundMode: session.request.usesBackgroundMode),
+                to: session
+            )
+            let execution = services.sessionRegistry.execution(for: session.messageID)
+            execution?.service.cancelStream()
+            execution?.task?.cancel()
+
+            guard let message = conversations.findMessage(byId: session.messageID),
+                  let runtimeState = await runtimeState(for: session) else {
+                await services.runtimeRegistry.remove(assistantReplyID)
+                continue
+            }
+
+            if runtimeState.responseID != nil {
+                message.isComplete = false
+                message.conversation?.updatedAt = .now
+                conversations.upsertMessage(message)
+            } else {
+                message.content = interruptedResponseFallbackText(
+                    recoveryFallbackText(
+                        for: message,
+                        session: session,
+                        runtimeState: cachedRuntimeState(for: session),
+                        visibleSessionMessageID: visibleSessionMessageID,
+                        currentStreamingText: state.currentStreamingText
+                    )
+                )
+                message.thinking = runtimeState.buffer.thinking.isEmpty ? nil : runtimeState.buffer.thinking
+                message.isComplete = true
+                message.lastSequenceNumber = nil
+                message.conversation?.updatedAt = .now
+                conversations.upsertMessage(message)
+            }
+
+            await services.runtimeRegistry.remove(assistantReplyID)
+        }
+
+        conversations.saveContextIfPossible("suspendActiveSessionsForAppBackground")
+        services.sessionRegistry.removeAll { execution in
+            execution.task?.cancel()
+            execution.service.cancelStream()
+        }
+        await services.runtimeRegistry.removeAll()
+        detachVisibleSessionBinding()
+    }
+
     func ensureRuntimeSessionRegistered(for session: ReplySession) {
         Task { @MainActor [weak self] in
             guard let self else { return }
@@ -108,62 +170,5 @@ extension ChatSessionCoordinator {
         }
 
         return message.toolCalls.contains { $0.status != .completed }
-    }
-
-    func suspendActiveSessionsForAppBackground() {
-        let sessions = services.sessionRegistry.allSessions
-        services.cancelGeneratedFilePrefetches(services.generatedFilePrefetchRegistry.cancelAll())
-        guard !sessions.isEmpty else { return }
-
-        Task { @MainActor [weak self] in
-            guard let self else { return }
-            for session in sessions {
-                let assistantReplyID = session.assistantReplyID
-                saveSessionNow(session)
-                _ = await applyRuntimeTransition(
-                    .detachForBackground(usedBackgroundMode: session.request.usesBackgroundMode),
-                    to: session
-                )
-                let execution = services.sessionRegistry.execution(for: session.messageID)
-                execution?.service.cancelStream()
-                execution?.task?.cancel()
-
-                guard let message = conversations.findMessage(byId: session.messageID),
-                      let runtimeState = await runtimeState(for: session) else {
-                    await services.runtimeRegistry.remove(assistantReplyID)
-                    continue
-                }
-
-                if runtimeState.responseID != nil {
-                    message.isComplete = false
-                    message.conversation?.updatedAt = .now
-                    conversations.upsertMessage(message)
-                } else {
-                    message.content = interruptedResponseFallbackText(
-                        recoveryFallbackText(
-                            for: message,
-                            session: session,
-                            runtimeState: cachedRuntimeState(for: session),
-                            visibleSessionMessageID: visibleSessionMessageID,
-                            currentStreamingText: state.currentStreamingText
-                        )
-                    )
-                    message.thinking = runtimeState.buffer.thinking.isEmpty ? nil : runtimeState.buffer.thinking
-                    message.isComplete = true
-                    message.lastSequenceNumber = nil
-                    message.conversation?.updatedAt = .now
-                    conversations.upsertMessage(message)
-                }
-
-                await services.runtimeRegistry.remove(assistantReplyID)
-            }
-
-            conversations.saveContextIfPossible("suspendActiveSessionsForAppBackground")
-            services.sessionRegistry.removeAll { execution in
-                execution.task?.cancel()
-                execution.service.cancelStream()
-            }
-            detachVisibleSessionBinding()
-        }
     }
 }
