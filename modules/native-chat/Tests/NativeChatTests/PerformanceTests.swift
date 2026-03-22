@@ -7,8 +7,8 @@ import XCTest
 
 final class PerformanceTests: XCTestCase {
     private enum BenchmarkIterations {
-        static let incrementalAppend = 5
-        static let richTextBuilder = 5
+        static let incrementalAppend = 12
+        static let richTextBuilder = 12
     }
 
     // MARK: - SSE Frame Buffer Throughput

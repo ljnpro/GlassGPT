@@ -1025,7 +1025,7 @@ function gate_performance_tests() {
   fi
 
   if [[ "${GITHUB_ACTIONS:-}" == "true" ]]; then
-    regression_attempt_limit=2
+    regression_attempt_limit=3
   fi
 
   while (( regression_attempt <= regression_attempt_limit )); do

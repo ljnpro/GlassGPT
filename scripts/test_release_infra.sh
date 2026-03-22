@@ -929,8 +929,8 @@ EOF
     fail "gate_performance_tests should retry hosted performance regressions once to rule out runner noise."
   fi
 
-  if ! printf '%s\n' "$performance_tests_block" | grep -Fq 'regression_attempt_limit=2'; then
-    fail "gate_performance_tests should allow one extra hosted retry before failing."
+  if ! printf '%s\n' "$performance_tests_block" | grep -Fq 'regression_attempt_limit=3'; then
+    fail "gate_performance_tests should allow two extra hosted retries before failing."
   fi
 
   if ! grep -Fq 'performance-tests coverage-report' "$ROOT_DIR/scripts/ci.sh"; then
