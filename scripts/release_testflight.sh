@@ -14,6 +14,7 @@ EXPORT_OPTIONS="${EXPORT_OPTIONS_PLIST:-$ROOT_DIR/.local/export-options-app-stor
 REMOTE="${GITHUB_REMOTE:-origin}"
 REMOTE_REPO="${GITHUB_REPO_URL:-}"
 XCODEBUILD_APPINTENTS_LINKER_SETTING='OTHER_LDFLAGS=$(inherited) -framework AppIntents'
+RELEASE_SECRETS_XCCONFIG=""
 
 function usage() {
   cat <<'EOF'
@@ -156,6 +157,17 @@ function run_logged_release_command() {
   echo "$success_summary"
 }
 
+function prepare_release_secrets_xcconfig() {
+  RELEASE_SECRETS_XCCONFIG="$(mktemp "$BUILD_DIR/release-secrets.XXXXXX.xcconfig")"
+  printf 'CLOUDFLARE_AIG_TOKEN = %s\n' "$CLOUDFLARE_AIG_TOKEN_EFFECTIVE" >"$RELEASE_SECRETS_XCCONFIG"
+}
+
+function cleanup_release_secrets_xcconfig() {
+  if [[ -n "$RELEASE_SECRETS_XCCONFIG" && -f "$RELEASE_SECRETS_XCCONFIG" ]]; then
+    rm -f "$RELEASE_SECRETS_XCCONFIG"
+  fi
+}
+
 function resolve_release_tag() {
   local version="$1"
   local build_number="$2"
@@ -268,6 +280,8 @@ if [[ ! -d "$BUILD_DIR" ]]; then
   mkdir -p "$BUILD_DIR"
 fi
 
+trap cleanup_release_secrets_xcconfig EXIT
+
 REMOTE_MAIN_SHA=""
 if [[ "${PUSH_RELEASE:-1}" == "1" && "$PROMOTE_MAIN" == "1" ]]; then
   REMOTE_MAIN_SHA="$(remote_branch_sha main)"
@@ -352,6 +366,7 @@ IPA_PATH="$EXPORT_PATH/GlassGPT.ipa"
 RELEASE_TAG="$(resolve_release_tag "$VERSION" "$BUILD_NUMBER")"
 
 rm -rf "$ARCHIVE_PATH" "$EXPORT_PATH"
+prepare_release_secrets_xcconfig
 
 KEY_PATH="${ASC_API_KEY_PATH:-}"
 if [[ -z "$KEY_PATH" || ! -f "$KEY_PATH" ]]; then
@@ -365,20 +380,19 @@ fi
 
 echo "==> Archiving"
 run_logged_release_command "Archive" "$ARCHIVE_LOG" "Archive completed successfully." \
-  env \
-    CLOUDFLARE_AIG_TOKEN="$CLOUDFLARE_AIG_TOKEN_EFFECTIVE" \
-    xcodebuild \
-      -project "$PROJECT_PATH" \
-      -scheme "$SCHEME" \
-      -configuration Release \
-      -destination "generic/platform=iOS" \
-      -archivePath "$ARCHIVE_PATH" \
-      clean archive \
-      -allowProvisioningUpdates \
-      -authenticationKeyPath "$KEY_PATH" \
-      -authenticationKeyID "$ASC_API_KEY_ID" \
-      -authenticationKeyIssuerID "$ASC_ISSUER_ID" \
-      "$XCODEBUILD_APPINTENTS_LINKER_SETTING"
+  xcodebuild \
+    -project "$PROJECT_PATH" \
+    -scheme "$SCHEME" \
+    -configuration Release \
+    -destination "generic/platform=iOS" \
+    -archivePath "$ARCHIVE_PATH" \
+    -xcconfig "$RELEASE_SECRETS_XCCONFIG" \
+    clean archive \
+    -allowProvisioningUpdates \
+    -authenticationKeyPath "$KEY_PATH" \
+    -authenticationKeyID "$ASC_API_KEY_ID" \
+    -authenticationKeyIssuerID "$ASC_ISSUER_ID" \
+    "$XCODEBUILD_APPINTENTS_LINKER_SETTING"
 python3 "$ROOT_DIR/scripts/sanitize_success_log.py" xcodebuild "$ARCHIVE_LOG"
 ensure_successful_log_has_content "$ARCHIVE_LOG" "Archive completed successfully."
 

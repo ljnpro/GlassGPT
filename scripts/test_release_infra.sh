@@ -85,12 +85,24 @@ function test_cloudflare_release_token_is_externalized() {
     fail "release_testflight.sh should fail fast when the Cloudflare AIG token is missing."
   fi
 
-  if ! grep -Fq 'CLOUDFLARE_AIG_TOKEN="$CLOUDFLARE_AIG_TOKEN_EFFECTIVE"' "$ROOT_DIR/scripts/release_testflight.sh"; then
-    fail "release_testflight.sh should pass the resolved Cloudflare AIG token into the archive environment."
+  if ! grep -Fq 'function prepare_release_secrets_xcconfig()' "$ROOT_DIR/scripts/release_testflight.sh"; then
+    fail "release_testflight.sh should materialize release-only build secrets in a temporary xcconfig."
+  fi
+
+  if ! grep -Fq "printf 'CLOUDFLARE_AIG_TOKEN = %s\\n' \"\$CLOUDFLARE_AIG_TOKEN_EFFECTIVE\"" "$ROOT_DIR/scripts/release_testflight.sh"; then
+    fail "release_testflight.sh should write the resolved Cloudflare AIG token into the temporary release xcconfig."
+  fi
+
+  if ! grep -Fq -- '-xcconfig "$RELEASE_SECRETS_XCCONFIG"' "$ROOT_DIR/scripts/release_testflight.sh"; then
+    fail "release_testflight.sh should pass the temporary release xcconfig into the archive build."
   fi
 
   if grep -Fq '"CLOUDFLARE_AIG_TOKEN=$CLOUDFLARE_AIG_TOKEN_EFFECTIVE"' "$ROOT_DIR/scripts/release_testflight.sh"; then
     fail "release_testflight.sh should not pass the Cloudflare AIG token as a command-line build setting because that leaks into live logs."
+  fi
+
+  if ! grep -Fq 'trap cleanup_release_secrets_xcconfig EXIT' "$ROOT_DIR/scripts/release_testflight.sh"; then
+    fail "release_testflight.sh should clean up the temporary release xcconfig."
   fi
 
   if ! grep -Fq 'IPA metadata is missing CloudflareAIGToken.' "$ROOT_DIR/scripts/release_testflight.sh"; then
