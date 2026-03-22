@@ -17,6 +17,10 @@ env:
   GIT_CONFIG_KEY_0: init.defaultBranch
   GIT_CONFIG_VALUE_0: main
 
+defaults:
+  run:
+    shell: bash --noprofile --norc -eo pipefail {0}
+
 jobs:
   lint:
     name: Lint & Format
@@ -33,11 +37,23 @@ jobs:
         with:
           python-version: '3.14'
 
+      - name: Install CI shell tools
+        run: |
+          if ! brew list bash >/dev/null 2>&1; then
+            HOMEBREW_NO_AUTO_UPDATE=1 brew install bash
+          fi
+          if ! command -v rg >/dev/null 2>&1; then
+            HOMEBREW_NO_AUTO_UPDATE=1 brew install ripgrep
+          fi
+          echo /opt/homebrew/bin >> "$GITHUB_PATH"
+
       - name: Install Ruff
         run: python3 -m pip install ruff
 
       - name: Print toolchain versions
         run: |
+          bash --version | head -n 1
+          rg --version | head -n 1
           xcodebuild -version
           swift --version
 
@@ -87,8 +103,20 @@ jobs:
         with:
           python-version: '3.14'
 
+      - name: Install CI shell tools
+        run: |
+          if ! brew list bash >/dev/null 2>&1; then
+            HOMEBREW_NO_AUTO_UPDATE=1 brew install bash
+          fi
+          if ! command -v rg >/dev/null 2>&1; then
+            HOMEBREW_NO_AUTO_UPDATE=1 brew install ripgrep
+          fi
+          echo /opt/homebrew/bin >> "$GITHUB_PATH"
+
       - name: Print toolchain versions
         run: |
+          bash --version | head -n 1
+          rg --version | head -n 1
           xcodebuild -version
           swift --version
 
@@ -135,8 +163,20 @@ jobs:
         with:
           python-version: '3.14'
 
+      - name: Install CI shell tools
+        run: |
+          if ! brew list bash >/dev/null 2>&1; then
+            HOMEBREW_NO_AUTO_UPDATE=1 brew install bash
+          fi
+          if ! command -v rg >/dev/null 2>&1; then
+            HOMEBREW_NO_AUTO_UPDATE=1 brew install ripgrep
+          fi
+          echo /opt/homebrew/bin >> "$GITHUB_PATH"
+
       - name: Print toolchain versions
         run: |
+          bash --version | head -n 1
+          rg --version | head -n 1
           xcodebuild -version
           swift --version
 
@@ -177,8 +217,20 @@ jobs:
         with:
           python-version: '3.14'
 
+      - name: Install CI shell tools
+        run: |
+          if ! brew list bash >/dev/null 2>&1; then
+            HOMEBREW_NO_AUTO_UPDATE=1 brew install bash
+          fi
+          if ! command -v rg >/dev/null 2>&1; then
+            HOMEBREW_NO_AUTO_UPDATE=1 brew install ripgrep
+          fi
+          echo /opt/homebrew/bin >> "$GITHUB_PATH"
+
       - name: Print toolchain versions
         run: |
+          bash --version | head -n 1
+          rg --version | head -n 1
           xcodebuild -version
           swift --version
 
@@ -235,8 +287,20 @@ jobs:
         with:
           python-version: '3.14'
 
+      - name: Install CI shell tools
+        run: |
+          if ! brew list bash >/dev/null 2>&1; then
+            HOMEBREW_NO_AUTO_UPDATE=1 brew install bash
+          fi
+          if ! command -v rg >/dev/null 2>&1; then
+            HOMEBREW_NO_AUTO_UPDATE=1 brew install ripgrep
+          fi
+          echo /opt/homebrew/bin >> "$GITHUB_PATH"
+
       - name: Print toolchain versions
         run: |
+          bash --version | head -n 1
+          rg --version | head -n 1
           xcodebuild -version
           swift --version
 
