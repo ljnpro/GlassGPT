@@ -48,7 +48,7 @@ jobs:
           echo /opt/homebrew/bin >> "$GITHUB_PATH"
 
       - name: Install Ruff
-        run: python3 -m pip install ruff
+        run: '"$pythonLocation/bin/python3" -m pip install ruff'
 
       - name: Print toolchain versions
         run: |
