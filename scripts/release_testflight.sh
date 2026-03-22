@@ -18,7 +18,7 @@ XCODEBUILD_APPINTENTS_LINKER_SETTING='OTHER_LDFLAGS=$(inherited) -framework AppI
 function usage() {
   cat <<'EOF'
 Usage:
-  ./scripts/release_testflight.sh <marketing_version> <build_number> [--branch <name>] [--commit-message "<message>"] [--preserve-main-as <name>] [--force-main-with-lease] [--skip-main-promotion] [--preflight-only]
+  ./scripts/release_testflight.sh <marketing_version> <build_number> [--branch <name>] [--commit-message "<message>"] [--preserve-main-as <name>] [--force-main-with-lease] [--skip-main-promotion] [--skip-ci] [--preflight-only]
 
 Examples:
   ./scripts/release_testflight.sh 4.10.0 20185 --branch codex/stable-4.10
@@ -40,6 +40,7 @@ PRESERVE_MAIN_AS=""
 FORCE_MAIN_WITH_LEASE=0
 PROMOTE_MAIN=1
 PREFLIGHT_ONLY=0
+SKIP_CI=0
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -65,6 +66,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --preflight-only)
       PREFLIGHT_ONLY=1
+      shift
+      ;;
+    --skip-ci)
+      SKIP_CI=1
       shift
       ;;
     --help|-h)
@@ -266,14 +271,18 @@ if (( PREFLIGHT_ONLY == 1 )); then
   exit 0
 fi
 
-echo "==> Running release-readiness gate"
-export RELEASE_EXPECT_MARKETING_VERSION="$VERSION"
-export RELEASE_EXPECT_BUILD_NUMBER="$BUILD_NUMBER"
-export RELEASE_REQUIRE_CLEAN_WORKTREE=1
-./scripts/ci.sh release-readiness
+if (( SKIP_CI == 1 )); then
+  echo "==> Skipping CI gates (prevalidated run)"
+else
+  echo "==> Running release-readiness gate"
+  export RELEASE_EXPECT_MARKETING_VERSION="$VERSION"
+  export RELEASE_EXPECT_BUILD_NUMBER="$BUILD_NUMBER"
+  export RELEASE_REQUIRE_CLEAN_WORKTREE=1
+  ./scripts/ci.sh release-readiness
 
-echo "==> Running full CI gates"
-./scripts/ci.sh
+  echo "==> Running full CI gates"
+  ./scripts/ci.sh
+fi
 
 python3 - "$VERSIONS_XCCONFIG_PATH" "$VERSION" "$BUILD_NUMBER" <<'PY'
 import pathlib

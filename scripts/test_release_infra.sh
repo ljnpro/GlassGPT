@@ -621,6 +621,26 @@ CLOUDFLARE_AIG_TOKEN=test-cloudflare-token
   echo "[PASS] release_testflight.sh preflight guards main promotion topology"
 }
 
+function test_release_skip_ci_flag() {
+  if ! grep -Fq -- '--skip-ci)' "$ROOT_DIR/scripts/release_testflight.sh"; then
+    fail "release_testflight.sh should accept --skip-ci for prevalidated local releases."
+  fi
+
+  if ! grep -Fq 'SKIP_CI=1' "$ROOT_DIR/scripts/release_testflight.sh"; then
+    fail "release_testflight.sh should track the --skip-ci flag."
+  fi
+
+  if ! grep -Fq 'Skipping CI gates (prevalidated run)' "$ROOT_DIR/scripts/release_testflight.sh"; then
+    fail "release_testflight.sh should emit an explicit message when CI is skipped."
+  fi
+
+  if ! grep -Fq 'if (( SKIP_CI == 1 )); then' "$ROOT_DIR/scripts/release_testflight.sh"; then
+    fail "release_testflight.sh should guard the CI invocation behind the skip-ci flag."
+  fi
+
+  echo "[PASS] release_testflight.sh can skip CI after a separate validated run"
+}
+
 function test_release_tag_resolution_supports_repeat_builds() {
   if ! grep -Fq 'function resolve_release_tag()' "$ROOT_DIR/scripts/release_testflight.sh"; then
     fail "release_testflight.sh should define resolve_release_tag for repeated marketing-version releases."
@@ -903,6 +923,7 @@ test_simulator_lifecycle_uses_resolved_udid
 test_clean_outputs_removes_serial_probe_logs
 test_ui_runner_avoids_xctestrun_noise
 test_release_preflight
+test_release_skip_ci_flag
 test_release_tag_resolution_supports_repeat_builds
 test_snapshot_recording_covers_hosted_references
 test_single_flight_guards_prevent_overlapping_local_runs
