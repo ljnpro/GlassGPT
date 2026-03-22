@@ -3,6 +3,8 @@ import UIKit
 
 /// Thin wrapper around UIKit haptic feedback generators with a global enable/disable toggle.
 public struct HapticService: Sendable {
+    public static let shared = HapticService()
+
     /// Creates a new haptic service instance.
     public init() {}
 

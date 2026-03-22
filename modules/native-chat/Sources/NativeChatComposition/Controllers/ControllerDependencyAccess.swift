@@ -7,6 +7,6 @@ extension ChatController {
     }
 
     var hapticService: HapticService {
-        HapticService()
+        .shared
     }
 }

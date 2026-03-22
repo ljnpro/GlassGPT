@@ -18,10 +18,6 @@ public struct MessageComposerTextView: UIViewRepresentable {
     /// Insets applied to the text container within the text view.
     public let textInsets: UIEdgeInsets
 
-    private let singleLineCornerRadius: CGFloat = 20
-    private let multilineCornerRadius: CGFloat = 20
-    private let stableFillOpacity: CGFloat = 0.03
-
     /// Creates a message composer text view with the given bindings and layout constraints.
     public init(
         text: Binding<String>,
@@ -47,10 +43,10 @@ public struct MessageComposerTextView: UIViewRepresentable {
     /// Creates and configures the underlying ``ComposerHostingView``.
     public func makeUIView(context: Context) -> ComposerHostingView {
         let view = ComposerHostingView(
-            singleLineCornerRadius: singleLineCornerRadius,
-            multilineCornerRadius: multilineCornerRadius,
+            singleLineCornerRadius: ComposerGlassMetrics.singleLineCornerRadius,
+            multilineCornerRadius: ComposerGlassMetrics.multilineCornerRadius,
             singleLineHeightThreshold: minHeight,
-            stableFillOpacity: stableFillOpacity
+            stableFillOpacity: ComposerGlassMetrics.stableFillOpacity
         )
         context.coordinator.container = view
         view.textView.delegate = context.coordinator

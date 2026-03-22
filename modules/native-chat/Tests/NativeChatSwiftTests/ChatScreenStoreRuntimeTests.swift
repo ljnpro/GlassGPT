@@ -204,7 +204,7 @@ struct ChatScreenStoreRuntimeTests {
         streamClient.yield(.textDelta("Persisted answer"))
 
         try await waitUntil {
-            let message = self.latestAssistantMessage(in: store)
+            let message = latestAssistantMessage(in: store)
             return message?.responseId == "resp_suspend_cleanup" &&
                 store.lastSequenceNumber == 6 &&
                 store.currentThinkingText == "Persisted reasoning" &&
@@ -225,7 +225,7 @@ struct ChatScreenStoreRuntimeTests {
         }
 
         #expect(!runtimeStillRegistered)
-        let suspendedDraft = try #require(self.latestAssistantMessage(in: store))
+        let suspendedDraft = try #require(latestAssistantMessage(in: store))
         #expect(suspendedDraft.content == "Persisted answer")
         #expect(suspendedDraft.thinking == "Persisted reasoning")
         #expect(suspendedDraft.responseId == "resp_suspend_cleanup")

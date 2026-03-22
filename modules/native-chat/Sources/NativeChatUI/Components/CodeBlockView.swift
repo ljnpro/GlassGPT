@@ -45,10 +45,10 @@ package struct CodeBlockView: View {
                     .singleSurfaceGlass(
                         cornerRadius: 16,
                         stableFillOpacity: 0.01,
-                        tintOpacity: 0.024,
-                        borderWidth: 0.8,
-                        darkBorderOpacity: 0.15,
-                        lightBorderOpacity: 0.085
+                        tintOpacity: GlassStyleMetrics.LiveSurface.activeTintOpacity,
+                        borderWidth: GlassStyleMetrics.CompactSurface.borderWidth,
+                        darkBorderOpacity: GlassStyleMetrics.CompactSurface.darkBorderOpacity,
+                        lightBorderOpacity: GlassStyleMetrics.CompactSurface.lightBorderOpacity
                     )
 
             case .embedded:
@@ -58,7 +58,7 @@ package struct CodeBlockView: View {
     }
 
     private var hapticService: HapticService {
-        HapticService()
+        .shared
     }
 
     private var chrome: some View {
@@ -101,10 +101,10 @@ package struct CodeBlockView: View {
                     .padding(.horizontal, 11)
                     .padding(.vertical, 4)
                     .singleFrameGlassCapsuleControl(
-                        tintOpacity: 0.015,
+                        tintOpacity: GlassStyleMetrics.CapsuleControl.tintOpacity,
                         borderWidth: 0.75,
-                        darkBorderOpacity: 0.14,
-                        lightBorderOpacity: 0.08
+                        darkBorderOpacity: GlassStyleMetrics.CapsuleControl.darkBorderOpacity,
+                        lightBorderOpacity: GlassStyleMetrics.CapsuleControl.lightBorderOpacity
                     )
                 }
                 .buttonStyle(.plain)

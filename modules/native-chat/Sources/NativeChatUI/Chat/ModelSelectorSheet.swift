@@ -76,7 +76,7 @@ public struct ModelSelectorSheet: View {
     }
 
     private var hapticService: HapticService {
-        HapticService()
+        .shared
     }
 
     /// The model selector card, including mode toggles and reasoning controls.
@@ -104,13 +104,18 @@ public struct ModelSelectorSheet: View {
         .padding(.vertical, metrics.contentVerticalPadding)
         .singleSurfaceGlass(
             cornerRadius: metrics.panelCornerRadius,
-            stableFillOpacity: 0.014,
-            tintOpacity: 0.026,
-            borderWidth: 0.9,
-            darkBorderOpacity: 0.17,
-            lightBorderOpacity: 0.095
+            stableFillOpacity: GlassStyleMetrics.ElevatedPanel.stableFillOpacity,
+            tintOpacity: GlassStyleMetrics.ElevatedPanel.tintOpacity,
+            borderWidth: GlassStyleMetrics.ElevatedPanel.borderWidth,
+            darkBorderOpacity: GlassStyleMetrics.ElevatedPanel.darkBorderOpacity,
+            lightBorderOpacity: GlassStyleMetrics.ElevatedPanel.lightBorderOpacity
         )
-        .shadow(color: .black.opacity(0.08), radius: 24, x: 0, y: 10)
+        .shadow(
+            color: .black.opacity(GlassStyleMetrics.ElevatedPanel.shadowOpacity),
+            radius: GlassStyleMetrics.ElevatedPanel.shadowRadius,
+            x: 0,
+            y: GlassStyleMetrics.ElevatedPanel.shadowYOffset
+        )
     }
 
     private var reasoningControl: some View {
@@ -154,11 +159,11 @@ public struct ModelSelectorSheet: View {
         .accessibilityIdentifier("modelSelector.reasoning")
         .singleSurfaceGlass(
             cornerRadius: metrics.cardCornerRadius,
-            stableFillOpacity: 0.012,
-            tintOpacity: 0.022,
-            borderWidth: 0.8,
-            darkBorderOpacity: 0.15,
-            lightBorderOpacity: 0.085
+            stableFillOpacity: GlassStyleMetrics.CompactSurface.stableFillOpacity,
+            tintOpacity: GlassStyleMetrics.CompactSurface.tintOpacity,
+            borderWidth: GlassStyleMetrics.CompactSurface.borderWidth,
+            darkBorderOpacity: GlassStyleMetrics.CompactSurface.darkBorderOpacity,
+            lightBorderOpacity: GlassStyleMetrics.CompactSurface.lightBorderOpacity
         )
     }
 
@@ -188,10 +193,10 @@ public struct ModelSelectorSheet: View {
                     .padding(.horizontal, 12)
                     .padding(.vertical, 6)
                     .singleFrameGlassCapsuleControl(
-                        tintOpacity: 0.015,
-                        borderWidth: 0.78,
-                        darkBorderOpacity: 0.14,
-                        lightBorderOpacity: 0.08
+                        tintOpacity: GlassStyleMetrics.CapsuleControl.tintOpacity,
+                        borderWidth: GlassStyleMetrics.CapsuleControl.borderWidth,
+                        darkBorderOpacity: GlassStyleMetrics.CapsuleControl.darkBorderOpacity,
+                        lightBorderOpacity: GlassStyleMetrics.CapsuleControl.lightBorderOpacity
                     )
             }
             .buttonStyle(GlassPressButtonStyle())
@@ -230,11 +235,11 @@ public struct ModelSelectorSheet: View {
         }
         .singleSurfaceGlass(
             cornerRadius: metrics.cardCornerRadius,
-            stableFillOpacity: 0.012,
-            tintOpacity: 0.022,
-            borderWidth: 0.8,
-            darkBorderOpacity: 0.15,
-            lightBorderOpacity: 0.085
+            stableFillOpacity: GlassStyleMetrics.CompactSurface.stableFillOpacity,
+            tintOpacity: GlassStyleMetrics.CompactSurface.tintOpacity,
+            borderWidth: GlassStyleMetrics.CompactSurface.borderWidth,
+            darkBorderOpacity: GlassStyleMetrics.CompactSurface.darkBorderOpacity,
+            lightBorderOpacity: GlassStyleMetrics.CompactSurface.lightBorderOpacity
         )
     }
 

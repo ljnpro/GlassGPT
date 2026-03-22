@@ -167,6 +167,13 @@ extension SourceTargetBoundaryTests {
         #expect(backupURL.pathExtension == "sqlite")
     }
 
+    @Test func `persistence timestamp formatter returns filesystem safe ISO8601 value`() {
+        #expect(
+            PersistenceTimestampFormatter.storePathComponent(from: Date(timeIntervalSince1970: 0))
+                == "1970-01-01T00-00-00.000Z"
+        )
+    }
+
     @Test func `chat persistence settings store keeps default selection contract`() {
         final class MemoryStore: SettingsValueStore {
             var values: [String: Any] = [:]

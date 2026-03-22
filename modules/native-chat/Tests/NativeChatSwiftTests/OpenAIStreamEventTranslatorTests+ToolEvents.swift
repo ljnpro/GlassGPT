@@ -196,10 +196,10 @@ extension OpenAIStreamEventTranslatorTests {
         }
     }
 
-    @Test func `extraction helpers prefer structured content`() {
+    @Test func `extraction helpers prefer authoritative top level output text`() {
         let response = makeStructuredExtractionResponse()
 
-        #expect(OpenAIStreamEventTranslator.extractOutputText(from: response) == "body")
+        #expect(OpenAIStreamEventTranslator.extractOutputText(from: response) == "top level text")
         #expect(
             OpenAIStreamEventTranslator.extractReasoningText(from: response)
                 == "top levelplan summary step"

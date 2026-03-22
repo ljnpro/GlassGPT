@@ -3,9 +3,9 @@ import ChatDomain
 import Foundation
 
 @MainActor
-extension SettingsCredentialsStore {
+public extension SettingsCredentialsStore {
     /// Performs a Cloudflare gateway health check and updates ``cloudflareHealthStatus``.
-    public func checkCloudflareHealth() async {
+    func checkCloudflareHealth() async {
         let gatewayEnabled = isCloudflareGatewayEnabled()
         guard gatewayEnabled else {
             cloudflareHealthStatus = .unknown
@@ -35,7 +35,7 @@ extension SettingsCredentialsStore {
     }
 
     /// Switches the locally selected Cloudflare configuration mode.
-    public func setCloudflareConfigurationMode(_ mode: CloudflareGatewayConfigurationMode) {
+    func setCloudflareConfigurationMode(_ mode: CloudflareGatewayConfigurationMode) {
         cloudflareConfigurationMode = mode
         if mode == .default {
             controller.persistCloudflareConfigurationMode(.default)
@@ -44,7 +44,7 @@ extension SettingsCredentialsStore {
     }
 
     /// Saves the currently edited custom Cloudflare gateway configuration and activates it.
-    public func saveCustomCloudflareConfiguration() {
+    func saveCustomCloudflareConfiguration() {
         let trimmedGatewayBaseURL = customCloudflareGatewayBaseURL
             .trimmingCharacters(in: .whitespacesAndNewlines)
         let trimmedGatewayToken = customCloudflareAIGToken
@@ -69,7 +69,7 @@ extension SettingsCredentialsStore {
     }
 
     /// Clears the saved custom Cloudflare gateway configuration while keeping custom mode active.
-    public func clearCustomCloudflareConfiguration() {
+    func clearCustomCloudflareConfiguration() {
         controller.clearCustomCloudflareConfiguration()
         customCloudflareGatewayBaseURL = ""
         customCloudflareAIGToken = ""
@@ -77,7 +77,7 @@ extension SettingsCredentialsStore {
     }
 
     /// Recomputes local gateway health after the Cloudflare preference changes.
-    public func handleCloudflareGatewayChange(_ enabled: Bool) {
+    func handleCloudflareGatewayChange(_ enabled: Bool) {
         guard enabled else {
             cloudflareHealthStatus = .unknown
             isCheckingCloudflareHealth = false
@@ -88,7 +88,7 @@ extension SettingsCredentialsStore {
     }
 
     /// Recomputes local gateway health for the current configuration preview.
-    public func refreshCloudflareHealthStatus() {
+    func refreshCloudflareHealthStatus() {
         let gatewayEnabled = isCloudflareGatewayEnabled()
         guard gatewayEnabled else {
             cloudflareHealthStatus = .unknown
@@ -103,7 +103,7 @@ extension SettingsCredentialsStore {
         )
     }
 
-    func currentCloudflareConfiguration(
+    internal func currentCloudflareConfiguration(
         mode: CloudflareGatewayConfigurationMode? = nil,
         customGatewayBaseURL: String? = nil,
         customGatewayToken: String? = nil

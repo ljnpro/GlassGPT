@@ -4,11 +4,22 @@ import PDFKit
 import UIKit
 
 enum FilePreviewLoadingModel {
-    static func loadGeneratedImagePreview(from fileURL: URL) -> FilePreviewSheet.ImagePreviewLoadResult {
+    static func loadGeneratedImagePreview(
+        from fileURL: URL,
+        onFailure: ((String) -> Void)? = nil,
+        logFailure: Bool = true
+    ) -> FilePreviewSheet.ImagePreviewLoadResult {
         let data: Data
         do {
             data = try Data(contentsOf: fileURL)
         } catch {
+            reportLoadFailure(
+                kind: "image",
+                fileURL: fileURL,
+                error: error,
+                onFailure: onFailure,
+                logFailure: logFailure
+            )
             return .unavailable
         }
 
@@ -43,11 +54,22 @@ enum FilePreviewLoadingModel {
         )
     }
 
-    static func loadGeneratedPDFPreview(from fileURL: URL) -> FilePreviewSheet.PDFPreviewLoadResult {
+    static func loadGeneratedPDFPreview(
+        from fileURL: URL,
+        onFailure: ((String) -> Void)? = nil,
+        logFailure: Bool = true
+    ) -> FilePreviewSheet.PDFPreviewLoadResult {
         let data: Data
         do {
             data = try Data(contentsOf: fileURL)
         } catch {
+            reportLoadFailure(
+                kind: "PDF",
+                fileURL: fileURL,
+                error: error,
+                onFailure: onFailure,
+                logFailure: logFailure
+            )
             return .unavailable
         }
 
@@ -73,5 +95,19 @@ enum FilePreviewLoadingModel {
 
     private static func isGeneratedPDFFilename(_ filename: String) -> Bool {
         URL(fileURLWithPath: filename).pathExtension.lowercased() == "pdf"
+    }
+
+    private static func reportLoadFailure(
+        kind: String,
+        fileURL: URL,
+        error: some Error,
+        onFailure: ((String) -> Void)?,
+        logFailure: Bool
+    ) {
+        let message = "Failed to load generated \(kind) preview at \(fileURL.path): \(error.localizedDescription)"
+        onFailure?(message)
+        if logFailure {
+            NSLog("%@", message)
+        }
     }
 }

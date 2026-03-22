@@ -16,7 +16,8 @@ if [[ "$installed_swiftlint_version" != "$REQUIRED_SWIFTLINT_VERSION" ]]; then
   exit 1
 fi
 
-swiftlint lint --strict --config "$ROOT_DIR/.swiftlint.yml"
+swiftlint lint --strict --quiet --config "$ROOT_DIR/.swiftlint.yml"
+echo "SwiftLint lint passed."
 
 critical_try_hits="$(
   rg -n -P '\btry\?' \

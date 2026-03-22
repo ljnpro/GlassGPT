@@ -72,5 +72,4 @@ extension ChatStreamingCoordinator {
             )
         }
     }
-
 }

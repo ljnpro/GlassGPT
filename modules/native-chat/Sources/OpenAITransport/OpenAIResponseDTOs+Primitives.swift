@@ -24,6 +24,7 @@ public struct ResponsesErrorDTO: Codable, Equatable, Sendable {
     }
 
     /// Decodes an error payload that may arrive as either a string or an object.
+    /// Decodes reasoning text, accepting either fragment arrays or string summaries.
     public init(from decoder: Decoder) throws {
         let singleValue = try decoder.singleValueContainer()
         do {
@@ -73,6 +74,7 @@ public struct ResponsesReasoningDTO: Codable, Equatable, Sendable {
         case summary
     }
 
+    /// Decodes reasoning text, accepting either fragment arrays or string summaries.
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         text = try container.decodeIfPresent(String.self, forKey: .text)
@@ -84,6 +86,7 @@ public struct ResponsesReasoningDTO: Codable, Equatable, Sendable {
         }
     }
 
+    /// Encodes this reasoning payload back into the Responses API wire format.
     public func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encodeIfPresent(text, forKey: .text)

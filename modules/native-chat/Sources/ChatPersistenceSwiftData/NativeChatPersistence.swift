@@ -170,10 +170,7 @@ public enum NativeChatPersistence {
             return .noExistingStore
         }
 
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        let timestamp = formatter.string(from: .now)
-            .replacingOccurrences(of: ":", with: "-")
+        let timestamp = PersistenceTimestampFormatter.storePathComponent(from: .now)
 
         let recoveryDirectory = appSupportURL
             .appendingPathComponent("NativeChat", isDirectory: true)

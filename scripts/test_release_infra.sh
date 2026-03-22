@@ -101,11 +101,19 @@ function test_lint_tool_version_is_pinned() {
     fail "lint.sh must pin the SwiftLint version used for strict linting."
   fi
 
+  if ! grep -Fq 'swiftlint lint --strict --quiet --config "$ROOT_DIR/.swiftlint.yml"' "$ROOT_DIR/scripts/lint.sh"; then
+    fail "lint.sh should run SwiftLint in quiet mode so successful CI logs stay concise."
+  fi
+
+  if ! grep -Fq 'SwiftLint lint passed.' "$ROOT_DIR/scripts/lint.sh"; then
+    fail "lint.sh should emit a concise success summary after a clean lint run."
+  fi
+
   if grep -Fq 'brew install swiftlint' "$ROOT_DIR/scripts/lint.sh"; then
     fail "lint.sh should not auto-install an unpinned SwiftLint version."
   fi
 
-  echo "[PASS] lint.sh pins the strict SwiftLint toolchain version"
+  echo "[PASS] lint.sh pins and quiets the strict SwiftLint toolchain"
 }
 
 function test_xcodebuild_log_tail_guard() {
@@ -576,11 +584,66 @@ function test_snapshot_recording_covers_hosted_references() {
     fail "record_snapshots.sh should rerun both snapshot suites when refreshing references."
   fi
 
+  if ! grep -Fq 'Snapshots already up to date' "$ROOT_DIR/scripts/record_snapshots.sh"; then
+    fail "record_snapshots.sh should treat a clean snapshot refresh as a successful no-op."
+  fi
+
   if ! grep -Fq 'No recorded snapshots were found in CoreSimulator temp directories or snapshot reference folders.' "$ROOT_DIR/scripts/record_snapshots.sh"; then
-    fail "record_snapshots.sh should treat directly auto-recorded references as a successful refresh source."
+    fail "record_snapshots.sh should still fail when recording produced no references after a failing snapshot run."
   fi
 
   echo "[PASS] snapshot recording updates both snapshot suites"
+}
+
+function test_single_flight_guards_prevent_overlapping_local_runs() {
+  local temp_dir harness output status holder_pid
+  temp_dir="$(mktemp -d)"
+  trap 'rm -rf "$temp_dir"' RETURN
+
+  if ! grep -Fq 'source "$ROOT_DIR/scripts/lib_single_flight.sh"' "$ROOT_DIR/scripts/ci.sh"; then
+    fail "ci.sh should source the shared single-flight lock library."
+  fi
+
+  if ! grep -Fq 'single_flight_acquire "$CI_OUTPUT_DIR/ci.lock" "ci.sh"' "$ROOT_DIR/scripts/ci.sh"; then
+    fail "ci.sh should reject overlapping local runs with the CI lock."
+  fi
+
+  if ! grep -Fq 'single_flight_acquire "$CI_OUTPUT_DIR/record-snapshots.lock" "record_snapshots.sh"' "$ROOT_DIR/scripts/record_snapshots.sh"; then
+    fail "record_snapshots.sh should reject overlapping local snapshot recordings."
+  fi
+
+  cat <<EOF >"$temp_dir/lock_harness.sh"
+#!/usr/bin/env bash
+set -euo pipefail
+source "$ROOT_DIR/scripts/lib_single_flight.sh"
+single_flight_acquire "$temp_dir/harness.lock" "lock harness"
+trap 'single_flight_release_all' EXIT INT TERM HUP
+sleep "\${1:-1}"
+EOF
+  chmod +x "$temp_dir/lock_harness.sh"
+
+  "$temp_dir/lock_harness.sh" 2 &
+  holder_pid=$!
+  sleep 1
+
+  set +e
+  output="$("$temp_dir/lock_harness.sh" 0 2>&1)"
+  status=$?
+  set -e
+  if [[ $status -eq 0 ]]; then
+    fail "single_flight_acquire should fail when the lock is already held."
+  fi
+
+  if ! printf '%s\n' "$output" | grep -Fq 'lock harness is already running'; then
+    fail "single_flight_acquire should explain why the second run was rejected."
+  fi
+
+  wait "$holder_pid"
+  "$temp_dir/lock_harness.sh" 0 >/dev/null
+
+  rm -rf "$temp_dir"
+  trap - RETURN
+  echo "[PASS] single-flight guards prevent overlapping local runs"
 }
 
 function test_performance_regression_pipeline() {
@@ -679,6 +742,59 @@ EOF
   echo "[PASS] performance regression pipeline is enforced and script-covered"
 }
 
+function test_ui_test_shards_are_split_cleanly() {
+  if ! grep -Fq 'source "$ROOT_DIR/scripts/lib_ui_test_sharding.sh"' "$ROOT_DIR/scripts/ci.sh"; then
+    fail "ci.sh should source the shared UI test sharding library."
+  fi
+
+  if ! grep -Fq 'resolve_ui_test_cases "$UI_TEST_FILTER"' "$ROOT_DIR/scripts/ci.sh"; then
+    fail "ci.sh should resolve UI_TEST_FILTER through the shard-aware selector."
+  fi
+
+  # shellcheck source=/dev/null
+  source "$ROOT_DIR/scripts/lib_ui_test_sharding.sh"
+
+  local -a all_cases=()
+  local -a shard_1_cases=()
+  local -a shard_2_cases=()
+  local -a shard_3_cases=()
+  local resolved_case
+
+  while IFS= read -r resolved_case; do
+    all_cases+=("$resolved_case")
+  done < <(resolve_ui_test_cases "")
+  while IFS= read -r resolved_case; do
+    shard_1_cases+=("$resolved_case")
+  done < <(resolve_ui_test_cases "shard-1")
+  while IFS= read -r resolved_case; do
+    shard_2_cases+=("$resolved_case")
+  done < <(resolve_ui_test_cases "shard-2")
+  while IFS= read -r resolved_case; do
+    shard_3_cases+=("$resolved_case")
+  done < <(resolve_ui_test_cases "shard-3")
+
+  if (( ${#all_cases[@]} == 0 )); then
+    fail "UI sharding library should define at least one UI test case."
+  fi
+
+  if (( ${#shard_1_cases[@]} == 0 || ${#shard_2_cases[@]} == 0 || ${#shard_3_cases[@]} == 0 )); then
+    fail "Each UI shard should contain at least one UI test case."
+  fi
+
+  all_sorted="$(printf '%s\n' "${all_cases[@]}" | LC_ALL=C sort)"
+  union_sorted="$(printf '%s\n' "${shard_1_cases[@]}" "${shard_2_cases[@]}" "${shard_3_cases[@]}" | LC_ALL=C sort | uniq)"
+  if [[ "$all_sorted" != "$union_sorted" ]]; then
+    fail "The three UI shards should cover exactly the full UI suite."
+  fi
+
+  duplicates="$(printf '%s\n' "${shard_1_cases[@]}" "${shard_2_cases[@]}" "${shard_3_cases[@]}" | LC_ALL=C sort | uniq -d)"
+  if [[ -n "$duplicates" ]]; then
+    fail "UI shards should be disjoint, but overlap was detected: $duplicates"
+  fi
+
+  echo "[PASS] UI tests are split cleanly across three executable shards"
+}
+
 test_check_warnings
 test_appintents_linker_setting
 test_cloudflare_release_token_is_externalized
@@ -699,5 +815,7 @@ test_ui_runner_avoids_xctestrun_noise
 test_release_preflight
 test_release_tag_resolution_supports_repeat_builds
 test_snapshot_recording_covers_hosted_references
+test_single_flight_guards_prevent_overlapping_local_runs
 test_performance_regression_pipeline
+test_ui_test_shards_are_split_cleanly
 echo "Release infrastructure tests passed."

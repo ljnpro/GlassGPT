@@ -67,33 +67,51 @@ extension ReplySessionActor {
             state.buffer.filePathAnnotations.append(annotation)
 
         case let .mergeTerminalPayload(text, thinking, filePathAnnotations):
-            if !text.isEmpty {
-                state.buffer.text = text
-            }
-            if let thinking, !thinking.isEmpty {
-                state.buffer.thinking = thinking
-            }
-            if let filePathAnnotations, !filePathAnnotations.isEmpty {
-                state.buffer.filePathAnnotations = filePathAnnotations
-            }
-            for index in state.buffer.toolCalls.indices where state.buffer.toolCalls[index].status != .completed {
-                state.buffer.toolCalls[index].status = .completed
-            }
-            state.isThinking = false
+            applyTerminalPayload(
+                text: text,
+                thinking: thinking,
+                filePathAnnotations: filePathAnnotations
+            )
 
         case let .beginAnswering(text, replace):
-            if replace {
-                state.buffer.text = text
-            } else {
-                state.buffer.text += text
-            }
-            for index in state.buffer.toolCalls.indices where state.buffer.toolCalls[index].status != .completed {
-                state.buffer.toolCalls[index].status = .completed
-            }
-            state.isThinking = false
+            applyAnsweringTransition(text: text, replace: replace)
 
         default:
             break
+        }
+    }
+
+    private func applyTerminalPayload(
+        text: String,
+        thinking: String?,
+        filePathAnnotations: [FilePathAnnotation]?
+    ) {
+        if !text.isEmpty {
+            state.buffer.text = text
+        }
+        if let thinking, !thinking.isEmpty {
+            state.buffer.thinking = thinking
+        }
+        if let filePathAnnotations, !filePathAnnotations.isEmpty {
+            state.buffer.filePathAnnotations = filePathAnnotations
+        }
+        completeActiveToolCalls()
+        state.isThinking = false
+    }
+
+    private func applyAnsweringTransition(text: String, replace: Bool) {
+        if replace {
+            state.buffer.text = text
+        } else {
+            state.buffer.text += text
+        }
+        completeActiveToolCalls()
+        state.isThinking = false
+    }
+
+    private func completeActiveToolCalls() {
+        for index in state.buffer.toolCalls.indices where state.buffer.toolCalls[index].status != .completed {
+            state.buffer.toolCalls[index].status = .completed
         }
     }
 }

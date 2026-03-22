@@ -3,19 +3,15 @@ import Foundation
 
 enum OpenAIResponseOutputExtractor {
     static func extractOutputText(from response: ResponsesResponseDTO) -> String? {
-        let joined = preferredMessageItems(from: response)
-            .compactMap(outputText(in:))
-            .joined()
-
-        if !joined.isEmpty {
-            return joined
-        }
-
         if let text = response.outputText, !text.isEmpty {
             return text
         }
 
-        return nil
+        let joined = OpenAIResponseOutputSelection.preferredMessageItems(from: response)
+            .compactMap(OpenAIResponseOutputSelection.outputText(in:))
+            .joined()
+
+        return joined.isEmpty ? nil : joined
     }
 
     static func extractReasoningText(from response: ResponsesResponseDTO) -> String? {
@@ -49,7 +45,7 @@ enum OpenAIResponseOutputExtractor {
     }
 
     static func extractFilePathAnnotations(from response: ResponsesResponseDTO) -> [FilePathAnnotation] {
-        let messageItems = preferredMessageItems(from: response)
+        let messageItems = OpenAIResponseOutputSelection.preferredMessageItems(from: response)
         guard !messageItems.isEmpty else {
             return []
         }
@@ -66,7 +62,7 @@ enum OpenAIResponseOutputExtractor {
                 }
 
                 guard let partAnnotations = part.annotations else { continue }
-                for annotation in partAnnotations where isFileCitationAnnotationType(annotation.type) {
+                for annotation in partAnnotations where OpenAIStreamEventTranslator.isFileCitationAnnotationType(annotation.type) {
                     guard let fileId = annotation.fileID, !fileId.isEmpty else { continue }
                     let startIndex = annotation.startIndex ?? 0
                     let endIndex = annotation.endIndex ?? 0
@@ -75,7 +71,7 @@ enum OpenAIResponseOutputExtractor {
                         FilePathAnnotation(
                             fileId: fileId,
                             containerId: annotation.containerID,
-                            sandboxPath: extractAnnotatedSubstring(
+                            sandboxPath: OpenAIStreamEventTranslator.extractAnnotatedSubstring(
                                 from: outputText,
                                 startIndex: startIndex,
                                 endIndex: endIndex
@@ -100,50 +96,5 @@ enum OpenAIResponseOutputExtractor {
             return message
         }
         return nil
-    }
-
-    static func preferredMessageItems(from response: ResponsesResponseDTO) -> [ResponsesOutputItemDTO] {
-        guard let output = response.output else {
-            return []
-        }
-
-        let messageItems = output.filter { item in
-            item.type == "message" && outputText(in: item) != nil
-        }
-
-        guard !messageItems.isEmpty else {
-            return []
-        }
-
-        if let finalAssistant = messageItems.last(where: {
-            $0.role == "assistant" && $0.phase == "final_answer"
-        }) {
-            return [finalAssistant]
-        }
-
-        if let completedAssistant = messageItems.last(where: {
-            $0.role == "assistant" && $0.status == "completed"
-        }) {
-            return [completedAssistant]
-        }
-
-        if let assistant = messageItems.last(where: { $0.role == "assistant" }) {
-            return [assistant]
-        }
-
-        if let lastMessage = messageItems.last {
-            return [lastMessage]
-        }
-
-        return []
-    }
-
-    static func outputText(in item: ResponsesOutputItemDTO) -> String? {
-        guard let content = item.content else { return nil }
-        let text = content
-            .filter { $0.type == "output_text" }
-            .compactMap(\.text)
-            .joined()
-        return text.isEmpty ? nil : text
     }
 }

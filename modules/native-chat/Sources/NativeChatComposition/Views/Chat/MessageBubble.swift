@@ -25,7 +25,7 @@ struct MessageBubble: View {
     @Environment(\.hapticsEnabled) var hapticsEnabled
 
     var hapticService: HapticService {
-        HapticService()
+        .shared
     }
 
     init(

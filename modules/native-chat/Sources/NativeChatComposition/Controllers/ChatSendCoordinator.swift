@@ -183,5 +183,4 @@ final class ChatSendCoordinator {
             attachmentsToUpload: attachmentsToSend
         )
     }
-
 }

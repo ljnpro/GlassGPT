@@ -50,5 +50,4 @@ extension ChatSessionCoordinator {
     func isSessionActive(_ session: ReplySession) -> Bool {
         services.sessionRegistry.contains(session)
     }
-
 }

@@ -55,7 +55,7 @@ final class PerformanceTests: XCTestCase {
         plus regular text to fill space. The quick brown fox jumps over the lazy dog.
         """
 
-        let targetLength = 20_000
+        let targetLength = 20000
         let repetitions = targetLength / markdownBlock.count + 1
         let longMarkdown = String(repeating: markdownBlock, count: repetitions)
         precondition(longMarkdown.count >= targetLength)

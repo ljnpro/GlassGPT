@@ -37,6 +37,9 @@ public enum RuntimeSessionDecisionPolicy {
         lastSequenceNumber: Int?,
         errorMessage: String?
     ) -> RuntimeRecoveryFetchAction {
+        // Terminal fetch states stay semantically distinct so incomplete work does not
+        // get collapsed into a hard failure. Only queued/in-progress states re-enter
+        // the recovery transport loop.
         switch status {
         case .completed:
             .finish(.completed)
@@ -95,6 +98,9 @@ public enum RuntimeSessionDecisionPolicy {
         encounteredRecoverableFailure: Bool,
         responseId: String?
     ) -> RuntimeRecoveryStreamNextStep {
+        // Gateway resume fallback wins before polling because a timeout or zero-event
+        // recovery stream usually indicates the transport path is unhealthy, not that
+        // the response itself has reached a terminal state.
         if shouldFallbackToDirectRecoveryStream(
             cloudflareGatewayEnabled: cloudflareGatewayEnabled,
             useDirectEndpoint: useDirectEndpoint,

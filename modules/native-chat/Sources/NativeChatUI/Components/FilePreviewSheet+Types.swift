@@ -1,3 +1,4 @@
+import ChatUIComponents
 import GeneratedFilesCore
 import PDFKit
 import SwiftUI
@@ -57,10 +58,10 @@ extension FilePreviewSheet {
             label()
                 .frame(width: diameter, height: diameter)
                 .singleFrameGlassCircleControl(
-                    tintOpacity: 0.015,
-                    borderWidth: 0.78,
-                    darkBorderOpacity: 0.14,
-                    lightBorderOpacity: 0.08
+                    tintOpacity: GlassStyleMetrics.CapsuleControl.tintOpacity,
+                    borderWidth: GlassStyleMetrics.CapsuleControl.borderWidth,
+                    darkBorderOpacity: GlassStyleMetrics.CapsuleControl.darkBorderOpacity,
+                    lightBorderOpacity: GlassStyleMetrics.CapsuleControl.lightBorderOpacity
                 )
                 .scaleEffect(isPressed ? 0.9 : 1)
                 .opacity(isEnabled ? (isPressed ? 0.8 : 1) : 0.62)

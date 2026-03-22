@@ -31,7 +31,7 @@ public struct FilePreviewSheet: View {
     }
 
     var hapticService: HapticService {
-        HapticService()
+        .shared
     }
 
     var canSaveToPhotos: Bool {

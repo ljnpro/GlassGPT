@@ -39,6 +39,8 @@ public struct SSEEventDecoder {
     public internal(set) var emittedResponseID: String?
     /// The active output item currently contributing visible assistant text.
     public internal(set) var activeTextItemID: String?
+    /// The active output-text content part currently contributing visible assistant text.
+    public internal(set) var activeTextContentIndex: Int?
     /// The number of malformed frames seen in a row.
     var consecutiveDecodeFailures = 0
 
@@ -65,7 +67,9 @@ public struct SSEEventDecoder {
 
         let sequenceNumber = OpenAIStreamEventTranslator.extractSequenceNumber(from: jsonData)
         let responseID = OpenAIStreamEventTranslator.extractResponseIdentifier(from: jsonData)
-        let itemID = decodeEnvelope(from: jsonData)?.itemID
+        let envelope = decodeEnvelope(from: jsonData)
+        let itemID = envelope?.itemID
+        let contentIndex = envelope?.contentIndex
 
         if let translated = OpenAIStreamEventTranslator.translate(eventType: frame.type, data: jsonData) {
             resetDecodeFailures()
@@ -74,6 +78,7 @@ public struct SSEEventDecoder {
                 responseID: responseID,
                 sequenceNumber: sequenceNumber,
                 itemID: itemID,
+                contentIndex: contentIndex,
                 continuation: continuation
             )
         }

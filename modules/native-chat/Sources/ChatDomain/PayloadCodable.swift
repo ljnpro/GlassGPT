@@ -5,6 +5,13 @@ import Foundation
 package protocol PayloadCodable: Codable, Sendable {}
 
 package extension PayloadCodable {
+    static func codingFailureMessage(
+        operation: String,
+        error: some Error
+    ) -> String {
+        "Payload \(operation) failed for \(String(describing: Self.self)): \(error.localizedDescription)"
+    }
+
     static func encodeOrThrow(_ items: [Self]?) throws(EncodingError) -> Data? {
         guard let items, !items.isEmpty else { return nil }
         return try PayloadJSONCoding.encode(items)
@@ -22,6 +29,7 @@ package extension PayloadCodable {
         do {
             return try encodeOrThrow(items)
         } catch {
+            NSLog("%@", codingFailureMessage(operation: "encode", error: error))
             return nil
         }
     }
@@ -33,6 +41,7 @@ package extension PayloadCodable {
         do {
             return try decodeOrThrow(data)
         } catch {
+            NSLog("%@", codingFailureMessage(operation: "decode", error: error))
             return nil
         }
     }

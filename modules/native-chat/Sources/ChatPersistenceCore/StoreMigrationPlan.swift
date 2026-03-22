@@ -42,9 +42,9 @@ public struct StoreMigrationPlan: Equatable, Sendable {
 
     /// Computes the backup file URL for a given store URL and timestamp.
     public func backupURL(for storeURL: URL, timestamp: Date) -> URL {
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime, .withDashSeparatorInDate, .withColonSeparatorInTime]
-        let backupFilename = storeURL.deletingPathExtension().lastPathComponent + "-" + formatter.string(from: timestamp)
+        let backupFilename = storeURL.deletingPathExtension().lastPathComponent
+            + "-"
+            + PersistenceTimestampFormatter.storePathComponent(from: timestamp)
 
         return storeURL
             .deletingLastPathComponent()

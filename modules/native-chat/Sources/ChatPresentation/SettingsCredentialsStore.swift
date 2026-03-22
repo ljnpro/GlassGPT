@@ -109,5 +109,4 @@ public final class SettingsCredentialsStore {
         isAPIKeyValid = await controller.validateAPIKey(trimmedKey)
         isValidating = false
     }
-
 }

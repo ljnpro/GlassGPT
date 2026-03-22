@@ -81,6 +81,7 @@ public struct ResponsesOutputItemDTO: Codable, Equatable, Sendable {
         case summary
     }
 
+    /// Decodes an output item, accepting string or fragment-array reasoning summaries.
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         type = try container.decode(String.self, forKey: .type)
@@ -104,6 +105,7 @@ public struct ResponsesOutputItemDTO: Codable, Equatable, Sendable {
         }
     }
 
+    /// Encodes this output item back into the Responses API wire format.
     public func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(type, forKey: .type)

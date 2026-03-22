@@ -4,6 +4,8 @@ public struct ResponsesStreamEnvelopeDTO: Codable, Equatable, Sendable {
     public let delta: String?
     /// The identifier of the output item this event relates to.
     public let itemID: String?
+    /// The content part index this event relates to, if present.
+    public let contentIndex: Int?
     /// Completed code for a code interpreter call.
     public let code: String?
     /// Full text content for a done event.
@@ -23,6 +25,7 @@ public struct ResponsesStreamEnvelopeDTO: Codable, Equatable, Sendable {
     public init(
         delta: String? = nil,
         itemID: String? = nil,
+        contentIndex: Int? = nil,
         code: String? = nil,
         text: String? = nil,
         annotation: ResponsesAnnotationDTO? = nil,
@@ -33,6 +36,7 @@ public struct ResponsesStreamEnvelopeDTO: Codable, Equatable, Sendable {
     ) {
         self.delta = delta
         self.itemID = itemID
+        self.contentIndex = contentIndex
         self.code = code
         self.text = text
         self.annotation = annotation
@@ -45,6 +49,7 @@ public struct ResponsesStreamEnvelopeDTO: Codable, Equatable, Sendable {
     private enum CodingKeys: String, CodingKey {
         case delta
         case itemID = "item_id"
+        case contentIndex = "content_index"
         case code
         case text
         case annotation

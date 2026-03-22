@@ -23,9 +23,13 @@ struct KaTeXProviderTests {
             .appendingPathComponent("missing.js")
         var failureMessage: String?
 
-        let content = KaTeXProvider.loadContent(from: missingURL, onFailure: { message in
-            failureMessage = message
-        }, logFailure: false)
+        let content = KaTeXProvider.loadContent(
+            from: missingURL,
+            onFailure: { message in
+                failureMessage = message
+            },
+            logFailure: false
+        )
 
         #expect(content == nil)
         #expect(failureMessage?.contains("Failed to load KaTeX resource") == true)

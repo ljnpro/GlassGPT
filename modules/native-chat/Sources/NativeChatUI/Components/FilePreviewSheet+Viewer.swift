@@ -234,10 +234,10 @@ extension FilePreviewSheet {
             .padding(.vertical, 10)
             .singleSurfaceGlass(
                 cornerRadius: 999,
-                stableFillOpacity: 0.012,
-                borderWidth: 0.8,
-                darkBorderOpacity: 0.14,
-                lightBorderOpacity: 0.08
+                stableFillOpacity: GlassStyleMetrics.CompactSurface.stableFillOpacity,
+                borderWidth: GlassStyleMetrics.CompactSurface.borderWidth,
+                darkBorderOpacity: GlassStyleMetrics.CapsuleControl.darkBorderOpacity,
+                lightBorderOpacity: GlassStyleMetrics.CapsuleControl.lightBorderOpacity
             )
             .accessibilityLabel(String(localized: "Image saved to Photos"))
             .accessibilityIdentifier("filePreview.saveSuccess")

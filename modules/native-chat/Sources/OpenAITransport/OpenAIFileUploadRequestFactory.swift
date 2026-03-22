@@ -26,6 +26,11 @@ public extension OpenAIRequestFactory {
             mimeType: Self.mimeType(for: filename),
             fileData: fileData
         )
+        if body.didTruncateFilename {
+            throw OpenAIServiceError.requestFailed(
+                "Filename exceeds the multipart upload header limit. Rename the file and try again."
+            )
+        }
 
         return try request(
             for: OpenAIRequestDescriptor(

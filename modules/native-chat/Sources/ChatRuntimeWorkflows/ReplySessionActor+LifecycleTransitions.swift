@@ -54,6 +54,7 @@ extension ReplySessionActor {
                 )
             } else {
                 state.lifecycle = .failed(nil)
+                state.isThinking = false
             }
 
         case let .detachForBackground(usedBackgroundMode):

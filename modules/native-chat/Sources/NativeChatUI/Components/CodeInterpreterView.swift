@@ -24,11 +24,11 @@ package struct CodeInterpreterIndicator: View {
         .padding(.vertical, 8)
         .singleSurfaceGlass(
             cornerRadius: 999,
-            stableFillOpacity: 0.01,
-            tintOpacity: 0.022,
-            borderWidth: 0.75,
-            darkBorderOpacity: 0.14,
-            lightBorderOpacity: 0.08
+            stableFillOpacity: GlassStyleMetrics.SubtleSurface.stableFillOpacity,
+            tintOpacity: GlassStyleMetrics.CompactSurface.tintOpacity,
+            borderWidth: GlassStyleMetrics.SubtleSurface.borderWidth,
+            darkBorderOpacity: GlassStyleMetrics.SubtleSurface.darkBorderOpacity,
+            lightBorderOpacity: GlassStyleMetrics.SubtleSurface.lightBorderOpacity
         )
         .accessibilityIdentifier("indicator.codeInterpreter")
     }
@@ -105,7 +105,7 @@ package struct CodeInterpreterResultView: View {
                         .singleSurfaceGlass(
                             cornerRadius: 8,
                             stableFillOpacity: 0.006,
-                            tintOpacity: 0.022,
+                            tintOpacity: GlassStyleMetrics.CompactSurface.tintOpacity,
                             borderWidth: 0.7,
                             darkBorderOpacity: 0.13,
                             lightBorderOpacity: 0.075
@@ -132,7 +132,7 @@ package struct CodeInterpreterResultView: View {
                         .singleSurfaceGlass(
                             cornerRadius: 8,
                             stableFillOpacity: 0.006,
-                            tintOpacity: 0.022,
+                            tintOpacity: GlassStyleMetrics.CompactSurface.tintOpacity,
                             borderWidth: 0.7,
                             darkBorderOpacity: 0.13,
                             lightBorderOpacity: 0.075
@@ -146,11 +146,11 @@ package struct CodeInterpreterResultView: View {
         }
         .singleSurfaceGlass(
             cornerRadius: 12,
-            stableFillOpacity: 0.01,
-            tintOpacity: 0.024,
-            borderWidth: 0.75,
-            darkBorderOpacity: 0.14,
-            lightBorderOpacity: 0.08
+            stableFillOpacity: GlassStyleMetrics.SubtleSurface.stableFillOpacity,
+            tintOpacity: GlassStyleMetrics.LiveSurface.activeTintOpacity,
+            borderWidth: GlassStyleMetrics.SubtleSurface.borderWidth,
+            darkBorderOpacity: GlassStyleMetrics.SubtleSurface.darkBorderOpacity,
+            lightBorderOpacity: GlassStyleMetrics.SubtleSurface.lightBorderOpacity
         )
     }
 }

@@ -23,6 +23,14 @@ public struct ExportableMessage: Sendable {
 /// Renders a list of ``ExportableMessage`` values into a formatted document
 /// suitable for sharing or archiving.
 public enum ConversationExportService {
+    private static let timestampFormatterLock = NSLock()
+    private static let timestampFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .short
+        return formatter
+    }()
+
     /// Exports messages to Markdown format.
     /// - Parameters:
     ///   - title: The conversation title.
@@ -36,14 +44,10 @@ public enum ConversationExportService {
         lines.append("# \(title)")
         lines.append("")
 
-        let formatter = DateFormatter()
-        formatter.dateStyle = .medium
-        formatter.timeStyle = .short
-
         for message in messages {
             let roleLabel = roleHeader(for: message.role)
             if let date = message.createdAt {
-                lines.append("### \(roleLabel) — \(formatter.string(from: date))")
+                lines.append("### \(roleLabel) — \(formattedTimestamp(from: date))")
             } else {
                 lines.append("### \(roleLabel)")
             }
@@ -72,14 +76,10 @@ public enum ConversationExportService {
         lines.append(String(repeating: "=", count: title.count))
         lines.append("")
 
-        let formatter = DateFormatter()
-        formatter.dateStyle = .medium
-        formatter.timeStyle = .short
-
         for message in messages {
             let roleLabel = roleHeader(for: message.role)
             if let date = message.createdAt {
-                lines.append("[\(roleLabel)] \(formatter.string(from: date))")
+                lines.append("[\(roleLabel)] \(formattedTimestamp(from: date))")
             } else {
                 lines.append("[\(roleLabel)]")
             }
@@ -100,5 +100,11 @@ public enum ConversationExportService {
         case .system:
             String(localized: "System")
         }
+    }
+
+    private static func formattedTimestamp(from date: Date) -> String {
+        timestampFormatterLock.lock()
+        defer { timestampFormatterLock.unlock() }
+        return timestampFormatter.string(from: date)
     }
 }

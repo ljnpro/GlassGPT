@@ -5,11 +5,15 @@ extension View {
     func assistantSingleSurfaceGlass(isLive: Bool) -> some View {
         singleSurfaceGlass(
             cornerRadius: 20,
-            stableFillOpacity: isLive ? 0.01 : 0.004,
-            tintOpacity: isLive ? 0.03 : 0.024,
-            borderWidth: 0.85,
-            darkBorderOpacity: 0.16,
-            lightBorderOpacity: 0.09
+            stableFillOpacity: isLive
+                ? GlassStyleMetrics.AssistantSurface.liveStableFillOpacity
+                : GlassStyleMetrics.AssistantSurface.idleStableFillOpacity,
+            tintOpacity: isLive
+                ? GlassStyleMetrics.AssistantSurface.liveTintOpacity
+                : GlassStyleMetrics.AssistantSurface.idleTintOpacity,
+            borderWidth: GlassStyleMetrics.AssistantSurface.borderWidth,
+            darkBorderOpacity: GlassStyleMetrics.AssistantSurface.darkBorderOpacity,
+            lightBorderOpacity: GlassStyleMetrics.AssistantSurface.lightBorderOpacity
         )
     }
 }

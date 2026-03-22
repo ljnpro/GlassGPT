@@ -16,6 +16,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Release readiness now defaults to the version values in `Versions.xcconfig` instead of stale hardcoded expectations
 - Successful release packaging logs are sanitized down to a clean summary so release artifacts stay free of warning-like noise
 
+## [4.10.4] - 2026-03-22
+
+### Fixed
+
+- Streaming no longer duplicates simple assistant replies across partial and terminal text frames, and recovery relaunch now hydrates persisted draft content before resuming runtime state
+- Payload, preview, and KaTeX failure paths now preserve actionable diagnostics instead of dropping context silently
+- Local snapshot recording and CI entrypoints now reject overlapping runs, preventing stale `xcodebuild` contention and noisy interrupted recordings
+
+### Changed
+
+- Shared UI glass metrics and export timestamp formatting were consolidated further to reduce drift across the 4.10 line
+- UI test execution remains split across three deterministic shards with cleaner local and GitHub log output
 ## [4.10.3] - 2026-03-21
 
 ### Changed

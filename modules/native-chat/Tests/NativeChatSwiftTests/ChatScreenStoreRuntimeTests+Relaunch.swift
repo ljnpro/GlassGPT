@@ -113,6 +113,73 @@ extension ChatScreenStoreRuntimeTests {
         #expect(resumeURL.contains("starting_after=7"))
     }
 
+    @Test func `relaunched recovery hydrates persisted draft content before resumed events arrive`() async throws {
+        let deps = try makeRelaunchDependencies()
+
+        let initialStreamClient = ControlledOpenAIStreamClient()
+        let initialStore = makeRelaunchableStore(deps: deps, streamClient: initialStreamClient)
+        let conversation = try seedConversation(
+            in: initialStore,
+            title: "Hydrated Recovery",
+            backgroundModeEnabled: true
+        )
+
+        initialStore.currentConversation = conversation
+        initialStore.messages = []
+        initialStore.backgroundModeEnabled = true
+        initialStore.syncConversationProjection()
+
+        #expect(initialStore.sendMessage(text: "Hydrate recovery state"))
+        try await waitUntil {
+            initialStore.currentVisibleSession != nil && initialStreamClient.activeStreamCount > 0
+        }
+
+        initialStreamClient.yield(.responseCreated("resp_hydrated_recovery"))
+        initialStreamClient.yield(.sequenceUpdate(11))
+        initialStreamClient.yield(.thinkingStarted)
+        initialStreamClient.yield(.thinkingDelta("Persisted reasoning"))
+        initialStreamClient.yield(.textDelta("Persisted answer"))
+
+        try await waitUntil {
+            let message = self.latestAssistantMessage(in: initialStore)
+            return message?.responseId == "resp_hydrated_recovery" &&
+                message?.lastSequenceNumber == 11
+        }
+
+        initialStore.handleEnterBackground()
+        initialStore.suspendActiveSessionsForAppBackground()
+
+        let relaunchTransport = StubOpenAITransport()
+        let streamURL = try #require(
+            URL(string: "https://api.test.openai.local/v1/responses/resp_hydrated_recovery")
+        )
+        try await relaunchTransport.enqueue(
+            data: makeFetchResponseData(status: .inProgress, text: ""),
+            url: streamURL
+        )
+
+        let relaunchStreamClient = ControlledOpenAIStreamClient()
+        let relaunchStore = makeRelaunchableStore(
+            deps: deps,
+            transport: relaunchTransport,
+            streamClient: relaunchStreamClient,
+            restoreConversation: true
+        )
+
+        try await waitUntil {
+            relaunchStore.currentVisibleSession != nil &&
+                relaunchStore.isRecovering &&
+                relaunchStore.currentStreamingText == "Persisted answer" &&
+                relaunchStore.currentThinkingText == "Persisted reasoning" &&
+                relaunchStore.isThinking
+        }
+
+        relaunchStreamClient.yield(.completed("Persisted answer", "Persisted reasoning", nil))
+
+        try await waitUntil {
+            self.latestAssistantMessage(in: relaunchStore)?.isComplete == true
+        }
+    }
 }
 
 // MARK: - Relaunch Test Helpers

@@ -124,11 +124,11 @@ package struct DetachedStreamingBubbleView: View, Equatable {
             .padding(12)
             .singleSurfaceGlass(
                 cornerRadius: 20,
-                stableFillOpacity: 0.01,
-                tintOpacity: 0.03,
-                borderWidth: 0.85,
-                darkBorderOpacity: 0.16,
-                lightBorderOpacity: 0.09
+                stableFillOpacity: GlassStyleMetrics.AssistantSurface.liveStableFillOpacity,
+                tintOpacity: GlassStyleMetrics.AssistantSurface.liveTintOpacity,
+                borderWidth: GlassStyleMetrics.AssistantSurface.borderWidth,
+                darkBorderOpacity: GlassStyleMetrics.AssistantSurface.darkBorderOpacity,
+                lightBorderOpacity: GlassStyleMetrics.AssistantSurface.lightBorderOpacity
             )
             .accessibilityElement(children: .contain)
             .accessibilityLabel(String(localized: "Assistant response in progress"))

@@ -47,6 +47,12 @@ public actor RuntimeRegistryActor {
         registerSession(replyID: replyID, messageID: messageID, conversationID: conversationID)
     }
 
+    /// Creates and registers a new session from a prepared runtime state snapshot.
+    /// - Parameter initialState: The runtime state to seed into the new session actor.
+    public func startSession(initialState: ReplyRuntimeState) {
+        sessions[initialState.assistantReplyID] = ReplySessionActor(initialState: initialState)
+    }
+
     private func registerSession(
         replyID: AssistantReplyID,
         messageID: UUID,

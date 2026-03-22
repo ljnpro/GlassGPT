@@ -49,11 +49,18 @@ extension SSEEventDecoder {
            let fullText = envelope.text,
            !fullText.isEmpty {
             resetDecodeFailures()
+            let shouldReplace = accumulatedText != fullText ||
+                activeTextItemID != envelope.itemID ||
+                activeTextContentIndex != envelope.contentIndex
             accumulatedText = fullText
             if let itemID = envelope.itemID {
                 activeTextItemID = itemID
             }
+            activeTextContentIndex = envelope.contentIndex
             emittedAnyOutput = true
+            if shouldReplace {
+                continuation.yield(.replaceText(fullText))
+            }
         } else {
             recordDecodeFailure("SSE frame could not be decoded for event type \(frameType).")
         }

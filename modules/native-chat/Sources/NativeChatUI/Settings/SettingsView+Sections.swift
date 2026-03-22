@@ -74,9 +74,9 @@ private struct SettingsInlineReasoningEffortControl: View {
                             .padding(.vertical, 5)
                             .singleFrameGlassCapsuleControl(
                                 tintOpacity: 0.02,
-                                borderWidth: 0.78,
-                                darkBorderOpacity: 0.14,
-                                lightBorderOpacity: 0.08
+                                borderWidth: GlassStyleMetrics.CapsuleControl.borderWidth,
+                                darkBorderOpacity: GlassStyleMetrics.CapsuleControl.darkBorderOpacity,
+                                lightBorderOpacity: GlassStyleMetrics.CapsuleControl.lightBorderOpacity
                             )
 
                         Image(systemName: isExpanded ? "chevron.up" : "chevron.down")

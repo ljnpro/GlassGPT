@@ -150,12 +150,25 @@ struct PresentationHelperTests {
 
     @Test func `load generated image preview returns unavailable for missing file`() {
         let missingURL = URL(fileURLWithPath: "/tmp/missing-generated-image.png")
-        switch FilePreviewLoadingModel.loadGeneratedImagePreview(from: missingURL) {
+        switch FilePreviewLoadingModel.loadGeneratedImagePreview(from: missingURL, logFailure: false) {
         case .unavailable:
             ()
         default:
             Issue.record("Expected unavailable image preview")
         }
+    }
+
+    @Test func `load generated image preview reports missing file context`() {
+        let missingURL = URL(fileURLWithPath: "/tmp/missing-generated-image.png")
+        var failureMessage: String?
+
+        _ = FilePreviewLoadingModel.loadGeneratedImagePreview(
+            from: missingURL,
+            onFailure: { failureMessage = $0 },
+            logFailure: false
+        )
+
+        #expect(failureMessage?.contains("missing-generated-image.png") == true)
     }
 
     @Test func `load generated image preview rejects non image filename`() throws {
@@ -185,12 +198,25 @@ struct PresentationHelperTests {
 
     @Test func `load generated PDF preview returns unavailable for missing file`() {
         let missingURL = URL(fileURLWithPath: "/tmp/missing-generated-document.pdf")
-        switch FilePreviewLoadingModel.loadGeneratedPDFPreview(from: missingURL) {
+        switch FilePreviewLoadingModel.loadGeneratedPDFPreview(from: missingURL, logFailure: false) {
         case .unavailable:
             ()
         default:
             Issue.record("Expected unavailable PDF preview")
         }
+    }
+
+    @Test func `load generated PDF preview reports missing file context`() {
+        let missingURL = URL(fileURLWithPath: "/tmp/missing-generated-document.pdf")
+        var failureMessage: String?
+
+        _ = FilePreviewLoadingModel.loadGeneratedPDFPreview(
+            from: missingURL,
+            onFailure: { failureMessage = $0 },
+            logFailure: false
+        )
+
+        #expect(failureMessage?.contains("missing-generated-document.pdf") == true)
     }
 
     @Test func `load generated PDF preview rejects non PDF filename`() throws {

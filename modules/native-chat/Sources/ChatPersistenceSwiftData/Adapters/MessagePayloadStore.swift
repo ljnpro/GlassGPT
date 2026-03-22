@@ -7,41 +7,26 @@ import os
 /// file attachments, and file-path annotations) stored as binary blobs on ``Message``.
 public enum MessagePayloadStore {
     private static let digestEncodingFailureSentinel = Data(#"{"payload_encoding_error":true}"#.utf8)
-    private static let logger = Logger(subsystem: "GlassGPT", category: "persistence")
+    package static let logger = Logger(subsystem: "GlassGPT", category: "persistence")
+
     /// Decodes URL citations from binary data.
     public static func annotations(from data: Data?) -> [URLCitation] {
-        do {
-            return try decodedPayloadItems(URLCitation.self, from: data, label: "annotations")
-        } catch {
-            return []
-        }
+        payloadItems(URLCitation.self, from: data, label: "annotations")
     }
 
     /// Decodes tool call metadata from binary data.
     public static func toolCalls(from data: Data?) -> [ToolCallInfo] {
-        do {
-            return try decodedPayloadItems(ToolCallInfo.self, from: data, label: "tool calls")
-        } catch {
-            return []
-        }
+        payloadItems(ToolCallInfo.self, from: data, label: "tool calls")
     }
 
     /// Decodes file attachments from binary data.
     public static func fileAttachments(from data: Data?) -> [FileAttachment] {
-        do {
-            return try decodedPayloadItems(FileAttachment.self, from: data, label: "file attachments")
-        } catch {
-            return []
-        }
+        payloadItems(FileAttachment.self, from: data, label: "file attachments")
     }
 
     /// Decodes file-path annotations from binary data.
     public static func filePathAnnotations(from data: Data?) -> [FilePathAnnotation] {
-        do {
-            return try decodedPayloadItems(FilePathAnnotation.self, from: data, label: "file path annotations")
-        } catch {
-            return []
-        }
+        payloadItems(FilePathAnnotation.self, from: data, label: "file path annotations")
     }
 
     /// Encodes URL citations to binary data, returning `nil` for empty or nil input.
@@ -148,63 +133,6 @@ public enum MessagePayloadStore {
             }
             return digestEncodingFailureSentinel
         }
-    }
-
-    package static func encodedPayloadData<T: PayloadCodable>(
-        _ items: [T]?,
-        label: String,
-        logFailure: Bool = true
-    ) throws(EncodingError) -> Data? {
-        do {
-            return try T.encodeOrThrow(items)
-        } catch {
-            if logFailure {
-                logger.error("Failed to encode \(label, privacy: .public): \(error.localizedDescription, privacy: .public)")
-            }
-            throw error
-        }
-    }
-
-    package static func decodedPayloadItems<T: PayloadCodable>(
-        _: T.Type,
-        from data: Data?,
-        label: String,
-        logFailure: Bool = true
-    ) throws(DecodingError) -> [T] {
-        do {
-            return try T.decodeOrThrow(data) ?? []
-        } catch {
-            if logFailure {
-                logger.error("Failed to decode \(label, privacy: .public): \(error.localizedDescription, privacy: .public)")
-            }
-            throw error
-        }
-    }
-
-    package static func storedPayloadData<T: PayloadCodable>(
-        _ items: [T],
-        existingData: Data?,
-        label: String,
-        logFailure: Bool = true
-    ) -> Data? {
-        guard !items.isEmpty else {
-            return nil
-        }
-
-        do {
-            return try encodedPayloadData(items, label: label, logFailure: logFailure)
-        } catch {
-            return existingData
-        }
-    }
-
-    private static func setPayload<T: PayloadCodable>(
-        _ items: [T],
-        existingData: Data?,
-        label: String,
-        assign: (Data?) -> Void
-    ) {
-        assign(storedPayloadData(items, existingData: existingData, label: label))
     }
 }
 

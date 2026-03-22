@@ -70,7 +70,7 @@ extension ChatRecoveryCoordinator {
         )
     }
 
-    private func makeRecoverySession(for message: Message, visible: Bool) -> ReplySession? {
+    private func makeRecoverySession(for message: Message, visible _: Bool) -> ReplySession? {
         if let existing = services.sessionRegistry.session(for: message.id) {
             return existing
         }

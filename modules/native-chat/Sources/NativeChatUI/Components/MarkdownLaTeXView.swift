@@ -58,10 +58,10 @@ package struct StandaloneBlockLaTeXCardView: View {
             .singleSurfaceGlass(
                 cornerRadius: 18,
                 stableFillOpacity: 0.008,
-                tintOpacity: 0.022,
-                borderWidth: 0.8,
-                darkBorderOpacity: 0.15,
-                lightBorderOpacity: 0.085
+                tintOpacity: GlassStyleMetrics.CompactSurface.tintOpacity,
+                borderWidth: GlassStyleMetrics.CompactSurface.borderWidth,
+                darkBorderOpacity: GlassStyleMetrics.CompactSurface.darkBorderOpacity,
+                lightBorderOpacity: GlassStyleMetrics.CompactSurface.lightBorderOpacity
             )
     }
 }

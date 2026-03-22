@@ -21,6 +21,8 @@ XCODEBUILD_RETRY_ATTEMPTS="${XCODEBUILD_RETRY_ATTEMPTS:-5}"
 XCODE_TEST_TIMEOUT_ALLOWANCE="${XCODE_TEST_TIMEOUT_ALLOWANCE:-180}"
 SIMULATOR_BOOT_TIMEOUT_SECONDS="${SIMULATOR_BOOT_TIMEOUT_SECONDS:-60}"
 XCODEBUILD_APPINTENTS_LINKER_SETTING='OTHER_LDFLAGS=$(inherited) -framework AppIntents'
+source "$ROOT_DIR/scripts/lib_single_flight.sh"
+source "$ROOT_DIR/scripts/lib_ui_test_sharding.sh"
 SNAPSHOT_CASES=(
   testChatSnapshots
   testHistorySnapshots
@@ -31,47 +33,13 @@ SNAPSHOT_CASES=(
   testModelSelectorPadDarkSnapshot
   testFilePreviewSnapshots
 )
-UI_TEST_CASES=(
-  testTabsAndPrimaryScreensRemainReachable
-  testHistoryScenarioCanOpenConversationAndDeleteAll
-  testHistoryScenarioOpeningConversationShowsSeededMessages
-  testHistoryScenarioCanDeleteSingleConversationWithoutDeletingOthers
-  testHistoryScenarioSearchFiltersSeededConversations
-  testHistoryScenarioShowsDeleteAllActionWhenSeeded
-  testSettingsScenarioPersistsThemeSelectionWithinSession
-  testSettingsGatewayScenarioShowsCloudflareControlsAndMissingKeyFeedback
-  testSettingsGatewayScenarioCustomModeShowsEditableGatewayFields
-  testSettingsGatewayScenarioCustomModeWaitsForInputBeforeStatusValidation
-  testSettingsGatewayScenarioCanSaveAndClearCustomConfiguration
-  testSettingsScenarioCanSaveAndClearAPIKeyLocally
-  testSettingsScenarioReasoningEffortPickerOpensAvailableOptions
-  testFreshInstallScenarioChatDefaultsStartDisabled
-  testEmptyScenarioWithoutAPIKeyKeepsShellUsable
-  testAPIKeyPersistsAcrossAppRelaunch
-  testSettingsScenarioCanChangeDefaultReasoningEffort
-  testSeededScenarioLoadsExistingConversationContent
-  testSeededScenarioPreservesConversationAfterTabRoundTrip
-  testStreamingScenarioCanOpenAndDismissModelSelector
-  testStreamingScenarioCanDismissModelSelectorByTappingBackdrop
-  testStreamingScenarioShowsLiveReasoningOutputAndToolIndicator
-  testStreamingScenarioModelSelectorShowsConfigurationControls
-  testPreviewScenarioShowsAndDismissesGeneratedPreview
-  testPreviewScenarioExposesDownloadAndShareActions
-  testReplySplitScenarioKeepsOneAssistantSurface
-  AccessibilityAuditTests/testChatTabAccessibilityAudit
-  AccessibilityAuditTests/testHistoryTabAccessibilityAudit
-  AccessibilityAuditTests/testSettingsTabAccessibilityAudit
-)
-REINSTALL_UI_TEST_CASES=(
-  testPreparePersistedAPIKeyForReinstall
-  testReinstalledAppReadsPersistedAPIKeyWithoutRestoringHistory
-  testFreshInstallWithoutPersistedAPIKeyKeepsShellUsable
-)
 UI_TEST_FILTER="${UI_TEST_FILTER:-}"
 UI_TEST_BUILD_PREPARED=0
 
 cd "$ROOT_DIR"
 mkdir -p "$CI_OUTPUT_DIR"
+single_flight_acquire "$CI_OUTPUT_DIR/ci.lock" "ci.sh" || exit 1
+trap 'single_flight_release_all' EXIT INT TERM HUP
 
 function log() {
   echo "==> $1"
@@ -716,10 +684,14 @@ function run_ui_test_case() {
 
 function gate_ui_tests() {
   log "Running UI tests"
-  local -a selected_ui_cases=("${UI_TEST_CASES[@]}")
-
-  if [[ -n "$UI_TEST_FILTER" ]]; then
-    IFS=',' read -ra selected_ui_cases <<< "$UI_TEST_FILTER"
+  local -a selected_ui_cases=()
+  local resolved_ui_case
+  while IFS= read -r resolved_ui_case; do
+    selected_ui_cases+=("$resolved_ui_case")
+  done < <(resolve_ui_test_cases "$UI_TEST_FILTER")
+  if (( ${#selected_ui_cases[@]} == 0 )); then
+    echo "UI_TEST_FILTER selected no UI test cases." >&2
+    exit 1
   fi
 
   ensure_ui_test_build_artifacts

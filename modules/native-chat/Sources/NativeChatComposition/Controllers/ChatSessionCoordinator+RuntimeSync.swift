@@ -16,11 +16,7 @@ extension ChatSessionCoordinator {
     func ensureRuntimeSessionRegisteredNow(for session: ReplySession) async {
         let alreadyRegistered = await services.runtimeRegistry.contains(session.assistantReplyID)
         if !alreadyRegistered {
-            await services.runtimeRegistry.startSession(
-                replyID: session.assistantReplyID,
-                messageID: session.messageID,
-                conversationID: session.conversationID
-            )
+            await services.runtimeRegistry.startSession(initialState: initialRuntimeState(for: session))
         }
         guard let replySession = await services.runtimeRegistry.session(for: session.assistantReplyID) else {
             return
@@ -73,6 +69,45 @@ extension ChatSessionCoordinator {
         Task {
             await runtimeRegistry.remove(assistantReplyID)
         }
+    }
+
+    private func initialRuntimeState(for session: ReplySession) -> ReplyRuntimeState {
+        guard let message = conversations.findMessage(byId: session.messageID) else {
+            return ReplyRuntimeState(
+                assistantReplyID: session.assistantReplyID,
+                messageID: session.messageID,
+                conversationID: session.conversationID,
+                lifecycle: .preparingInput
+            )
+        }
+
+        return ReplyRuntimeState(
+            assistantReplyID: session.assistantReplyID,
+            messageID: session.messageID,
+            conversationID: session.conversationID,
+            lifecycle: .preparingInput,
+            buffer: ReplyBuffer(
+                text: message.content,
+                thinking: message.thinking ?? "",
+                toolCalls: message.toolCalls,
+                citations: message.annotations,
+                filePathAnnotations: message.filePathAnnotations,
+                attachments: message.fileAttachments
+            ),
+            isThinking: inferredRecoveryThinkingState(from: message)
+        )
+    }
+
+    private func inferredRecoveryThinkingState(from message: Message) -> Bool {
+        guard !message.isComplete, message.responseId != nil else {
+            return false
+        }
+
+        if let thinking = message.thinking, !thinking.isEmpty {
+            return true
+        }
+
+        return message.toolCalls.contains { $0.status != .completed }
     }
 
     func suspendActiveSessionsForAppBackground() {

@@ -162,10 +162,38 @@ extension OpenAIResponseParserTests {
     @Test func `invalid payload data falls back to empty collections`() {
         let invalid = Data("not-json".utf8)
 
-        #expect(MessagePayloadStore.annotations(from: invalid).isEmpty)
-        #expect(MessagePayloadStore.toolCalls(from: invalid).isEmpty)
-        #expect(MessagePayloadStore.fileAttachments(from: invalid).isEmpty)
-        #expect(MessagePayloadStore.filePathAnnotations(from: invalid).isEmpty)
+        #expect(
+            MessagePayloadStore.payloadItems(
+                URLCitation.self,
+                from: invalid,
+                label: "annotations",
+                logFailure: false
+            ).isEmpty
+        )
+        #expect(
+            MessagePayloadStore.payloadItems(
+                ToolCallInfo.self,
+                from: invalid,
+                label: "tool calls",
+                logFailure: false
+            ).isEmpty
+        )
+        #expect(
+            MessagePayloadStore.payloadItems(
+                FileAttachment.self,
+                from: invalid,
+                label: "file attachments",
+                logFailure: false
+            ).isEmpty
+        )
+        #expect(
+            MessagePayloadStore.payloadItems(
+                FilePathAnnotation.self,
+                from: invalid,
+                label: "file path annotations",
+                logFailure: false
+            ).isEmpty
+        )
     }
 
     @Test func `set empty payload stores nil data and stabilizes digest`() {
@@ -191,9 +219,13 @@ extension OpenAIResponseParserTests {
     @Test func `message role fallback reports invalid raw value and defaults to user`() {
         var invalidRawValue: String?
 
-        let resolvedRole = Message.resolvedRole(from: "ghost", onInvalid: { rawValue in
-            invalidRawValue = rawValue
-        }, logFailure: false)
+        let resolvedRole = Message.resolvedRole(
+            from: "ghost",
+            onInvalid: { rawValue in
+                invalidRawValue = rawValue
+            },
+            logFailure: false
+        )
 
         #expect(resolvedRole == .user)
         #expect(invalidRawValue == "ghost")
@@ -229,193 +261,27 @@ extension OpenAIResponseParserTests {
 
         #expect(stored == existing)
     }
-}
 
-// MARK: - Test Fixture Builders
-
-extension OpenAIResponseParserTests {
-    func makeActionQueriesPayload() -> ResponsesResponseDTO {
-        ResponsesResponseDTO(
-            status: "in_progress",
-            output: [
-                makeActionMessageOutput(),
-                makeActionWebSearchOutput(),
-                makeActionCodeInterpreterOutput(),
-                makeActionFileSearchOutput()
-            ],
-            reasoning: ResponsesReasoningDTO(
-                text: "analysis",
-                summary: [ResponsesTextFragmentDTO(text: " complete")]
-            ),
-            message: "still working"
-        )
-    }
-
-    private func makeActionMessageOutput() -> ResponsesOutputItemDTO {
-        ResponsesOutputItemDTO(
-            type: "message",
-            id: nil,
-            content: [
-                ResponsesContentPartDTO(
-                    type: "output_text",
-                    text: "Primary response",
-                    annotations: nil
-                ),
-                ResponsesContentPartDTO(
-                    type: "input_text",
-                    text: "ignored",
-                    annotations: nil
-                )
-            ],
-            action: nil,
-            query: nil,
-            queries: nil,
-            code: nil,
-            results: nil,
-            outputs: nil,
-            text: nil,
-            summary: nil
-        )
-    }
-
-    private func makeActionWebSearchOutput() -> ResponsesOutputItemDTO {
-        ResponsesOutputItemDTO(
-            type: "web_search_call",
-            id: "ws_action",
-            content: nil,
-            action: ResponsesActionDTO(query: nil, queries: ["swift", "ios"]),
-            query: nil,
-            queries: nil,
-            code: nil,
-            results: nil,
-            outputs: nil,
-            text: nil,
-            summary: nil
-        )
-    }
-
-    private func makeActionCodeInterpreterOutput() -> ResponsesOutputItemDTO {
-        ResponsesOutputItemDTO(
-            type: "code_interpreter_call",
-            id: "ci_outputs",
-            content: nil,
-            action: nil,
-            query: nil,
-            queries: nil,
-            code: "print(2)",
-            results: nil,
-            outputs: [
-                ResponsesCodeInterpreterOutputDTO(output: nil, text: "", logs: "log line"),
-                ResponsesCodeInterpreterOutputDTO(output: nil, text: "2", logs: nil)
-            ],
-            text: nil,
-            summary: nil
-        )
-    }
-
-    private func makeActionFileSearchOutput() -> ResponsesOutputItemDTO {
-        ResponsesOutputItemDTO(
-            type: "file_search_call",
-            id: "fs_queries",
-            content: nil,
-            action: nil,
-            query: nil,
-            queries: ["notes", "summary"],
-            code: nil,
-            results: nil,
-            outputs: nil,
-            text: nil,
-            summary: nil
-        )
-    }
-
-    func makeTestCitations() -> [URLCitation] {
-        [
-            URLCitation(
-                url: "https://example.com",
-                title: "Example",
-                startIndex: 0,
-                endIndex: 7
-            ),
-            URLCitation(
-                url: "https://example.org",
-                title: "Second",
-                startIndex: 10,
-                endIndex: 20
+    @Test func `payload codable encoding failure message includes operation and type`() {
+        let message = FailingPayload.codingFailureMessage(
+            operation: "encode",
+            error: EncodingError.invalidValue(
+                "boom",
+                .init(codingPath: [], debugDescription: "intentional payload failure")
             )
-        ]
-    }
-
-    func makeTestToolCalls() -> [ToolCallInfo] {
-        [
-            ToolCallInfo(
-                id: "tc_1",
-                type: .webSearch,
-                status: .completed,
-                code: nil,
-                results: nil,
-                queries: ["swift"]
-            ),
-            ToolCallInfo(
-                id: "tc_2",
-                type: .codeInterpreter,
-                status: .completed,
-                code: "print(1)",
-                results: ["1"],
-                queries: nil
-            )
-        ]
-    }
-
-    func makeTestFilePathAnnotations() -> [FilePathAnnotation] {
-        [
-            FilePathAnnotation(
-                fileId: "file_1",
-                containerId: "container_1",
-                sandboxPath: "sandbox:/mnt/data/report.txt",
-                filename: "report.txt",
-                startIndex: 0,
-                endIndex: 20
-            )
-        ]
-    }
-
-    func makeTestFileAttachments() -> [FileAttachment] {
-        [
-            FileAttachment(
-                id: UUID(),
-                filename: "sample.pdf",
-                fileSize: 128,
-                fileType: "pdf",
-                fileId: "file_attachment_1",
-                uploadStatus: .uploaded
-            )
-        ]
-    }
-}
-
-private struct FailingDigestPayload: Encodable {
-    func encode(to _: Encoder) throws {
-        throw EncodingError.invalidValue(
-            "boom",
-            .init(codingPath: [], debugDescription: "intentional test failure")
         )
-    }
-}
 
-private struct FailingPayload: PayloadCodable {
-    func encode(to _: Encoder) throws {
-        throw EncodingError.invalidValue(
-            "boom",
-            .init(codingPath: [], debugDescription: "intentional payload failure")
-        )
+        #expect(message.contains("Payload encode failed for FailingPayload"))
     }
 
-    init() {}
-
-    init(from _: Decoder) throws {
-        throw DecodingError.dataCorrupted(
-            .init(codingPath: [], debugDescription: "intentional payload decode failure")
+    @Test func `payload codable decoding failure message includes operation and type`() {
+        let message = FailingPayload.codingFailureMessage(
+            operation: "decode",
+            error: DecodingError.dataCorrupted(
+                .init(codingPath: [], debugDescription: "intentional payload decode failure")
+            )
         )
+
+        #expect(message.contains("Payload decode failed for FailingPayload"))
     }
 }
