@@ -1,5 +1,6 @@
 import ChatDomain
 import ChatPersistenceSwiftData
+import ChatPresentation
 import ChatRuntimeModel
 import Foundation
 
@@ -18,6 +19,7 @@ struct ChatVisibleSessionState {
     var isStreaming: Bool
     var isRecovering: Bool
     var isThinking: Bool
+    var thinkingPresentationState: ThinkingPresentationState?
 
     static func empty() -> ChatVisibleSessionState {
         ChatVisibleSessionState(
@@ -34,7 +36,8 @@ struct ChatVisibleSessionState {
             activeRequestServiceTier: .standard,
             isStreaming: false,
             isRecovering: false,
-            isThinking: false
+            isThinking: false,
+            thinkingPresentationState: nil
         )
     }
 }
@@ -71,8 +74,9 @@ enum SessionVisibilityCoordinator {
             activeRequestUsesBackgroundMode: session.request.usesBackgroundMode,
             activeRequestServiceTier: session.request.serviceTier,
             isStreaming: runtimeState.isStreaming,
-            isRecovering: runtimeState.isRecovering,
-            isThinking: runtimeState.isThinking
+            isRecovering: ReplyRuntimePresentationStateResolver.shouldShowRecoveryIndicator(for: runtimeState),
+            isThinking: runtimeState.isThinking,
+            thinkingPresentationState: ReplyRuntimePresentationStateResolver.thinkingPresentationState(for: runtimeState)
         )
     }
 
@@ -103,7 +107,8 @@ enum SessionVisibilityCoordinator {
             activeRequestServiceTier: requestConfiguration?.2 ?? .standard,
             isStreaming: false,
             isRecovering: true,
-            isThinking: false
+            isThinking: false,
+            thinkingPresentationState: nil
         )
     }
 
@@ -126,6 +131,7 @@ enum SessionVisibilityCoordinator {
         state.isStreaming = visibleState.isStreaming
         state.isThinking = visibleState.isThinking
         state.isRecovering = visibleState.isRecovering
+        state.thinkingPresentationState = visibleState.thinkingPresentationState
     }
 
     private static func shouldUseRecoverableDraftPlaceholder(
@@ -184,7 +190,8 @@ enum SessionVisibilityCoordinator {
             activeRequestServiceTier: session.request.serviceTier,
             isStreaming: runtimeState.isStreaming,
             isRecovering: true,
-            isThinking: runtimeState.isThinking
+            isThinking: runtimeState.isThinking,
+            thinkingPresentationState: nil
         )
     }
 }

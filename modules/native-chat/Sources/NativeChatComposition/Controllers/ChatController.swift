@@ -31,6 +31,8 @@ package final class ChatController {
     /// Whether the model is actively in a reasoning phase.
     package var isThinking = false
     var isRecovering = false
+    /// The current presentation phase for streamed reasoning content, if any.
+    package var thinkingPresentationState: ThinkingPresentationState?
     var isRestoringConversation = false
     var selectedModel: ModelType = .gpt5_4 {
         didSet {

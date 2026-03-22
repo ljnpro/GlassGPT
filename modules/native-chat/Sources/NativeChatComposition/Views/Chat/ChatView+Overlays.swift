@@ -86,6 +86,7 @@ extension ChatView {
             currentStreamingText: viewModel.currentStreamingText,
             isThinking: viewModel.isThinking,
             isStreaming: viewModel.isStreaming,
+            thinkingPresentationState: viewModel.thinkingPresentationState,
             liveCitations: viewModel.liveCitations,
             streamingThinkingExpanded: $streamingThinkingExpanded,
             assistantBubbleMaxWidth: assistantBubbleMaxWidth

@@ -12,6 +12,7 @@
 		02FB76D317231FE3C3FE9C26 /* SnapshotTestSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = AEB7DA53CC27898C943EE0C9 /* SnapshotTestSupport.swift */; };
 		13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB51A68108700A75B9A /* Images.xcassets */; };
 		15FE2F91277A79575837BA7F /* GlassGPTUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CC5500B0A1EE5BC8728B919 /* GlassGPTUITests.swift */; };
+		2B8B6D6E7F104E4AA5B5A1C2 /* AccessibilityAuditTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C1F6A2B3D4E5F60718293A4 /* AccessibilityAuditTests.swift */; };
 		3E461D99554A48A4959DE609 /* SplashScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */; };
 		5776C307D8D36530E5D5481C /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 69358B5C464810283E740D47 /* PrivacyInfo.xcprivacy */; };
 		5F67A87C4A7E4BE9A0E24F61 /* NativeChatUITestSupport in Frameworks */ = {isa = PBXBuildFile; productRef = 5F67A87D4A7E4BE9A0E24F61 /* NativeChatUITestSupport */; };
@@ -49,6 +50,7 @@
 		5991E9E08763AFDD43672213 /* SnapshotViewTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SnapshotViewTests.swift; sourceTree = "<group>"; };
 		5CC5500B0A1EE5BC8728B919 /* GlassGPTUITests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = GlassGPTUITests.swift; sourceTree = "<group>"; };
 		69358B5C464810283E740D47 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xml; name = PrivacyInfo.xcprivacy; path = GlassGPT/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		9C1F6A2B3D4E5F60718293A4 /* AccessibilityAuditTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AccessibilityAuditTests.swift; sourceTree = "<group>"; };
 		A1B2C3D50123456789ABCDE0 /* Versions.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Versions.xcconfig; sourceTree = "<group>"; };
 		A1B2C3D60123456789ABCDE0 /* Project-Base.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = "Project-Base.xcconfig"; sourceTree = "<group>"; };
 		A1B2C3D70123456789ABCDE0 /* Project-Debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = "Project-Debug.xcconfig"; sourceTree = "<group>"; };
@@ -186,6 +188,7 @@
 		BA5D2C92314BC8FFDCDE8238 /* GlassGPTUITests */ = {
 			isa = PBXGroup;
 			children = (
+				9C1F6A2B3D4E5F60718293A4 /* AccessibilityAuditTests.swift */,
 				5CC5500B0A1EE5BC8728B919 /* GlassGPTUITests.swift */,
 			);
 			path = GlassGPTUITests;
@@ -351,6 +354,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				2B8B6D6E7F104E4AA5B5A1C2 /* AccessibilityAuditTests.swift in Sources */,
 				15FE2F91277A79575837BA7F /* GlassGPTUITests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

@@ -36,7 +36,11 @@ public struct HistoryView: View {
                 }
             }
             .navigationTitle(String(localized: "History"))
-            .searchable(text: $viewModel.searchText, prompt: String(localized: "Search conversations"))
+            .searchable(
+                text: $viewModel.searchText,
+                placement: .navigationBarDrawer(displayMode: .always),
+                prompt: String(localized: "Search")
+            )
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     if !viewModel.conversations.isEmpty {
@@ -76,11 +80,27 @@ public struct HistoryView: View {
     }
 
     private var emptyState: some View {
-        ContentUnavailableView(
-            String(localized: "No Conversations Yet"),
-            systemImage: "clock.badge.questionmark",
-            description: Text(String(localized: "Your chat history will appear here."))
-        )
+        VStack(spacing: 14) {
+            Image(systemName: "clock.badge.questionmark")
+                .font(.system(size: 32, weight: .semibold))
+                .foregroundStyle(.secondary)
+                .accessibilityHidden(true)
+
+            Text(String(localized: "No Conversations Yet"))
+                .font(.title2.weight(.semibold))
+                .foregroundStyle(.primary)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+
+            Text(String(localized: "Your chat history will appear here."))
+                .font(.body)
+                .foregroundStyle(.primary.opacity(0.78))
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(.horizontal, 32)
+        .frame(maxWidth: 320)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .accessibilityIdentifier("history.emptyState")
     }
 

@@ -1,5 +1,6 @@
 import ChatDomain
 import ChatPersistenceSwiftData
+import ChatPresentation
 import NativeChatUI
 import SwiftUI
 import UIKit
@@ -27,6 +28,18 @@ extension MessageBubble {
 
     var displayedToolCalls: [ToolCallInfo] {
         activeToolCalls.isEmpty ? message.toolCalls : activeToolCalls
+    }
+
+    var displayedThinkingPresentationState: ThinkingPresentationState? {
+        guard displayedThinking != nil else {
+            return nil
+        }
+
+        if let liveThinking, !liveThinking.isEmpty {
+            return liveThinkingPresentationState ?? .completed
+        }
+
+        return .completed
     }
 
     var displayedCitations: [URLCitation] {
@@ -79,7 +92,10 @@ extension MessageBubble {
     private var bubbleColumn: some View {
         VStack(alignment: message.role == .user ? .trailing : .leading, spacing: 8) {
             if message.role == .assistant, let thinking = displayedThinking, !thinking.isEmpty {
-                ThinkingView(text: thinking, isLive: isLiveThinking)
+                ThinkingView(
+                    text: thinking,
+                    phase: displayedThinkingPresentationState ?? .completed
+                )
             }
 
             if message.role == .user, !message.fileAttachments.isEmpty {

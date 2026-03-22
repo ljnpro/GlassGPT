@@ -1,3 +1,4 @@
+import ChatPresentation
 import ChatUIComponents
 import SwiftUI
 
@@ -44,8 +45,8 @@ package struct ThinkingIndicator: View {
 package struct ThinkingView: View {
     /// The reasoning text emitted by the model.
     let text: String
-    /// Whether the thinking is still in progress (streaming). When true, starts expanded.
-    var isLive = false
+    /// The visible reasoning phase. Live phases start expanded.
+    var phase: ThinkingPresentationState = .completed
     /// Optional external binding for expanded state (used during streaming to preserve state across re-renders)
     @Binding var externalIsExpanded: Bool?
 
@@ -66,10 +67,19 @@ package struct ThinkingView: View {
     }
 
     /// Creates a thinking view with the given text and optional external expanded-state binding.
-    package init(text: String, isLive: Bool = false, externalIsExpanded: Binding<Bool?> = .constant(nil)) {
+    package init(text: String, phase: ThinkingPresentationState = .completed, externalIsExpanded: Binding<Bool?> = .constant(nil)) {
         self.text = text
-        self.isLive = isLive
+        self.phase = phase
         _externalIsExpanded = externalIsExpanded
+    }
+
+    /// Creates a thinking view using the legacy live/completed boolean state.
+    package init(text: String, isLive: Bool = false, externalIsExpanded: Binding<Bool?> = .constant(nil)) {
+        self.init(
+            text: text,
+            phase: isLive ? .reasoning : .completed,
+            externalIsExpanded: externalIsExpanded
+        )
     }
 
     /// The collapsible reasoning card and any expanded reasoning content.
@@ -77,13 +87,13 @@ package struct ThinkingView: View {
         VStack(alignment: .leading, spacing: 0) {
             // Header — tap entire row to toggle expand/collapse
             HStack(spacing: 8) {
-                Image(systemName: isLive ? "brain" : "brain.fill")
+                Image(systemName: headerIconName)
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(.orange)
-                    .symbolEffect(.pulse, options: .repeating, isActive: isLive)
+                    .symbolEffect(.pulse, options: .repeating, isActive: phase.isLive)
                     .accessibilityHidden(true)
 
-                Text(isLive ? String(localized: "Reasoning…") : String(localized: "Reasoning Completed"))
+                Text(headerTitle)
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(.secondary)
 
@@ -98,7 +108,7 @@ package struct ThinkingView: View {
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
             .contentShape(Rectangle())
-            .accessibilityLabel(isLive ? String(localized: "Reasoning in progress") : String(localized: "Reasoning completed"))
+            .accessibilityLabel(accessibilityTitle)
             .accessibilityHint(
                 isExpanded
                     ? String(localized: "Double-tap to collapse")
@@ -117,7 +127,7 @@ package struct ThinkingView: View {
                 VStack(alignment: .leading, spacing: 4) {
                     ThinkingMarkdownText(
                         text: text,
-                        allowsSelection: !isLive
+                        allowsSelection: !phase.isLive
                     )
                 }
                 .padding(.horizontal, 12)
@@ -126,22 +136,55 @@ package struct ThinkingView: View {
             }
         }
         .modifier(
-            ThinkingSurfaceModifier(isLive: isLive)
+            ThinkingSurfaceModifier(isLive: phase.isLive)
         )
         .onAppear {
             if !hasInitialized {
                 hasInitialized = true
                 // Live (streaming) thinking starts expanded; completed thinking starts collapsed
-                setExpanded(isLive)
+                setExpanded(phase.isLive)
             }
         }
-        .onChange(of: isLive) { _, newValue in
+        .onChange(of: phase.isLive) { _, newValue in
             // When streaming finishes, auto-collapse
             if !newValue, isExpanded {
                 withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
                     setExpanded(false)
                 }
             }
+        }
+    }
+
+    private var headerIconName: String {
+        switch phase {
+        case .reasoning:
+            "brain"
+        case .waiting:
+            "hourglass"
+        case .completed:
+            "brain.fill"
+        }
+    }
+
+    private var headerTitle: String {
+        switch phase {
+        case .reasoning:
+            String(localized: "Reasoning…")
+        case .waiting:
+            String(localized: "Waiting…")
+        case .completed:
+            String(localized: "Reasoning Completed")
+        }
+    }
+
+    private var accessibilityTitle: String {
+        switch phase {
+        case .reasoning:
+            String(localized: "Reasoning in progress")
+        case .waiting:
+            String(localized: "Waiting for response")
+        case .completed:
+            String(localized: "Reasoning completed")
         }
     }
 }

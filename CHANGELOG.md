@@ -16,6 +16,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Release readiness now defaults to the version values in `Versions.xcconfig` instead of stale hardcoded expectations
 - Successful release packaging logs are sanitized down to a clean summary so release artifacts stay free of warning-like noise
 
+## [4.10.5] - 2026-03-22
+
+### Fixed
+
+- Thinking and recovery presentation no longer mark reasoning as completed while search, tools, or resumed streaming are still in flight
+- Settings accessibility audits now pass without contrast regressions, and the history search affordance uses the shorter search prompt required by the current 4.10 layout
+
+### Changed
+
+- Settings toggle labels now use stronger local contrast surfaces, and the 4.10 settings snapshot baselines were refreshed to match the audited UI
+- Added a CI baseline update playbook so future UI, snapshot, and release changes follow the same deterministic local-to-remote verification flow
+
 ## [4.10.4] - 2026-03-22
 
 ### Fixed
@@ -203,7 +215,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - Migrated from React Native / Expo to fully native Swift and SwiftUI
 
-[Unreleased]: https://github.com/ljnpro/GlassGPT/compare/v4.10.3...HEAD
+[Unreleased]: https://github.com/ljnpro/GlassGPT/compare/v4.10.5...HEAD
+[4.10.5]: https://github.com/ljnpro/GlassGPT/compare/v4.10.4...v4.10.5
+[4.10.4]: https://github.com/ljnpro/GlassGPT/compare/v4.10.3...v4.10.4
 [4.10.3]: https://github.com/ljnpro/GlassGPT/compare/v4.10.2...v4.10.3
 [4.10.2]: https://github.com/ljnpro/GlassGPT/compare/v4.10.1...v4.10.2
 [4.10.1]: https://github.com/ljnpro/GlassGPT/compare/0d96eab19deb26571a93107626fa982725563805...v4.10.1

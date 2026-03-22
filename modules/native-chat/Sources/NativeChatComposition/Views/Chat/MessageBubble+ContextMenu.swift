@@ -1,5 +1,6 @@
 import ChatDomain
 import ChatPersistenceSwiftData
+import ChatPresentation
 import ChatUIComponents
 import SwiftUI
 import UIKit
@@ -49,6 +50,7 @@ extension MessageBubble {
         let liveFilePathAnnotations: [FilePathAnnotation]
         let showsRecoveryIndicator: Bool
         let isLiveThinking: Bool
+        let liveThinkingPresentationState: ThinkingPresentationState?
         let suppressesPersistedThinking: Bool
     }
 }

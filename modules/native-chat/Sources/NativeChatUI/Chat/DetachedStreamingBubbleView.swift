@@ -1,4 +1,5 @@
 import ChatDomain
+import ChatPresentation
 import ChatUIComponents
 import SwiftUI
 
@@ -15,6 +16,8 @@ package struct DetachedStreamingBubbleView: View, Equatable {
     let isThinking: Bool
     /// Whether content is actively being streamed.
     let isStreaming: Bool
+    /// The current presentation state of any streamed reasoning text.
+    let thinkingPresentationState: ThinkingPresentationState?
     /// Citations collected during web search tool calls.
     let liveCitations: [URLCitation]
     /// External binding controlling the thinking disclosure expanded state.
@@ -30,6 +33,7 @@ package struct DetachedStreamingBubbleView: View, Equatable {
         currentStreamingText: String,
         isThinking: Bool,
         isStreaming: Bool,
+        thinkingPresentationState: ThinkingPresentationState?,
         liveCitations: [URLCitation],
         streamingThinkingExpanded: Binding<Bool?>,
         assistantBubbleMaxWidth: CGFloat
@@ -39,6 +43,7 @@ package struct DetachedStreamingBubbleView: View, Equatable {
         self.currentStreamingText = currentStreamingText
         self.isThinking = isThinking
         self.isStreaming = isStreaming
+        self.thinkingPresentationState = thinkingPresentationState
         self.liveCitations = liveCitations
         _streamingThinkingExpanded = streamingThinkingExpanded
         self.assistantBubbleMaxWidth = assistantBubbleMaxWidth
@@ -48,6 +53,7 @@ package struct DetachedStreamingBubbleView: View, Equatable {
             currentStreamingText: currentStreamingText,
             isThinking: isThinking,
             isStreaming: isStreaming,
+            thinkingPresentationState: thinkingPresentationState,
             liveCitations: liveCitations,
             assistantBubbleMaxWidth: assistantBubbleMaxWidth
         )
@@ -93,7 +99,7 @@ package struct DetachedStreamingBubbleView: View, Equatable {
                         .transition(.opacity.combined(with: .move(edge: .top)))
                 }
 
-                if isThinking {
+                if isThinking, currentThinkingText.isEmpty, currentStreamingText.isEmpty {
                     ThinkingIndicator()
                         .transition(.opacity.combined(with: .scale(scale: 0.95)))
                 }
@@ -101,7 +107,7 @@ package struct DetachedStreamingBubbleView: View, Equatable {
                 if !currentThinkingText.isEmpty {
                     ThinkingView(
                         text: currentThinkingText,
-                        isLive: isThinking,
+                        phase: thinkingPresentationState ?? .completed,
                         externalIsExpanded: $streamingThinkingExpanded
                     )
                     .transition(.opacity.combined(with: .move(edge: .top)))
@@ -147,6 +153,7 @@ private extension DetachedStreamingBubbleView {
         let currentStreamingText: String
         let isThinking: Bool
         let isStreaming: Bool
+        let thinkingPresentationState: ThinkingPresentationState?
         let liveCitations: [URLCitation]
         let assistantBubbleMaxWidth: CGFloat
     }

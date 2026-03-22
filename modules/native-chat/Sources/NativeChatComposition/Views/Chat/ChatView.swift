@@ -64,41 +64,7 @@ package struct ChatView: View {
                 }
                 .animation(.easeInOut(duration: 0.25), value: viewModel.isRestoringConversation)
                 .animation(.easeInOut(duration: 0.2), value: viewModel.isDownloadingFile)
-                .navigationBarTitleDisplayMode(.inline)
-                .toolbar {
-                    ToolbarItem(placement: .topBarLeading) {
-                        ModelBadge(
-                            model: viewModel.selectedModel,
-                            effort: viewModel.reasoningEffort,
-                            onTap: { presentModelSelector() }
-                        )
-                        .fixedSize(horizontal: true, vertical: false)
-                        .allowsHitTesting(!shouldShowGeneratedPreviewTouchShield)
-                    }
-
-                    ToolbarItem(placement: .topBarTrailing) {
-                        Button {
-                            startNewChat()
-                        } label: {
-                            Image(systemName: "square.and.pencil")
-                                .font(.subheadline.weight(.semibold))
-                                .foregroundStyle(.primary)
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 6)
-                                .singleFrameGlassCapsuleControl(
-                                    tintOpacity: GlassStyleMetrics.CapsuleControl.tintOpacity,
-                                    borderWidth: GlassStyleMetrics.CapsuleControl.borderWidth,
-                                    darkBorderOpacity: GlassStyleMetrics.CapsuleControl.darkBorderOpacity,
-                                    lightBorderOpacity: GlassStyleMetrics.CapsuleControl.lightBorderOpacity
-                                )
-                        }
-                        .buttonStyle(GlassPressButtonStyle())
-                        .accessibilityLabel(String(localized: "Start new chat"))
-                        .accessibilityIdentifier("chat.newChat")
-                        .allowsHitTesting(!shouldShowGeneratedPreviewTouchShield)
-                    }
-                }
-                .toolbarBackgroundVisibility(.hidden, for: .navigationBar)
+                .toolbar(.hidden, for: .navigationBar)
                 .sheet(item: sharedGeneratedFileBinding) { sharedItem in
                     ActivityViewController(activityItems: [sharedItem.url])
                 }

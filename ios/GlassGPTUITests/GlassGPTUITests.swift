@@ -300,13 +300,11 @@ final class GlassGPTUITests: XCTestCase {
         let app = launchApp(scenario: "settings")
 
         _ = openSettings(in: app)
-        let effortPicker = app.descendants(matching: .any).matching(identifier: "settings.defaultEffort").firstMatch
-        revealIfNeeded(effortPicker, in: app)
-        XCTAssertTrue(effortPicker.waitForExistence(timeout: 5))
-
-        effortPicker.tap()
-
-        XCTAssertTrue(app.buttons["settings.defaultEffortOption.none"].waitForExistence(timeout: 5))
+        let effortControl = defaultEffortControl(in: app)
+        revealIfNeeded(effortControl, in: app)
+        XCTAssertTrue(effortControl.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.sliders["settings.defaultEffortSlider"].waitForExistence(timeout: 5))
+        XCTAssertTrue(waitForValue(of: effortControl, "High", timeout: 5))
     }
 
     @MainActor
@@ -482,9 +480,9 @@ final class GlassGPTUITests: XCTestCase {
         let flexToggle = app.switches["settings.defaultFlexMode"]
         XCTAssertTrue(backgroundToggle.waitForExistence(timeout: 5))
         XCTAssertTrue(flexToggle.waitForExistence(timeout: 5))
-        XCTAssertEqual(proToggle.value as? String, "0")
-        XCTAssertEqual(backgroundToggle.value as? String, "0")
-        XCTAssertEqual(flexToggle.value as? String, "0")
+        XCTAssertEqual(proToggle.value as? String, "Off")
+        XCTAssertEqual(backgroundToggle.value as? String, "Off")
+        XCTAssertEqual(flexToggle.value as? String, "Off")
 
         let defaultEffort = defaultEffortControl(in: app)
         XCTAssertTrue(defaultEffort.waitForExistence(timeout: 5))
@@ -501,11 +499,9 @@ final class GlassGPTUITests: XCTestCase {
         XCTAssertTrue(defaultEffort.waitForExistence(timeout: 5))
         XCTAssertTrue(waitForValue(of: defaultEffort, "High", timeout: 5))
 
-        defaultEffort.tap()
-
-        let mediumOption = app.buttons["settings.defaultEffortOption.medium"]
-        XCTAssertTrue(mediumOption.waitForExistence(timeout: 5))
-        mediumOption.tap()
+        let slider = app.sliders["settings.defaultEffortSlider"]
+        XCTAssertTrue(slider.waitForExistence(timeout: 5))
+        slider.adjust(toNormalizedSliderPosition: 0.5)
 
         XCTAssertTrue(waitForValue(of: defaultEffort, "Medium", timeout: 5))
     }
@@ -576,10 +572,11 @@ final class GlassGPTUITests: XCTestCase {
     func testStreamingScenarioShowsLiveReasoningOutputAndToolIndicator() {
         let app = launchApp(scenario: "streaming")
 
-        XCTAssertTrue(app.staticTexts["Running code…"].waitForExistence(timeout: 5))
-        XCTAssertTrue(
-            app.staticTexts["Gathering the recovery plan before finalizing the response."].waitForExistence(timeout: 5)
-        )
+        let codeIndicator = app.descendants(matching: .any).matching(identifier: "indicator.codeInterpreter").firstMatch
+        XCTAssertTrue(codeIndicator.waitForExistence(timeout: 5))
+
+        let thinkingHeader = app.descendants(matching: .any).matching(identifier: "thinking.header").firstMatch
+        XCTAssertTrue(thinkingHeader.waitForExistence(timeout: 5))
         XCTAssertTrue(
             app.staticTexts["The streaming session is active and will resume cleanly after a reconnect."].waitForExistence(timeout: 5)
         )
@@ -712,7 +709,8 @@ final class GlassGPTUITests: XCTestCase {
     private func clearText(in element: XCUIElement) {
         if let stringValue = element.value as? String,
            !stringValue.isEmpty,
-           stringValue != "Search conversations" {
+           stringValue != "Search conversations",
+           stringValue != "Search" {
             let deleteSequence = String(repeating: XCUIKeyboardKey.delete.rawValue, count: stringValue.count)
             element.typeText(deleteSequence)
         }

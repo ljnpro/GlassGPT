@@ -2,6 +2,7 @@ import ChatApplication
 import ChatDomain
 import ChatPersistenceCore
 import ChatPersistenceSwiftData
+import ChatPresentation
 import Foundation
 import GeneratedFilesInfra
 import OpenAITransport
@@ -168,10 +169,10 @@ extension ChatScreenStoreRuntimeTests {
 
         try await waitUntil {
             relaunchStore.currentVisibleSession != nil &&
-                relaunchStore.isRecovering &&
                 relaunchStore.currentStreamingText == "Persisted answer" &&
                 relaunchStore.currentThinkingText == "Persisted reasoning" &&
-                relaunchStore.isThinking
+                relaunchStore.isThinking &&
+                relaunchStore.thinkingPresentationState == .completed
         }
 
         relaunchStreamClient.yield(.completed("Persisted answer", "Persisted reasoning", nil))

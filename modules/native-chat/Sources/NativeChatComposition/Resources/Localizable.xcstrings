@@ -2295,13 +2295,29 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Search conversations"
+            "value": "Search"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "搜索对话"
+            "value": "搜索"
+          }
+        }
+      }
+    },
+    "Search": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Search"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "搜索"
           }
         }
       }
@@ -2766,6 +2782,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "等待回复"
+          }
+        }
+      }
+    },
+    "Waiting…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Waiting…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "等待中…"
           }
         }
       }

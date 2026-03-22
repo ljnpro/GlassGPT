@@ -23,9 +23,7 @@ package struct ModelBadge: View {
     package var body: some View {
         Button(action: onTap) {
             HStack(spacing: 4) {
-                Text(badgeText)
-                    .font(.subheadline.weight(.semibold))
-                    .lineLimit(1)
+                badgeLabel(toolbarBadgeText)
 
                 Image(systemName: "chevron.down")
                     .font(.caption2)
@@ -33,7 +31,6 @@ package struct ModelBadge: View {
             .foregroundStyle(.primary)
             .padding(.horizontal, 12)
             .padding(.vertical, 6)
-            .fixedSize(horizontal: true, vertical: false)
             .singleFrameGlassCapsuleControl(
                 tintOpacity: GlassStyleMetrics.CapsuleControl.tintOpacity,
                 borderWidth: GlassStyleMetrics.CapsuleControl.borderWidth,
@@ -42,15 +39,47 @@ package struct ModelBadge: View {
             )
         }
         .buttonStyle(GlassPressButtonStyle())
-        .accessibilityLabel(String(localized: "Model") + ": \(badgeText). " + String(localized: "Tap to change"))
+        .accessibilityElement(children: .ignore)
+        .accessibilityAddTraits(.isButton)
+        .accessibilityLabel(String(localized: "Model") + ": \(primaryBadgeText). " + String(localized: "Tap to change"))
         .accessibilityIdentifier("chat.modelBadge")
     }
 
-    private var badgeText: String {
+    private var primaryBadgeText: String {
         if effort == .none {
             return model.displayName
         }
-        return "\(model.displayName) \(effort.displayName)"
+        return "\(model.displayName) \(compactEffortText)"
+    }
+
+    private var toolbarBadgeText: String {
+        switch model {
+        case .gpt5_4:
+            model.displayName
+        case .gpt5_4_pro:
+            "5.4 Pro"
+        }
+    }
+
+    private var compactEffortText: String {
+        switch effort {
+        case .none:
+            String(localized: "Off")
+        case .low:
+            String(localized: "Low")
+        case .medium:
+            String(localized: "Med")
+        case .high:
+            String(localized: "High")
+        case .xhigh:
+            String(localized: "Max")
+        }
+    }
+
+    private func badgeLabel(_ text: String) -> some View {
+        Text(text)
+            .font(.subheadline.weight(.semibold))
+            .lineLimit(1)
     }
 }
 

@@ -62,6 +62,7 @@ final class UITestScenarioLoaderTests: XCTestCase {
             bootstrap.chatController.currentStreamingText,
             "The streaming session is active and will resume cleanly after a reconnect."
         )
+        XCTAssertEqual(bootstrap.chatController.thinkingPresentationState, .completed)
         XCTAssertEqual(bootstrap.chatController.activeToolCalls.first?.type, .codeInterpreter)
     }
 

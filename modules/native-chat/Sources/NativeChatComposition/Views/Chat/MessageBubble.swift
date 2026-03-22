@@ -1,5 +1,6 @@
 import ChatDomain
 import ChatPersistenceSwiftData
+import ChatPresentation
 import ChatUIComponents
 import SwiftUI
 
@@ -17,6 +18,7 @@ struct MessageBubble: View {
     var liveFilePathAnnotations: [FilePathAnnotation] = []
     var showsRecoveryIndicator = false
     var isLiveThinking = false
+    var liveThinkingPresentationState: ThinkingPresentationState?
     var suppressesPersistedThinking = false
 
     // File preview handler
@@ -38,6 +40,7 @@ struct MessageBubble: View {
         liveFilePathAnnotations: [FilePathAnnotation] = [],
         showsRecoveryIndicator: Bool = false,
         isLiveThinking: Bool = false,
+        liveThinkingPresentationState: ThinkingPresentationState? = nil,
         suppressesPersistedThinking: Bool = false,
         onSandboxLinkTap: ((String, FilePathAnnotation?) -> Void)? = nil
     ) {
@@ -50,6 +53,7 @@ struct MessageBubble: View {
         self.liveFilePathAnnotations = liveFilePathAnnotations
         self.showsRecoveryIndicator = showsRecoveryIndicator
         self.isLiveThinking = isLiveThinking
+        self.liveThinkingPresentationState = liveThinkingPresentationState
         self.suppressesPersistedThinking = suppressesPersistedThinking
         self.onSandboxLinkTap = onSandboxLinkTap
         renderKey = RenderKey(
@@ -69,6 +73,7 @@ struct MessageBubble: View {
             liveFilePathAnnotations: liveFilePathAnnotations,
             showsRecoveryIndicator: showsRecoveryIndicator,
             isLiveThinking: isLiveThinking,
+            liveThinkingPresentationState: liveThinkingPresentationState,
             suppressesPersistedThinking: suppressesPersistedThinking
         )
     }

@@ -6,43 +6,47 @@ import UIKit
 
 struct SettingsChatDefaultsSection: View {
     @Bindable var viewModel: SettingsDefaultsStore
-    @State private var isReasoningEffortExpanded = false
 
     var body: some View {
-        Section {
-            Toggle(String(localized: "Default Pro Mode"), isOn: Binding(
-                get: { viewModel.defaultProModeEnabled },
-                set: { viewModel.defaultProModeEnabled = $0 }
-            ))
-            .accessibilityLabel(String(localized: "Default Pro Mode"))
-            .accessibilityIdentifier("settings.defaultProMode")
+        SettingsGlassSection(
+            title: String(localized: "Chat Defaults"),
+            footerText: String(
+                localized: "Applies only to new chats. Existing chats keep their own settings."
+            )
+        ) {
+            SettingsBooleanRow(
+                title: String(localized: "Default Pro Mode"),
+                accessibilityLabel: String(localized: "Default Pro Mode"),
+                accessibilityIdentifier: "settings.defaultProMode",
+                isOn: Binding(
+                    get: { viewModel.defaultProModeEnabled },
+                    set: { viewModel.defaultProModeEnabled = $0 }
+                )
+            )
+            SettingsSectionDivider()
 
-            Toggle(String(localized: "Default Background Mode"), isOn: $viewModel.defaultBackgroundModeEnabled)
-                .accessibilityLabel(String(localized: "Default Background Mode"))
-                .accessibilityIdentifier("settings.defaultBackgroundMode")
+            SettingsBooleanRow(
+                title: String(localized: "Default Background Mode"),
+                accessibilityLabel: String(localized: "Default Background Mode"),
+                accessibilityIdentifier: "settings.defaultBackgroundMode",
+                isOn: $viewModel.defaultBackgroundModeEnabled
+            )
+            SettingsSectionDivider()
 
-            Toggle(String(localized: "Default Flex Mode"), isOn: Binding(
-                get: { viewModel.defaultFlexModeEnabled },
-                set: { viewModel.defaultFlexModeEnabled = $0 }
-            ))
-            .accessibilityLabel(String(localized: "Default Flex Mode"))
-            .accessibilityIdentifier("settings.defaultFlexMode")
+            SettingsBooleanRow(
+                title: String(localized: "Default Flex Mode"),
+                accessibilityLabel: String(localized: "Default Flex Mode"),
+                accessibilityIdentifier: "settings.defaultFlexMode",
+                isOn: Binding(
+                    get: { viewModel.defaultFlexModeEnabled },
+                    set: { viewModel.defaultFlexModeEnabled = $0 }
+                )
+            )
+            SettingsSectionDivider()
 
             SettingsInlineReasoningEffortControl(
                 selectedEffort: $viewModel.defaultEffort,
-                availableEfforts: viewModel.availableDefaultEfforts,
-                isExpanded: $isReasoningEffortExpanded
-            )
-        } header: {
-            Text(String(localized: "Chat Defaults"))
-        } footer: {
-            Text(
-                String(
-                    localized: """
-                    These defaults are applied only when you start a new chat. Existing conversations keep \
-                    their own model, background, and pricing settings.
-                    """
-                )
+                availableEfforts: viewModel.availableDefaultEfforts
             )
         }
     }
@@ -51,116 +55,72 @@ struct SettingsChatDefaultsSection: View {
 private struct SettingsInlineReasoningEffortControl: View {
     @Binding var selectedEffort: ReasoningEffort
     let availableEfforts: [ReasoningEffort]
-    @Binding var isExpanded: Bool
+    @Environment(\.hapticsEnabled) private var hapticsEnabled
 
     var body: some View {
-        VStack(alignment: .leading, spacing: isExpanded ? 10 : 0) {
-            Button {
-                withAnimation(.spring(response: 0.28, dampingFraction: 0.84)) {
-                    isExpanded.toggle()
-                }
-            } label: {
-                HStack(spacing: 10) {
-                    Text(String(localized: "Reasoning Effort"))
-                        .foregroundStyle(.primary)
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .center, spacing: 12) {
+                Text(String(localized: "Reasoning Effort"))
+                    .font(.body.weight(.semibold))
+                    .foregroundStyle(.primary)
+                    .accessibilityHidden(true)
 
-                    Spacer(minLength: 10)
+                Spacer(minLength: 12)
 
-                    HStack(spacing: 8) {
-                        Text(selectedEffort.displayName)
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(.primary)
-                            .padding(.horizontal, 9)
-                            .padding(.vertical, 5)
-                            .singleFrameGlassCapsuleControl(
-                                tintOpacity: 0.02,
-                                borderWidth: GlassStyleMetrics.CapsuleControl.borderWidth,
-                                darkBorderOpacity: GlassStyleMetrics.CapsuleControl.darkBorderOpacity,
-                                lightBorderOpacity: GlassStyleMetrics.CapsuleControl.lightBorderOpacity
-                            )
-
-                        Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
-                            .font(.footnote.weight(.semibold))
-                            .foregroundStyle(.secondary)
-                    }
-                }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 10)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                Text(selectedEffort.displayName)
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(.primary)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(.regularMaterial, in: Capsule())
+                    .accessibilityHidden(true)
             }
-            .buttonStyle(GlassPressButtonStyle())
+
+            Slider(
+                value: sliderBinding,
+                in: 0 ... Double(max(availableEfforts.count - 1, 1)),
+                step: 1
+            ) {
+                Text(String(localized: "Reasoning Effort"))
+            }
+            .tint(.accentColor)
             .accessibilityLabel(String(localized: "Default reasoning effort"))
             .accessibilityValue(selectedEffort.displayName)
-            .accessibilityIdentifier("settings.defaultEffort")
+            .accessibilityIdentifier("settings.defaultEffortSlider")
 
-            if isExpanded {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 8) {
-                        ForEach(availableEfforts) { effort in
-                            effortButton(for: effort)
-                        }
-                    }
+            HStack(spacing: 8) {
+                ForEach(availableEfforts, id: \.self) { effort in
+                    Text(effort.displayName)
+                        .font(.caption.weight(effort == selectedEffort ? .semibold : .medium))
+                        .foregroundStyle(effort == selectedEffort ? Color.accentColor : Color.secondary)
+                        .frame(maxWidth: .infinity)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+                        .accessibilityHidden(true)
                 }
-                .scrollClipDisabled()
-                .padding(.horizontal, 12)
-                .padding(.bottom, 10)
-                .transition(.move(edge: .top).combined(with: .opacity))
             }
         }
-        .modifier(
-            StableRoundedGlassModifier(
-                cornerRadius: 18,
-                interactive: true,
-                innerInset: 0.8,
-                stableFillOpacity: 0.045
-            )
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel(String(localized: "Default reasoning effort"))
+        .accessibilityValue(selectedEffort.displayName)
+        .accessibilityIdentifier("settings.defaultEffort")
+    }
+
+    private var sliderBinding: Binding<Double> {
+        Binding(
+            get: {
+                Double(availableEfforts.firstIndex(of: selectedEffort) ?? 0)
+            },
+            set: { newValue in
+                let index = Int(round(newValue))
+                let clampedIndex = min(max(index, 0), availableEfforts.count - 1)
+                let newEffort = availableEfforts[clampedIndex]
+                guard newEffort != selectedEffort else { return }
+                selectedEffort = newEffort
+                HapticService.shared.selection(isEnabled: hapticsEnabled)
+            }
         )
-    }
-
-    @ViewBuilder
-    private func effortButton(for effort: ReasoningEffort) -> some View {
-        if effort == selectedEffort {
-            Button {
-                withAnimation(.spring(response: 0.28, dampingFraction: 0.84)) {
-                    selectedEffort = effort
-                    isExpanded = false
-                }
-            } label: {
-                optionLabel(for: effort, showsCheckmark: true)
-            }
-            .buttonStyle(.glassProminent)
-            .buttonBorderShape(.capsule)
-            .controlSize(.small)
-            .accessibilityIdentifier("settings.defaultEffortOption.\(effort.id)")
-        } else {
-            Button {
-                withAnimation(.spring(response: 0.28, dampingFraction: 0.84)) {
-                    selectedEffort = effort
-                    isExpanded = false
-                }
-            } label: {
-                optionLabel(for: effort, showsCheckmark: false)
-            }
-            .buttonStyle(.glass)
-            .buttonBorderShape(.capsule)
-            .controlSize(.small)
-            .accessibilityIdentifier("settings.defaultEffortOption.\(effort.id)")
-        }
-    }
-
-    private func optionLabel(for effort: ReasoningEffort, showsCheckmark: Bool) -> some View {
-        HStack(spacing: 6) {
-            if showsCheckmark {
-                Image(systemName: "checkmark")
-                    .font(.caption.weight(.bold))
-            }
-
-            Text(effort.displayName)
-                .font(.caption.weight(showsCheckmark ? .semibold : .medium))
-                .lineLimit(1)
-        }
-        .padding(.horizontal, 2)
     }
 }
 
@@ -168,7 +128,7 @@ struct SettingsAppearanceSection: View {
     @Bindable var viewModel: SettingsDefaultsStore
 
     var body: some View {
-        Section(String(localized: "Appearance")) {
+        SettingsGlassSection(title: String(localized: "Appearance")) {
             Picker(String(localized: "Theme"), selection: $viewModel.appTheme) {
                 ForEach(AppTheme.allCases) { theme in
                     Text(theme.displayName).tag(theme)
@@ -179,9 +139,13 @@ struct SettingsAppearanceSection: View {
             .accessibilityIdentifier("settings.themePicker")
 
             if UIDevice.current.userInterfaceIdiom == .phone {
-                Toggle(String(localized: "Haptic Feedback"), isOn: $viewModel.hapticEnabled)
-                    .accessibilityLabel(String(localized: "Haptic feedback"))
-                    .accessibilityIdentifier("settings.haptics")
+                SettingsSectionDivider()
+                SettingsBooleanRow(
+                    title: String(localized: "Haptic Feedback"),
+                    accessibilityLabel: String(localized: "Haptic feedback"),
+                    accessibilityIdentifier: "settings.haptics",
+                    isOn: $viewModel.hapticEnabled
+                )
             }
         }
     }

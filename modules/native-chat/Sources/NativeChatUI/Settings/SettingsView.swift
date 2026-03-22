@@ -67,45 +67,50 @@ public struct SettingsView: View {
         )
 
         NavigationStack {
-            Form {
-                SettingsAPIConfigurationSection(
-                    viewModel: credentials,
-                    focusedField: $focusedField,
-                    dismissKeyboard: dismissKeyboard
-                )
-                SettingsCloudflareSection(
-                    credentials: credentials,
-                    defaults: defaults,
-                    focusedField: $focusedField
-                )
-                SettingsChatDefaultsSection(viewModel: defaults)
-                SettingsAppearanceSection(viewModel: defaults)
-                SettingsCacheSection(
-                    title: String(localized: "Image Cache"),
-                    usedValue: cache.generatedImageCacheSizeString,
-                    footerText: imageCacheFooter,
-                    isClearing: cache.isClearingImageCache,
-                    hasCachedContent: cache.generatedImageCacheSizeBytes > 0,
-                    clearLabel: String(localized: "Clear Image Cache"),
-                    clearAction: {
-                        await cache.clearGeneratedImageCache()
-                    }
-                )
-                SettingsCacheSection(
-                    title: String(localized: "Document Cache"),
-                    usedValue: cache.generatedDocumentCacheSizeString,
-                    footerText: documentCacheFooter,
-                    isClearing: cache.isClearingDocumentCache,
-                    hasCachedContent: cache.generatedDocumentCacheSizeBytes > 0,
-                    clearLabel: String(localized: "Clear Document Cache"),
-                    clearAction: {
-                        await cache.clearGeneratedDocumentCache()
-                    }
-                )
-                SettingsAboutSection(
-                    appVersionString: about.appVersionString,
-                    platformString: about.platformString
-                )
+            ScrollView {
+                VStack(alignment: .leading, spacing: 24) {
+                    SettingsAPIConfigurationSection(
+                        viewModel: credentials,
+                        focusedField: $focusedField,
+                        dismissKeyboard: dismissKeyboard
+                    )
+                    SettingsCloudflareSection(
+                        credentials: credentials,
+                        defaults: defaults,
+                        focusedField: $focusedField
+                    )
+                    SettingsChatDefaultsSection(viewModel: defaults)
+                    SettingsAppearanceSection(viewModel: defaults)
+                    SettingsCacheSection(
+                        title: String(localized: "Image Cache"),
+                        usedValue: cache.generatedImageCacheSizeString,
+                        footerText: imageCacheFooter,
+                        isClearing: cache.isClearingImageCache,
+                        hasCachedContent: cache.generatedImageCacheSizeBytes > 0,
+                        clearLabel: String(localized: "Clear Image Cache"),
+                        clearAction: {
+                            await cache.clearGeneratedImageCache()
+                        }
+                    )
+                    SettingsCacheSection(
+                        title: String(localized: "Document Cache"),
+                        usedValue: cache.generatedDocumentCacheSizeString,
+                        footerText: documentCacheFooter,
+                        isClearing: cache.isClearingDocumentCache,
+                        hasCachedContent: cache.generatedDocumentCacheSizeBytes > 0,
+                        clearLabel: String(localized: "Clear Document Cache"),
+                        clearAction: {
+                            await cache.clearGeneratedDocumentCache()
+                        }
+                    )
+                    SettingsAboutSection(
+                        appVersionString: about.appVersionString,
+                        platformString: about.platformString
+                    )
+                }
+                .padding(.horizontal, 16)
+                .padding(.top, 20)
+                .padding(.bottom, 32)
             }
             .coordinateSpace(name: "settingsForm")
             .scrollDismissesKeyboard(.interactively)

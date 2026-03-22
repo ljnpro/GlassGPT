@@ -9,12 +9,21 @@ struct SettingsCloudflareSection: View {
     let focusedField: FocusState<SettingsFocusedField?>.Binding
 
     var body: some View {
-        Section {
-            Toggle(String(localized: "Enable Cloudflare Gateway"), isOn: $defaults.cloudflareEnabled)
-                .accessibilityLabel(String(localized: "Enable Cloudflare Gateway"))
-                .accessibilityIdentifier("settings.cloudflare")
+        SettingsGlassSection(
+            title: String(localized: "Cloudflare Gateway"),
+            footerText: String(
+                localized: "Route API requests through Cloudflare's global edge network for improved reliability and analytics."
+            )
+        ) {
+            SettingsBooleanRow(
+                title: String(localized: "Enable Cloudflare Gateway"),
+                accessibilityLabel: String(localized: "Enable Cloudflare Gateway"),
+                accessibilityIdentifier: "settings.cloudflare",
+                isOn: $defaults.cloudflareEnabled
+            )
 
             if defaults.cloudflareEnabled {
+                SettingsSectionDivider()
                 Picker(
                     String(localized: "Gateway Configuration"),
                     selection: Binding(
@@ -31,6 +40,7 @@ struct SettingsCloudflareSection: View {
                 .accessibilityIdentifier("settings.cloudflareMode")
 
                 if credentials.cloudflareConfigurationMode == .custom {
+                    SettingsSectionDivider()
                     TextField(
                         String(localized: "https://gateway.example/v1"),
                         text: $credentials.customCloudflareGatewayBaseURL
@@ -52,6 +62,7 @@ struct SettingsCloudflareSection: View {
                         credentials.refreshCloudflareHealthStatus()
                     }
 
+                    SettingsSectionDivider()
                     SecureField(
                         String(localized: "Cloudflare AIG token"),
                         text: $credentials.customCloudflareAIGToken
@@ -74,6 +85,7 @@ struct SettingsCloudflareSection: View {
                         credentials.refreshCloudflareHealthStatus()
                     }
 
+                    SettingsSectionDivider()
                     HStack {
                         Button(String(localized: "Clear Custom")) {
                             credentials.clearCustomCloudflareConfiguration()
@@ -101,6 +113,7 @@ struct SettingsCloudflareSection: View {
                     }
                 }
 
+                SettingsSectionDivider()
                 HStack(spacing: 10) {
                     Image(systemName: "circle.fill")
                         .font(.system(size: 10))
@@ -108,10 +121,12 @@ struct SettingsCloudflareSection: View {
 
                     VStack(alignment: .leading, spacing: 2) {
                         Text(String(localized: "Connection Status"))
+                            .font(.body)
+                            .foregroundStyle(.primary)
                         if let statusText {
                             Text(statusText)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
+                                .font(.body)
+                                .foregroundStyle(.primary.opacity(0.8))
                                 .multilineTextAlignment(.leading)
                         }
                     }
@@ -128,6 +143,7 @@ struct SettingsCloudflareSection: View {
                 .accessibilityLabel(statusAccessibilityLabel)
                 .accessibilityIdentifier("settings.cloudflareStatus")
 
+                SettingsSectionDivider()
                 Button(String(localized: "Check Connection")) {
                     Task { @MainActor in
                         await credentials.checkCloudflareHealth()
@@ -138,10 +154,6 @@ struct SettingsCloudflareSection: View {
                 .accessibilityLabel(String(localized: "Check Cloudflare connection"))
                 .accessibilityIdentifier("settings.checkConnection")
             }
-        } header: {
-            Text(String(localized: "Cloudflare Gateway"))
-        } footer: {
-            Text(String(localized: "Route API requests through Cloudflare's global edge network for improved reliability and analytics."))
         }
     }
 

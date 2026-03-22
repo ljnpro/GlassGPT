@@ -67,6 +67,7 @@ package final class ChatConversationCoordinator {
         state.selectedImageData = nil
         state.pendingAttachments = []
         state.isThinking = false
+        state.thinkingPresentationState = nil
         state.draftMessage = nil
         state.activeToolCalls = []
         state.liveCitations = []
@@ -162,6 +163,7 @@ package final class ChatConversationCoordinator {
         state.currentThinkingText = ""
         state.errorMessage = nil
         state.isThinking = false
+        state.thinkingPresentationState = nil
         state.draftMessage = nil
         state.activeToolCalls = []
         state.liveCitations = []

@@ -1,5 +1,6 @@
 import ChatDomain
 import ChatPersistenceSwiftData
+import ChatPresentation
 import ChatRuntimeModel
 import ChatRuntimeWorkflows
 import Foundation
@@ -29,8 +30,9 @@ extension ChatSessionDecisionsTests {
         #expect(visibleState.activeRequestModel == .gpt5_4)
         #expect(visibleState.activeRequestEffort == .high)
         #expect(visibleState.isStreaming)
-        #expect(visibleState.isRecovering)
+        #expect(!visibleState.isRecovering)
         #expect(visibleState.isThinking)
+        #expect(visibleState.thinkingPresentationState == .completed)
         #expect(visibleState.draftMessage?.id == draft.id)
     }
 
@@ -113,6 +115,7 @@ extension ChatSessionDecisionsTests {
         #expect(visibleState.lastSequenceNumber == 11)
         #expect(visibleState.isRecovering)
         #expect(!visibleState.isThinking)
+        #expect(visibleState.thinkingPresentationState == nil)
         #expect(visibleState.activeToolCalls == [
             ToolCallInfo(id: "ws_1", type: .webSearch, status: .completed)
         ])
@@ -162,6 +165,7 @@ extension ChatSessionDecisionsTests {
         #expect(visibleState.lastSequenceNumber == 7)
         #expect(visibleState.isRecovering)
         #expect(!visibleState.isThinking)
+        #expect(visibleState.thinkingPresentationState == nil)
     }
 
     @Test func `session visibility coordinator preserves draft placeholder while recovery runtime is empty`() {
@@ -204,6 +208,7 @@ extension ChatSessionDecisionsTests {
         #expect(visibleState.currentThinkingText.isEmpty)
         #expect(visibleState.isRecovering)
         #expect(!visibleState.isThinking)
+        #expect(visibleState.thinkingPresentationState == nil)
     }
 
     @Test func `session visibility coordinator applies only for the registered visible session in the active conversation`() {

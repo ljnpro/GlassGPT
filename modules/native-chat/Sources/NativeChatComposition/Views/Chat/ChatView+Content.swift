@@ -1,5 +1,6 @@
 import ChatDomain
 import ChatPersistenceSwiftData
+import ChatPresentation
 import ChatUIComponents
 import NativeChatUI
 import SwiftUI
@@ -17,6 +18,46 @@ extension ChatView {
             liveBottomAnchorKey: liveBottomAnchorKey,
             onBackgroundTap: dismissKeyboard
         )
+        .safeAreaInset(edge: .top, spacing: 0) {
+            chatTopBar
+        }
+    }
+
+    var chatTopBar: some View {
+        HStack(alignment: .center, spacing: 12) {
+            ModelBadge(
+                model: viewModel.selectedModel,
+                effort: viewModel.reasoningEffort,
+                onTap: { presentModelSelector() }
+            )
+            .fixedSize(horizontal: true, vertical: false)
+
+            Spacer(minLength: 12)
+
+            Button {
+                startNewChat()
+            } label: {
+                Image(systemName: "square.and.pencil")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.primary)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .singleFrameGlassCapsuleControl(
+                        tintOpacity: GlassStyleMetrics.CapsuleControl.tintOpacity,
+                        borderWidth: GlassStyleMetrics.CapsuleControl.borderWidth,
+                        darkBorderOpacity: GlassStyleMetrics.CapsuleControl.darkBorderOpacity,
+                        lightBorderOpacity: GlassStyleMetrics.CapsuleControl.lightBorderOpacity
+                    )
+            }
+            .buttonStyle(GlassPressButtonStyle())
+            .accessibilityLabel(String(localized: "Start new chat"))
+            .accessibilityIdentifier("chat.newChat")
+        }
+        .padding(.horizontal, 16)
+        .padding(.top, 8)
+        .padding(.bottom, 10)
+        .background(Color.clear)
+        .allowsHitTesting(!shouldShowGeneratedPreviewTouchShield)
     }
 
     var chatMessagesContent: some View {
@@ -82,6 +123,7 @@ extension ChatView {
             liveFilePathAnnotations: isLiveDraft ? viewModel.liveFilePathAnnotations : [],
             showsRecoveryIndicator: isLiveDraft && viewModel.isRecovering,
             isLiveThinking: isLiveDraft && viewModel.isThinking,
+            liveThinkingPresentationState: isLiveDraft ? viewModel.thinkingPresentationState : nil,
             suppressesPersistedThinking: isLiveDraft && viewModel.isRecovering && viewModel.currentThinkingText.isEmpty,
             onSandboxLinkTap: message.role == .assistant ? { sandboxURL, annotation in
                 viewModel.fileInteractionCoordinator.handleSandboxLinkTap(

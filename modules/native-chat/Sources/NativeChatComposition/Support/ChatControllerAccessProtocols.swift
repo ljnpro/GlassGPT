@@ -1,6 +1,7 @@
 import ChatDomain
 import ChatPersistenceCore
 import ChatPersistenceSwiftData
+import ChatPresentation
 import ChatRuntimeModel
 import ChatRuntimeWorkflows
 import ChatUIComponents
@@ -28,6 +29,7 @@ protocol ChatStreamingProjectionAccess: AnyObject {
     var isStreaming: Bool { get set }
     var isThinking: Bool { get set }
     var isRecovering: Bool { get set }
+    var thinkingPresentationState: ThinkingPresentationState? { get set }
     var activeToolCalls: [ToolCallInfo] { get set }
     var liveCitations: [URLCitation] { get set }
     var liveFilePathAnnotations: [FilePathAnnotation] { get set }

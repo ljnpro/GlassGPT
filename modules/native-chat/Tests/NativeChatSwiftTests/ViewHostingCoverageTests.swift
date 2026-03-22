@@ -1,5 +1,6 @@
 import ChatDomain
 import ChatPersistenceSwiftData
+import ChatPresentation
 import GeneratedFilesCore
 import NativeChatUI
 import SnapshotTesting
@@ -163,6 +164,7 @@ private func makeDetachedStreamingChatStore() throws -> ChatController {
     store.messages = [userMessage, assistantMessage]
     store.isStreaming = true
     store.isThinking = true
+    store.thinkingPresentationState = .completed
     store.visibleSessionMessageID = UUID()
     store.currentThinkingText = "Checking the release pipeline and verifying the archive."
     store.currentStreamingText = "Archive complete. Uploading the build now."

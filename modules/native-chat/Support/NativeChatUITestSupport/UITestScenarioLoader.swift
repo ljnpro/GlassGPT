@@ -175,6 +175,7 @@ package enum UITestScenarioLoader {
             viewModel.isThinking = true
             viewModel.currentThinkingText = "Gathering the recovery plan before finalizing the response."
             viewModel.currentStreamingText = "The streaming session is active and will resume cleanly after a reconnect."
+            viewModel.thinkingPresentationState = .completed
             viewModel.activeToolCalls = [
                 ToolCallInfo(
                     id: "ci_ui",

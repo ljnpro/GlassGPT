@@ -8,7 +8,10 @@ struct SettingsAPIConfigurationSection: View {
     let dismissKeyboard: @MainActor () -> Void
 
     var body: some View {
-        Section {
+        SettingsGlassSection(
+            title: String(localized: "API Configuration"),
+            footerText: String(localized: "Your API key is stored securely in the device Keychain.")
+        ) {
             SecureField(String(localized: "sk-proj-..."), text: $viewModel.apiKey)
                 .focused(focusedField, equals: .apiKey)
                 .textContentType(.password)
@@ -31,7 +34,7 @@ struct SettingsAPIConfigurationSection: View {
                         .foregroundStyle(isValid ? .green : .red)
                         .accessibilityHidden(true)
                     Text(isValid ? String(localized: "API key is valid") : String(localized: "API key is invalid"))
-                        .font(.caption)
+                        .font(.body)
                         .foregroundStyle(isValid ? .green : .red)
                 }
                 .accessibilityElement(children: .combine)
@@ -71,10 +74,6 @@ struct SettingsAPIConfigurationSection: View {
                 .accessibilityLabel(String(localized: "Save API key"))
                 .accessibilityIdentifier("settings.saveAPIKey")
             }
-        } header: {
-            Text(String(localized: "API Configuration"))
-        } footer: {
-            Text(String(localized: "Your API key is stored securely in the device Keychain."))
         }
     }
 }

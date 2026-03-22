@@ -1,26 +1,53 @@
 import XCTest
 
 final class AccessibilityAuditTests: XCTestCase {
-    private var app: XCUIApplication!
-
-    override func setUp() {
-        continueAfterFailure = false
-        app = XCUIApplication()
+    @MainActor
+    private func launchApp() -> XCUIApplication {
+        let app = XCUIApplication()
         app.launchArguments = ["--uitesting", "--scenario", "empty"]
         app.launch()
+        return app
     }
 
+    @MainActor
+    private func assertAccessibilityAudit(for app: XCUIApplication) throws {
+        var issues: [String] = []
+
+        try app.performAccessibilityAudit { issue in
+            let elementDescription = issue.element?.debugDescription ?? "nil"
+            issues.append(
+                """
+                \(issue.compactDescription)
+                \(issue.detailedDescription)
+                auditType=\(issue.auditType.rawValue)
+                element=\(elementDescription)
+                """
+            )
+            return true
+        }
+
+        if !issues.isEmpty {
+            XCTFail(issues.joined(separator: "\n\n"))
+        }
+    }
+
+    @MainActor
     func testChatTabAccessibilityAudit() throws {
-        try app.performAccessibilityAudit()
+        let app = launchApp()
+        try assertAccessibilityAudit(for: app)
     }
 
+    @MainActor
     func testHistoryTabAccessibilityAudit() throws {
+        let app = launchApp()
         app.tabBars.buttons["History"].tap()
-        try app.performAccessibilityAudit()
+        try assertAccessibilityAudit(for: app)
     }
 
+    @MainActor
     func testSettingsTabAccessibilityAudit() throws {
+        let app = launchApp()
         app.tabBars.buttons["Settings"].tap()
-        try app.performAccessibilityAudit()
+        try assertAccessibilityAudit(for: app)
     }
 }

@@ -8,6 +8,7 @@ public final class PlaceholderTextView: UITextView {
     public var placeholderText = "" {
         didSet {
             placeholderLabel.text = placeholderText
+            accessibilityLabel = placeholderText
         }
     }
 
@@ -27,6 +28,7 @@ public final class PlaceholderTextView: UITextView {
     override public var text: String! {
         didSet {
             updatePlaceholderVisibility()
+            accessibilityValue = text
         }
     }
 
@@ -68,9 +70,12 @@ public final class PlaceholderTextView: UITextView {
     }
 
     private func configurePlaceholder() {
+        isAccessibilityElement = true
         placeholderLabel.textColor = placeholderColor
         placeholderLabel.numberOfLines = 0
         placeholderLabel.font = font
+        placeholderLabel.adjustsFontForContentSizeCategory = true
+        placeholderLabel.isAccessibilityElement = false
         addSubview(placeholderLabel)
         updatePlaceholderVisibility()
     }
