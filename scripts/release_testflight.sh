@@ -131,6 +131,31 @@ function ensure_successful_log_has_content() {
   fi
 }
 
+function run_logged_release_command() {
+  local label="$1"
+  local log_file="$2"
+  local success_summary="$3"
+  shift 3
+
+  local status=0
+  rm -f "$log_file"
+
+  set +e
+  "$@" >"$log_file" 2>&1
+  status=$?
+  set -e
+
+  if (( status != 0 )); then
+    echo "${label} failed. Log tail:" >&2
+    if [[ -f "$log_file" ]]; then
+      tail -n 80 "$log_file" >&2 || true
+    fi
+    return "$status"
+  fi
+
+  echo "$success_summary"
+}
+
 function resolve_release_tag() {
   local version="$1"
   local build_number="$2"
@@ -339,32 +364,35 @@ if [[ -z "$KEY_PATH" || ! -f "$KEY_PATH" ]]; then
 fi
 
 echo "==> Archiving"
-xcodebuild \
-  -project "$PROJECT_PATH" \
-  -scheme "$SCHEME" \
-  -configuration Release \
-  -destination "generic/platform=iOS" \
-  -archivePath "$ARCHIVE_PATH" \
-  clean archive \
-  -allowProvisioningUpdates \
-  -authenticationKeyPath "$KEY_PATH" \
-  -authenticationKeyID "$ASC_API_KEY_ID" \
-  -authenticationKeyIssuerID "$ASC_ISSUER_ID" \
-  "CLOUDFLARE_AIG_TOKEN=$CLOUDFLARE_AIG_TOKEN_EFFECTIVE" \
-  "$XCODEBUILD_APPINTENTS_LINKER_SETTING" | tee "$ARCHIVE_LOG"
+run_logged_release_command "Archive" "$ARCHIVE_LOG" "Archive completed successfully." \
+  env \
+    CLOUDFLARE_AIG_TOKEN="$CLOUDFLARE_AIG_TOKEN_EFFECTIVE" \
+    xcodebuild \
+      -project "$PROJECT_PATH" \
+      -scheme "$SCHEME" \
+      -configuration Release \
+      -destination "generic/platform=iOS" \
+      -archivePath "$ARCHIVE_PATH" \
+      clean archive \
+      -allowProvisioningUpdates \
+      -authenticationKeyPath "$KEY_PATH" \
+      -authenticationKeyID "$ASC_API_KEY_ID" \
+      -authenticationKeyIssuerID "$ASC_ISSUER_ID" \
+      "$XCODEBUILD_APPINTENTS_LINKER_SETTING"
 python3 "$ROOT_DIR/scripts/sanitize_success_log.py" xcodebuild "$ARCHIVE_LOG"
 ensure_successful_log_has_content "$ARCHIVE_LOG" "Archive completed successfully."
 
 echo "==> Exporting"
-xcodebuild \
-  -exportArchive \
-  -archivePath "$ARCHIVE_PATH" \
-  -exportPath "$EXPORT_PATH" \
-  -exportOptionsPlist "$EXPORT_OPTIONS" \
-  -allowProvisioningUpdates \
-  -authenticationKeyPath "$KEY_PATH" \
-  -authenticationKeyID "$ASC_API_KEY_ID" \
-  -authenticationKeyIssuerID "$ASC_ISSUER_ID" | tee "$EXPORT_LOG"
+run_logged_release_command "Export" "$EXPORT_LOG" "Export completed successfully." \
+  xcodebuild \
+    -exportArchive \
+    -archivePath "$ARCHIVE_PATH" \
+    -exportPath "$EXPORT_PATH" \
+    -exportOptionsPlist "$EXPORT_OPTIONS" \
+    -allowProvisioningUpdates \
+    -authenticationKeyPath "$KEY_PATH" \
+    -authenticationKeyID "$ASC_API_KEY_ID" \
+    -authenticationKeyIssuerID "$ASC_ISSUER_ID"
 python3 "$ROOT_DIR/scripts/sanitize_success_log.py" xcodebuild "$EXPORT_LOG"
 ensure_successful_log_has_content "$EXPORT_LOG" "Export completed successfully."
 sanitize_successful_distribution_log "$EXPORT_PATH/Packaging.log"
@@ -396,22 +424,16 @@ print(f"Verified IPA version: {actual_version} ({actual_build})")
 PY
 
 echo "==> Uploading to TestFlight"
-UPLOAD_OUTPUT="$(
+run_logged_release_command "Upload" "$UPLOAD_LOG" "Upload completed successfully." \
   xcrun altool \
     --upload-app \
     --type ios \
     --file "$IPA_PATH" \
     --apiKey "$ASC_API_KEY_ID" \
-    --apiIssuer "$ASC_ISSUER_ID" \
-    2>&1 | tee "$UPLOAD_LOG"
-)"
+    --apiIssuer "$ASC_ISSUER_ID"
 sanitize_successful_upload_log "$UPLOAD_LOG"
 ensure_successful_log_has_content "$UPLOAD_LOG" "Upload completed successfully."
-DELIVERY_UUID="$(printf '%s\n' "$UPLOAD_OUTPUT" | awk -F'Delivery UUID: ' '/Delivery UUID:/ {print $2}' | tail -1)"
-
-if [[ -z "$DELIVERY_UUID" && -f "$UPLOAD_LOG" ]]; then
-  DELIVERY_UUID="$(awk -F'Delivery UUID: ' '/Delivery UUID:/ {print $2}' "$UPLOAD_LOG" | tail -1)"
-fi
+DELIVERY_UUID="$(awk -F'Delivery UUID: ' '/Delivery UUID:/ {print $2}' "$UPLOAD_LOG" | tail -1)"
 
 if [[ -z "$DELIVERY_UUID" ]]; then
   DELIVERY_UUID="unknown"

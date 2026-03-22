@@ -85,8 +85,12 @@ function test_cloudflare_release_token_is_externalized() {
     fail "release_testflight.sh should fail fast when the Cloudflare AIG token is missing."
   fi
 
-  if ! grep -Fq '"CLOUDFLARE_AIG_TOKEN=$CLOUDFLARE_AIG_TOKEN_EFFECTIVE"' "$ROOT_DIR/scripts/release_testflight.sh"; then
-    fail "release_testflight.sh should pass the resolved Cloudflare AIG token into the archive build."
+  if ! grep -Fq 'CLOUDFLARE_AIG_TOKEN="$CLOUDFLARE_AIG_TOKEN_EFFECTIVE"' "$ROOT_DIR/scripts/release_testflight.sh"; then
+    fail "release_testflight.sh should pass the resolved Cloudflare AIG token into the archive environment."
+  fi
+
+  if grep -Fq '"CLOUDFLARE_AIG_TOKEN=$CLOUDFLARE_AIG_TOKEN_EFFECTIVE"' "$ROOT_DIR/scripts/release_testflight.sh"; then
+    fail "release_testflight.sh should not pass the Cloudflare AIG token as a command-line build setting because that leaks into live logs."
   fi
 
   if ! grep -Fq 'IPA metadata is missing CloudflareAIGToken.' "$ROOT_DIR/scripts/release_testflight.sh"; then
@@ -396,8 +400,28 @@ function test_success_report_gates_stay_quiet() {
 }
 
 function test_release_upload_log_sanitizer() {
+  if ! grep -Fq 'function run_logged_release_command()' "$ROOT_DIR/scripts/release_testflight.sh"; then
+    fail "release_testflight.sh should centralize release command logging so successful archive/export/upload output stays concise."
+  fi
+
   if ! grep -Fq 'function sanitize_successful_upload_log()' "$ROOT_DIR/scripts/release_testflight.sh"; then
     fail "release_testflight.sh should define a dedicated upload log sanitizer."
+  fi
+
+  if ! grep -Fq 'run_logged_release_command "Archive" "$ARCHIVE_LOG" "Archive completed successfully."' "$ROOT_DIR/scripts/release_testflight.sh"; then
+    fail "release_testflight.sh should capture archive output to a log file and print only a concise success summary."
+  fi
+
+  if ! grep -Fq 'run_logged_release_command "Export" "$EXPORT_LOG" "Export completed successfully."' "$ROOT_DIR/scripts/release_testflight.sh"; then
+    fail "release_testflight.sh should capture export output to a log file and print only a concise success summary."
+  fi
+
+  if ! grep -Fq 'run_logged_release_command "Upload" "$UPLOAD_LOG" "Upload completed successfully."' "$ROOT_DIR/scripts/release_testflight.sh"; then
+    fail "release_testflight.sh should capture upload output to a log file and print only a concise success summary."
+  fi
+
+  if grep -Fq '| tee "$ARCHIVE_LOG"' "$ROOT_DIR/scripts/release_testflight.sh"; then
+    fail "release_testflight.sh should not stream raw archive output to stdout on successful runs."
   fi
 
   if ! grep -Fq 'sanitize_successful_upload_log "$UPLOAD_LOG"' "$ROOT_DIR/scripts/release_testflight.sh"; then
@@ -416,7 +440,7 @@ function test_release_upload_log_sanitizer() {
     fail "release_testflight.sh should ensure sanitized Packaging.log files keep a concise success summary."
   fi
 
-  echo "[PASS] release_testflight.sh sanitizes successful upload logs"
+  echo "[PASS] release_testflight.sh keeps release logs concise and sanitized"
 }
 
 function test_release_readiness_defaults_to_versions_file() {
