@@ -218,6 +218,42 @@ for raw_line in path.read_text().splitlines():
 PY
 }
 
+function write_release_versions() {
+  python3 - "$VERSIONS_XCCONFIG_PATH" "$VERSION" "$BUILD_NUMBER" <<'PY'
+import pathlib
+import re
+import sys
+
+path = pathlib.Path(sys.argv[1])
+version = sys.argv[2]
+build = sys.argv[3]
+text = path.read_text()
+text, build_count = re.subn(
+    r"(?m)^(\s*CURRENT_PROJECT_VERSION\s*=\s*).+$",
+    rf"\g<1>{build}",
+    text
+)
+text, version_count = re.subn(
+    r"(?m)^(\s*MARKETING_VERSION\s*=\s*).+$",
+    rf"\g<1>{version}",
+    text
+)
+if build_count != 1 or version_count != 1:
+    sys.exit("Failed to update version values in Versions.xcconfig")
+path.write_text(text)
+PY
+
+  if ! rg -q "^MARKETING_VERSION = ${VERSION}$" "$VERSIONS_XCCONFIG_PATH"; then
+    echo "Failed to set MARKETING_VERSION to $VERSION." >&2
+    exit 1
+  fi
+
+  if ! rg -q "^CURRENT_PROJECT_VERSION = ${BUILD_NUMBER}$" "$VERSIONS_XCCONFIG_PATH"; then
+    echo "Failed to set CURRENT_PROJECT_VERSION to $BUILD_NUMBER." >&2
+    exit 1
+  fi
+}
+
 if [[ ! -f "$ENV_FILE" ]]; then
   echo "Missing env file: $ENV_FILE" >&2
   exit 1
@@ -310,9 +346,12 @@ if (( PREFLIGHT_ONLY == 1 )); then
   exit 0
 fi
 
+write_release_versions
+
 echo "==> Running release-readiness gate"
 export RELEASE_EXPECT_MARKETING_VERSION="$VERSION"
 export RELEASE_EXPECT_BUILD_NUMBER="$BUILD_NUMBER"
+export RELEASE_ALLOW_DIRTY_VERSION_XCCONFIG=1
 export RELEASE_REQUIRE_CLEAN_WORKTREE=1
 ./scripts/ci.sh release-readiness
 
@@ -321,40 +360,6 @@ if (( SKIP_CI == 1 )); then
 else
   echo "==> Running full CI gates"
   ./scripts/ci.sh
-fi
-
-python3 - "$VERSIONS_XCCONFIG_PATH" "$VERSION" "$BUILD_NUMBER" <<'PY'
-import pathlib
-import re
-import sys
-
-path = pathlib.Path(sys.argv[1])
-version = sys.argv[2]
-build = sys.argv[3]
-text = path.read_text()
-text, build_count = re.subn(
-    r"(?m)^(\s*CURRENT_PROJECT_VERSION\s*=\s*).+$",
-    rf"\g<1>{build}",
-    text
-)
-text, version_count = re.subn(
-    r"(?m)^(\s*MARKETING_VERSION\s*=\s*).+$",
-    rf"\g<1>{version}",
-    text
-)
-if build_count != 1 or version_count != 1:
-    sys.exit("Failed to update version values in Versions.xcconfig")
-path.write_text(text)
-PY
-
-if ! rg -q "^MARKETING_VERSION = ${VERSION}$" "$VERSIONS_XCCONFIG_PATH"; then
-  echo "Failed to set MARKETING_VERSION to $VERSION." >&2
-  exit 1
-fi
-
-if ! rg -q "^CURRENT_PROJECT_VERSION = ${BUILD_NUMBER}$" "$VERSIONS_XCCONFIG_PATH"; then
-  echo "Failed to set CURRENT_PROJECT_VERSION to $BUILD_NUMBER." >&2
-  exit 1
 fi
 
 ARCHIVE_PATH="$BUILD_DIR/GlassGPT-$VERSION.xcarchive"

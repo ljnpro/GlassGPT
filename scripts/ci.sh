@@ -1167,7 +1167,13 @@ function clean_outputs() {
 }
 
 function filtered_git_status() {
-  git status --short -- . ':(exclude)docs/refactor' ':(exclude)scripts/export_refactor_bundle.py'
+  local pathspecs=(. ':(exclude)docs/refactor' ':(exclude)scripts/export_refactor_bundle.py')
+
+  if [[ "${RELEASE_ALLOW_DIRTY_VERSION_XCCONFIG:-0}" == "1" ]]; then
+    pathspecs+=(':(exclude)ios/GlassGPT/Config/Versions.xcconfig')
+  fi
+
+  git status --short -- "${pathspecs[@]}"
 }
 
 if [[ $# -gt 1 ]]; then

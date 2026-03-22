@@ -710,6 +710,36 @@ PY
   echo "[PASS] release_testflight.sh can skip only the full CI after release-readiness passes"
 }
 
+function test_release_wrapper_prepares_versions_before_readiness() {
+  if ! grep -Fq 'function write_release_versions()' "$ROOT_DIR/scripts/release_testflight.sh"; then
+    fail "release_testflight.sh should define a helper that writes the target release versions before running readiness."
+  fi
+
+  if ! grep -Fq 'export RELEASE_ALLOW_DIRTY_VERSION_XCCONFIG=1' "$ROOT_DIR/scripts/release_testflight.sh"; then
+    fail "release_testflight.sh should allow only Versions.xcconfig to remain dirty during release-readiness."
+  fi
+
+  if ! python3 - <<'PY' "$ROOT_DIR/scripts/release_testflight.sh"
+from pathlib import Path
+import sys
+
+text = Path(sys.argv[1]).read_text()
+write_call = text.find('write_release_versions')
+readiness_call = text.find('./scripts/ci.sh release-readiness')
+
+raise SystemExit(0 if -1 not in (write_call, readiness_call) and write_call < readiness_call else 1)
+PY
+  then
+    fail "release_testflight.sh should update Versions.xcconfig before invoking release-readiness."
+  fi
+
+  if ! grep -Fq "pathspecs+=(':(exclude)ios/GlassGPT/Config/Versions.xcconfig')" "$ROOT_DIR/scripts/ci.sh"; then
+    fail "ci.sh should ignore Versions.xcconfig only when the release wrapper explicitly allows that pending version update."
+  fi
+
+  echo "[PASS] release wrapper prepares target versions before release-readiness without weakening clean-worktree checks"
+}
+
 function test_release_readiness_gate_allows_skip_ci_only() {
   local release_readiness_block
   release_readiness_block="$(sed -n '/function assert_release_readiness()/,/^}/p' "$ROOT_DIR/scripts/ci.sh")"
@@ -1021,6 +1051,7 @@ test_clean_outputs_removes_serial_probe_logs
 test_ui_runner_avoids_xctestrun_noise
 test_release_preflight
 test_release_skip_ci_flag
+test_release_wrapper_prepares_versions_before_readiness
 test_release_tag_resolution_supports_repeat_builds
 test_snapshot_recording_covers_hosted_references
 test_single_flight_guards_prevent_overlapping_local_runs
