@@ -400,8 +400,16 @@ function test_success_report_gates_stay_quiet() {
 
   local performance_tests_block
   performance_tests_block="$(sed -n '/function gate_performance_tests()/,/^}/p' "$ROOT_DIR/scripts/ci.sh")"
-  if ! printf '%s\n' "$performance_tests_block" | grep -Fq 'run_report_command "$report_path" ""'; then
-    fail "gate_performance_tests should keep the metric table in a report file and print only the success summary."
+  if ! printf '%s\n' "$performance_tests_block" | grep -Fq '>"$report_path" 2>&1'; then
+    fail "gate_performance_tests should write the performance comparison table to a report file."
+  fi
+
+  if ! printf '%s\n' "$performance_tests_block" | grep -Fq "awk 'NF { line = \$0 } END { if (line != \"\") print line }'"; then
+    fail "gate_performance_tests should print only the concise success summary from the report."
+  fi
+
+  if ! printf '%s\n' "$performance_tests_block" | grep -Fq '"$report_path"'; then
+    fail "gate_performance_tests should print only the concise success summary from the report."
   fi
 
   if ! grep -Fq 'rm -f "$CI_COMPLETION_NOTICES_FILE"' "$ROOT_DIR/scripts/ci.sh"; then
@@ -666,15 +674,59 @@ function test_release_skip_ci_flag() {
     fail "release_testflight.sh should track the --skip-ci flag."
   fi
 
-  if ! grep -Fq 'Skipping CI gates (prevalidated run)' "$ROOT_DIR/scripts/release_testflight.sh"; then
-    fail "release_testflight.sh should emit an explicit message when CI is skipped."
+  if ! grep -Fq 'Skipping full CI gates (prevalidated run)' "$ROOT_DIR/scripts/release_testflight.sh"; then
+    fail "release_testflight.sh should emit an explicit message when full CI is skipped."
   fi
 
   if ! grep -Fq 'if (( SKIP_CI == 1 )); then' "$ROOT_DIR/scripts/release_testflight.sh"; then
     fail "release_testflight.sh should guard the CI invocation behind the skip-ci flag."
   fi
 
-  echo "[PASS] release_testflight.sh can skip CI after a separate validated run"
+  if grep -Fq -- '--skip-readiness' "$ROOT_DIR/scripts/release_testflight.sh"; then
+    fail "release_testflight.sh must not advertise a release-readiness bypass flag."
+  fi
+
+  if ! python3 - <<'PY' "$ROOT_DIR/scripts/release_testflight.sh"
+from pathlib import Path
+import sys
+
+text = Path(sys.argv[1]).read_text()
+release_readiness_banner = text.find('echo "==> Running release-readiness gate"')
+release_readiness_call = text.find('./scripts/ci.sh release-readiness')
+skip_ci_guard = text.find('if (( SKIP_CI == 1 )); then')
+
+raise SystemExit(
+    0
+    if -1 not in (release_readiness_banner, release_readiness_call, skip_ci_guard)
+    and release_readiness_banner < skip_ci_guard
+    and release_readiness_call < skip_ci_guard
+    else 1
+)
+PY
+  then
+    fail "release_testflight.sh should always run release-readiness before optionally skipping full CI."
+  fi
+
+  echo "[PASS] release_testflight.sh can skip only the full CI after release-readiness passes"
+}
+
+function test_release_readiness_gate_allows_skip_ci_only() {
+  local release_readiness_block
+  release_readiness_block="$(sed -n '/function assert_release_readiness()/,/^}/p' "$ROOT_DIR/scripts/ci.sh")"
+
+  if printf '%s\n' "$release_readiness_block" | grep -Fq -- '--skip-ci'; then
+    fail "assert_release_readiness should not reject the supported --skip-ci flag."
+  fi
+
+  if ! printf '%s\n' "$release_readiness_block" | grep -Fq -- '--skip-readiness'; then
+    fail "assert_release_readiness should reject release-readiness bypass flags."
+  fi
+
+  if ! printf '%s\n' "$release_readiness_block" | grep -Fq 'release_testflight.sh must run the release-readiness gate.'; then
+    fail "assert_release_readiness should require the release wrapper to run the release-readiness gate."
+  fi
+
+  echo "[PASS] release-readiness allows skip-ci without allowing release-readiness bypass"
 }
 
 function test_release_tag_resolution_supports_repeat_builds() {
@@ -873,6 +925,14 @@ EOF
     fail "gate_performance_tests should reuse the shared SourcePackages cache path."
   fi
 
+  if ! printf '%s\n' "$performance_tests_block" | grep -Fq 'Hosted performance regression detected; rerunning benchmarks once to rule out runner variance.'; then
+    fail "gate_performance_tests should retry hosted performance regressions once to rule out runner noise."
+  fi
+
+  if ! printf '%s\n' "$performance_tests_block" | grep -Fq 'regression_attempt_limit=2'; then
+    fail "gate_performance_tests should allow one extra hosted retry before failing."
+  fi
+
   if ! grep -Fq 'performance-tests coverage-report' "$ROOT_DIR/scripts/ci.sh"; then
     fail "ci.sh default full run should include the performance-tests gate."
   fi
@@ -954,6 +1014,7 @@ test_successful_xcodebuild_log_sanitizer
 test_success_report_gates_stay_quiet
 test_release_upload_log_sanitizer
 test_release_readiness_defaults_to_versions_file
+test_release_readiness_gate_allows_skip_ci_only
 test_snapshot_gates_are_split_cleanly
 test_simulator_lifecycle_uses_resolved_udid
 test_clean_outputs_removes_serial_probe_logs

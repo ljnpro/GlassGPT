@@ -886,8 +886,13 @@ function assert_release_readiness() {
     exit 1
   fi
 
-  if search_quiet '--skip-ci|--skip-readiness' "$ROOT_DIR/scripts/release_testflight.sh"; then
-    echo "release_testflight.sh must not advertise CI bypass flags." >&2
+  if search_quiet '--skip-readiness' "$ROOT_DIR/scripts/release_testflight.sh"; then
+    echo "release_testflight.sh must not advertise release-readiness bypass flags." >&2
+    exit 1
+  fi
+
+  if ! search_quiet './scripts/ci.sh release-readiness' "$ROOT_DIR/scripts/release_testflight.sh"; then
+    echo "release_testflight.sh must run the release-readiness gate." >&2
     exit 1
   fi
 
@@ -1008,8 +1013,9 @@ function gate_performance_tests() {
   local results_path="$CI_OUTPUT_DIR/performance.json"
   local baseline_path
   local report_path="$CI_OUTPUT_DIR/performance-report.txt"
-  local attempt=1
   local command_status=0
+  local regression_attempt=1
+  local regression_attempt_limit=1
 
   baseline_path="$(resolve_performance_baseline_path)"
 
@@ -1018,52 +1024,75 @@ function gate_performance_tests() {
     exit 1
   fi
 
-  while (( attempt <= XCODEBUILD_RETRY_ATTEMPTS )); do
-    rm -f "$log_file"
-    : > "$log_file"
-    prepare_simulator_state
-    force_remove_path "$result_bundle_path"
+  if [[ "${GITHUB_ACTIONS:-}" == "true" ]]; then
+    regression_attempt_limit=2
+  fi
+
+  while (( regression_attempt <= regression_attempt_limit )); do
+    local attempt=1
+    while (( attempt <= XCODEBUILD_RETRY_ATTEMPTS )); do
+      rm -f "$log_file"
+      : > "$log_file"
+      prepare_simulator_state
+      force_remove_path "$result_bundle_path"
+
+      set +e
+      (
+        cd "$ROOT_DIR/modules/native-chat"
+        xcodebuild \
+          -scheme NativeChat-Package \
+          -clonedSourcePackagesDirPath "$CI_SOURCE_PACKAGES_DIR" \
+          -destination "$SIMULATOR_DEVICE_DESTINATION" \
+          -parallel-testing-enabled NO \
+          -test-timeouts-enabled YES \
+          -maximum-test-execution-time-allowance "$XCODE_TEST_TIMEOUT_ALLOWANCE" \
+          -resultBundlePath "$result_bundle_path" \
+          -only-testing:NativeChatTests/PerformanceTests \
+          test \
+          "$XCODEBUILD_APPINTENTS_LINKER_SETTING"
+      ) >"$log_file" 2>&1
+      command_status=$?
+      set -e
+
+      if (( command_status == 0 )); then
+        break
+      fi
+
+      if (( attempt >= XCODEBUILD_RETRY_ATTEMPTS )) || ! is_transient_xcresult_failure "$result_bundle_path"; then
+        echo "xcodebuild failed for ${label}. Log tail:" >&2
+        if [[ -f "$log_file" ]]; then
+          tail -n 80 "$log_file" >&2 || true
+        fi
+        return "$command_status"
+      fi
+
+      echo "Transient xcodebuild failure detected for ${label}; retrying (attempt ${attempt}/${XCODEBUILD_RETRY_ATTEMPTS})." >&2
+      (( attempt += 1 ))
+    done
+
+    python3 ./scripts/extract_performance_metrics.py "$log_file" "$results_path"
+    cp "$baseline_path" "$CI_OUTPUT_DIR/performance-baseline.json"
 
     set +e
-    (
-      cd "$ROOT_DIR/modules/native-chat"
-      xcodebuild \
-        -scheme NativeChat-Package \
-        -clonedSourcePackagesDirPath "$CI_SOURCE_PACKAGES_DIR" \
-        -destination "$SIMULATOR_DEVICE_DESTINATION" \
-        -parallel-testing-enabled NO \
-        -test-timeouts-enabled YES \
-        -maximum-test-execution-time-allowance "$XCODE_TEST_TIMEOUT_ALLOWANCE" \
-        -resultBundlePath "$result_bundle_path" \
-        -only-testing:NativeChatTests/PerformanceTests \
-        test \
-        "$XCODEBUILD_APPINTENTS_LINKER_SETTING"
-    ) >"$log_file" 2>&1
+    python3 ./scripts/check_performance_regression.py \
+      "$results_path" \
+      "$baseline_path" >"$report_path" 2>&1
     command_status=$?
     set -e
 
     if (( command_status == 0 )); then
+      awk 'NF { line = $0 } END { if (line != "") print line }' "$report_path"
       break
     fi
 
-    if (( attempt >= XCODEBUILD_RETRY_ATTEMPTS )) || ! is_transient_xcresult_failure "$result_bundle_path"; then
-      echo "xcodebuild failed for ${label}. Log tail:" >&2
-      if [[ -f "$log_file" ]]; then
-        tail -n 80 "$log_file" >&2 || true
-      fi
+    if (( regression_attempt >= regression_attempt_limit )); then
+      cat "$report_path" >&2
       return "$command_status"
     fi
 
-    echo "Transient xcodebuild failure detected for ${label}; retrying (attempt ${attempt}/${XCODEBUILD_RETRY_ATTEMPTS})." >&2
-    (( attempt += 1 ))
+    echo "Hosted performance regression detected; rerunning benchmarks once to rule out runner variance." >&2
+    (( regression_attempt += 1 ))
   done
-
-  python3 ./scripts/extract_performance_metrics.py "$log_file" "$results_path"
-  cp "$baseline_path" "$CI_OUTPUT_DIR/performance-baseline.json"
-  run_report_command "$report_path" "" \
-    python3 ./scripts/check_performance_regression.py \
-      "$results_path" \
-      "$baseline_path"
 
   sanitize_successful_xcodebuild_log "$log_file"
   ensure_successful_log_has_content "$log_file" "Completed ${label} successfully."

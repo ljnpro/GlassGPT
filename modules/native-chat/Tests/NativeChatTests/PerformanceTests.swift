@@ -6,6 +6,11 @@ import XCTest
 // MARK: - PerformanceTests
 
 final class PerformanceTests: XCTestCase {
+    private enum BenchmarkIterations {
+        static let incrementalAppend = 5
+        static let richTextBuilder = 5
+    }
+
     // MARK: - SSE Frame Buffer Throughput
 
     func testSSEFrameBufferThroughput() {
@@ -36,12 +41,14 @@ final class PerformanceTests: XCTestCase {
         }
 
         measure {
-            var buffer = SSEFrameBuffer()
             var totalFrames = 0
-            for chunk in chunks {
-                totalFrames += buffer.append(chunk).count
+            for _ in 0 ..< BenchmarkIterations.incrementalAppend {
+                var buffer = SSEFrameBuffer()
+                for chunk in chunks {
+                    totalFrames += buffer.append(chunk).count
+                }
             }
-            XCTAssertEqual(totalFrames, 5000)
+            XCTAssertEqual(totalFrames, 5000 * BenchmarkIterations.incrementalAppend)
         }
     }
 
@@ -64,8 +71,10 @@ final class PerformanceTests: XCTestCase {
         XCTAssertFalse(warmupResult.characters.isEmpty)
 
         measure {
-            let result = RichTextAttributedStringBuilder.parseRichText(longMarkdown)
-            XCTAssertFalse(result.characters.isEmpty)
+            for _ in 0 ..< BenchmarkIterations.richTextBuilder {
+                let result = RichTextAttributedStringBuilder.parseRichText(longMarkdown)
+                XCTAssertFalse(result.characters.isEmpty)
+            }
         }
     }
 

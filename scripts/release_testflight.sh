@@ -310,15 +310,15 @@ if (( PREFLIGHT_ONLY == 1 )); then
   exit 0
 fi
 
-if (( SKIP_CI == 1 )); then
-  echo "==> Skipping CI gates (prevalidated run)"
-else
-  echo "==> Running release-readiness gate"
-  export RELEASE_EXPECT_MARKETING_VERSION="$VERSION"
-  export RELEASE_EXPECT_BUILD_NUMBER="$BUILD_NUMBER"
-  export RELEASE_REQUIRE_CLEAN_WORKTREE=1
-  ./scripts/ci.sh release-readiness
+echo "==> Running release-readiness gate"
+export RELEASE_EXPECT_MARKETING_VERSION="$VERSION"
+export RELEASE_EXPECT_BUILD_NUMBER="$BUILD_NUMBER"
+export RELEASE_REQUIRE_CLEAN_WORKTREE=1
+./scripts/ci.sh release-readiness
 
+if (( SKIP_CI == 1 )); then
+  echo "==> Skipping full CI gates (prevalidated run)"
+else
   echo "==> Running full CI gates"
   ./scripts/ci.sh
 fi
