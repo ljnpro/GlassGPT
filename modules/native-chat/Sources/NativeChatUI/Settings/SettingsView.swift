@@ -98,7 +98,7 @@ public struct SettingsView: View {
             }
             .listSectionSpacing(.compact)
             .coordinateSpace(name: "settingsForm")
-            .contentMargins(.bottom, 72, for: .scrollContent)
+            .contentMargins(.bottom, 0, for: .scrollContent)
             .scrollDismissesKeyboard(.interactively)
             .accessibilityIdentifier("settings.form")
             .onPreferenceChange(SettingsFieldFramePreferenceKey.self) { fieldFrames = $0 }
