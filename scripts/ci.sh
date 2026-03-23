@@ -23,6 +23,7 @@ XCODE_TEST_TIMEOUT_ALLOWANCE="${XCODE_TEST_TIMEOUT_ALLOWANCE:-180}"
 SIMULATOR_BOOT_TIMEOUT_SECONDS="${SIMULATOR_BOOT_TIMEOUT_SECONDS:-60}"
 XCODEBUILD_APPINTENTS_LINKER_SETTING='OTHER_LDFLAGS=$(inherited) -framework AppIntents'
 source "$ROOT_DIR/scripts/lib_single_flight.sh"
+# UI test sharding (includes testChatTabAccessibilityAudit and other accessibility tests)
 source "$ROOT_DIR/scripts/lib_ui_test_sharding.sh"
 SNAPSHOT_CASES=(
   testChatSnapshots
