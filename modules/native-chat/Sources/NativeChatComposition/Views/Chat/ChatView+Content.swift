@@ -30,7 +30,6 @@ extension ChatView {
                 effort: viewModel.reasoningEffort,
                 onTap: { presentModelSelector() }
             )
-            .fixedSize(horizontal: true, vertical: false)
 
             Spacer(minLength: 12)
 

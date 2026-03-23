@@ -8,10 +8,7 @@ struct SettingsAPIConfigurationSection: View {
     let dismissKeyboard: @MainActor () -> Void
 
     var body: some View {
-        SettingsGlassSection(
-            title: String(localized: "API Configuration"),
-            footerText: String(localized: "Your API key is stored securely in the device Keychain.")
-        ) {
+        Section {
             SecureField(String(localized: "sk-proj-..."), text: $viewModel.apiKey)
                 .focused(focusedField, equals: .apiKey)
                 .textContentType(.password)
@@ -34,7 +31,7 @@ struct SettingsAPIConfigurationSection: View {
                         .foregroundStyle(isValid ? .green : .red)
                         .accessibilityHidden(true)
                     Text(isValid ? String(localized: "API key is valid") : String(localized: "API key is invalid"))
-                        .font(.body)
+                        .font(.caption)
                         .foregroundStyle(isValid ? .green : .red)
                 }
                 .accessibilityElement(children: .combine)
@@ -49,7 +46,7 @@ struct SettingsAPIConfigurationSection: View {
                         await viewModel.validateAPIKey()
                     }
                 }
-                .buttonStyle(.glass)
+                .buttonStyle(SettingsActionButtonStyle(kind: .standard))
                 .disabled(viewModel.apiKey.isEmpty || viewModel.isValidating)
                 .accessibilityLabel(String(localized: "Validate API key"))
                 .accessibilityIdentifier("settings.validateAPIKey")
@@ -60,8 +57,7 @@ struct SettingsAPIConfigurationSection: View {
                     dismissKeyboard()
                     viewModel.clearAPIKey()
                 }
-                .buttonStyle(.glass)
-                .tint(.red)
+                .buttonStyle(SettingsActionButtonStyle(kind: .destructive))
                 .accessibilityLabel(String(localized: "Clear API key"))
                 .accessibilityIdentifier("settings.clearAPIKey")
 
@@ -69,7 +65,7 @@ struct SettingsAPIConfigurationSection: View {
                     dismissKeyboard()
                     viewModel.saveAPIKey()
                 }
-                .buttonStyle(.glassProminent)
+                .buttonStyle(SettingsActionButtonStyle(kind: .prominent))
                 .disabled(viewModel.apiKey.isEmpty)
                 .accessibilityLabel(String(localized: "Save API key"))
                 .accessibilityIdentifier("settings.saveAPIKey")

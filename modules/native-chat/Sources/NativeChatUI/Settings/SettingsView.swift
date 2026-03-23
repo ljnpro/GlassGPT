@@ -67,52 +67,38 @@ public struct SettingsView: View {
         )
 
         NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 24) {
-                    SettingsAPIConfigurationSection(
-                        viewModel: credentials,
-                        focusedField: $focusedField,
-                        dismissKeyboard: dismissKeyboard
-                    )
-                    SettingsCloudflareSection(
-                        credentials: credentials,
-                        defaults: defaults,
-                        focusedField: $focusedField
-                    )
-                    SettingsChatDefaultsSection(viewModel: defaults)
-                    SettingsAppearanceSection(viewModel: defaults)
-                    SettingsCacheSection(
-                        title: String(localized: "Image Cache"),
-                        usedValue: cache.generatedImageCacheSizeString,
-                        footerText: imageCacheFooter,
-                        isClearing: cache.isClearingImageCache,
-                        hasCachedContent: cache.generatedImageCacheSizeBytes > 0,
-                        clearLabel: String(localized: "Clear Image Cache"),
-                        clearAction: {
-                            await cache.clearGeneratedImageCache()
-                        }
-                    )
-                    SettingsCacheSection(
-                        title: String(localized: "Document Cache"),
-                        usedValue: cache.generatedDocumentCacheSizeString,
-                        footerText: documentCacheFooter,
-                        isClearing: cache.isClearingDocumentCache,
-                        hasCachedContent: cache.generatedDocumentCacheSizeBytes > 0,
-                        clearLabel: String(localized: "Clear Document Cache"),
-                        clearAction: {
-                            await cache.clearGeneratedDocumentCache()
-                        }
-                    )
-                    SettingsAboutSection(
-                        appVersionString: about.appVersionString,
-                        platformString: about.platformString
-                    )
+            Form {
+                SettingsAPIConfigurationSection(
+                    viewModel: credentials,
+                    focusedField: $focusedField,
+                    dismissKeyboard: dismissKeyboard
+                )
+                SettingsCloudflareSection(
+                    credentials: credentials,
+                    defaults: defaults,
+                    focusedField: $focusedField
+                )
+                Section {
+                    NavigationLink {
+                        SettingsAdvancedView(
+                            defaults: defaults,
+                            cache: cache,
+                            appVersionString: about.appVersionString,
+                            platformString: about.platformString,
+                            imageCacheFooter: imageCacheFooter,
+                            documentCacheFooter: documentCacheFooter
+                        )
+                    } label: {
+                        Label(String(localized: "Advanced"), systemImage: "slider.horizontal.3")
+                    }
+                    .accessibilityIdentifier("settings.advanced")
                 }
-                .padding(.horizontal, 16)
-                .padding(.top, 20)
-                .padding(.bottom, 32)
+                SettingsChatDefaultsSection(viewModel: defaults)
+                SettingsAppearanceSection(viewModel: defaults)
             }
+            .listSectionSpacing(.compact)
             .coordinateSpace(name: "settingsForm")
+            .contentMargins(.bottom, 132, for: .scrollContent)
             .scrollDismissesKeyboard(.interactively)
             .accessibilityIdentifier("settings.form")
             .onPreferenceChange(SettingsFieldFramePreferenceKey.self) { fieldFrames = $0 }
@@ -137,9 +123,6 @@ public struct SettingsView: View {
                 including: focusedField != nil ? .all : .none
             )
             .navigationTitle(String(localized: "Settings"))
-            .task {
-                await cache.refreshAll()
-            }
             .alert(String(localized: "API Key Saved"), isPresented: saveConfirmationBinding) {
                 Button(String(localized: "OK"), role: .cancel) {}
             } message: {

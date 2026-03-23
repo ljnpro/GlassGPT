@@ -9,21 +9,13 @@ struct SettingsCloudflareSection: View {
     let focusedField: FocusState<SettingsFocusedField?>.Binding
 
     var body: some View {
-        SettingsGlassSection(
-            title: String(localized: "Cloudflare Gateway"),
-            footerText: String(
-                localized: "Route API requests through Cloudflare's global edge network for improved reliability and analytics."
-            )
-        ) {
-            SettingsBooleanRow(
-                title: String(localized: "Enable Cloudflare Gateway"),
-                accessibilityLabel: String(localized: "Enable Cloudflare Gateway"),
-                accessibilityIdentifier: "settings.cloudflare",
-                isOn: $defaults.cloudflareEnabled
-            )
+        Section {
+            Toggle(String(localized: "Enable Cloudflare Gateway"), isOn: $defaults.cloudflareEnabled)
+                .accessibilityLabel(String(localized: "Enable Cloudflare Gateway"))
+                .accessibilityValue(defaults.cloudflareEnabled ? String(localized: "On") : String(localized: "Off"))
+                .accessibilityIdentifier("settings.cloudflare")
 
             if defaults.cloudflareEnabled {
-                SettingsSectionDivider()
                 Picker(
                     String(localized: "Gateway Configuration"),
                     selection: Binding(
@@ -40,57 +32,48 @@ struct SettingsCloudflareSection: View {
                 .accessibilityIdentifier("settings.cloudflareMode")
 
                 if credentials.cloudflareConfigurationMode == .custom {
-                    SettingsSectionDivider()
-                    TextField(
-                        String(localized: "https://gateway.example/v1"),
-                        text: $credentials.customCloudflareGatewayBaseURL
-                    )
-                    .focused(focusedField, equals: .cloudflareGatewayBaseURL)
-                    .textInputAutocapitalization(.never)
-                    .autocorrectionDisabled()
-                    .background(
-                        GeometryReader { geometry in
-                            Color.clear.preference(
-                                key: SettingsFieldFramePreferenceKey.self,
-                                value: [.cloudflareGatewayBaseURL: geometry.frame(in: .named("settingsForm"))]
-                            )
+                    TextField(String(localized: "https://gateway.example/v1"), text: $credentials.customCloudflareGatewayBaseURL)
+                        .focused(focusedField, equals: .cloudflareGatewayBaseURL)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .background(
+                            GeometryReader { geometry in
+                                Color.clear.preference(
+                                    key: SettingsFieldFramePreferenceKey.self,
+                                    value: [.cloudflareGatewayBaseURL: geometry.frame(in: .named("settingsForm"))]
+                                )
+                            }
+                        )
+                        .accessibilityLabel(String(localized: "Custom Cloudflare gateway URL"))
+                        .accessibilityIdentifier("settings.cloudflareCustomURL")
+                        .onChange(of: credentials.customCloudflareGatewayBaseURL) { _, _ in
+                            credentials.refreshCloudflareHealthStatus()
                         }
-                    )
-                    .accessibilityLabel(String(localized: "Custom Cloudflare gateway URL"))
-                    .accessibilityIdentifier("settings.cloudflareCustomURL")
-                    .onChange(of: credentials.customCloudflareGatewayBaseURL) { _, _ in
-                        credentials.refreshCloudflareHealthStatus()
-                    }
 
-                    SettingsSectionDivider()
-                    SecureField(
-                        String(localized: "Cloudflare AIG token"),
-                        text: $credentials.customCloudflareAIGToken
-                    )
-                    .focused(focusedField, equals: .cloudflareAIGToken)
-                    .textContentType(.password)
-                    .textInputAutocapitalization(.never)
-                    .autocorrectionDisabled()
-                    .background(
-                        GeometryReader { geometry in
-                            Color.clear.preference(
-                                key: SettingsFieldFramePreferenceKey.self,
-                                value: [.cloudflareAIGToken: geometry.frame(in: .named("settingsForm"))]
-                            )
+                    SecureField(String(localized: "Cloudflare AIG token"), text: $credentials.customCloudflareAIGToken)
+                        .focused(focusedField, equals: .cloudflareAIGToken)
+                        .textContentType(.password)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .background(
+                            GeometryReader { geometry in
+                                Color.clear.preference(
+                                    key: SettingsFieldFramePreferenceKey.self,
+                                    value: [.cloudflareAIGToken: geometry.frame(in: .named("settingsForm"))]
+                                )
+                            }
+                        )
+                        .accessibilityLabel(String(localized: "Custom Cloudflare gateway token"))
+                        .accessibilityIdentifier("settings.cloudflareCustomToken")
+                        .onChange(of: credentials.customCloudflareAIGToken) { _, _ in
+                            credentials.refreshCloudflareHealthStatus()
                         }
-                    )
-                    .accessibilityLabel(String(localized: "Custom Cloudflare gateway token"))
-                    .accessibilityIdentifier("settings.cloudflareCustomToken")
-                    .onChange(of: credentials.customCloudflareAIGToken) { _, _ in
-                        credentials.refreshCloudflareHealthStatus()
-                    }
 
-                    SettingsSectionDivider()
                     HStack {
                         Button(String(localized: "Clear Custom")) {
                             credentials.clearCustomCloudflareConfiguration()
                         }
-                        .buttonStyle(.glass)
+                        .buttonStyle(SettingsActionButtonStyle(kind: .standard))
                         .accessibilityLabel(String(localized: "Clear custom Cloudflare configuration"))
                         .accessibilityIdentifier("settings.clearCustomCloudflare")
 
@@ -99,7 +82,7 @@ struct SettingsCloudflareSection: View {
                         Button(String(localized: "Save Custom")) {
                             credentials.saveCustomCloudflareConfiguration()
                         }
-                        .buttonStyle(.glassProminent)
+                        .buttonStyle(SettingsActionButtonStyle(kind: .prominent))
                         .disabled(
                             credentials.customCloudflareGatewayBaseURL
                                 .trimmingCharacters(in: .whitespacesAndNewlines)
@@ -113,7 +96,6 @@ struct SettingsCloudflareSection: View {
                     }
                 }
 
-                SettingsSectionDivider()
                 HStack(spacing: 10) {
                     Image(systemName: "circle.fill")
                         .font(.system(size: 10))
@@ -121,12 +103,10 @@ struct SettingsCloudflareSection: View {
 
                     VStack(alignment: .leading, spacing: 2) {
                         Text(String(localized: "Connection Status"))
-                            .font(.body)
-                            .foregroundStyle(.primary)
                         if let statusText {
                             Text(statusText)
-                                .font(.body)
-                                .foregroundStyle(.primary.opacity(0.8))
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
                                 .multilineTextAlignment(.leading)
                         }
                     }
@@ -143,13 +123,12 @@ struct SettingsCloudflareSection: View {
                 .accessibilityLabel(statusAccessibilityLabel)
                 .accessibilityIdentifier("settings.cloudflareStatus")
 
-                SettingsSectionDivider()
                 Button(String(localized: "Check Connection")) {
                     Task { @MainActor in
                         await credentials.checkCloudflareHealth()
                     }
                 }
-                .buttonStyle(.glass)
+                .buttonStyle(SettingsActionButtonStyle(kind: .standard))
                 .disabled(credentials.isCheckingCloudflareHealth || isCustomConfigurationIncomplete)
                 .accessibilityLabel(String(localized: "Check Cloudflare connection"))
                 .accessibilityIdentifier("settings.checkConnection")

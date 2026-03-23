@@ -16,6 +16,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Release readiness now defaults to the version values in `Versions.xcconfig` instead of stale hardcoded expectations
 - Successful release packaging logs are sanitized down to a clean summary so release artifacts stay free of warning-like noise
 
+## [4.10.6] - 2026-03-22
+
+### Fixed
+
+- Settings visuals now match the cleaner `4.10.4` baseline again, including the dark appearance and the restored native form density
+- The chat toolbar and model badge now use the `4.10.4` glass capsule presentation again so chat and history actions stay visually aligned
+
+### Changed
+
+- Default reasoning effort now uses a compact inline glass slider inside Settings instead of the heavier expanded presentation
+- Settings, chat, and model-selector snapshot baselines were refreshed for the 4.10.6 release line
+
 ## [4.10.5] - 2026-03-22
 
 ### Fixed
@@ -215,7 +227,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - Migrated from React Native / Expo to fully native Swift and SwiftUI
 
-[Unreleased]: https://github.com/ljnpro/GlassGPT/compare/v4.10.5...HEAD
+[Unreleased]: https://github.com/ljnpro/GlassGPT/compare/v4.10.6...HEAD
+[4.10.6]: https://github.com/ljnpro/GlassGPT/compare/v4.10.5...v4.10.6
 [4.10.5]: https://github.com/ljnpro/GlassGPT/compare/v4.10.4...v4.10.5
 [4.10.4]: https://github.com/ljnpro/GlassGPT/compare/v4.10.3...v4.10.4
 [4.10.3]: https://github.com/ljnpro/GlassGPT/compare/v4.10.2...v4.10.3

@@ -38,12 +38,10 @@ public struct SettingsCacheSection: View {
 
     /// The cache usage and clear-action controls for this cache type.
     public var body: some View {
-        SettingsGlassSection(title: title, footerText: footerText) {
+        Section {
             LabeledContent(String(localized: "Used"), value: usedValue)
                 .accessibilityLabel(title + ", " + String(localized: "Used") + ": \(usedValue)")
                 .accessibilityIdentifier("settings.cache.\(title.lowercased().replacingOccurrences(of: " ", with: "")).used")
-
-            SettingsSectionDivider()
 
             Button(role: .destructive) {
                 Task { @MainActor in
@@ -59,9 +57,14 @@ public struct SettingsCacheSection: View {
                     Text(clearLabel)
                 }
             }
+            .buttonStyle(SettingsActionButtonStyle(kind: .destructive))
             .disabled(isClearing || !hasCachedContent)
             .accessibilityLabel(clearLabel)
             .accessibilityIdentifier("settings.cache.\(title.lowercased().replacingOccurrences(of: " ", with: "")).clear")
+        } header: {
+            SettingsSectionHeaderText(text: title)
+        } footer: {
+            SettingsSectionFooterText(text: footerText)
         }
     }
 }

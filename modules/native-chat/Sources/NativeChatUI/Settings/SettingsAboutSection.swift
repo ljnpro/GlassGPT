@@ -15,21 +15,18 @@ public struct SettingsAboutSection: View {
 
     /// The about section content for the settings screen.
     public var body: some View {
-        SettingsGlassSection(title: String(localized: "About")) {
+        Section {
             LabeledContent(String(localized: "Version"), value: appVersionString)
                 .accessibilityLabel(String(localized: "App version") + ": \(appVersionString)")
                 .accessibilityIdentifier("settings.about.version")
-            SettingsSectionDivider()
             LabeledContent(String(localized: "Platform"), value: platformString)
                 .accessibilityLabel(String(localized: "Platform") + ": \(platformString)")
                 .accessibilityIdentifier("settings.about.platform")
-            SettingsSectionDivider()
             LabeledContent(String(localized: "Engine"), value: "SwiftUI")
                 .accessibilityLabel(String(localized: "Engine") + ": SwiftUI")
                 .accessibilityIdentifier("settings.about.engine")
 
             if let supportURL = URL(string: "https://ljnpro.github.io/liquid-glass-chat-support/") {
-                SettingsSectionDivider()
                 Link(destination: supportURL) {
                     HStack {
                         Text(String(localized: "Support Website"))
@@ -42,6 +39,8 @@ public struct SettingsAboutSection: View {
                 .accessibilityLabel(String(localized: "Open support website"))
                 .accessibilityIdentifier("settings.about.support")
             }
+        } header: {
+            SettingsSectionHeaderText(text: String(localized: "About"))
         }
     }
 }
