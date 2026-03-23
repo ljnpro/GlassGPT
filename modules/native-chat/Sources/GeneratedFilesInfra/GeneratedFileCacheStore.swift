@@ -40,6 +40,7 @@ package struct GeneratedFileCacheStore {
             throw GeneratedFileStoreError.fileSystemError(underlying: error)
         }
         touchGeneratedFile(at: fileURL)
+        trimCacheIfNeeded(for: bucket)
         return fileURL
     }
 
@@ -107,8 +108,11 @@ package struct GeneratedFileCacheStore {
         }
     }
 
+    /// The default maximum cache size per bucket (200 MB).
+    package static let defaultCacheLimitBytes: Int64 = 200 * 1024 * 1024
+
     /// Evicts the oldest cached entries until the bucket size is within the given limit.
-    package func trimCacheIfNeeded(for bucket: GeneratedFileCacheBucket, limitBytes: Int64) {
+    package func trimCacheIfNeeded(for bucket: GeneratedFileCacheBucket, limitBytes: Int64 = defaultCacheLimitBytes) {
         let entries = cacheEntries(for: bucket)
             .sorted { $0.modifiedAt < $1.modifiedAt }
 

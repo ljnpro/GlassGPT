@@ -73,8 +73,9 @@ extension SSEEventDecoder {
 
         case let .filePathAnnotationAdded(annotation):
             yieldResponseIdentifierIfNeeded(responseID, continuation: continuation)
-            accumulatedFilePathAnnotations.append(annotation)
-            continuation.yield(.filePathAnnotationAdded(annotation))
+            let enriched = enrichFilePathAnnotation(annotation)
+            accumulatedFilePathAnnotations.append(enriched)
+            continuation.yield(.filePathAnnotationAdded(enriched))
             yieldSequenceIfNeeded(sequenceNumber, continuation: continuation)
             return .continued
 
@@ -110,6 +111,24 @@ extension SSEEventDecoder {
             yieldSequenceIfNeeded(sequenceNumber, continuation: continuation)
             return .continued
         }
+    }
+
+    func enrichFilePathAnnotation(_ annotation: FilePathAnnotation) -> FilePathAnnotation {
+        guard annotation.sandboxPath.isEmpty else { return annotation }
+        let extracted = OpenAIStreamEventTranslator.extractAnnotatedSubstring(
+            from: accumulatedText,
+            startIndex: annotation.startIndex,
+            endIndex: annotation.endIndex
+        )
+        guard !extracted.isEmpty else { return annotation }
+        return FilePathAnnotation(
+            fileId: annotation.fileId,
+            containerId: annotation.containerId,
+            sandboxPath: extracted,
+            filename: annotation.filename,
+            startIndex: annotation.startIndex,
+            endIndex: annotation.endIndex
+        )
     }
 
     mutating func textEvent(delta: String, itemID: String?, contentIndex: Int?) -> StreamEvent {

@@ -54,8 +54,8 @@ struct NativeChatPersistenceTests {
         #expect(
             messages
                 == [
-                    "[NativeChatPersistence] Initial persistent container creation failed: bootstrap failed",
-                    "[NativeChatPersistence] Persistent container retry failed: bootstrap failed"
+                    "[NativeChatPersistence] Initial persistent container creation failed: bootstrapFailed",
+                    "[NativeChatPersistence] Persistent container retry failed: bootstrapFailed"
                 ]
         )
     }

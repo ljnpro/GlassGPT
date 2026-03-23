@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - codex/stable-4.10
+      - codex/stable-4.11
       - codex/feature/**
   pull_request:
 
@@ -274,7 +275,7 @@ jobs:
     name: Release Readiness
     runs-on: macos-26
     needs: [test, quality]
-    if: github.ref == 'refs/heads/codex/stable-4.10' || github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/codex/stable-4.10' || github.ref == 'refs/heads/codex/stable-4.11' || github.ref == 'refs/heads/main'
     steps:
       - name: Checkout
         uses: actions/checkout@v6

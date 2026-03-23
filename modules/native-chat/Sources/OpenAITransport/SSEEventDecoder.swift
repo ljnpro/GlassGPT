@@ -23,6 +23,7 @@ private let sseDecoderSignposter = OSSignposter(subsystem: "GlassGPT", category:
 public struct SSEEventDecoder {
     static let logger = Logger(subsystem: "GlassGPT", category: "sse")
     static let decodeFailureLogThreshold = 5
+    static let decodeFailureHardCeiling = 50
     /// The accumulated output text from all text deltas.
     public internal(set) var accumulatedText = ""
     /// The accumulated reasoning/thinking text.
@@ -61,7 +62,9 @@ public struct SSEEventDecoder {
         defer { sseDecoderSignposter.endInterval("DecodeSSEFrame", signpostState) }
 
         guard let jsonData = frame.data.data(using: .utf8) else {
-            recordDecodeFailure("SSE frame data is not valid UTF-8.")
+            if recordDecodeFailure("SSE frame data is not valid UTF-8.") {
+                return .terminalError
+            }
             return .continued
         }
 

@@ -62,7 +62,9 @@ extension SSEEventDecoder {
                 continuation.yield(.replaceText(fullText))
             }
         } else {
-            recordDecodeFailure("SSE frame could not be decoded for event type \(frameType).")
+            if recordDecodeFailure("SSE frame could not be decoded for event type \(frameType).") {
+                return .terminalError
+            }
         }
         yieldSequenceIfNeeded(sequenceNumber, continuation: continuation)
         return .continued
@@ -73,7 +75,9 @@ extension SSEEventDecoder {
         jsonData: Data
     ) -> SSEEventTerminalResult {
         if decodeEnvelope(from: jsonData) == nil {
-            recordDecodeFailure("SSE frame could not be decoded for event type \(frameType).")
+            if recordDecodeFailure("SSE frame could not be decoded for event type \(frameType).") {
+                return .terminalError
+            }
         } else {
             resetDecodeFailures()
         }
@@ -109,11 +113,13 @@ extension SSEEventDecoder {
         consecutiveDecodeFailures = 0
     }
 
-    mutating func recordDecodeFailure(_ message: String) {
+    /// Records a decode failure and returns `true` if the hard ceiling has been exceeded.
+    mutating func recordDecodeFailure(_ message: String) -> Bool {
         consecutiveDecodeFailures += 1
         if shouldLogDecodeFailure(after: consecutiveDecodeFailures) {
             Self.logger.error("\(message, privacy: .public)")
         }
+        return consecutiveDecodeFailures >= Self.decodeFailureHardCeiling
     }
 
     func shouldLogDecodeFailure(after count: Int) -> Bool {

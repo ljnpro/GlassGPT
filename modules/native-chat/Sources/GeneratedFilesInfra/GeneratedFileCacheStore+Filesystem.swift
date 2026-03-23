@@ -44,10 +44,10 @@ package extension GeneratedFileCacheStore {
 
     /// Removes the item at the given URL if it exists, logging errors with the provided context.
     func removeItemIfExists(at url: URL, logContext: String) {
-        guard fileManager.fileExists(atPath: url.path) else { return }
-
         do {
             try fileManager.removeItem(at: url)
+        } catch let error as NSError where error.domain == NSCocoaErrorDomain && error.code == NSFileNoSuchFileError {
+            // Item was already removed — not an error.
         } catch {
             GeneratedFilesLogger.error("[\(logContext)] \(error.localizedDescription)")
         }

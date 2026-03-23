@@ -103,7 +103,7 @@ public enum NativeChatPersistence {
                 startupErrorDescription: nil
             )
         } catch {
-            logError("[NativeChatPersistence] Initial persistent container creation failed: \(error.localizedDescription)")
+            logError("[NativeChatPersistence] Initial persistent container creation failed: \(error)")
         }
 
         let preservationResult = preserveExistingStore()
@@ -118,7 +118,7 @@ public enum NativeChatPersistence {
                 startupErrorDescription: nil
             )
         } catch {
-            logError("[NativeChatPersistence] Persistent container retry failed: \(error.localizedDescription)")
+            logError("[NativeChatPersistence] Persistent container retry failed: \(error)")
         }
 
         if let inMemoryContainer = makeFallbackContainer() {

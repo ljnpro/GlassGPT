@@ -867,7 +867,7 @@ function assert_release_readiness() {
   current_branch="${GITHUB_REF_NAME:-$(git rev-parse --abbrev-ref HEAD)}"
 
   case "$current_branch" in
-    main|codex/stable-4.10|codex/feature/4.10*|HEAD)
+    main|codex/stable-4.10|codex/stable-4.11|codex/feature/4.10*|codex/feature/4.11*|HEAD)
       ;;
     *)
       echo "Release-readiness gate does not permit branch '$current_branch'." >&2
@@ -875,18 +875,18 @@ function assert_release_readiness() {
       ;;
   esac
 
-  if ! search_quiet "codex/stable-4.10" "$ROOT_DIR/docs/branch-strategy.md"; then
-    echo "branch-strategy.md does not include codex/stable-4.10." >&2
+  if ! search_quiet "codex/stable-4.11" "$ROOT_DIR/docs/branch-strategy.md"; then
+    echo "branch-strategy.md does not include codex/stable-4.11." >&2
     exit 1
   fi
 
-  if ! search_quiet "4.9.1" "$ROOT_DIR/docs/parity-baseline.md"; then
-    echo "parity-baseline.md must include the active 4.9.1 baseline marker." >&2
+  if ! search_quiet "4.10.9" "$ROOT_DIR/docs/parity-baseline.md"; then
+    echo "parity-baseline.md must include the active 4.10.9 baseline marker." >&2
     exit 1
   fi
 
-  if ! search_quiet "codex/stable-4.10" "$ROOT_DIR/docs/release.md"; then
-    echo "release.md must describe the codex/stable-4.10 release line." >&2
+  if ! search_quiet "codex/stable-4.11" "$ROOT_DIR/docs/release.md"; then
+    echo "release.md must describe the codex/stable-4.11 release line." >&2
     exit 1
   fi
 
@@ -895,8 +895,8 @@ function assert_release_readiness() {
     exit 1
   fi
 
-  if ! search_quiet "codex/stable-4.10" "$ROOT_DIR/.github/workflows/ios.yml"; then
-    echo "ios.yml must include codex/stable-4.10." >&2
+  if ! search_quiet "codex/stable-4.11" "$ROOT_DIR/.github/workflows/ios.yml"; then
+    echo "ios.yml must include codex/stable-4.11." >&2
     exit 1
   fi
 

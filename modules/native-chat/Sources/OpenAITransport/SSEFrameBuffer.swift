@@ -24,7 +24,7 @@ public struct SSEFrame: Equatable, Sendable {
 public struct SSEFrameBuffer {
     private var lineBuffer = ""
     private var currentEventType = ""
-    private var dataBuffer = ""
+    private var dataLines: [String] = []
 
     /// Creates a new empty frame buffer.
     public init() {}
@@ -65,7 +65,7 @@ public struct SSEFrameBuffer {
                     frames.append(frame)
                 } else {
                     currentEventType = ""
-                    dataBuffer = ""
+                    dataLines = []
                 }
                 continue
             }
@@ -73,12 +73,7 @@ public struct SSEFrameBuffer {
             if trimmedLine.hasPrefix("event: ") {
                 currentEventType = String(trimmedLine.dropFirst(7))
             } else if trimmedLine.hasPrefix("data: ") {
-                let payload = String(trimmedLine.dropFirst(6))
-                if dataBuffer.isEmpty {
-                    dataBuffer = payload
-                } else {
-                    dataBuffer += "\n" + payload
-                }
+                dataLines.append(String(trimmedLine.dropFirst(6)))
             }
         }
 
@@ -86,13 +81,13 @@ public struct SSEFrameBuffer {
     }
 
     private mutating func takePendingFrame() -> SSEFrame? {
-        guard !currentEventType.isEmpty, !dataBuffer.isEmpty else {
+        guard !currentEventType.isEmpty, !dataLines.isEmpty else {
             return nil
         }
 
-        let frame = SSEFrame(type: currentEventType, data: dataBuffer)
+        let frame = SSEFrame(type: currentEventType, data: dataLines.joined(separator: "\n"))
         currentEventType = ""
-        dataBuffer = ""
+        dataLines = []
         return frame
     }
 }

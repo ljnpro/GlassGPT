@@ -99,9 +99,14 @@ public final class AudioSessionManager: NSObject, Sendable {
         if let url = recordingURL {
             do {
                 recordedAudioData = try Data(contentsOf: url)
-                try FileManager.default.removeItem(at: url)
             } catch {
                 recordedAudioData = nil
+            }
+            do {
+                try FileManager.default.removeItem(at: url)
+            } catch {
+                // Best-effort cleanup; the temporary file will be
+                // reclaimed by the system on the next temp purge.
             }
         }
 
