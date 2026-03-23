@@ -642,6 +642,7 @@ final class GlassGPTUITests: XCTestCase {
     private func launchApp(scenario: String? = nil, resetState: Bool = false) -> XCUIApplication {
         let app = XCUIApplication()
         app.launchArguments.append("-ApplePersistenceIgnoreState")
+        app.launchArguments.append(contentsOf: ["-hasAcceptedDataSharing", "YES"])
         if let scenario {
             app.launchArguments.append("UITestScenario=\(scenario)")
         }

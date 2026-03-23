@@ -9,9 +9,13 @@ package struct GeneratedFileCacheStore {
     /// The file manager used for all filesystem operations.
     package let fileManager: FileManager
 
+    /// Optional override for the cache root directory, used for testing.
+    let cacheRootOverride: URL?
+
     /// Creates a cache store using the given file manager.
-    package init(fileManager: FileManager = .default) {
+    package init(fileManager: FileManager = .default, cacheRootOverride: URL? = nil) {
         self.fileManager = fileManager
+        self.cacheRootOverride = cacheRootOverride
     }
 
     /// Writes file data to the cache, replacing any previous entry for the same key.

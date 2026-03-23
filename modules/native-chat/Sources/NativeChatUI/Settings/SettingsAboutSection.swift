@@ -39,6 +39,20 @@ public struct SettingsAboutSection: View {
                 .accessibilityLabel(String(localized: "Open support website"))
                 .accessibilityIdentifier("settings.about.support")
             }
+
+            if let privacyURL = URL(string: "https://ljnpro.github.io/liquid-glass-chat-support/privacy") {
+                Link(destination: privacyURL) {
+                    HStack {
+                        Text(String(localized: "Privacy Policy"))
+                        Spacer()
+                        Image(systemName: "hand.raised")
+                            .foregroundStyle(.secondary)
+                            .accessibilityHidden(true)
+                    }
+                }
+                .accessibilityLabel(String(localized: "Open privacy policy"))
+                .accessibilityIdentifier("settings.about.privacy")
+            }
         } header: {
             SettingsSectionHeaderText(text: String(localized: "About"))
         }

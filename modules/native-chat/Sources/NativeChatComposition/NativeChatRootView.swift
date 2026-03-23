@@ -7,6 +7,7 @@ import SwiftUI
 public struct NativeChatRootView: View {
     @Environment(\.modelContext) private var modelContext
     @AppStorage("appTheme") private var appThemeRawValue: String = AppTheme.system.rawValue
+    @AppStorage("hasAcceptedDataSharing") private var hasAcceptedDataSharing = false
     @State private var appStore: NativeChatAppStore?
     @State private var overrideContent: AnyView?
     private let rootOverrideFactory: (any NativeChatRootOverrideFactory)?
@@ -42,5 +43,21 @@ public struct NativeChatRootView: View {
             }
         }
         .preferredColorScheme(selectedTheme.colorScheme)
+        .fullScreenCover(isPresented: showConsentBinding) {
+            DataSharingConsentView {
+                hasAcceptedDataSharing = true
+            }
+        }
+    }
+
+    private var showConsentBinding: Binding<Bool> {
+        Binding(
+            get: { !hasAcceptedDataSharing && overrideContent == nil },
+            set: { newValue in
+                if !newValue {
+                    hasAcceptedDataSharing = true
+                }
+            }
+        )
     }
 }

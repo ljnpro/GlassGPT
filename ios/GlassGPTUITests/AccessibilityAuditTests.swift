@@ -4,7 +4,7 @@ final class AccessibilityAuditTests: XCTestCase {
     @MainActor
     private func launchApp() -> XCUIApplication {
         let app = XCUIApplication()
-        app.launchArguments = ["--uitesting", "--scenario", "empty"]
+        app.launchArguments = ["--uitesting", "--scenario", "empty", "-hasAcceptedDataSharing", "YES"]
         app.launch()
         return app
     }

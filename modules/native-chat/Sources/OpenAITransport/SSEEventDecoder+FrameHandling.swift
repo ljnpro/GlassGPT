@@ -119,7 +119,13 @@ extension SSEEventDecoder {
         if shouldLogDecodeFailure(after: consecutiveDecodeFailures) {
             Self.logger.error("\(message, privacy: .public)")
         }
-        return consecutiveDecodeFailures >= Self.decodeFailureHardCeiling
+        let ceilingReached = consecutiveDecodeFailures >= Self.decodeFailureHardCeiling
+        if ceilingReached {
+            Self.logger.error(
+                "Terminating SSE stream after \(Self.decodeFailureHardCeiling) consecutive decode failures."
+            )
+        }
+        return ceilingReached
     }
 
     func shouldLogDecodeFailure(after count: Int) -> Bool {

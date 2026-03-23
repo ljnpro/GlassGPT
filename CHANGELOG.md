@@ -16,6 +16,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Release readiness now defaults to the version values in `Versions.xcconfig` instead of stale hardcoded expectations
 - Successful release packaging logs are sanitized down to a clean summary so release artifacts stay free of warning-like noise
 
+## [4.11.1] - 2026-03-23
+
+### Added
+
+- First-launch data sharing consent screen gating app access until user accepts
+- Privacy Policy link in Settings > Advanced > About
+- Boundary tests for generated file cache eviction
+- Unicode tests for file-path annotation substring extraction
+
+### Fixed
+
+- Removed unjustified `UIBackgroundModes.audio` entitlement (App Review 2.5.4)
+- Removed dead `pruneTerminalSessions()` method that was never called
+- Restored `.unbounded` AsyncStream buffering to prevent silent event loss
+- Added explicit log message when SSE decode failure ceiling is reached
+
+### Changed
+
+- Release infrastructure updated for the `codex/stable-4.11` line
+
+## [4.11.0] - 2026-03-23
+
+### Fixed
+
+- Capped AsyncStream buffer to prevent unbounded memory growth on slow consumers (reverted to `.unbounded` in 4.11.1)
+- Replaced O(n²) SSE data concatenation with array-joined approach in `SSEFrameBuffer`
+- Added 200 MB auto-eviction to generated file cache
+- Fixed TOCTOU race in cache filesystem removal
+- Added 50-failure hard ceiling to SSE decode loop
+- Fixed temp audio file leak in `AudioSessionManager`
+- Enriched streaming file-path annotations with `sandboxPath` data
+- Used full error context in persistence bootstrap logging
+- Removed incorrect `LSMinimumSystemVersion` key from iOS Info.plist
+- Removed `.macOS` platform from Package.swift (iOS-only project)
+
 ## [4.10.9] - 2026-03-23
 
 ### Fixed

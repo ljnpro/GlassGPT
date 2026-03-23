@@ -98,21 +98,4 @@ public actor RuntimeRegistryActor {
     public func activeReplyIDs() -> [AssistantReplyID] {
         Array(sessions.keys)
     }
-
-    /// Removes sessions whose lifecycle has reached a terminal state (idle, completed, or failed).
-    public func pruneTerminalSessions() async {
-        var toRemove: [AssistantReplyID] = []
-        for (replyID, session) in sessions {
-            let lifecycle = await session.snapshot().lifecycle
-            switch lifecycle {
-            case .idle, .completed, .failed:
-                toRemove.append(replyID)
-            default:
-                break
-            }
-        }
-        for replyID in toRemove {
-            sessions.removeValue(forKey: replyID)
-        }
-    }
 }

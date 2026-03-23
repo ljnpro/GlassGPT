@@ -7,11 +7,17 @@ package extension GeneratedFileCacheStore {
         for bucket: GeneratedFileCacheBucket,
         createIfNeeded: Bool
     ) -> URL? {
-        guard let cachesURL = fileManager.urls(for: .cachesDirectory, in: .userDomainMask).first else {
-            return nil
+        let baseCachesURL: URL
+        if let cacheRootOverride {
+            baseCachesURL = cacheRootOverride
+        } else {
+            guard let systemURL = fileManager.urls(for: .cachesDirectory, in: .userDomainMask).first else {
+                return nil
+            }
+            baseCachesURL = systemURL
         }
 
-        let rootURL = cachesURL.appendingPathComponent(bucket.directoryName, isDirectory: true)
+        let rootURL = baseCachesURL.appendingPathComponent(bucket.directoryName, isDirectory: true)
         if createIfNeeded {
             do {
                 try fileManager.createDirectory(at: rootURL, withIntermediateDirectories: true)

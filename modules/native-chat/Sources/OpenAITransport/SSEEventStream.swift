@@ -13,7 +13,7 @@ public final class SSEEventStream: OpenAIStreamClient {
     /// - Parameter request: The URL request to stream.
     /// - Returns: An async stream of ``StreamEvent`` values.
     public func makeStream(request: URLRequest) -> AsyncStream<StreamEvent> {
-        AsyncStream(bufferingPolicy: .bufferingNewest(256)) { continuation in
+        AsyncStream(bufferingPolicy: .unbounded) { continuation in
             let delegate = OpenAISSEDelegate(continuation: continuation)
             self.currentDelegate = delegate
 

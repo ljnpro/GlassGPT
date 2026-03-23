@@ -56,7 +56,7 @@ public extension OpenAIService {
             }
         }
 
-        return AsyncStream(bufferingPolicy: .bufferingNewest(256)) { continuation in
+        return AsyncStream(bufferingPolicy: .unbounded) { continuation in
             let task = Task { @MainActor [weak self] in
                 guard let self else {
                     continuation.finish()
