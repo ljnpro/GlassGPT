@@ -16,6 +16,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Release readiness now defaults to the version values in `Versions.xcconfig` instead of stale hardcoded expectations
 - Successful release packaging logs are sanitized down to a clean summary so release artifacts stay free of warning-like noise
 
+## [4.10.9] - 2026-03-23
+
+### Fixed
+
+- The main Settings screen now matches Advanced again by using the default bottom inset instead of overriding the scroll content margin
+
 ## [4.10.8] - 2026-03-23
 
 ### Fixed
