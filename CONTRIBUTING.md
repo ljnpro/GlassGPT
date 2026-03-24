@@ -27,11 +27,11 @@ Build and run the `GlassGPT` scheme on a simulator or device.
 | Branch                  | Purpose                        |
 |-------------------------|--------------------------------|
 | `main`                  | Latest release                 |
-| `codex/stable-4.10`     | Active stable release line     |
+| `codex/stable-4.11`     | Active stable release line     |
 | `codex/stable-4.9`      | Frozen prior stable line       |
 | `codex/feature/*`       | Feature branches               |
 
-Create feature branches from `codex/stable-4.10`. Target your pull requests
+Create feature branches from `codex/stable-4.11`. Target your pull requests
 back to that branch unless you are shipping a hotfix to `main`.
 
 ## Pre-commit Hooks
