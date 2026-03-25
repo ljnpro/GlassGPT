@@ -52,6 +52,7 @@ extension NativeChatCompositionRoot {
             cloudflareTokenStore: cloudflareTokenStore,
             configurationProvider: configurationProvider,
             requestBuilder: requestBuilder,
+            responseParser: responseParser,
             transport: transport,
             serviceFactory: serviceFactory,
             openAIService: serviceFactory(),
@@ -66,6 +67,7 @@ struct CompositionServices {
     let cloudflareTokenStore: PersistedAPIKeyStore
     let configurationProvider: DefaultOpenAIConfigurationProvider
     let requestBuilder: OpenAIRequestBuilder
+    let responseParser: OpenAIResponseParser
     let transport: OpenAIURLSessionTransport
     let serviceFactory: @MainActor () -> OpenAIService
     let openAIService: OpenAIService

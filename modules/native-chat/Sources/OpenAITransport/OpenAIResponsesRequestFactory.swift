@@ -2,6 +2,28 @@ import ChatDomain
 import Foundation
 
 public extension OpenAIRequestFactory {
+    /// Returns the default chat tool set used for Responses API requests.
+    static func defaultChatTools(vectorStoreIds: [String] = []) -> [ResponsesToolDTO] {
+        var tools: [ResponsesToolDTO] = [
+            ResponsesToolDTO(type: "web_search_preview"),
+            ResponsesToolDTO(
+                type: "code_interpreter",
+                container: .init(type: "auto")
+            )
+        ]
+
+        if !vectorStoreIds.isEmpty {
+            tools.append(
+                ResponsesToolDTO(
+                    type: "file_search",
+                    vectorStoreIDs: vectorStoreIds
+                )
+            )
+        }
+
+        return tools
+    }
+
     /// Builds a streaming chat completion request with tools enabled.
     /// - Parameters:
     ///   - apiKey: The API key for authentication.
@@ -25,22 +47,7 @@ public extension OpenAIRequestFactory {
         useDirectBaseURL: Bool = false
     ) throws(OpenAIServiceError) -> URLRequest {
         let timeoutInterval = configuration.chatRequestTimeoutInterval
-        var tools: [ResponsesToolDTO] = [
-            ResponsesToolDTO(type: "web_search_preview"),
-            ResponsesToolDTO(
-                type: "code_interpreter",
-                container: .init(type: "auto")
-            )
-        ]
-
-        if !vectorStoreIds.isEmpty {
-            tools.append(
-                ResponsesToolDTO(
-                    type: "file_search",
-                    vectorStoreIDs: vectorStoreIds
-                )
-            )
-        }
+        let tools = Self.defaultChatTools(vectorStoreIds: vectorStoreIds)
 
         let body = try JSONCoding.encode(
             ResponsesStreamRequestDTO(

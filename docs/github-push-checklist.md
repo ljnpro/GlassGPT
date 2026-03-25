@@ -8,7 +8,7 @@ must already be complete before starting the GitHub phase.
 
 ## Preconditions
 
-- current branch is the active stable branch, usually `codex/stable-4.11`
+- current branch is the active stable branch, usually local `stable-4.12` before mirroring to `codex/stable-4.12`
 - worktree is clean
 - `ios/GlassGPT/Config/Versions.xcconfig` matches the intended release
 - `.local/build` logs were reviewed manually
@@ -58,10 +58,10 @@ When promoting a new stable line to `main`:
 - if a force update is required, use `--force-with-lease`
 - verify `main`, the stable branch, and the release tag all point to the intended commit
 
-For the `4.11` rollout:
+For the `4.12` rollout:
 
-- previous `main` must remain available as `codex/stable-4.10`
-- the released `4.11.x` commit becomes both `codex/stable-4.11` and `main`
+- previous `main` must remain available as `codex/stable-4.11`
+- the released `4.12.x` commit becomes both `codex/stable-4.12` and `main`
 
 ## Post-Push Verification
 

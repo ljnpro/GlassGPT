@@ -45,6 +45,13 @@ final class AccessibilityAuditTests: XCTestCase {
     }
 
     @MainActor
+    func testAgentTabAccessibilityAudit() throws {
+        let app = launchApp()
+        app.tabBars.buttons["Agent"].tap()
+        try assertAccessibilityAudit(for: app)
+    }
+
+    @MainActor
     func testSettingsTabAccessibilityAudit() throws {
         let app = launchApp()
         app.tabBars.buttons["Settings"].tap()

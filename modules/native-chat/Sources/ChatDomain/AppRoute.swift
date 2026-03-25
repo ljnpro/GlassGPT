@@ -23,6 +23,10 @@ public enum AppRoute: Hashable, Sendable {
     case chat
     /// A specific conversation within the chat tab.
     case chatConversation(UUID)
+    /// The dedicated Agent tab.
+    case agent
+    /// A specific conversation within the Agent tab.
+    case agentConversation(UUID)
     /// The conversation history tab.
     case history
     /// The settings tab.

@@ -43,6 +43,8 @@ public final class Message {
     public var fileAttachmentsData: Data?
     /// Encoded file-path annotation payload.
     public var filePathAnnotationsData: Data?
+    /// Encoded Agent-process trace payload.
+    public var agentTraceData: Data?
 
     /// Creates a new message with the given parameters.
     public init(
@@ -63,7 +65,8 @@ public final class Message {
         annotations: [URLCitation]? = nil,
         toolCalls: [ToolCallInfo]? = nil,
         fileAttachments: [FileAttachment]? = nil,
-        filePathAnnotations: [FilePathAnnotation]? = nil
+        filePathAnnotations: [FilePathAnnotation]? = nil,
+        agentTrace: AgentTurnTrace? = nil
     ) {
         self.id = id
         roleRawValue = role.rawValue
@@ -83,6 +86,7 @@ public final class Message {
         toolCallsData = MessagePayloadStore.encodeToolCalls(toolCalls)
         fileAttachmentsData = MessagePayloadStore.encodeFileAttachments(fileAttachments)
         filePathAnnotationsData = MessagePayloadStore.encodeFilePathAnnotations(filePathAnnotations)
+        agentTraceData = Self.encodePayload(agentTrace)
     }
 
     /// Typed accessor for the message role, derived from ``roleRawValue``.
@@ -115,6 +119,12 @@ public final class Message {
         set { MessagePayloadStore.setFilePathAnnotations(newValue, on: self) }
     }
 
+    /// Decoded Agent-mode process trace, if this assistant reply came from Agent mode.
+    public var agentTrace: AgentTurnTrace? {
+        get { Self.decodePayload(AgentTurnTrace.self, from: agentTraceData) }
+        set { agentTraceData = Self.encodePayload(newValue) }
+    }
+
     /// SHA-256 hex digest of all payload blobs, used for change detection.
     public var payloadRenderDigest: String {
         MessagePayloadStore.renderDigest(for: self)
@@ -134,5 +144,31 @@ public final class Message {
         }
 
         return role
+    }
+
+    private static func decodePayload<T: Decodable>(_: T.Type, from data: Data?) -> T? {
+        guard let data else { return nil }
+        do {
+            return try JSONDecoder().decode(T.self, from: data)
+        } catch {
+            NSLog(
+                "%@",
+                "Message payload decode failed for \(String(describing: T.self)): \(error.localizedDescription)"
+            )
+            return nil
+        }
+    }
+
+    private static func encodePayload<T: Encodable>(_ value: T?) -> Data? {
+        guard let value else { return nil }
+        do {
+            return try JSONEncoder().encode(value)
+        } catch {
+            NSLog(
+                "%@",
+                "Message payload encode failed for \(String(describing: T.self)): \(error.localizedDescription)"
+            )
+            return nil
+        }
     }
 }

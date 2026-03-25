@@ -4,7 +4,7 @@ import GeneratedFilesCore
 import NativeChatUI
 import SwiftUI
 
-/// Root tab view that composes the Chat, History, and Settings tabs.
+/// Root tab view that composes the Chat, Agent, History, and Settings tabs.
 package struct ContentView: View {
     /// The shared application store driving all tab content.
     @Bindable var appStore: NativeChatAppStore
@@ -14,7 +14,7 @@ package struct ContentView: View {
         self.appStore = appStore
     }
 
-    /// The root tab layout for chat, history, settings, and UI-test preview presentation.
+    /// The root tab layout for chat, agent, history, settings, and UI-test preview presentation.
     package var body: some View {
         @Bindable var settingsDefaults = appStore.settingsPresenter.defaults
 
@@ -24,19 +24,24 @@ package struct ContentView: View {
             }
             .accessibilityIdentifier("tab.chat")
 
-            Tab(String(localized: "History"), systemImage: "clock.fill", value: 1) {
+            Tab(String(localized: "Agent"), systemImage: "person.3.fill", value: 1) {
+                AgentView(viewModel: appStore.agentController)
+            }
+            .accessibilityIdentifier("tab.agent")
+
+            Tab(String(localized: "History"), systemImage: "clock.fill", value: 2) {
                 NativeChatUI.HistoryView(store: appStore.historyPresenter)
             }
             .accessibilityIdentifier("tab.history")
 
-            Tab(String(localized: "Settings"), systemImage: "gearshape.fill", value: 2) {
+            Tab(String(localized: "Settings"), systemImage: "gearshape.fill", value: 3) {
                 NativeChatUI.SettingsView(viewModel: appStore.settingsPresenter)
             }
             .accessibilityIdentifier("tab.settings")
         }
         .environment(\.hapticsEnabled, settingsDefaults.hapticEnabled)
         .onOpenURL { url in
-            appStore.router.handleURL(url)
+            appStore.handleOpenURL(url)
         }
         .tabBarMinimizeBehavior(.never)
         .fullScreenCover(item: uiTestPreviewItemBinding, onDismiss: handleUITestPreviewDismiss) { previewItem in
@@ -59,7 +64,7 @@ package struct ContentView: View {
     private var selectedTabBinding: Binding<Int> {
         Binding(
             get: { appStore.selectedTab },
-            set: { appStore.selectedTab = $0 }
+            set: { appStore.selectTab($0) }
         )
     }
 

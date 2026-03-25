@@ -280,15 +280,20 @@ func makeHistorySnapshotContainer() throws -> ModelContainer {
     let container = try makeInMemoryModelContainer()
     let context = ModelContext(container)
     for offset in 0 ..< 4 {
+        let conversationTitle = offset == 3 ? "Agent Review" : "Conversation \(offset + 1)"
         let conversation = Conversation(
-            title: "Conversation \(offset + 1)",
+            title: conversationTitle,
             createdAt: Date(timeIntervalSince1970: Double(offset)),
             updatedAt: Date(timeIntervalSince1970: Double(10 - offset)),
+            modeRawValue: offset == 3 ? ConversationMode.agent.rawValue : nil,
             model: ModelType.gpt5_4.rawValue,
             reasoningEffort: ReasoningEffort.high.rawValue,
             backgroundModeEnabled: offset.isMultiple(of: 2),
             serviceTierRawValue: ServiceTier.standard.rawValue
         )
+        if offset == 3 {
+            conversation.mode = .agent
+        }
         let message = Message(
             role: .assistant,
             content: "Snapshot sample \(offset + 1)"
@@ -319,6 +324,13 @@ func makeHistoryScreenStore() -> HistoryPresenter {
                 preview: "Snapshot sample 2",
                 updatedAt: Date(timeIntervalSince1970: 9),
                 modelDisplayName: "GPT-5.4"
+            ),
+            HistoryConversationSummary(
+                id: UUID(),
+                title: "Agent Review",
+                preview: "Snapshot sample 3",
+                updatedAt: Date(timeIntervalSince1970: 8),
+                modelDisplayName: "Agent"
             )
         ],
         loadConversations: { [] },

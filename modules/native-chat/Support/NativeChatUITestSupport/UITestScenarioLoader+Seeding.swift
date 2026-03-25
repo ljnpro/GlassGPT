@@ -48,7 +48,8 @@ extension UITestScenarioLoader {
             conversations = [
                 makeConversation(title: "Release Planning", timeOffset: 0, backgroundModeEnabled: false),
                 makeConversation(title: "Archive Audit", timeOffset: -120, backgroundModeEnabled: true),
-                makeConversation(title: "Snapshot Review", timeOffset: -240, backgroundModeEnabled: false)
+                makeConversation(title: "Snapshot Review", timeOffset: -240, backgroundModeEnabled: false),
+                makeAgentConversation(title: "Agent Review", timeOffset: -360)
             ]
         }
 
@@ -99,6 +100,52 @@ extension UITestScenarioLoader {
         userMessage.conversation = conversation
         assistantMessage.conversation = conversation
 
+        return conversation
+    }
+
+    static func makeAgentConversation(
+        title: String,
+        timeOffset: TimeInterval
+    ) -> Conversation {
+        let createdAt = Date(timeIntervalSinceNow: timeOffset)
+        let updatedAt = Date(timeIntervalSinceNow: timeOffset)
+        let conversation = Conversation(
+            title: title,
+            createdAt: createdAt,
+            updatedAt: updatedAt,
+            modeRawValue: ConversationMode.agent.rawValue,
+            model: ModelType.gpt5_4.rawValue,
+            reasoningEffort: ReasoningEffort.high.rawValue,
+            backgroundModeEnabled: false,
+            serviceTierRawValue: ServiceTier.standard.rawValue,
+            agentStateData: nil
+        )
+        conversation.mode = .agent
+
+        let userMessage = Message(
+            role: .user,
+            content: "What is the safest rollout plan?"
+        )
+        let assistantMessage = Message(
+            role: .assistant,
+            content: "Use an additive rollout with rollback gates and parity checks.",
+            agentTrace: AgentTurnTrace(
+                leaderBriefSummary: "Prefer the lowest-risk rollout path.",
+                workerSummaries: [
+                    AgentWorkerSummary(
+                        role: .workerA,
+                        summary: "Ship additively and gate by parity.",
+                        adoptedPoints: ["Keep rollback explicit."]
+                    )
+                ],
+                completedStage: .finalSynthesis,
+                outcome: "Completed"
+            )
+        )
+
+        conversation.messages = [userMessage, assistantMessage]
+        userMessage.conversation = conversation
+        assistantMessage.conversation = conversation
         return conversation
     }
 

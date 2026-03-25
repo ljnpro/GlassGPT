@@ -144,7 +144,7 @@ extension ScreenStoreTests {
         try modelContext.save()
         appStore.historyPresenter.refresh()
 
-        appStore.selectedTab = 1
+        appStore.selectedTab = 2
         appStore.historyPresenter.selectConversation(id: conversation.id)
 
         #expect(appStore.selectedTab == 0)
@@ -165,6 +165,41 @@ extension ScreenStoreTests {
         #expect(appStore.chatController.currentConversation == nil)
         #expect(appStore.chatController.messages.isEmpty)
         #expect(appStore.historyPresenter.conversations.isEmpty)
+    }
+
+    @Test func `history presenter routes agent conversations into agent tab`() throws {
+        let container = try makeInMemoryModelContainer()
+        let modelContext = ModelContext(container)
+        let appStore = NativeChatCompositionRoot(
+            modelContext: modelContext,
+            bootstrapPolicy: .testing
+        ).makeAppStore()
+        let conversation = Conversation(title: "Agent Conversation")
+        conversation.mode = .agent
+        let userMessage = Message(
+            role: .user,
+            content: "Review the migration plan.",
+            conversation: conversation
+        )
+        let assistantMessage = Message(
+            role: .assistant,
+            content: "I'll synthesize the council result.",
+            conversation: conversation
+        )
+        conversation.messages.append(userMessage)
+        conversation.messages.append(assistantMessage)
+        modelContext.insert(conversation)
+        modelContext.insert(userMessage)
+        modelContext.insert(assistantMessage)
+        try modelContext.save()
+        appStore.historyPresenter.refresh()
+
+        appStore.selectedTab = 2
+        appStore.historyPresenter.selectConversation(id: conversation.id)
+
+        #expect(appStore.selectedTab == 1)
+        #expect(appStore.agentController.currentConversation?.id == conversation.id)
+        #expect(appStore.agentController.messages.map(\.id) == [userMessage.id, assistantMessage.id])
     }
 
     @Test func `app store dismisses UI test preview state`() throws {

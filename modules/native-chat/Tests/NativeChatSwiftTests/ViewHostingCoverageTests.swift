@@ -80,6 +80,24 @@ struct ViewHostingCoverageTests {
         }
     }
 
+    @Test func `agent snapshot matches phone light reference`() throws {
+        let store = try makeSnapshotAgentScreenStore(hasAPIKey: true)
+        let conversation = makeCompletedAgentConversationSamples(in: store)
+        let expandedMessageIDs = Set(conversation.messages.map(\.id))
+
+        assertHostedSnapshot(
+            named: "agent-phone-light",
+            testName: "testAgentCoverageSnapshot",
+            size: snapshotVariant.canvasSize,
+            delay: 0.15
+        ) {
+            AgentView(
+                viewModel: store,
+                initialExpandedTraceMessageIDs: expandedMessageIDs
+            )
+        }
+    }
+
     @Test func `file preview snapshots cover image and PDF payloads`() throws {
         let imageURL = try makeSnapshotImageFile()
         assertHostedSnapshot(

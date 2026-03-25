@@ -33,9 +33,9 @@ final class UITestScenarioLoaderTests: XCTestCase {
     }
 
     func testScenarioMetadataCapturesTabsAndLiveKeychainUsage() {
-        XCTAssertEqual(UITestScenario.history.initialTab, 1)
-        XCTAssertEqual(UITestScenario.settings.initialTab, 2)
-        XCTAssertEqual(UITestScenario.reinstallVerify.initialTab, 2)
+        XCTAssertEqual(UITestScenario.history.initialTab, 2)
+        XCTAssertEqual(UITestScenario.settings.initialTab, 3)
+        XCTAssertEqual(UITestScenario.reinstallVerify.initialTab, 3)
         XCTAssertTrue(UITestScenario.reinstallSeed.usesLiveKeychain)
         XCTAssertTrue(UITestScenario.freshInstall.usesLiveKeychain)
         XCTAssertFalse(UITestScenario.streaming.usesLiveKeychain)
@@ -86,11 +86,12 @@ final class UITestScenarioLoaderTests: XCTestCase {
         let seededConversations = try context.fetch(FetchDescriptor<Conversation>())
         let titles = seededConversations.map(\.title)
 
-        XCTAssertEqual(bootstrap.initialTab, 1)
-        XCTAssertEqual(seededConversations.count, 3)
+        XCTAssertEqual(bootstrap.initialTab, 2)
+        XCTAssertEqual(seededConversations.count, 4)
         XCTAssertTrue(titles.contains("Release Planning"))
         XCTAssertTrue(titles.contains("Archive Audit"))
         XCTAssertTrue(titles.contains("Snapshot Review"))
+        XCTAssertTrue(titles.contains("Agent Review"))
     }
 
     func testMakeBootstrapForSettingsGatewayEnablesGatewayAndLeavesConversationListEmpty() throws {
@@ -100,7 +101,7 @@ final class UITestScenarioLoaderTests: XCTestCase {
         let bootstrap = UITestScenarioLoader.makeBootstrap(for: .settingsGateway, modelContext: context)
         let seededConversations = try context.fetch(FetchDescriptor<Conversation>())
 
-        XCTAssertEqual(bootstrap.initialTab, 2)
+        XCTAssertEqual(bootstrap.initialTab, 3)
         XCTAssertTrue(bootstrap.settingsPresenter.defaults.cloudflareEnabled)
         XCTAssertTrue(bootstrap.settingsPresenter.credentials.apiKey.isEmpty)
         XCTAssertTrue(seededConversations.isEmpty)

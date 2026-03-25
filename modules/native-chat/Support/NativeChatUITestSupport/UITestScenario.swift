@@ -18,9 +18,9 @@ package enum UITestScenario: String {
     package var initialTab: Int {
         switch self {
         case .history:
-            1
-        case .settings, .settingsGateway, .reinstallSeed, .reinstallVerify:
             2
+        case .settings, .settingsGateway, .reinstallSeed, .reinstallVerify:
+            3
         default:
             0
         }
@@ -38,6 +38,7 @@ package enum UITestScenario: String {
 
 package struct UITestBootstrap {
     package let chatController: ChatController
+    package let agentController: AgentController
     package let settingsPresenter: SettingsPresenter
     package let initialTab: Int
     package let scenario: UITestScenario

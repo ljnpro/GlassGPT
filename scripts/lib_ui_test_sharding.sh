@@ -1,5 +1,7 @@
 UI_TEST_CASES=(
   testTabsAndPrimaryScreensRemainReachable
+  testHistoryScenarioCanOpenAgentConversation
+  testAgentNewConversationClearsLoadedHistoryThread
   testHistoryScenarioCanOpenConversationAndDeleteAll
   testHistoryScenarioOpeningConversationShowsSeededMessages
   testHistoryScenarioCanDeleteSingleConversationWithoutDeletingOthers
@@ -27,6 +29,7 @@ UI_TEST_CASES=(
   testReplySplitScenarioKeepsOneAssistantSurface
   AccessibilityAuditTests/testChatTabAccessibilityAudit
   AccessibilityAuditTests/testHistoryTabAccessibilityAudit
+  AccessibilityAuditTests/testAgentTabAccessibilityAudit
   AccessibilityAuditTests/testSettingsTabAccessibilityAudit
 )
 

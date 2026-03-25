@@ -32,6 +32,9 @@ final class GlassGPTUITests: XCTestCase {
         XCTAssertTrue(app.tabBars.buttons["Chat"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.buttons["chat.newChat"].exists)
 
+        app.tabBars.buttons["Agent"].tap()
+        XCTAssertTrue(app.buttons["agent.newConversation"].waitForExistence(timeout: 5))
+
         app.tabBars.buttons["History"].tap()
         XCTAssertTrue(app.navigationBars["History"].waitForExistence(timeout: 5))
 
@@ -41,6 +44,43 @@ final class GlassGPTUITests: XCTestCase {
 
         app.tabBars.buttons["Chat"].tap()
         XCTAssertTrue(app.buttons["chat.newChat"].waitForExistence(timeout: 5))
+    }
+
+    @MainActor
+    func testHistoryScenarioCanOpenAgentConversation() {
+        let app = launchApp(scenario: "history")
+        openHistory(in: app)
+
+        let agentRow = app.buttons["history.row.Agent Review"]
+        XCTAssertTrue(agentRow.waitForExistence(timeout: 5))
+        agentRow.tap()
+
+        XCTAssertTrue(app.buttons["agent.newConversation"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Agent Council"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["What is the safest rollout plan?"].waitForExistence(timeout: 5))
+        XCTAssertTrue(
+            app.staticTexts["Use an additive rollout with rollback gates and parity checks."].waitForExistence(timeout: 5)
+        )
+    }
+
+    @MainActor
+    func testAgentNewConversationClearsLoadedHistoryThread() {
+        let app = launchApp(scenario: "history")
+        openHistory(in: app)
+
+        let agentRow = app.buttons["history.row.Agent Review"]
+        XCTAssertTrue(agentRow.waitForExistence(timeout: 5))
+        agentRow.tap()
+
+        let priorUserMessage = app.staticTexts["What is the safest rollout plan?"]
+        XCTAssertTrue(priorUserMessage.waitForExistence(timeout: 5))
+
+        let newAgentButton = app.buttons["agent.newConversation"]
+        XCTAssertTrue(newAgentButton.waitForExistence(timeout: 5))
+        newAgentButton.tap()
+
+        XCTAssertTrue(app.staticTexts["Ask the Agent Council"].waitForExistence(timeout: 5))
+        XCTAssertTrue(waitForNonExistence(of: priorUserMessage, timeout: 5))
     }
 
     @MainActor
@@ -316,6 +356,9 @@ final class GlassGPTUITests: XCTestCase {
 
         app.tabBars.buttons["History"].tap()
         XCTAssertTrue(app.navigationBars["History"].waitForExistence(timeout: 5))
+
+        app.tabBars.buttons["Agent"].tap()
+        XCTAssertTrue(app.buttons["agent.newConversation"].waitForExistence(timeout: 5))
 
         app.tabBars.buttons["Settings"].tap()
         let apiKeyField = app.secureTextFields["settings.apiKey"]

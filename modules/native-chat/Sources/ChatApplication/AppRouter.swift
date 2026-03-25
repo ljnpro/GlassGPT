@@ -19,6 +19,9 @@ public final class AppRouter: Sendable {
     /// An optional conversation identifier to navigate to when the chat tab is shown.
     public var pendingConversationID: UUID?
 
+    /// An optional conversation identifier to navigate to when the Agent tab is shown.
+    public var pendingAgentConversationID: UUID?
+
     /// An optional settings section to scroll to when the settings tab is shown.
     public var pendingSettingsSection: SettingsSection?
 
@@ -31,16 +34,32 @@ public final class AppRouter: Sendable {
         switch route {
         case .chat:
             pendingConversationID = nil
+            pendingAgentConversationID = nil
             currentRoute = .chat
         case let .chatConversation(id):
             pendingConversationID = id
+            pendingAgentConversationID = nil
             currentRoute = .chat
+        case .agent:
+            pendingConversationID = nil
+            pendingAgentConversationID = nil
+            currentRoute = .agent
+        case let .agentConversation(id):
+            pendingConversationID = nil
+            pendingAgentConversationID = id
+            currentRoute = .agent
         case .history:
+            pendingConversationID = nil
+            pendingAgentConversationID = nil
             currentRoute = .history
         case .settings:
+            pendingConversationID = nil
+            pendingAgentConversationID = nil
             pendingSettingsSection = nil
             currentRoute = .settings
         case let .settingsSection(section):
+            pendingConversationID = nil
+            pendingAgentConversationID = nil
             pendingSettingsSection = section
             currentRoute = .settings
         }
@@ -64,6 +83,14 @@ public final class AppRouter: Sendable {
                 navigate(to: .chatConversation(id))
             } else {
                 navigate(to: .chat)
+            }
+            return true
+
+        case "agent":
+            if let idString = pathComponents.first, let id = UUID(uuidString: idString) {
+                navigate(to: .agentConversation(id))
+            } else {
+                navigate(to: .agent)
             }
             return true
 
@@ -94,6 +121,10 @@ public final class AppRouter: Sendable {
             URL(string: "\(urlScheme)://chat")
         case let .chatConversation(id):
             URL(string: "\(urlScheme)://chat/\(id.uuidString)")
+        case .agent:
+            URL(string: "\(urlScheme)://agent")
+        case let .agentConversation(id):
+            URL(string: "\(urlScheme)://agent/\(id.uuidString)")
         case .history:
             URL(string: "\(urlScheme)://history")
         case .settings:
@@ -109,17 +140,20 @@ public final class AppRouter: Sendable {
             switch currentRoute {
             case .chat, .chatConversation:
                 0
-            case .history:
+            case .agent, .agentConversation:
                 1
-            case .settings, .settingsSection:
+            case .history:
                 2
+            case .settings, .settingsSection:
+                3
             }
         }
         set {
             switch newValue {
             case 0: navigate(to: .chat)
-            case 1: navigate(to: .history)
-            case 2: navigate(to: .settings)
+            case 1: navigate(to: .agent)
+            case 2: navigate(to: .history)
+            case 3: navigate(to: .settings)
             default: break
             }
         }

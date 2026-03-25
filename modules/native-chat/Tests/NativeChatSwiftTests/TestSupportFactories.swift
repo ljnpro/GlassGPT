@@ -67,6 +67,52 @@ func makeTestChatScreenStore(
 }
 
 @MainActor
+func makeTestAgentController(
+    apiKey: String = "sk-test",
+    configurationProvider: RuntimeTestOpenAIConfigurationProvider
+        = RuntimeTestOpenAIConfigurationProvider(),
+    transport: OpenAIDataTransport = StubOpenAITransport(),
+    streamClient: OpenAIStreamClient,
+    hapticsEnabled: Bool = true
+) throws -> AgentController {
+    let container = try makeInMemoryModelContainer()
+    let context = ModelContext(container)
+    let settingsValueStore = makeDefaultSettingsValueStore(
+        cloudflareEnabled: configurationProvider.useCloudflareGateway
+    )
+    settingsValueStore.set(
+        hapticsEnabled,
+        forKey: SettingsStore.Keys.hapticEnabled
+    )
+
+    let apiBackend = InMemoryAPIKeyBackend()
+    apiBackend.storedKey = apiKey
+
+    let settingsStore = SettingsStore(valueStore: settingsValueStore)
+    let apiKeyStore = PersistedAPIKeyStore(backend: apiBackend)
+    let requestBuilder = OpenAIRequestBuilder(
+        configuration: configurationProvider
+    )
+    let responseParser = OpenAIResponseParser()
+    let sharedService = OpenAIService(
+        requestBuilder: requestBuilder,
+        responseParser: responseParser,
+        streamClient: streamClient,
+        transport: transport
+    )
+
+    return AgentController(
+        modelContext: context,
+        settingsStore: settingsStore,
+        apiKeyStore: apiKeyStore,
+        requestBuilder: requestBuilder,
+        responseParser: responseParser,
+        transport: transport,
+        serviceFactory: { sharedService }
+    )
+}
+
+@MainActor
 func makeTestSettingsScreenStore(
     apiKey: String? = nil,
     configurationProvider: RuntimeTestOpenAIConfigurationProvider

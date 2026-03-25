@@ -8,13 +8,32 @@ package enum NativeChatHistoryPresenterFactory {
     package static func makePresenter(
         modelContext: ModelContext,
         chatController: ChatController,
-        showChatTab: @escaping @MainActor () -> Void
+        agentController: AgentController,
+        showChatTab: @escaping @MainActor () -> Void,
+        showAgentTab: @escaping @MainActor () -> Void
     ) -> HistoryPresenter {
         NativeChatHistoryCoordinator(
             modelContext: modelContext,
-            state: chatController,
-            conversations: chatController.conversationCoordinator,
-            showChatTab: showChatTab
+            loadChatConversation: { conversation in
+                chatController.conversationCoordinator.loadConversation(conversation)
+            },
+            loadAgentConversation: { conversation in
+                agentController.loadConversation(conversation)
+            },
+            handleDeletedConversationSelection: { deletedConversationID in
+                if chatController.currentConversation?.id == deletedConversationID {
+                    chatController.conversationCoordinator.startNewChat()
+                }
+                if agentController.currentConversation?.id == deletedConversationID {
+                    agentController.startNewConversation()
+                }
+            },
+            resetVisibleSelections: {
+                chatController.conversationCoordinator.startNewChat()
+                agentController.startNewConversation()
+            },
+            showChatTab: showChatTab,
+            showAgentTab: showAgentTab
         )
         .makePresenter()
     }

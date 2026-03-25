@@ -22,6 +22,7 @@ public struct NativeChatUITestRootOverrideFactory: NativeChatRootOverrideFactory
 
         let store = NativeChatAppStore(
             chatController: bootstrap.chatController,
+            agentController: bootstrap.agentController,
             settingsPresenter: bootstrap.settingsPresenter,
             historyPresenter: HistoryPresenter(
                 loadConversations: { [] },
@@ -36,12 +37,14 @@ public struct NativeChatUITestRootOverrideFactory: NativeChatRootOverrideFactory
         store.historyPresenter = NativeChatHistoryPresenterFactory.makePresenter(
             modelContext: resolvedModelContext,
             chatController: bootstrap.chatController,
-            showChatTab: { store.selectedTab = 0 }
+            agentController: bootstrap.agentController,
+            showChatTab: { store.selectTab(0) },
+            showAgentTab: { store.selectTab(1) }
         )
         let initialTab = bootstrap.initialTab
         Task { @MainActor in
             await Task.yield()
-            store.selectedTab = initialTab
+            store.selectTab(initialTab)
         }
         return AnyView(ContentView(appStore: store))
     }

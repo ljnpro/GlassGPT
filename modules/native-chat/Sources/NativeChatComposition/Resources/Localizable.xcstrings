@@ -114,6 +114,118 @@
         }
       }
     },
+    "Adopted Points": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Adopted Points"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "采纳要点"
+          }
+        }
+      }
+    },
+    "Agent": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Agent"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Agent"
+          }
+        }
+      }
+    },
+    "Agent Council": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Agent Council"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Agent Council"
+          }
+        }
+      }
+    },
+    "Agent Process": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Agent Process"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Agent 过程"
+          }
+        }
+      }
+    },
+    "Agent Run": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Agent Run"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Agent 运行"
+          }
+        }
+      }
+    },
+    "Ask the Agent Council": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ask the Agent Council"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "向 Agent Council 提问"
+          }
+        }
+      }
+    },
+    "Ask the council": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ask the council"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "向 council 提问"
+          }
+        }
+      }
+    },
     "An unknown error occurred.": {
       "localizations": {
         "en": {
@@ -1506,6 +1618,38 @@
         }
       }
     },
+    "Leader Brief": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Leader Brief"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Leader 简报"
+          }
+        }
+      }
+    },
+    "Leader High · 3 Workers Low": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Leader High · 3 Workers Low"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Leader 高 · 3 个 Worker 低"
+          }
+        }
+      }
+    },
     "Local storage could not be initialized.": {
       "localizations": {
         "en": {
@@ -2402,6 +2546,22 @@
         }
       }
     },
+    "Send Agent message": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Send Agent message"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "发送 Agent 消息"
+          }
+        }
+      }
+    },
     "Send message": {
       "localizations": {
         "en": {
@@ -2546,6 +2706,22 @@
         }
       }
     },
+    "Start new Agent conversation": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Start new Agent conversation"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "开始新的 Agent 对话"
+          }
+        }
+      }
+    },
     "Start new chat": {
       "localizations": {
         "en": {
@@ -2574,6 +2750,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "停止生成"
+          }
+        }
+      }
+    },
+    "Stop Agent run": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stop Agent run"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "停止 Agent 运行"
           }
         }
       }

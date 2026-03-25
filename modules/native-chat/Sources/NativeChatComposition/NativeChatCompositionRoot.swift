@@ -47,6 +47,15 @@ package struct NativeChatCompositionRoot {
             serviceFactory: services.serviceFactory,
             bootstrapPolicy: bootstrapPolicy
         )
+        let agentController = AgentController(
+            modelContext: modelContext,
+            settingsStore: settingsStore,
+            apiKeyStore: services.apiKeyStore,
+            requestBuilder: services.requestBuilder,
+            responseParser: services.responseParser,
+            transport: services.transport,
+            serviceFactory: services.serviceFactory
+        )
         let settingsPresenter = makeSettingsPresenter(
             settingsStore: settingsStore,
             apiKeyStore: services.apiKeyStore,
@@ -60,6 +69,7 @@ package struct NativeChatCompositionRoot {
         )
         let store = NativeChatAppStore(
             chatController: chatController,
+            agentController: agentController,
             settingsPresenter: settingsPresenter,
             historyPresenter: HistoryPresenter(
                 loadConversations: { [] },
@@ -71,7 +81,9 @@ package struct NativeChatCompositionRoot {
         store.historyPresenter = NativeChatHistoryPresenterFactory.makePresenter(
             modelContext: modelContext,
             chatController: chatController,
-            showChatTab: { store.selectedTab = 0 }
+            agentController: agentController,
+            showChatTab: { store.selectTab(0) },
+            showAgentTab: { store.selectTab(1) }
         )
 
         #if DEBUG

@@ -61,20 +61,35 @@ package enum UITestScenarioLoader {
         let transport = OpenAIURLSessionTransport(
             session: OpenAITransportSessionFactory.makeRequestSession()
         )
+        let requestBuilder = OpenAIRequestBuilder(configuration: configurationProvider)
+        let responseParser = OpenAIResponseParser()
+        let serviceFactory: @MainActor () -> OpenAIService = {
+            OpenAIService(
+                requestBuilder: requestBuilder,
+                responseParser: responseParser,
+                streamClient: SSEEventStream(),
+                transport: transport
+            )
+        }
         let chatController = ChatController(
             modelContext: modelContext,
             settingsStore: settingsStore,
             apiKeyStore: apiKeyStore,
             configurationProvider: configurationProvider,
             transport: transport,
+            serviceFactory: serviceFactory,
             bootstrapPolicy: .testing
         )
-        let requestBuilder = OpenAIRequestBuilder(configuration: configurationProvider)
-        let openAIService = OpenAIService(
+        let agentController = AgentController(
+            modelContext: modelContext,
+            settingsStore: settingsStore,
+            apiKeyStore: apiKeyStore,
             requestBuilder: requestBuilder,
-            streamClient: SSEEventStream(),
-            transport: transport
+            responseParser: responseParser,
+            transport: transport,
+            serviceFactory: serviceFactory
         )
+        let openAIService = serviceFactory()
         let settingsPresenter = makeSettingsPresenter(
             settingsStore: settingsStore,
             apiKeyStore: apiKeyStore,
@@ -120,6 +135,7 @@ package enum UITestScenarioLoader {
 
         return UITestBootstrap(
             chatController: chatController,
+            agentController: agentController,
             settingsPresenter: settingsPresenter,
             initialTab: scenario.initialTab,
             scenario: scenario,

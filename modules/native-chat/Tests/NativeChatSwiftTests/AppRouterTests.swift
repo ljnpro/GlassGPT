@@ -32,6 +32,23 @@ struct AppRouterTests {
         #expect(router.currentRoute == .history)
     }
 
+    @Test func `handle agent URL`() throws {
+        let router = AppRouter()
+        let handled = try router.handleURL(#require(URL(string: "glassgpt://agent")))
+        #expect(handled == true)
+        #expect(router.currentRoute == .agent)
+        #expect(router.pendingAgentConversationID == nil)
+    }
+
+    @Test func `handle agent conversation URL`() throws {
+        let router = AppRouter()
+        let id = UUID()
+        let handled = try router.handleURL(#require(URL(string: "glassgpt://agent/\(id.uuidString)")))
+        #expect(handled == true)
+        #expect(router.currentRoute == .agent)
+        #expect(router.pendingAgentConversationID == id)
+    }
+
     @Test func `handle settings URL`() throws {
         let router = AppRouter()
         let handled = try router.handleURL(#require(URL(string: "glassgpt://settings")))
@@ -76,6 +93,14 @@ struct AppRouterTests {
         #expect(router.pendingSettingsSection == nil)
     }
 
+    @Test func `handle invalid agent conversation ID falls back to agent`() throws {
+        let router = AppRouter()
+        let handled = try router.handleURL(#require(URL(string: "glassgpt://agent/not-a-uuid")))
+        #expect(handled == true)
+        #expect(router.currentRoute == .agent)
+        #expect(router.pendingAgentConversationID == nil)
+    }
+
     // MARK: - URL Construction Round-Trip
 
     @Test func `url round trip for chat`() {
@@ -92,6 +117,17 @@ struct AppRouterTests {
     @Test func `url round trip for history`() {
         let url = AppRouter.url(for: .history)
         #expect(url?.absoluteString == "glassgpt://history")
+    }
+
+    @Test func `url round trip for agent`() {
+        let url = AppRouter.url(for: .agent)
+        #expect(url?.absoluteString == "glassgpt://agent")
+    }
+
+    @Test func `url round trip for agent conversation`() {
+        let id = UUID()
+        let url = AppRouter.url(for: .agentConversation(id))
+        #expect(url?.absoluteString == "glassgpt://agent/\(id.uuidString)")
     }
 
     @Test func `url round trip for settings`() {
@@ -120,6 +156,13 @@ struct AppRouterTests {
         #expect(router.pendingSettingsSection == nil)
     }
 
+    @Test func `navigate to agent clears pending agent conversation`() {
+        let router = AppRouter()
+        router.navigate(to: .agentConversation(UUID()))
+        router.navigate(to: .agent)
+        #expect(router.pendingAgentConversationID == nil)
+    }
+
     // MARK: - Tab Index Compatibility
 
     @Test func `tab index for chat`() {
@@ -131,18 +174,26 @@ struct AppRouterTests {
     @Test func `tab index for history`() {
         let router = AppRouter()
         router.navigate(to: .history)
+        #expect(router.selectedTabIndex == 2)
+    }
+
+    @Test func `tab index for agent`() {
+        let router = AppRouter()
+        router.navigate(to: .agent)
         #expect(router.selectedTabIndex == 1)
     }
 
     @Test func `tab index for settings`() {
         let router = AppRouter()
         router.navigate(to: .settings)
-        #expect(router.selectedTabIndex == 2)
+        #expect(router.selectedTabIndex == 3)
     }
 
     @Test func `set tab index navigates`() {
         let router = AppRouter()
         router.selectedTabIndex = 1
+        #expect(router.currentRoute == .agent)
+        router.selectedTabIndex = 2
         #expect(router.currentRoute == .history)
         router.selectedTabIndex = 0
         #expect(router.currentRoute == .chat)
