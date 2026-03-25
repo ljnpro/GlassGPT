@@ -3,57 +3,6 @@ import ChatUIComponents
 import SwiftUI
 import UIKit
 
-/// Compact capsule badge displaying the current model name and reasoning effort, tappable to open the model selector.
-package struct ModelBadge: View {
-    /// The currently selected model.
-    let model: ModelType
-    /// The currently selected reasoning effort level.
-    let effort: ReasoningEffort
-    /// Callback invoked when the badge is tapped.
-    let onTap: () -> Void
-
-    /// Creates a model badge for the given model and effort.
-    package init(model: ModelType, effort: ReasoningEffort, onTap: @escaping () -> Void) {
-        self.model = model
-        self.effort = effort
-        self.onTap = onTap
-    }
-
-    /// The badge surface showing the current model and reasoning effort.
-    package var body: some View {
-        Button(action: onTap) {
-            HStack(spacing: 4) {
-                Text(badgeText)
-                    .font(.subheadline.weight(.semibold))
-                    .lineLimit(1)
-
-                Image(systemName: "chevron.down")
-                    .font(.caption2)
-            }
-            .foregroundStyle(.primary)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 6)
-            .fixedSize(horizontal: true, vertical: false)
-            .singleFrameGlassCapsuleControl(
-                tintOpacity: GlassStyleMetrics.CapsuleControl.tintOpacity,
-                borderWidth: GlassStyleMetrics.CapsuleControl.borderWidth,
-                darkBorderOpacity: GlassStyleMetrics.CapsuleControl.darkBorderOpacity,
-                lightBorderOpacity: GlassStyleMetrics.CapsuleControl.lightBorderOpacity
-            )
-        }
-        .buttonStyle(GlassPressButtonStyle())
-        .accessibilityLabel(String(localized: "Model") + ": \(badgeText). " + String(localized: "Tap to change"))
-        .accessibilityIdentifier("chat.modelBadge")
-    }
-
-    private var badgeText: String {
-        if effort == .none {
-            return model.displayName
-        }
-        return "\(model.displayName) \(effort.displayName)"
-    }
-}
-
 /// Header row showing the reasoning control title and the currently selected effort.
 package struct ModelSelectorReasoningHeader: View {
     /// The currently selected reasoning effort shown in the header.
