@@ -98,6 +98,25 @@ struct MarkdownContentViewParsingTests {
         )
     }
 
+    @Test func `parse blocks extracts pipe tables with alignment`() throws {
+        let input = """
+        | Name | Score | Notes |
+        | :--- | ---: | :---: |
+        | Alpha | 10 | **Ready** |
+        | Beta | 8 | `Hold` |
+        """
+
+        let parts = makeView().parseBlocks(input)
+
+        #expect(parts.count == 1)
+        let table = try #require(tablePart(parts[0]))
+        #expect(table.alignments.count == 3)
+        #expect(table.alignments[0] == .leading)
+        #expect(table.alignments[1] == .trailing)
+        #expect(table.alignments[2] == .center)
+        #expect(table.rows.count == 2)
+    }
+
     private func makeView() -> MarkdownContentView {
         MarkdownContentView(text: "")
     }
@@ -149,5 +168,12 @@ struct MarkdownContentViewParsingTests {
             return nil
         }
         return content
+    }
+
+    private func tablePart(_ part: BlockPart) -> MarkdownTable? {
+        guard case let .table(_, table) = part else {
+            return nil
+        }
+        return table
     }
 }

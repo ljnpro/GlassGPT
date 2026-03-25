@@ -20,9 +20,10 @@ extension AgentRunCoordinator {
         draft.toolCalls = execution.snapshot.activeToolCalls
         draft.annotations = execution.snapshot.liveCitations
         draft.filePathAnnotations = execution.snapshot.liveFilePathAnnotations
+        let synthesisContext = finalSynthesisContext(from: execution.snapshot.processSnapshot)
         draft.agentTrace = AgentTurnTrace(
             leaderBriefSummary: execution.snapshot.leaderBriefSummary ?? execution.snapshot.processSnapshot.currentFocus,
-            workerSummaries: completedWorkerSummaries(from: execution.snapshot.processSnapshot),
+            workerSummaries: synthesisContext.workerSummaries,
             processSnapshot: execution.snapshot.processSnapshot,
             completedStage: .finalSynthesis,
             outcome: outcome
@@ -216,16 +217,7 @@ extension AgentRunCoordinator {
     }
 
     func completedWorkerSummaries(from snapshot: AgentProcessSnapshot) -> [AgentWorkerSummary] {
-        snapshot.tasks
-            .filter { $0.status == .completed }
-            .compactMap { task in
-                guard let role = task.owner.role else { return nil }
-                return AgentWorkerSummary(
-                    role: role,
-                    summary: task.result?.summary ?? task.resultSummary ?? task.title,
-                    adoptedPoints: task.result?.evidence.prefix(2).map(\.self) ?? []
-                )
-            }
+        AgentSummaryFormatter.workerSummaries(from: snapshot)
     }
 
     func syncVisibleStateIfNeeded(_ execution: AgentExecutionState, in conversation: Conversation) {

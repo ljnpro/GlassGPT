@@ -14,7 +14,7 @@ extension ChatRecoveryMaintenanceCoordinator {
 
         let fetchedMessages: [Message]
         do {
-            fetchedMessages = try services.draftRepository.fetchRecoverableDrafts()
+            fetchedMessages = try services.draftRepository.fetchRecoverableDrafts(mode: .chat)
         } catch {
             Loggers.recovery.error("[Recovery] Failed to fetch recoverable drafts: \(error.localizedDescription)")
             return
@@ -42,7 +42,7 @@ extension ChatRecoveryMaintenanceCoordinator {
         let staleMessages: [Message]
 
         do {
-            staleMessages = try services.draftRepository.fetchIncompleteDrafts()
+            staleMessages = try services.draftRepository.fetchIncompleteDrafts(mode: .chat)
         } catch {
             Loggers.recovery.error("[Recovery] Failed to fetch stale drafts: \(error.localizedDescription)")
             return
@@ -79,7 +79,7 @@ extension ChatRecoveryMaintenanceCoordinator {
 
         let orphanedDrafts: [Message]
         do {
-            orphanedDrafts = try services.draftRepository.fetchOrphanedDrafts()
+            orphanedDrafts = try services.draftRepository.fetchOrphanedDrafts(mode: .chat)
         } catch {
             Loggers.recovery.error("[Recovery] Failed to fetch orphaned drafts: \(error.localizedDescription)")
             return
@@ -126,6 +126,10 @@ extension ChatRecoveryMaintenanceCoordinator {
         guard let conversation = draft.conversation else {
             services.conversationRepository.delete(draft)
             conversations.saveContextIfPossible("resendOrphanedDrafts.deleteDetachedDraft")
+            return nil
+        }
+
+        guard conversation.mode == .chat else {
             return nil
         }
 

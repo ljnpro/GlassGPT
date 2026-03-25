@@ -58,11 +58,26 @@ public final class ConversationRepository {
 
     /// Returns the most recently updated conversation that has at least one message.
     public func fetchMostRecentConversationWithMessages() throws(PersistenceError) -> Conversation? {
+        try fetchMostRecentConversationWithMessages(mode: nil)
+    }
+
+    /// Returns the most recently updated conversation with at least one message for the requested mode.
+    public func fetchMostRecentConversationWithMessages(
+        mode: ConversationMode?
+    ) throws(PersistenceError) -> Conversation? {
         do {
             let descriptor = FetchDescriptor<Conversation>(
                 sortBy: [SortDescriptor(\.updatedAt, order: .reverse)]
             )
-            return try modelContext.fetch(descriptor).first(where: { !$0.messages.isEmpty })
+            return try modelContext.fetch(descriptor).first(where: { conversation in
+                guard !conversation.messages.isEmpty else {
+                    return false
+                }
+                guard let mode else {
+                    return true
+                }
+                return conversation.mode == mode
+            })
         } catch {
             throw .migrationFailure(underlying: error)
         }

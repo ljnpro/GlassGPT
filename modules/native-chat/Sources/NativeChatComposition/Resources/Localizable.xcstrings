@@ -3380,6 +3380,22 @@
         }
       }
     },
+    "Agent Mode": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Agent Mode"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Agent 模式"
+          }
+        }
+      }
+    },
     "Agent Settings": {
       "localizations": {
         "en": {
@@ -3492,6 +3508,22 @@
         }
       }
     },
+    "Delegated Tasks": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Delegated Tasks"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "委派任务"
+          }
+        }
+      }
+    },
     "Done": {
       "localizations": {
         "en": {
@@ -3508,6 +3540,22 @@
         }
       }
     },
+    "Evidence": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Evidence"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "依据"
+          }
+        }
+      }
+    },
     "Keeps Agent runs recoverable across longer interruptions.": {
       "localizations": {
         "en": {
@@ -3520,6 +3568,38 @@
           "stringUnit": {
             "state": "translated",
             "value": "在较长时间中断后仍可恢复 Agent 运行。"
+          }
+        }
+      }
+    },
+    "Leader Decisions": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Leader Decisions"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Leader 决策"
+          }
+        }
+      }
+    },
+    "Leader Focus": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Leader Focus"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Leader 焦点"
           }
         }
       }
@@ -3552,6 +3632,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "打开 Agent 设置"
+          }
+        }
+      }
+    },
+    "Plan Progress": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Plan Progress"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "计划进度"
           }
         }
       }
@@ -3604,6 +3700,22 @@
         }
       }
     },
+    "Stop Reason": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stop Reason"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "停止原因"
+          }
+        }
+      }
+    },
     "Waiting": {
       "localizations": {
         "en": {
@@ -3616,6 +3728,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "等待中"
+          }
+        }
+      }
+    },
+    "Worker Summaries": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Worker Summaries"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Worker 摘要"
           }
         }
       }

@@ -73,6 +73,54 @@ struct AgentModePersistenceTests {
         ])
     }
 
+    @Test func `worker preview parser extracts partial streamed summaries`() {
+        let preview = AgentTaggedOutputParser.parseWorkerTaskPreview(
+            from: """
+            [STATUS]
+            Checking launch risks
+            [/STATUS]
+            [SUMMARY]
+            The main issue is rollback visibility while the worker is still collecting evidence.
+            [EVIDENCE]
+            - Rollback gate is missing from the current draft.
+            """
+        )
+
+        #expect(preview.status == "Checking launch risks")
+        #expect(preview.summary == "The main issue is rollback visibility while the worker is still collecting evidence.")
+        #expect(preview.evidence == ["Rollback gate is missing from the current draft."])
+    }
+
+    @Test func `final synthesis input includes accepted worker discussion bundle`() {
+        let input = AgentPromptBuilder.finalSynthesisInput(
+            baseInput: [],
+            discussion: AgentPromptBuilder.FinalSynthesisDiscussion(
+                leaderFocus: "Write the final rollout recommendation.",
+                planHighlights: ["Validate rollback gates."],
+                workerSummaries: [
+                    AgentWorkerSummary(
+                        role: .workerA,
+                        summary: "Use an additive rollout with rollback gates.",
+                        adoptedPoints: ["Keep parity checks visible."]
+                    )
+                ],
+                adoptedEvidence: ["Parity checks stayed explicit."],
+                remainingRisks: ["Monitoring is still thin."],
+                stopReason: "Answer completed"
+            )
+        )
+
+        let text = input.compactMap { message -> String? in
+            guard case let .text(text) = message.content else { return nil }
+            return text
+        }.joined(separator: "\n")
+
+        #expect(text.contains("Accepted worker discussion"))
+        #expect(text.contains("Worker A: Use an additive rollout with rollback gates."))
+        #expect(text.contains("Adopted evidence"))
+        #expect(text.contains("Remaining risks to keep in mind"))
+    }
+
     @Test func `history presenter labels agent conversations as Agent`() throws {
         let container = try makeInMemoryModelContainer()
         let modelContext = ModelContext(container)

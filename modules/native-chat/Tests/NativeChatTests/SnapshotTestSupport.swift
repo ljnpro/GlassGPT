@@ -217,6 +217,17 @@ func makeRichMarkdownCodeBlockConversationSamples(in viewModel: ChatController) 
 }
 
 @MainActor
+func makeRichMarkdownTableConversationSamples(in viewModel: ChatController) -> Conversation {
+    let conversation = RichAssistantReplyFixture.makeConversation(
+        title: RichAssistantReplyFixture.tableConversationTitle,
+        assistantReply: RichAssistantReplyFixture.assistantReplyWithTable
+    )
+    viewModel.currentConversation = conversation
+    viewModel.messages = conversation.messages.sorted { $0.createdAt < $1.createdAt }
+    return conversation
+}
+
+@MainActor
 func makeSettingsSnapshotViewModel() -> SettingsPresenter {
     let settingsValueStore = InMemorySettingsValueStore()
     settingsValueStore.set(ModelType.gpt5_4_pro.rawValue, forKey: SettingsStore.Keys.defaultModel)
@@ -360,34 +371,6 @@ func makeSnapshotImageFile() throws -> URL {
     }
     let url = FileManager.default.temporaryDirectory
         .appendingPathComponent("snapshot-preview-image.png")
-    try data.write(to: url, options: .atomic)
-    return url
-}
-
-@MainActor
-func makeSnapshotPDFFile() throws -> URL {
-    let bounds = CGRect(x: 0, y: 0, width: 612, height: 792)
-    let renderer = UIGraphicsPDFRenderer(bounds: bounds)
-    let data = renderer.pdfData { context in
-        context.beginPage()
-        let title = "Quarterly Report" as NSString
-        let titleAttributes: [NSAttributedString.Key: Any] = [
-            .font: UIFont.systemFont(ofSize: 28, weight: .bold),
-            .foregroundColor: UIColor.black
-        ]
-        title.draw(at: CGPoint(x: 48, y: 52), withAttributes: titleAttributes)
-        let body = "The release completed successfully and all zero-diff parity checks passed." as NSString
-        let bodyAttributes: [NSAttributedString.Key: Any] = [
-            .font: UIFont.systemFont(ofSize: 18, weight: .regular),
-            .foregroundColor: UIColor.darkGray
-        ]
-        body.draw(
-            in: CGRect(x: 48, y: 120, width: 516, height: 200),
-            withAttributes: bodyAttributes
-        )
-    }
-    let url = FileManager.default.temporaryDirectory
-        .appendingPathComponent("snapshot-preview-document.pdf")
     try data.write(to: url, options: .atomic)
     return url
 }

@@ -99,6 +99,17 @@ final class GlassGPTUITests: XCTestCase {
     }
 
     @MainActor
+    func testAgentRunningScenarioDoesNotLeakIntoChatAfterLaunch() {
+        let app = launchApp(scenario: "agentRunning")
+
+        app.tabBars.buttons["Chat"].tap()
+
+        XCTAssertTrue(app.buttons["chat.newChat"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.staticTexts["What changes should we make before launch?"].exists)
+        XCTAssertFalse(app.staticTexts["Agent Process"].exists)
+    }
+
+    @MainActor
     func testAgentRunningScenarioCanStartNewConversationAndReopenLiveRun() {
         let app = launchApp(scenario: "agentRunning")
         openHistory(in: app)

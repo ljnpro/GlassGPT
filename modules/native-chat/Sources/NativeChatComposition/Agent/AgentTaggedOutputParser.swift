@@ -30,6 +30,14 @@ enum AgentTaggedOutputParser {
         let followUps: [AgentTaskSuggestion]
     }
 
+    struct WorkerTaskPreview: Equatable {
+        let status: String?
+        let summary: String?
+        let evidence: [String]
+        let confidence: AgentConfidence?
+        let risks: [String]
+    }
+
     static func parseLeaderDirective(from text: String) -> LeaderDirective {
         let focus = parseSection("FOCUS", in: text) ?? fallbackText(from: text)
         let decision = LeaderDecision(
@@ -87,6 +95,19 @@ enum AgentTaggedOutputParser {
             confidence: confidence,
             risks: risks,
             followUps: followUps
+        )
+    }
+
+    static func parseWorkerTaskPreview(from text: String) -> WorkerTaskPreview {
+        let confidenceText = parseSection("CONFIDENCE", in: text, allowPartial: true)?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+        return WorkerTaskPreview(
+            status: parseSection("STATUS", in: text, allowPartial: true),
+            summary: parseSection("SUMMARY", in: text, allowPartial: true),
+            evidence: listItems(from: parseSection("EVIDENCE", in: text, allowPartial: true) ?? ""),
+            confidence: confidenceText.flatMap(AgentConfidence.init(rawValue:)),
+            risks: listItems(from: parseSection("RISKS", in: text, allowPartial: true) ?? "")
         )
     }
 
@@ -158,17 +179,32 @@ enum AgentTaggedOutputParser {
             .filter { !$0.isEmpty }
     }
 
-    private static func parseSection(_ name: String, in text: String) -> String? {
+    private static func parseSection(
+        _ name: String,
+        in text: String,
+        allowPartial: Bool = false
+    ) -> String? {
         let startTag = "[\(name)]"
         let endTag = "[/\(name)]"
-        guard
-            let startRange = text.range(of: startTag),
-            let endRange = text.range(of: endTag)
-        else {
+        guard let startRange = text.range(of: startTag) else {
             return nil
         }
 
-        let body = text[startRange.upperBound ..< endRange.lowerBound]
+        let bodyRange: Range<String.Index>
+        if let endRange = text.range(of: endTag) {
+            bodyRange = startRange.upperBound ..< endRange.lowerBound
+        } else if allowPartial {
+            let trailingText = text[startRange.upperBound...]
+            if let nextTagRange = trailingText.range(of: "\n[") {
+                bodyRange = startRange.upperBound ..< nextTagRange.lowerBound
+            } else {
+                bodyRange = startRange.upperBound ..< text.endIndex
+            }
+        } else {
+            return nil
+        }
+
+        let body = text[bodyRange]
             .trimmingCharacters(in: .whitespacesAndNewlines)
         return body.isEmpty ? nil : body
     }

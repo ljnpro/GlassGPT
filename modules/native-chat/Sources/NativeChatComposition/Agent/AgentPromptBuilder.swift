@@ -108,24 +108,28 @@ enum AgentPromptBuilder {
         You own only the task you were assigned.
         Do not delegate.
         \(toolPolicy == .enabled ? "You may use tools when they materially help." : "Stay reasoning-only; do not use tools.")
+        Keep every section concise. The process UI only needs a compact summary, not a transcript.
 
         Output only these tagged sections:
+        [STATUS]
+        <2 to 6 words about what you are currently doing or what you concluded>
+        [/STATUS]
         [SUMMARY]
-        <short result summary>
+        <one short paragraph, max 2 sentences>
         [/SUMMARY]
         [EVIDENCE]
-        - <evidence point 1>
-        - <evidence point 2 if needed>
+        - <evidence point 1, concise>
+        - <evidence point 2 if needed, concise>
         [/EVIDENCE]
         [CONFIDENCE]
         <low|medium|high>
         [/CONFIDENCE]
         [RISKS]
-        - <remaining risk 1>
-        - <remaining risk 2 if needed>
+        - <remaining risk 1, concise>
+        - <remaining risk 2 if needed, concise>
         [/RISKS]
         [FOLLOW_UP]
-        <zero to three lines using this exact format>
+        <zero to two lines using this exact format>
         <title> || <goal> || <tool_policy>
         Allowed tool_policy: enabled, reasoningOnly
         [/FOLLOW_UP]
@@ -215,44 +219,6 @@ enum AgentPromptBuilder {
 
                     Accepted evidence:
                     - \(evidenceBlock)
-                    """
-                )
-            )
-        ]
-    }
-
-    static func finalSynthesisInput(
-        baseInput: [ResponsesInputMessageDTO],
-        snapshot: AgentProcessSnapshot
-    ) -> [ResponsesInputMessageDTO] {
-        let taskSummaries = snapshot.tasks
-            .filter { $0.status == .completed }
-            .map { task in
-                let confidence = task.result?.confidence.displayName ?? AgentConfidence.medium.displayName
-                return """
-                \(task.owner.displayName): \(task.result?.summary ?? task.resultSummary ?? task.title)
-                Confidence: \(confidence)
-                """
-            }
-            .joined(separator: "\n\n")
-        let evidenceBlock = snapshot.evidence.prefix(8).joined(separator: "\n- ")
-
-        return baseInput + [
-            ResponsesInputMessageDTO(
-                role: "user",
-                content: .text(
-                    """
-                    Current focus:
-                    \(snapshot.currentFocus)
-
-                    Accepted task results:
-                    \(taskSummaries)
-
-                    Accepted evidence:
-                    - \(evidenceBlock.isEmpty ? "None" : evidenceBlock)
-
-                    Final stop reason:
-                    \(snapshot.stopReason?.displayName ?? "Leader judged the answer sufficient")
                     """
                 )
             )

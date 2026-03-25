@@ -210,10 +210,16 @@ package extension MarkdownContentView {
 
                 let lines = rawText.components(separatedBy: "\n")
                 var lineBuffer: [String] = []
+                var lineIndex = 0
 
-                for line in lines {
+                while lineIndex < lines.count {
+                    let line = lines[lineIndex]
                     let trimmed = line.trimmingCharacters(in: .whitespaces)
-                    if let headingMatch = detectHeading(trimmed) {
+                    if let tableParse = parseTable(lines: lines, startingAt: lineIndex) {
+                        flushLineBuffer(&lineBuffer)
+                        finalParts.append(.table(id: makeID(), table: tableParse.table))
+                        lineIndex = tableParse.nextIndex
+                    } else if let headingMatch = detectHeading(trimmed) {
                         flushLineBuffer(&lineBuffer)
                         finalParts.append(.heading(id: makeID(), level: headingMatch.level, text: headingMatch.text))
                     } else if isHorizontalRule(trimmed) {
@@ -222,6 +228,7 @@ package extension MarkdownContentView {
                     } else {
                         lineBuffer.append(line)
                     }
+                    lineIndex += 1
                 }
                 flushLineBuffer(&lineBuffer)
 
@@ -249,6 +256,8 @@ package extension MarkdownContentView {
                 result.append(.latexBlock(id: finalID, content: content))
             case let .codeBlock(_, language, code):
                 result.append(.codeBlock(id: finalID, language: language, code: code))
+            case let .table(_, table):
+                result.append(.table(id: finalID, table: table))
             }
             finalID += 1
         }

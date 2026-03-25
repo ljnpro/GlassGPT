@@ -3,7 +3,7 @@
   "testRichTextAttributedStringBuilderThroughput": 0.171558,
   "testSSEFrameBufferFinishPendingThroughput": 0.0181555,
   "testSSEFrameBufferIncrementalAppend": 0.175362,
-  "testSSEFrameBufferThroughput": 0.1281715,
+  "testSSEFrameBufferThroughput": 0.271957,
   "testStreamEnvelopeDTODecodingThroughput": 0.015994500000000002,
   "testStreamEventTranslationThroughput": 0.0237325,
   "testStreamingTextParseThroughput": 0.01546

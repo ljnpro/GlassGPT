@@ -129,12 +129,39 @@ enum AgentProcessProjector {
         }
         snapshot.processSnapshot.tasks[index].status = .running
         snapshot.processSnapshot.tasks[index].startedAt = .now
+        snapshot.processSnapshot.tasks[index].liveStatusText = "Starting"
+        snapshot.processSnapshot.tasks[index].liveSummary = nil
+        snapshot.processSnapshot.tasks[index].liveEvidence = []
+        snapshot.processSnapshot.tasks[index].liveConfidence = nil
+        snapshot.processSnapshot.tasks[index].liveRisks = []
         if !snapshot.processSnapshot.activeTaskIDs.contains(taskID) {
             snapshot.processSnapshot.activeTaskIDs.append(taskID)
         }
         snapshot.processSnapshot.events.append(
             AgentEvent(kind: .taskStarted, summary: "Started \(snapshot.processSnapshot.tasks[index].title)")
         )
+        snapshot.updatedAt = .now
+        snapshot.processSnapshot.updatedAt = .now
+        syncLegacyWorkerProgress(on: &snapshot)
+    }
+
+    static func updateTaskLivePreview(
+        taskID: String,
+        statusText: String?,
+        summary: String?,
+        evidence: [String],
+        confidence: AgentConfidence?,
+        risks: [String],
+        on snapshot: inout AgentRunSnapshot
+    ) {
+        guard let index = snapshot.processSnapshot.tasks.firstIndex(where: { $0.id == taskID }) else {
+            return
+        }
+        snapshot.processSnapshot.tasks[index].liveStatusText = statusText
+        snapshot.processSnapshot.tasks[index].liveSummary = summary
+        snapshot.processSnapshot.tasks[index].liveEvidence = evidence
+        snapshot.processSnapshot.tasks[index].liveConfidence = confidence
+        snapshot.processSnapshot.tasks[index].liveRisks = risks
         snapshot.updatedAt = .now
         snapshot.processSnapshot.updatedAt = .now
         syncLegacyWorkerProgress(on: &snapshot)
@@ -151,7 +178,12 @@ enum AgentProcessProjector {
         }
         snapshot.processSnapshot.tasks[index].status = status
         snapshot.processSnapshot.tasks[index].result = result
-        snapshot.processSnapshot.tasks[index].resultSummary = result.summary
+        snapshot.processSnapshot.tasks[index].resultSummary = AgentSummaryFormatter.summarize(result.summary, maxLength: 220)
+        snapshot.processSnapshot.tasks[index].liveStatusText = nil
+        snapshot.processSnapshot.tasks[index].liveSummary = nil
+        snapshot.processSnapshot.tasks[index].liveEvidence = []
+        snapshot.processSnapshot.tasks[index].liveConfidence = nil
+        snapshot.processSnapshot.tasks[index].liveRisks = []
         snapshot.processSnapshot.tasks[index].completedAt = .now
         snapshot.processSnapshot.activeTaskIDs.removeAll { $0 == taskID }
         snapshot.processSnapshot.events.append(
@@ -160,7 +192,13 @@ enum AgentProcessProjector {
                 summary: "\(snapshot.processSnapshot.tasks[index].title) \(status.displayName.lowercased())"
             )
         )
-        snapshot.processSnapshot.evidence.append(contentsOf: result.evidence)
+        snapshot.processSnapshot.evidence.append(
+            contentsOf: AgentSummaryFormatter.summarizeBullets(
+                result.evidence,
+                maxItems: 2,
+                maxLength: 120
+            )
+        )
         snapshot.updatedAt = .now
         snapshot.processSnapshot.updatedAt = .now
         syncLegacyWorkerProgress(on: &snapshot)
@@ -170,9 +208,13 @@ enum AgentProcessProjector {
         _ evidence: [String],
         on snapshot: inout AgentRunSnapshot
     ) {
-        let trimmed = evidence.map {
-            $0.trimmingCharacters(in: .whitespacesAndNewlines)
-        }.filter { !$0.isEmpty }
+        let trimmed = AgentSummaryFormatter.summarizeBullets(
+            evidence.map {
+                $0.trimmingCharacters(in: .whitespacesAndNewlines)
+            }.filter { !$0.isEmpty },
+            maxItems: 4,
+            maxLength: 120
+        )
         guard !trimmed.isEmpty else { return }
         snapshot.processSnapshot.evidence.append(contentsOf: trimmed)
         snapshot.processSnapshot.events.append(
@@ -191,72 +233,5 @@ enum AgentProcessProjector {
         snapshot.updatedAt = .now
         snapshot.processSnapshot.updatedAt = .now
         syncLegacyWorkerProgress(on: &snapshot)
-    }
-
-    static func finalize(
-        outcome: String,
-        stopReason: AgentStopReason,
-        activity: AgentProcessActivity,
-        on snapshot: inout AgentRunSnapshot
-    ) {
-        snapshot.processSnapshot.activity = activity
-        snapshot.processSnapshot.stopReason = stopReason
-        snapshot.processSnapshot.outcome = outcome
-        snapshot.processSnapshot.activeTaskIDs = []
-        snapshot.processSnapshot.events.append(
-            AgentEvent(
-                kind: activity == .completed ? .completed : .failed,
-                summary: outcome
-            )
-        )
-        snapshot.currentStage = activity == .completed
-            ? .finalSynthesis
-            : (legacyStage(for: activity) ?? .finalSynthesis)
-        snapshot.updatedAt = .now
-        snapshot.processSnapshot.updatedAt = .now
-        syncLegacyWorkerProgress(on: &snapshot)
-    }
-
-    static func legacyStage(for activity: AgentProcessActivity) -> AgentStage? {
-        switch activity {
-        case .triage, .localPass:
-            .leaderBrief
-        case .delegation:
-            .workersRoundOne
-        case .reviewing:
-            .crossReview
-        case .synthesis, .waitingForUser, .completed, .failed:
-            .finalSynthesis
-        }
-    }
-
-    private static func syncLegacyWorkerProgress(on snapshot: inout AgentRunSnapshot) {
-        let workerTasks = snapshot.processSnapshot.tasks.filter { $0.owner.role != nil }
-        let progress = [AgentRole.workerA, .workerB, .workerC].map { role in
-            let status = workerTasks.last(where: { $0.owner.role == role }).map(progressStatus(for:)) ?? .waiting
-            return AgentWorkerProgress(role: role, status: status)
-        }
-
-        switch snapshot.processSnapshot.activity {
-        case .delegation:
-            snapshot.workersRoundOneProgress = progress
-        case .reviewing:
-            snapshot.crossReviewProgress = progress
-        default:
-            break
-        }
-    }
-
-    private static func progressStatus(for task: AgentTask) -> AgentWorkerProgress.Status {
-        switch task.status {
-        case .queued:
-            .waiting
-        case .running:
-            .running
-        case .completed:
-            .completed
-        case .blocked, .failed, .discarded:
-            .failed
-        }
     }
 }

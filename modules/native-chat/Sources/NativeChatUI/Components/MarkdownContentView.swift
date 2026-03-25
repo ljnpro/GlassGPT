@@ -4,7 +4,7 @@ import SwiftUI
 @preconcurrency import WebKit
 
 /// A segment of inline content, either plain text or an inline LaTeX expression.
-package enum InlineSegment {
+package enum InlineSegment: Equatable {
     /// A plain text segment.
     case text(String)
     /// An inline LaTeX expression.
@@ -18,6 +18,7 @@ package enum BlockPart: Identifiable {
     case horizontalRule(id: Int)
     case latexBlock(id: Int, content: String)
     case codeBlock(id: Int, language: String?, code: String)
+    case table(id: Int, table: MarkdownTable)
 
     /// Stable identifier for this block part.
     package var id: Int {
@@ -32,8 +33,27 @@ package enum BlockPart: Identifiable {
             id
         case let .codeBlock(id, _, _):
             id
+        case let .table(id, _):
+            id
         }
     }
+}
+
+/// Horizontal alignment for one parsed Markdown table column.
+package enum MarkdownTableAlignment: Equatable {
+    case leading
+    case center
+    case trailing
+}
+
+/// A parsed pipe-table extracted from Markdown block content.
+package struct MarkdownTable: Equatable {
+    /// Header cells for the table, parsed as inline segments per column.
+    package let headers: [[InlineSegment]]
+    /// Body rows for the table, parsed as inline segments per cell.
+    package let rows: [[[InlineSegment]]]
+    /// Column alignments derived from the Markdown separator row.
+    package let alignments: [MarkdownTableAlignment]
 }
 
 // MARK: - Markdown Content View
@@ -133,6 +153,14 @@ package struct MarkdownContentView: View {
         case let .richText(id: id, segments: segments):
             RichTextView(
                 segments: segments,
+                filePathAnnotations: filePathAnnotations,
+                onSandboxLinkTap: onSandboxLinkTap
+            )
+            .id(id)
+
+        case let .table(id: id, table: table):
+            MarkdownTableView(
+                table: table,
                 filePathAnnotations: filePathAnnotations,
                 onSandboxLinkTap: onSandboxLinkTap
             )

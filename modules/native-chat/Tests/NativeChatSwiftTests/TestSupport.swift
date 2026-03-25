@@ -145,7 +145,12 @@ final class QueuedOpenAIStreamClient: OpenAIStreamClient {
 final class ControlledOpenAIStreamClient: OpenAIStreamClient {
     private(set) var recordedRequests: [URLRequest] = []
     private(set) var cancelCallCount = 0
+    private var scriptedStreams: [[StreamEvent]]
     private var continuations: [AsyncStream<StreamEvent>.Continuation] = []
+
+    init(scriptedStreams: [[StreamEvent]] = []) {
+        self.scriptedStreams = scriptedStreams
+    }
 
     var activeStreamCount: Int {
         continuations.count
@@ -153,6 +158,15 @@ final class ControlledOpenAIStreamClient: OpenAIStreamClient {
 
     func makeStream(request: URLRequest) -> AsyncStream<StreamEvent> {
         recordedRequests.append(request)
+        if !scriptedStreams.isEmpty {
+            let events = scriptedStreams.removeFirst()
+            return AsyncStream { continuation in
+                for event in events {
+                    continuation.yield(event)
+                }
+                continuation.finish()
+            }
+        }
         return AsyncStream { continuation in
             self.continuations.append(continuation)
         }
@@ -174,6 +188,7 @@ final class ControlledOpenAIStreamClient: OpenAIStreamClient {
     func finishStream(at index: Int = 0) {
         guard continuations.indices.contains(index) else { return }
         continuations[index].finish()
+        continuations.remove(at: index)
     }
 
     func finishAll() {

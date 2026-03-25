@@ -1,5 +1,6 @@
 import ChatDomain
 import ChatUIComponents
+import NativeChatUI
 import SwiftUI
 
 struct AgentProcessCard: View {
@@ -20,7 +21,10 @@ struct AgentProcessCard: View {
         ) {
             if let processSnapshot = trace.processSnapshot {
                 VStack(alignment: .leading, spacing: 12) {
-                    AgentProcessSections(process: processSnapshot)
+                    CompletedAgentProcessSections(
+                        process: processSnapshot,
+                        workerSummaries: trace.workerSummaries
+                    )
 
                     Text(trace.completedAt.formatted(date: .abbreviated, time: .shortened))
                         .font(.caption2)
@@ -43,7 +47,8 @@ struct AgentProcessCard: View {
                 VStack(alignment: .leading, spacing: 8) {
                     AgentTraceSection(
                         title: summary.role.displayName,
-                        text: summary.summary
+                        text: summary.summary,
+                        emphasis: .body
                     )
 
                     if !summary.adoptedPoints.isEmpty {
@@ -53,9 +58,12 @@ struct AgentProcessCard: View {
                                 .foregroundStyle(.secondary)
 
                             ForEach(summary.adoptedPoints, id: \.self) { point in
-                                Text("• \(point)")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
+                                MarkdownContentView(
+                                    text: "- \(point)",
+                                    surfaceStyle: .plain
+                                )
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
                             }
                         }
                     }
@@ -154,17 +162,26 @@ struct AgentDisclosureCard<Content: View>: View {
 }
 
 struct AgentTraceSection: View {
+    enum Emphasis {
+        case body
+        case secondary
+    }
+
     let title: String
     let text: String
+    var emphasis: Emphasis = .body
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(title)
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(.secondary)
-            Text(text)
-                .font(.callout)
-                .foregroundStyle(.primary)
+            MarkdownContentView(
+                text: text,
+                surfaceStyle: .plain
+            )
+            .font(emphasis == .body ? .callout : .caption)
+            .foregroundStyle(emphasis == .body ? .primary : .secondary)
         }
     }
 }

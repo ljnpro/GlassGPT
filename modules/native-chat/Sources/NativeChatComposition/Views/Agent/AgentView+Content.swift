@@ -120,6 +120,9 @@ extension AgentView {
         for task in viewModel.processSnapshot.tasks {
             hasher.combine(task.id)
             hasher.combine(task.status.rawValue)
+            hasher.combine(task.liveStatusText ?? "")
+            hasher.combine(task.liveSummary ?? "")
+            hasher.combine(task.resultSummary ?? "")
         }
 
         return hasher.finalize()

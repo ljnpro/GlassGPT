@@ -144,7 +144,7 @@ extension ScreenStoreTests {
         #expect(store.shouldShowDetachedStreamingBubble)
     }
 
-    @Test func `restore last conversation loads most recent with messages`() throws {
+    @Test func `restore last conversation loads most recent chat conversation with messages`() throws {
         let store = try makeTestChatScreenStore(
             streamClient: QueuedOpenAIStreamClient(scriptedStreams: [])
         )
@@ -156,15 +156,29 @@ extension ScreenStoreTests {
             title: "Recent Thread",
             updatedAt: Date(timeIntervalSince1970: 200)
         )
+        let newerAgentConversation = Conversation(
+            title: "Recent Agent Thread",
+            updatedAt: Date(timeIntervalSince1970: 300),
+            modeRawValue: ConversationMode.agent.rawValue
+        )
+        newerAgentConversation.mode = .agent
         let restoredMessage = Message(
             role: .assistant,
             content: "Recovered",
             conversation: restoredConversation
         )
+        let newerAgentMessage = Message(
+            role: .assistant,
+            content: "Agent recovered",
+            conversation: newerAgentConversation
+        )
         restoredConversation.messages.append(restoredMessage)
+        newerAgentConversation.messages.append(newerAgentMessage)
         store.modelContext.insert(ignoredConversation)
         store.modelContext.insert(restoredConversation)
+        store.modelContext.insert(newerAgentConversation)
         store.modelContext.insert(restoredMessage)
+        store.modelContext.insert(newerAgentMessage)
         try store.modelContext.save()
 
         store.conversationCoordinator.restoreLastConversationIfAvailable()

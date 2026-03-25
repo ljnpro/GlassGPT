@@ -1,5 +1,6 @@
 import ChatDomain
 import ChatUIComponents
+import NativeChatUI
 import SwiftUI
 
 struct AgentTaskBoard: View {
@@ -39,13 +40,16 @@ private struct AgentTaskCard: View {
 
                 Spacer(minLength: 8)
 
-                AgentStatusChip(text: task.status.displayName, tint: statusTint)
+                AgentStatusChip(text: task.displayStatusText, tint: statusTint)
             }
 
-            Text(task.result?.summary ?? task.resultSummary ?? task.goal)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .lineLimit(3)
+            MarkdownContentView(
+                text: task.displaySummary,
+                surfaceStyle: .plain
+            )
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .lineLimit(3)
 
             HStack(spacing: 8) {
                 AgentStatusChip(
@@ -53,12 +57,22 @@ private struct AgentTaskCard: View {
                     tint: task.toolPolicy == .enabled ? .blue : .secondary
                 )
 
-                if let confidence = task.result?.confidence {
+                if let confidence = task.displayConfidence {
                     AgentStatusChip(
                         text: confidence.displayName,
                         tint: confidenceTint(for: confidence)
                     )
                 }
+            }
+
+            if let evidence = task.displayEvidence.first {
+                MarkdownContentView(
+                    text: "- \(AgentSummaryFormatter.summarize(evidence, maxLength: 100))",
+                    surfaceStyle: .plain
+                )
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
+                .lineLimit(2)
             }
         }
         .padding(10)

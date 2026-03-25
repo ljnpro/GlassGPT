@@ -65,7 +65,10 @@ def main() -> int:
     except subprocess.CalledProcessError as exc:
         failures.append(f"swift --version failed: {exc}")
     else:
-        if "6.2" not in swift_version:
+        version_match = re.search(r"Apple Swift version (\d+)\.(\d+)", swift_version)
+        if version_match is None:
+            failures.append(f"Unable to parse Swift version: {swift_version}")
+        elif tuple(int(component) for component in version_match.groups()) < (6, 2):
             failures.append(f"Swift 6.2+ required, found: {swift_version}")
         else:
             print(f"[PASS] Swift toolchain: {swift_version.splitlines()[0]}")

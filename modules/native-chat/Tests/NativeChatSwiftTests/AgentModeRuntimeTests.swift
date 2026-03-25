@@ -32,11 +32,17 @@ struct AgentModeRuntimeTests {
             ]
         )
         let streamClient = QueuedOpenAIStreamClient(scriptedStreams: [
+            scriptedWorkerStreamEvents(role: .workerA, responseID: "worker_a_task_1"),
+            scriptedWorkerStreamEvents(role: .workerB, responseID: "worker_b_task_1"),
+            scriptedWorkerStreamEvents(role: .workerC, responseID: "worker_c_task_1"),
             [
                 .responseCreated("leader_final_1"),
                 .textDelta("Final answer 1"),
                 .completed("Final answer 1", nil, nil)
             ],
+            scriptedWorkerStreamEvents(role: .workerA, responseID: "worker_a_task_2"),
+            scriptedWorkerStreamEvents(role: .workerB, responseID: "worker_b_task_2"),
+            scriptedWorkerStreamEvents(role: .workerC, responseID: "worker_c_task_2"),
             [
                 .responseCreated("leader_final_2"),
                 .textDelta("Final answer 2"),
@@ -66,16 +72,25 @@ struct AgentModeRuntimeTests {
 
         let recordedRequests = await transport.requests()
         let requestBodies = recordedRequests.compactMap(previousResponseID(from:))
+            + streamClient.recordedRequests.compactMap(previousResponseID(from:))
 
         #expect(requestBodies.contains("leader_final_1"))
         #expect(requestBodies.contains("worker_a_task_1"))
         #expect(requestBodies.contains("worker_b_task_1"))
         #expect(requestBodies.contains("worker_c_task_1"))
+
+        let trace = try #require(controller.messages.last?.agentTrace)
+        #expect(trace.workerSummaries.count == 3)
+        #expect(trace.processSnapshot?.decisions.count(where: { $0.title == "Finish" }) == 1)
     }
 
     @Test func `starting new agent conversation detaches active execution and rebinding avoids retry banner`() async throws {
         let transport = ScriptedAgentCouncilTransport(turns: [AgentTurnScript.singleTurn()])
-        let streamClient = ControlledOpenAIStreamClient()
+        let streamClient = ControlledOpenAIStreamClient(scriptedStreams: [
+            scriptedWorkerStreamEvents(role: .workerA, responseID: "worker_a_task"),
+            scriptedWorkerStreamEvents(role: .workerB, responseID: "worker_b_task"),
+            scriptedWorkerStreamEvents(role: .workerC, responseID: "worker_c_task")
+        ])
         let controller = try makeTestAgentController(
             transport: transport,
             streamClient: streamClient
@@ -112,7 +127,11 @@ struct AgentModeRuntimeTests {
 
     @Test func `retry banner only appears when no live session and no recoverable background snapshot exists`() async throws {
         let transport = ScriptedAgentCouncilTransport(turns: [AgentTurnScript.singleTurn()])
-        let streamClient = ControlledOpenAIStreamClient()
+        let streamClient = ControlledOpenAIStreamClient(scriptedStreams: [
+            scriptedWorkerStreamEvents(role: .workerA, responseID: "worker_a_task"),
+            scriptedWorkerStreamEvents(role: .workerB, responseID: "worker_b_task"),
+            scriptedWorkerStreamEvents(role: .workerC, responseID: "worker_c_task")
+        ])
         let controller = try makeTestAgentController(
             transport: transport,
             streamClient: streamClient

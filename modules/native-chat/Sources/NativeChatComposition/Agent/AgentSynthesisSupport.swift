@@ -4,6 +4,11 @@ import Foundation
 import OpenAITransport
 
 extension AgentRunCoordinator {
+    struct FinalSynthesisContext {
+        let discussion: AgentPromptBuilder.FinalSynthesisDiscussion
+        let workerSummaries: [AgentWorkerSummary]
+    }
+
     func applyLeaderDirective(
         _ directive: AgentTaggedOutputParser.LeaderDirective,
         decisionKind: AgentDecisionKind,
@@ -25,12 +30,14 @@ extension AgentRunCoordinator {
             AgentProcessProjector.replacePlan(directive.plan, on: &execution.snapshot)
         }
 
-        AgentProcessProjector.appendDecision(
-            kind: decisionKind,
-            title: directive.decision.rawValue.capitalized,
-            summary: directive.decisionNote.isEmpty ? focus : directive.decisionNote,
-            on: &execution.snapshot
-        )
+        if directive.decision == .delegate {
+            AgentProcessProjector.appendDecision(
+                kind: decisionKind,
+                title: directive.decision.rawValue.capitalized,
+                summary: directive.decisionNote.isEmpty ? focus : directive.decisionNote,
+                on: &execution.snapshot
+            )
+        }
 
         if appendTasks, !directive.tasks.isEmpty {
             let tasks = directive.tasks.map { task -> AgentTask in
@@ -90,13 +97,14 @@ extension AgentRunCoordinator {
             conversation: conversation,
             persist: false
         )
+        let synthesisContext = finalSynthesisContext(from: execution.snapshot.processSnapshot)
 
         let stream = execution.service.streamResponse(
             apiKey: apiKey,
             modelIdentifier: ModelType.gpt5_4.rawValue,
             input: AgentPromptBuilder.finalSynthesisInput(
                 baseInput: baseInput,
-                snapshot: execution.snapshot.processSnapshot
+                discussion: synthesisContext.discussion
             ),
             instructions: AgentPromptBuilder.finalSynthesisInstructions(),
             previousResponseID: currentAgentState(for: conversation).responseID(for: .leader),
@@ -119,6 +127,31 @@ extension AgentRunCoordinator {
                 draft: draft
             )
         }
+    }
+
+    func finalSynthesisContext(from snapshot: AgentProcessSnapshot) -> FinalSynthesisContext {
+        let workerSummaries = AgentSummaryFormatter.workerSummaries(from: snapshot)
+        let planHighlights = snapshot.plan
+            .map {
+                "\($0.title) (\($0.status.displayName.lowercased())): \(AgentSummaryFormatter.summarize($0.summary, maxLength: 100))"
+            }
+            .prefix(4)
+            .map(\.self)
+        let remainingRisks = [AgentRole.workerA, .workerB, .workerC]
+            .compactMap { AgentSummaryFormatter.latestCompletedWorkerTask(role: $0, from: snapshot)?.result?.risks }
+            .flatMap(\.self)
+        let discussion = AgentPromptBuilder.FinalSynthesisDiscussion(
+            leaderFocus: snapshot.currentFocus.isEmpty ? "Respond to the user with the accepted findings." : snapshot.currentFocus,
+            planHighlights: Array(planHighlights),
+            workerSummaries: workerSummaries,
+            adoptedEvidence: AgentSummaryFormatter.summarizeBullets(snapshot.evidence, maxItems: 6, maxLength: 120),
+            remainingRisks: AgentSummaryFormatter.summarizeBullets(remainingRisks, maxItems: 4, maxLength: 120),
+            stopReason: snapshot.stopReason?.displayName ?? "Leader judged the answer sufficient."
+        )
+        return FinalSynthesisContext(
+            discussion: discussion,
+            workerSummaries: workerSummaries
+        )
     }
 
     func uploadAttachmentsIfNeeded(_ prepared: PreparedAgentTurn) async throws {
@@ -156,73 +189,5 @@ extension AgentRunCoordinator {
                 throw AgentRunFailure.invalidResponse("Failed to save Agent attachments.")
             }
         }
-    }
-
-    func currentCompletedTasks(from snapshot: AgentRunSnapshot) -> [AgentTask] {
-        snapshot.processSnapshot.tasks.filter { $0.status == .completed || $0.status == .failed }
-    }
-
-    func currentQueuedTasks(from snapshot: AgentRunSnapshot) -> [AgentTask] {
-        snapshot.processSnapshot.tasks.filter { $0.status == .queued || $0.status == .running }
-    }
-
-    func pendingTasksToRun(from tasks: [AgentTask]) -> [AgentTask] {
-        tasks.map { task in
-            var task = task
-            task.status = .queued
-            return task
-        }
-    }
-
-    func latestDecisionSummary(in snapshot: AgentRunSnapshot) -> String {
-        snapshot.processSnapshot.decisions.last?.summary ?? snapshot.processSnapshot.currentFocus
-    }
-
-    func updatedTask(for taskID: String, in snapshot: AgentRunSnapshot) -> AgentTask? {
-        snapshot.processSnapshot.tasks.first(where: { $0.id == taskID })
-    }
-
-    func markPlanStepCompleted(for task: AgentTask, on snapshot: inout AgentRunSnapshot) {
-        guard let stepID = task.parentStepID,
-              let index = snapshot.processSnapshot.plan.firstIndex(where: { $0.id == stepID })
-        else {
-            return
-        }
-
-        snapshot.processSnapshot.plan[index].status = .completed
-        snapshot.updatedAt = .now
-        snapshot.processSnapshot.updatedAt = .now
-    }
-
-    func mappedStopReason(
-        decision: AgentTaggedOutputParser.LeaderDecision,
-        stopReasonText: String?
-    ) -> AgentStopReason {
-        if decision == .clarify {
-            return .clarificationRequired
-        }
-
-        let text = (stopReasonText ?? "").lowercased()
-        if text.contains("budget") || text.contains("limit") {
-            return .budgetReached
-        }
-        if text.contains("tool") || text.contains("search") || text.contains("code") {
-            return .toolFailure
-        }
-        return .sufficientAnswer
-    }
-
-    func forceBudgetStopDirective(
-        from directive: AgentTaggedOutputParser.LeaderDirective,
-        focus: String
-    ) -> AgentTaggedOutputParser.LeaderDirective {
-        AgentTaggedOutputParser.LeaderDirective(
-            focus: focus,
-            decision: .finish,
-            plan: directive.plan,
-            tasks: [],
-            decisionNote: "The leader stopped after enough task waves.",
-            stopReason: "Budget limit reached; synthesize the best answer from current evidence."
-        )
     }
 }

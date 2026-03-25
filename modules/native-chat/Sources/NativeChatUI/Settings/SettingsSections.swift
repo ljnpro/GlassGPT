@@ -113,7 +113,10 @@ struct SettingsInlineReasoningEffortControl: View {
                     HapticService.shared.selection(isEnabled: hapticsEnabled)
                 } label: {
                     if effort == selectedEffort {
-                        Label(visibleEffortLabel(effort), systemImage: "checkmark")
+                        HStack(spacing: 6) {
+                            Image(systemName: "checkmark")
+                            Text(visibleEffortLabel(effort))
+                        }
                     } else {
                         Text(visibleEffortLabel(effort))
                     }

@@ -2,11 +2,15 @@ import Foundation
 
 /// A leader-proposed follow-up idea returned by a worker.
 public struct AgentTaskSuggestion: Codable, Equatable, Identifiable, Sendable {
+    /// Stable identifier for the follow-up suggestion.
     public let id: String
+    /// Short title describing the suggested follow-up.
     public var title: String
+    /// Goal the suggested follow-up should accomplish.
     public var goal: String
+    /// Recommended tool policy for the suggested follow-up.
     public var toolPolicy: AgentToolPolicy
-
+    /// Creates a worker-suggested follow-up task recommendation.
     public init(
         id: String = UUID().uuidString,
         title: String,
@@ -22,14 +26,21 @@ public struct AgentTaskSuggestion: Codable, Equatable, Identifiable, Sendable {
 
 /// The bounded result of one delegated worker task.
 public struct AgentTaskResult: Codable, Equatable, Sendable {
+    /// Compact result summary returned by the worker.
     public var summary: String
+    /// Evidence items the worker believes support the summary.
     public var evidence: [String]
+    /// Confidence level reported for the result.
     public var confidence: AgentConfidence
+    /// Open risks or caveats the leader should consider.
     public var risks: [String]
+    /// Recommended follow-up tasks suggested by the worker.
     public var followUpRecommendations: [AgentTaskSuggestion]
+    /// Tool calls performed while completing the task.
     public var toolCalls: [ToolCallInfo]
+    /// Citations gathered while completing the task.
     public var citations: [URLCitation]
-
+    /// Creates a structured worker-task result.
     public init(
         summary: String,
         evidence: [String] = [],
@@ -51,21 +62,45 @@ public struct AgentTaskResult: Codable, Equatable, Sendable {
 
 /// One delegated worker task owned by a specific worker slot.
 public struct AgentTask: Codable, Equatable, Identifiable, Sendable {
+    /// Stable identifier for the delegated task.
     public let id: String
+    /// Worker slot currently responsible for the task.
     public var owner: AgentTaskOwner
+    /// Parent plan-step identifier, when the task belongs to a step.
     public var parentStepID: String?
+    /// Other task identifiers that must complete first.
     public var dependencyIDs: [String]
+    /// Short task title shown in the process UI.
     public var title: String
+    /// Goal the worker is expected to accomplish.
     public var goal: String
+    /// Output contract the worker was asked to satisfy.
     public var expectedOutput: String
+    /// Leader-provided context summary for the task.
     public var contextSummary: String
+    /// Whether this task may use tools or must remain reasoning-only.
     public var toolPolicy: AgentToolPolicy
+    /// Current lifecycle status for the task.
     public var status: AgentTaskStatus
+    /// Persisted one-line summary for completed tasks.
     public var resultSummary: String?
+    /// Structured result payload for completed tasks.
     public var result: AgentTaskResult?
+    /// Live status text projected while the worker stream is active.
+    public var liveStatusText: String?
+    /// Live summary text projected while the worker stream is active.
+    public var liveSummary: String?
+    /// Live evidence items projected while the worker stream is active.
+    public var liveEvidence: [String]
+    /// Live confidence projected while the worker stream is active.
+    public var liveConfidence: AgentConfidence?
+    /// Live risks projected while the worker stream is active.
+    public var liveRisks: [String]
+    /// Start timestamp for the task, when known.
     public var startedAt: Date?
+    /// Completion timestamp for the task, when known.
     public var completedAt: Date?
-
+    /// Creates a delegated worker task tracked by the Agent runtime.
     public init(
         id: String = UUID().uuidString,
         owner: AgentTaskOwner,
@@ -79,6 +114,11 @@ public struct AgentTask: Codable, Equatable, Identifiable, Sendable {
         status: AgentTaskStatus = .queued,
         resultSummary: String? = nil,
         result: AgentTaskResult? = nil,
+        liveStatusText: String? = nil,
+        liveSummary: String? = nil,
+        liveEvidence: [String] = [],
+        liveConfidence: AgentConfidence? = nil,
+        liveRisks: [String] = [],
         startedAt: Date? = nil,
         completedAt: Date? = nil
     ) {
@@ -94,19 +134,116 @@ public struct AgentTask: Codable, Equatable, Identifiable, Sendable {
         self.status = status
         self.resultSummary = resultSummary
         self.result = result
+        self.liveStatusText = liveStatusText
+        self.liveSummary = liveSummary
+        self.liveEvidence = liveEvidence
+        self.liveConfidence = liveConfidence
+        self.liveRisks = liveRisks
         self.startedAt = startedAt
         self.completedAt = completedAt
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id
+        case owner
+        case parentStepID
+        case dependencyIDs
+        case title
+        case goal
+        case expectedOutput
+        case contextSummary
+        case toolPolicy
+        case status
+        case resultSummary
+        case result
+        case liveStatusText
+        case liveSummary
+        case liveEvidence
+        case liveConfidence
+        case liveRisks
+        case startedAt
+        case completedAt
+    }
+
+    /// Decodes a delegated task while backfilling newer live-summary fields when absent.
+    public init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(String.self, forKey: .id)
+        owner = try container.decode(AgentTaskOwner.self, forKey: .owner)
+        parentStepID = try container.decodeIfPresent(String.self, forKey: .parentStepID)
+        dependencyIDs = try container.decodeIfPresent([String].self, forKey: .dependencyIDs) ?? []
+        title = try container.decode(String.self, forKey: .title)
+        goal = try container.decode(String.self, forKey: .goal)
+        expectedOutput = try container.decode(String.self, forKey: .expectedOutput)
+        contextSummary = try container.decode(String.self, forKey: .contextSummary)
+        toolPolicy = try container.decode(AgentToolPolicy.self, forKey: .toolPolicy)
+        status = try container.decode(AgentTaskStatus.self, forKey: .status)
+        resultSummary = try container.decodeIfPresent(String.self, forKey: .resultSummary)
+        result = try container.decodeIfPresent(AgentTaskResult.self, forKey: .result)
+        liveStatusText = try container.decodeIfPresent(String.self, forKey: .liveStatusText)
+        liveSummary = try container.decodeIfPresent(String.self, forKey: .liveSummary)
+        liveEvidence = try container.decodeIfPresent([String].self, forKey: .liveEvidence) ?? []
+        liveConfidence = try container.decodeIfPresent(AgentConfidence.self, forKey: .liveConfidence)
+        liveRisks = try container.decodeIfPresent([String].self, forKey: .liveRisks) ?? []
+        startedAt = try container.decodeIfPresent(Date.self, forKey: .startedAt)
+        completedAt = try container.decodeIfPresent(Date.self, forKey: .completedAt)
+    }
+
+    /// Best available worker status text for live or completed display.
+    public var displayStatusText: String {
+        let trimmed = liveStatusText?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return trimmed.isEmpty ? status.displayName : trimmed
+    }
+
+    /// Best available worker summary for live or completed display.
+    public var displaySummary: String {
+        let live = liveSummary?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        if !live.isEmpty {
+            return live
+        }
+
+        let persisted = result?.summary
+            ?? resultSummary
+            ?? goal
+        return persisted.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    /// Best available evidence list for live or completed display.
+    public var displayEvidence: [String] {
+        if !liveEvidence.isEmpty {
+            return liveEvidence
+        }
+        return result?.evidence ?? []
+    }
+
+    /// Best available worker confidence for live or completed display.
+    public var displayConfidence: AgentConfidence? {
+        liveConfidence ?? result?.confidence
+    }
+
+    /// Best available risk list for live or completed display.
+    public var displayRisks: [String] {
+        if !liveRisks.isEmpty {
+            return liveRisks
+        }
+        return result?.risks ?? []
     }
 }
 
 /// A compact leader decision shown in the Agent Process log.
 public struct AgentDecision: Codable, Equatable, Identifiable, Sendable {
+    /// Stable identifier for the recorded decision.
     public let id: String
+    /// Decision category used by the process UI.
     public var kind: AgentDecisionKind
+    /// Short title shown in the decision log.
     public var title: String
+    /// Concise explanation of the decision.
     public var summary: String
+    /// Timestamp when the decision was recorded.
     public var createdAt: Date
 
+    /// Creates a compact leader decision for process projection.
     public init(
         id: String = UUID().uuidString,
         kind: AgentDecisionKind,
@@ -124,11 +261,16 @@ public struct AgentDecision: Codable, Equatable, Identifiable, Sendable {
 
 /// A low-level event used to drive the projected Agent Process snapshot.
 public struct AgentEvent: Codable, Equatable, Identifiable, Sendable {
+    /// Stable identifier for the low-level event.
     public let id: String
+    /// Event category used when rebuilding process state.
     public var kind: AgentEventKind
+    /// Concise event summary used for debugging and projection.
     public var summary: String
+    /// Timestamp when the event was recorded.
     public var createdAt: Date
 
+    /// Creates a low-level Agent event for process projection.
     public init(
         id: String = UUID().uuidString,
         kind: AgentEventKind,

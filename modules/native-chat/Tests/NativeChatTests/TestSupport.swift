@@ -9,6 +9,7 @@ import Foundation
 import GeneratedFilesInfra
 import OpenAITransport
 import SwiftData
+import UIKit
 import XCTest
 @testable import NativeChatComposition
 
@@ -84,6 +85,34 @@ enum NativeChatTestError: Error {
     case saveFailed
     case missingStubbedTransportResponse
     case timeout
+}
+
+@MainActor
+func makeSnapshotPDFFile() throws -> URL {
+    let bounds = CGRect(x: 0, y: 0, width: 612, height: 792)
+    let renderer = UIGraphicsPDFRenderer(bounds: bounds)
+    let data = renderer.pdfData { context in
+        context.beginPage()
+        let title = "Quarterly Report" as NSString
+        let titleAttributes: [NSAttributedString.Key: Any] = [
+            .font: UIFont.systemFont(ofSize: 28, weight: .bold),
+            .foregroundColor: UIColor.black
+        ]
+        title.draw(at: CGPoint(x: 48, y: 52), withAttributes: titleAttributes)
+        let body = "The release completed successfully and all zero-diff parity checks passed." as NSString
+        let bodyAttributes: [NSAttributedString.Key: Any] = [
+            .font: UIFont.systemFont(ofSize: 18, weight: .regular),
+            .foregroundColor: UIColor.darkGray
+        ]
+        body.draw(
+            in: CGRect(x: 48, y: 120, width: 516, height: 200),
+            withAttributes: bodyAttributes
+        )
+    }
+    let url = FileManager.default.temporaryDirectory
+        .appendingPathComponent("snapshot-preview-document.pdf")
+    try data.write(to: url, options: .atomic)
+    return url
 }
 
 @MainActor

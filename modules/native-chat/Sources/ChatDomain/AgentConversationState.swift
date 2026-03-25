@@ -114,6 +114,7 @@ public struct AgentRunSnapshot: Codable, Equatable, Sendable {
         case updatedAt
     }
 
+    /// Decodes a persisted run snapshot, filling newer fields with safe defaults when absent.
     public init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         currentStage = try container.decode(AgentStage.self, forKey: .currentStage)

@@ -74,19 +74,7 @@ package final class NativeChatHistoryCoordinator {
     }
 
     private func makeHistorySummaries() -> [HistoryConversationSummary] {
-        fetchAllConversations().map(makeHistorySummary(for:))
-    }
-
-    private func makeHistorySummary(for conversation: Conversation) -> HistoryConversationSummary {
-        HistoryConversationSummary(
-            id: conversation.id,
-            title: conversation.title,
-            preview: historyPreview(for: conversation),
-            updatedAt: conversation.updatedAt,
-            modelDisplayName: conversation.mode == .agent
-                ? ConversationMode.agent.displayName
-                : (ModelType(rawValue: conversation.model)?.displayName ?? conversation.model)
-        )
+        fetchAllConversations().map(HistoryConversationSummaryBuilder.makeHistorySummary(for:))
     }
 
     private func fetchConversation(id: UUID) -> Conversation? {
@@ -112,29 +100,6 @@ package final class NativeChatHistoryCoordinator {
             Loggers.persistence.error("[NativeChatHistoryCoordinator.fetchAllConversations] \(error.localizedDescription)")
             return []
         }
-    }
-
-    private func historyPreview(for conversation: Conversation) -> String {
-        let sortedMessages = conversation.messages.sorted { $0.createdAt < $1.createdAt }
-        guard let lastMessage = sortedMessages.last else {
-            return String(localized: "No messages")
-        }
-
-        let trimmedContent = lastMessage.content.trimmingCharacters(in: .whitespacesAndNewlines)
-        if !trimmedContent.isEmpty {
-            return trimmedContent.prefix(100).description
-        }
-
-        if lastMessage.role == .assistant, !lastMessage.isComplete {
-            if let thinking = lastMessage.thinking?.trimmingCharacters(in: .whitespacesAndNewlines),
-               !thinking.isEmpty {
-                return thinking.prefix(100).description
-            }
-
-            return String(localized: "Generating...")
-        }
-
-        return String(localized: "No messages")
     }
 
     private func saveHistoryChanges(context: String) {

@@ -147,6 +147,13 @@ package final class ChatConversationCoordinator {
 
     /// Loads an existing conversation from persistence, replacing the current session.
     package func loadConversation(_ conversation: Conversation) {
+        guard conversation.mode == .chat else {
+            #if DEBUG
+            Loggers.chat.debug("[Load] Refused to load non-chat conversation into ChatCoordinator")
+            #endif
+            return
+        }
+
         if let session = sessions.currentVisibleSession {
             sessions.saveSessionNow(session)
         }
@@ -186,7 +193,9 @@ package final class ChatConversationCoordinator {
     /// Attempts to restore the most recent conversation from persistence on app launch.
     package func restoreLastConversationIfAvailable() {
         do {
-            if let lastConversation = try services.conversationRepository.fetchMostRecentConversationWithMessages() {
+            if let lastConversation = try services.conversationRepository.fetchMostRecentConversationWithMessages(
+                mode: .chat
+            ) {
                 state.currentConversation = lastConversation
                 state.messages = visibleMessages(for: lastConversation)
 

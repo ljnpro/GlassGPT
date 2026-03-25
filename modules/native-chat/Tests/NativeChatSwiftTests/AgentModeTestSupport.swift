@@ -249,6 +249,37 @@ func makeAgentResponseData(
     )
 }
 
+func scriptedWorkerStreamEvents(
+    role: AgentRole,
+    responseID: String
+) -> [StreamEvent] {
+    let body = """
+    [STATUS]
+    Checking \(role.displayName.lowercased())
+    [/STATUS]
+    [SUMMARY]
+    \(role.displayName) task summary.
+    [/SUMMARY]
+    [EVIDENCE]
+    - \(role.displayName) evidence point.
+    [/EVIDENCE]
+    [CONFIDENCE]
+    high
+    [/CONFIDENCE]
+    [RISKS]
+    - \(role.displayName) residual risk.
+    [/RISKS]
+    [FOLLOW_UP]
+    [/FOLLOW_UP]
+    """
+
+    return [
+        .responseCreated(responseID),
+        .textDelta(body),
+        .completed(body, nil, nil)
+    ]
+}
+
 func previousResponseID(from request: URLRequest) -> String? {
     guard
         let body = request.httpBody,

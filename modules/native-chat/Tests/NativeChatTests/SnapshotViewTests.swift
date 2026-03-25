@@ -57,6 +57,12 @@ final class SnapshotViewTests: XCTestCase {
             ChatView(viewModel: codeBlockViewModel)
         }
 
+        let tableViewModel = try makeSnapshotChatScreenStore(hasAPIKey: true)
+        _ = makeRichMarkdownTableConversationSamples(in: tableViewModel)
+        assertViewSnapshots(named: "chat-rich-assistant-response-table") {
+            ChatView(viewModel: tableViewModel)
+        }
+
         let streamingViewModel = try makeSnapshotChatScreenStore(hasAPIKey: true)
         _ = makeConversationSamples(in: streamingViewModel)
         streamingViewModel.isStreaming = true

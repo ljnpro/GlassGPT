@@ -74,15 +74,12 @@ extension MessageBubble {
         HStack(alignment: .top) {
             if message.role == .user {
                 Spacer(minLength: 40)
-            }
-
-            bubbleColumn
-                .frame(
-                    maxWidth: bubbleMaxWidth,
-                    alignment: message.role == .user ? .trailing : .leading
-                )
-
-            if message.role == .assistant {
+                bubbleColumn
+                    .frame(maxWidth: bubbleMaxWidth, alignment: .trailing)
+            } else {
+                bubbleColumn
+                    .frame(maxWidth: bubbleMaxWidth, alignment: .leading)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 Spacer(minLength: 40)
             }
         }
@@ -208,6 +205,7 @@ extension MessageBubble {
             onSandboxLinkTap: onSandboxLinkTap,
             surfaceStyle: .assistant(isLive: isDisplayingLiveAssistantState)
         )
+        .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("chat.assistant.surface")
         .contentShape(.contextMenuPreview, RoundedRectangle(cornerRadius: 20))

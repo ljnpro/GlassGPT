@@ -106,6 +106,7 @@ extension AgentRunCoordinator {
                             apiKey: prepared.apiKey,
                             configuration: prepared.configuration,
                             conversation: prepared.conversation,
+                            execution: execution,
                             baseInput: baseInput,
                             currentFocus: execution.snapshot.processSnapshot.currentFocus,
                             decisionSummary: decisionSummary
@@ -133,6 +134,9 @@ private extension AgentRunCoordinator {
     func initialLoopStep(for snapshot: AgentRunSnapshot) -> LoopStep {
         let queuedTasks = currentQueuedTasks(from: snapshot)
         if queuedTasks.isEmpty {
+            if snapshot.currentStage == .crossReview || snapshot.processSnapshot.activity == .reviewing {
+                return .review
+            }
             return .triage
         }
         return .delegate(
@@ -248,9 +252,6 @@ private extension AgentRunCoordinator {
                     on: &execution.snapshot
                 )
                 markPlanStepCompleted(for: result.task, on: &execution.snapshot)
-                if let taskResult = result.task.result {
-                    AgentProcessProjector.appendEvidence(taskResult.evidence, on: &execution.snapshot)
-                }
                 completedTasks.append(updatedTask(for: result.task.id, in: execution.snapshot) ?? result.task)
                 persistSnapshot(execution, in: conversation)
             } catch {

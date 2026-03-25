@@ -1,44 +1,16 @@
 import ChatDomain
-import ChatUIComponents
 import NativeChatUI
 import SwiftUI
 
-struct AgentLiveSummaryCard: View {
+struct CompletedAgentProcessSections: View {
     let process: AgentProcessSnapshot
-    @Binding var isExpanded: Bool?
-
-    var body: some View {
-        AgentDisclosureCard(
-            title: String(localized: "Agent Process"),
-            subtitle: headerSubtitle,
-            symbolName: "person.3.sequence.fill",
-            isLive: true,
-            isExpanded: $isExpanded,
-            accessibilityIdentifier: "agent.liveSummary"
-        ) {
-            AgentProcessSections(process: process)
-        }
-    }
-
-    private var headerSubtitle: String {
-        let focus = process.currentFocus.trimmingCharacters(in: .whitespacesAndNewlines)
-        if !focus.isEmpty {
-            return "\(process.activity.displayName) · \(process.progressSummary)"
-        }
-        return process.activity.displayName
-    }
-}
-
-struct AgentProcessSections: View {
-    let process: AgentProcessSnapshot
+    let workerSummaries: [AgentWorkerSummary]
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             AgentTraceSection(
                 title: String(localized: "Leader Focus"),
-                text: process.currentFocus.isEmpty
-                    ? process.activity.displayName
-                    : process.currentFocus
+                text: process.currentFocus.isEmpty ? process.activity.displayName : process.currentFocus
             )
 
             if !process.plan.isEmpty {
@@ -47,34 +19,54 @@ struct AgentProcessSections: View {
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(.secondary)
 
-                    VStack(alignment: .leading, spacing: 8) {
-                        ForEach(Array(process.plan.prefix(5))) { step in
-                            AgentPlanStepRow(step: step)
+                    ForEach(Array(process.plan.prefix(4))) { step in
+                        CompletedPlanRow(step: step)
+                    }
+                }
+            }
+
+            if !workerSummaries.isEmpty {
+                VStack(alignment: .leading, spacing: 10) {
+                    Text(String(localized: "Worker Summaries"))
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+
+                    ForEach(workerSummaries, id: \.role) { summary in
+                        VStack(alignment: .leading, spacing: 6) {
+                            AgentTraceSection(
+                                title: summary.role.displayName,
+                                text: summary.summary
+                            )
+
+                            if !summary.adoptedPoints.isEmpty {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(String(localized: "Adopted Points"))
+                                        .font(.caption2.weight(.semibold))
+                                        .foregroundStyle(.tertiary)
+
+                                    ForEach(summary.adoptedPoints, id: \.self) { point in
+                                        MarkdownContentView(
+                                            text: "- \(point)",
+                                            surfaceStyle: .plain
+                                        )
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                    }
+                                }
+                            }
                         }
                     }
                 }
             }
 
-            if !process.tasks.isEmpty {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text(String(localized: "Delegated Tasks"))
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.secondary)
-
-                    AgentTaskBoard(tasks: process.tasks)
-                }
-            }
-
             if !process.decisions.isEmpty {
-                VStack(alignment: .leading, spacing: 8) {
+                VStack(alignment: .leading, spacing: 6) {
                     Text(String(localized: "Leader Decisions"))
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(.secondary)
 
-                    VStack(alignment: .leading, spacing: 6) {
-                        ForEach(Array(process.decisions.suffix(4))) { decision in
-                            AgentDecisionRow(decision: decision)
-                        }
+                    ForEach(Array(process.decisions.suffix(4))) { decision in
+                        CompletedDecisionRow(decision: decision)
                     }
                 }
             }
@@ -85,15 +77,13 @@ struct AgentProcessSections: View {
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(.secondary)
 
-                    if !process.evidence.isEmpty {
-                        ForEach(Array(process.evidence.prefix(6).enumerated()), id: \.offset) { _, item in
-                            MarkdownContentView(
-                                text: "- \(item)",
-                                surfaceStyle: .plain
-                            )
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                        }
+                    ForEach(Array(process.evidence.prefix(4).enumerated()), id: \.offset) { _, item in
+                        MarkdownContentView(
+                            text: "- \(item)",
+                            surfaceStyle: .plain
+                        )
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                     }
 
                     if let stopReason = process.stopReason {
@@ -113,40 +103,33 @@ struct AgentProcessSections: View {
     }
 }
 
-private struct AgentPlanStepRow: View {
+private struct CompletedPlanRow: View {
     let step: AgentPlanStep
 
     var body: some View {
-        HStack(alignment: .top, spacing: 10) {
+        HStack(alignment: .top, spacing: 8) {
             Circle()
-                .fill(stepColor)
-                .frame(width: 7, height: 7)
+                .fill(color)
+                .frame(width: 6, height: 6)
                 .padding(.top, 6)
 
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 8) {
                     Text(step.title)
-                        .font(.callout.weight(.semibold))
+                        .font(.caption.weight(.semibold))
                         .foregroundStyle(.primary)
 
-                    AgentStatusChip(
-                        text: step.status.displayName,
-                        tint: stepColor
-                    )
+                    AgentStatusChip(text: step.status.displayName, tint: color)
                 }
 
                 MarkdownContentView(text: step.summary, surfaceStyle: .plain)
                     .font(.caption)
                     .foregroundStyle(.secondary)
-
-                Text(step.owner.displayName)
-                    .font(.caption2.weight(.semibold))
-                    .foregroundStyle(.tertiary)
             }
         }
     }
 
-    private var stepColor: Color {
+    private var color: Color {
         switch step.status {
         case .planned:
             .secondary
@@ -162,7 +145,7 @@ private struct AgentPlanStepRow: View {
     }
 }
 
-private struct AgentDecisionRow: View {
+private struct CompletedDecisionRow: View {
     let decision: AgentDecision
 
     var body: some View {

@@ -10,6 +10,8 @@ public enum RichAssistantReplyFixture {
     public static let conversationTitle = "Rich Markdown Sample"
     /// Default conversation title for code-block fixtures.
     public static let codeConversationTitle = "Rich Markdown Code Sample"
+    /// Default conversation title for table fixtures.
+    public static let tableConversationTitle = "Rich Markdown Table Sample"
 
     /// Sample assistant reply containing multi-paragraph prose.
     public static let assistantReply = """
@@ -47,6 +49,19 @@ public enum RichAssistantReplyFixture {
     ```
 
     当代码块结束后，后面的段落也应该继续留在同一个消息里，而不是被切成新的外层卡片。这样用户看到的仍然是一条完整答复。
+    """
+
+    /// Sample assistant reply containing a Markdown pipe table.
+    public static let assistantReplyWithTable = """
+    当然。下面先给出一个简洁对比表，再补一句结论。
+
+    | 方案 | 风险 | 适合场景 |
+    | :--- | ---: | :---: |
+    | 增量发布 | 低 | 稳定上线 |
+    | 原地替换 | 高 | 紧急但可回滚 |
+    | 双写迁移 | 中 | 需要长期兼容 |
+
+    如果目标是稳定发布，优先选择增量发布，并保留显式回滚门。
     """
 
     /// Creates a ``Conversation`` populated with a user message and an assistant reply.

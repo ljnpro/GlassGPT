@@ -7,10 +7,12 @@ public enum AgentTaskOwner: String, Codable, CaseIterable, Identifiable, Sendabl
     case workerB
     case workerC
 
+    /// Stable identifier used by SwiftUI and persistence helpers.
     public var id: String {
         rawValue
     }
 
+    /// Human-readable owner name shown in Agent Process UI.
     public var displayName: String {
         switch self {
         case .leader:
@@ -24,6 +26,7 @@ public enum AgentTaskOwner: String, Codable, CaseIterable, Identifiable, Sendabl
         }
     }
 
+    /// Compact owner badge shown in task chips and plan rows.
     public var shortLabel: String {
         switch self {
         case .leader:
@@ -37,6 +40,7 @@ public enum AgentTaskOwner: String, Codable, CaseIterable, Identifiable, Sendabl
         }
     }
 
+    /// Matching Agent role when the owner represents a worker slot.
     public var role: AgentRole? {
         switch self {
         case .leader:
@@ -59,6 +63,7 @@ public enum AgentPlanStepStatus: String, Codable, CaseIterable, Sendable {
     case completed
     case discarded
 
+    /// User-facing status label for plan progress UI.
     public var displayName: String {
         switch self {
         case .planned:
@@ -84,6 +89,7 @@ public enum AgentTaskStatus: String, Codable, CaseIterable, Sendable {
     case failed
     case discarded
 
+    /// User-facing status label for delegated task UI.
     public var displayName: String {
         switch self {
         case .queued:
@@ -107,6 +113,7 @@ public enum AgentToolPolicy: String, Codable, Sendable {
     case enabled
     case reasoningOnly
 
+    /// User-facing label for the task tool policy selector and summaries.
     public var displayName: String {
         switch self {
         case .enabled:
@@ -123,6 +130,7 @@ public enum AgentConfidence: String, Codable, CaseIterable, Sendable {
     case medium
     case high
 
+    /// User-facing confidence label shown in worker summaries.
     public var displayName: String {
         rawValue.capitalized
     }
@@ -149,6 +157,7 @@ public enum AgentStopReason: String, Codable, CaseIterable, Sendable {
     case cancelled
     case incomplete
 
+    /// User-facing stop reason label shown in the completed Agent Process.
     public var displayName: String {
         switch self {
         case .sufficientAnswer:
@@ -178,6 +187,7 @@ public enum AgentProcessActivity: String, Codable, CaseIterable, Sendable {
     case completed
     case failed
 
+    /// User-facing activity label shown in the live Agent Process header.
     public var displayName: String {
         switch self {
         case .triage:
@@ -218,13 +228,20 @@ public enum AgentEventKind: String, Codable, CaseIterable, Sendable {
 
 /// One plan step rendered in the live Agent Process tree.
 public struct AgentPlanStep: Codable, Equatable, Identifiable, Sendable {
+    /// Stable identifier for the plan step.
     public let id: String
+    /// Parent step identifier when this step is nested under another step.
     public var parentStepID: String?
+    /// Owner responsible for the step.
     public var owner: AgentTaskOwner
+    /// Current lifecycle status for the step.
     public var status: AgentPlanStepStatus
+    /// Short title shown in the plan tree.
     public var title: String
+    /// Concise summary of the step's intent or result.
     public var summary: String
 
+    /// Creates a projected plan step for the live or completed Agent Process.
     public init(
         id: String,
         parentStepID: String? = nil,

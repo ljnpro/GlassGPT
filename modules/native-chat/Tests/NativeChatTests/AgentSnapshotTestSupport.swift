@@ -245,7 +245,11 @@ private func makeRunningAgentProcessSnapshot() -> AgentProcessSnapshot {
                 expectedOutput: "Concise risk summary",
                 contextSummary: "Look for rollback and monitoring gaps.",
                 toolPolicy: .enabled,
-                status: .running
+                status: .running,
+                liveStatusText: "Checking rollback",
+                liveSummary: "The current draft still needs an explicit rollback gate and one monitoring checkpoint.",
+                liveEvidence: ["Rollback gate is not named yet."],
+                liveConfidence: .medium
             ),
             AgentTask(
                 owner: .workerC,
