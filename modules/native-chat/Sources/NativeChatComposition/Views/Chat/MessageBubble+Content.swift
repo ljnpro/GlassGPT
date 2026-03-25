@@ -71,16 +71,17 @@ extension MessageBubble {
     }
 
     var body: some View {
-        HStack(alignment: .top) {
+        Group {
             if message.role == .user {
-                Spacer(minLength: 40)
-                bubbleColumn
-                    .frame(maxWidth: bubbleMaxWidth, alignment: .trailing)
+                HStack(alignment: .top) {
+                    Spacer(minLength: 40)
+                    bubbleColumn
+                        .frame(maxWidth: bubbleMaxWidth, alignment: .trailing)
+                }
             } else {
                 bubbleColumn
                     .frame(maxWidth: bubbleMaxWidth, alignment: .leading)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                Spacer(minLength: 40)
             }
         }
         .padding(.vertical, 2)

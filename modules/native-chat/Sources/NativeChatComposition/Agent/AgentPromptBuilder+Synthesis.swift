@@ -39,6 +39,8 @@ extension AgentPromptBuilder {
                 role: "user",
                 content: .text(
                     """
+                    Use only the accepted findings below as authoritative internal discussion context.
+
                     Final leader focus:
                     \(discussion.leaderFocus)
 

@@ -16,7 +16,6 @@ package struct AgentView: View {
     @State var showDocumentPicker = false
     @State var composerResetToken = UUID()
     @State var isShowingAgentSelector = false
-    @State var agentSelectorDraft = AgentConversationConfiguration()
     @State var liveSummaryExpanded: Bool? = true
     @State var scrollRequestID = UUID()
     @State var expandedTraceMessageIDs: Set<UUID> = []
@@ -49,11 +48,7 @@ package struct AgentView: View {
                 }
                 .onChange(of: viewModel.currentConversation?.id) { _, _ in
                     liveSummaryExpanded = true
-                    agentSelectorDraft = viewModel.currentConfiguration
                     composerResetToken = UUID()
-                }
-                .onAppear {
-                    agentSelectorDraft = viewModel.currentConfiguration
                 }
                 .photosPicker(isPresented: $showPhotoPicker, selection: $selectedPhotoItem, matching: .images)
                 .onChange(of: selectedPhotoItem) { _, newItem in

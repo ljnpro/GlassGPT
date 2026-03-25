@@ -44,7 +44,7 @@ private struct AgentTaskCard: View {
             }
 
             MarkdownContentView(
-                text: task.displaySummary,
+                text: AgentSummaryFormatter.summarize(task.displaySummary, maxLength: 132),
                 surfaceStyle: .plain
             )
             .font(.caption)

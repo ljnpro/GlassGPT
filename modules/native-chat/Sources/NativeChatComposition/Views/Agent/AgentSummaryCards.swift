@@ -38,7 +38,7 @@ struct AgentProcessSections: View {
                 title: String(localized: "Leader Focus"),
                 text: process.currentFocus.isEmpty
                     ? process.activity.displayName
-                    : process.currentFocus
+                    : AgentSummaryFormatter.summarize(process.currentFocus, maxLength: 120)
             )
 
             if !process.plan.isEmpty {
@@ -86,13 +86,14 @@ struct AgentProcessSections: View {
                         .foregroundStyle(.secondary)
 
                     if !process.evidence.isEmpty {
-                        ForEach(Array(process.evidence.prefix(6).enumerated()), id: \.offset) { _, item in
+                        ForEach(Array(process.evidence.prefix(3).enumerated()), id: \.offset) { _, item in
                             MarkdownContentView(
-                                text: "- \(item)",
+                                text: "- \(AgentSummaryFormatter.summarize(item, maxLength: 88))",
                                 surfaceStyle: .plain
                             )
                             .font(.caption)
                             .foregroundStyle(.secondary)
+                            .lineLimit(2)
                         }
                     }
 
@@ -103,9 +104,13 @@ struct AgentProcessSections: View {
                     }
 
                     if !process.outcome.isEmpty {
-                        MarkdownContentView(text: process.outcome, surfaceStyle: .plain)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                        MarkdownContentView(
+                            text: AgentSummaryFormatter.summarize(process.outcome, maxLength: 96),
+                            surfaceStyle: .plain
+                        )
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(2)
                     }
                 }
             }
@@ -135,9 +140,13 @@ private struct AgentPlanStepRow: View {
                     )
                 }
 
-                MarkdownContentView(text: step.summary, surfaceStyle: .plain)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                MarkdownContentView(
+                    text: AgentSummaryFormatter.summarize(step.summary, maxLength: 88),
+                    surfaceStyle: .plain
+                )
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .lineLimit(2)
 
                 Text(step.owner.displayName)
                     .font(.caption2.weight(.semibold))
@@ -177,9 +186,13 @@ private struct AgentDecisionRow: View {
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(.primary)
 
-                MarkdownContentView(text: decision.summary, surfaceStyle: .plain)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                MarkdownContentView(
+                    text: AgentSummaryFormatter.summarize(decision.summary, maxLength: 88),
+                    surfaceStyle: .plain
+                )
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .lineLimit(2)
             }
         }
     }

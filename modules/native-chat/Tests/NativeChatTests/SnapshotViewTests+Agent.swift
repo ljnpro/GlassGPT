@@ -22,6 +22,15 @@ extension SnapshotViewTests {
             )
         }
 
+        let waitingViewModel = try makeSnapshotAgentScreenStore(hasAPIKey: true)
+        _ = makeRunningAgentConversationSamples(in: waitingViewModel)
+        waitingViewModel.isThinking = false
+        waitingViewModel.currentStreamingText = ""
+        waitingViewModel.currentThinkingText = "Waiting for the last tool result before synthesis."
+        assertViewSnapshots(named: "agent-running-waiting") {
+            AgentView(viewModel: waitingViewModel)
+        }
+
         let completedViewModel = try makeSnapshotAgentScreenStore(hasAPIKey: true)
         let completedConversation = makeCompletedAgentConversationSamples(in: completedViewModel)
         assertViewSnapshots(named: "agent-completed-collapsed") {

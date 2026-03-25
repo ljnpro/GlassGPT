@@ -17,12 +17,6 @@ package struct ChatView: View {
     @State var showDocumentPicker = false
     @State var isShowingModelSelector = false
     @State var composerResetToken = UUID()
-    @State var modelSelectorDraft = ConversationConfiguration(
-        model: .gpt5_4,
-        reasoningEffort: .high,
-        backgroundModeEnabled: false,
-        serviceTier: .standard
-    )
     @State var scrollRequestID = UUID()
     @State var streamingThinkingExpanded: Bool? = true
     @State var generatedPreview = GeneratedPreviewPresentationState()

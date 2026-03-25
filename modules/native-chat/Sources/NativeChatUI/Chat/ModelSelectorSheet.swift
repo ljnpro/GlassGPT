@@ -187,7 +187,7 @@ public struct ModelSelectorSheet: View {
             Button {
                 onDone()
             } label: {
-                Text(String(localized: "Save"))
+                Text(String(localized: "Done"))
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(.primary)
                     .padding(.horizontal, 12)
@@ -200,9 +200,9 @@ public struct ModelSelectorSheet: View {
                     )
             }
             .buttonStyle(GlassPressButtonStyle())
-            .accessibilityLabel(String(localized: "Save model settings"))
-            .accessibilityHint(String(localized: "Double-tap to save and dismiss"))
-            .accessibilityIdentifier("modelSelector.save")
+            .accessibilityLabel(String(localized: "Done with model settings"))
+            .accessibilityHint(String(localized: "Double-tap to dismiss"))
+            .accessibilityIdentifier("modelSelector.done")
         }
         .padding(.horizontal, 2)
     }
@@ -264,6 +264,7 @@ public struct ModelSelectorSheet: View {
             Toggle("", isOn: isOn)
                 .labelsHidden()
                 .toggleStyle(.switch)
+                .accessibilityLabel(title)
                 .accessibilityValue(isOn.wrappedValue ? String(localized: "On") : String(localized: "Off"))
                 .accessibilityIdentifier(accessibilityIdentifier)
                 .onChange(of: isOn.wrappedValue) { _, _ in
@@ -272,6 +273,7 @@ public struct ModelSelectorSheet: View {
         }
         .padding(.horizontal, metrics.rowHorizontalPadding)
         .padding(.vertical, metrics.rowVerticalPadding)
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier(rowAccessibilityIdentifier)
     }
 }

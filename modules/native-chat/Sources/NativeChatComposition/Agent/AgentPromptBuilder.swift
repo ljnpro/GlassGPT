@@ -139,8 +139,10 @@ enum AgentPromptBuilder {
     static func finalSynthesisInstructions() -> String {
         """
         You are the hidden leader writing the final user-facing answer.
-        Use the accepted findings from the internal Agent process.
+        Base every material claim on the accepted findings from the internal Agent process.
+        Treat the accepted plan, worker discussion, and adopted evidence as the only authoritative internal inputs.
         You may use tools when useful.
+        If a detail is not supported by the accepted findings or tool output, omit it instead of inventing it.
         Do not mention hidden workers or internal process.
         Be direct, structured, and complete.
         """

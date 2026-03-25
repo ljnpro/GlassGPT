@@ -65,84 +65,81 @@ package struct DetachedStreamingBubbleView: View, Equatable {
 
     /// The detached assistant bubble used while a response is still streaming.
     package var body: some View {
-        HStack(alignment: .top) {
-            VStack(alignment: .leading, spacing: 8) {
-                let hasActiveWebSearch = activeToolCalls.contains {
-                    $0.type == .webSearch && $0.status != .completed
-                }
-                if hasActiveWebSearch {
-                    WebSearchIndicator()
-                        .transition(.opacity.combined(with: .scale(scale: 0.95)))
-                }
-
-                let hasActiveCodeInterpreter = activeToolCalls.contains {
-                    $0.type == .codeInterpreter && $0.status != .completed
-                }
-                if hasActiveCodeInterpreter {
-                    CodeInterpreterIndicator()
-                        .transition(.opacity.combined(with: .scale(scale: 0.95)))
-                }
-
-                let hasActiveFileSearch = activeToolCalls.contains {
-                    $0.type == .fileSearch && $0.status != .completed
-                }
-                if hasActiveFileSearch {
-                    FileSearchIndicator()
-                        .transition(.opacity.combined(with: .scale(scale: 0.95)))
-                }
-
-                let completedCodeCalls = activeToolCalls.filter {
-                    $0.type == .codeInterpreter && $0.status == .completed
-                }
-                ForEach(completedCodeCalls) { toolCall in
-                    CodeInterpreterResultView(toolCall: toolCall)
-                        .transition(.opacity.combined(with: .move(edge: .top)))
-                }
-
-                if isThinking, currentThinkingText.isEmpty, currentStreamingText.isEmpty {
-                    ThinkingIndicator()
-                        .transition(.opacity.combined(with: .scale(scale: 0.95)))
-                }
-
-                if !currentThinkingText.isEmpty {
-                    ThinkingView(
-                        text: currentThinkingText,
-                        phase: thinkingPresentationState ?? .completed,
-                        externalIsExpanded: $streamingThinkingExpanded
-                    )
-                    .transition(.opacity.combined(with: .move(edge: .top)))
-                }
-
-                if !currentStreamingText.isEmpty {
-                    StreamingTextView(
-                        text: currentStreamingText,
-                        allowsSelection: false
-                    )
-                } else if !isThinking, currentThinkingText.isEmpty,
-                          activeToolCalls.allSatisfy({ $0.status == .completed }) {
-                    TypingIndicator()
-                }
-
-                if !liveCitations.isEmpty {
-                    CitationLinksView(citations: liveCitations)
-                }
+        VStack(alignment: .leading, spacing: 8) {
+            let hasActiveWebSearch = activeToolCalls.contains {
+                $0.type == .webSearch && $0.status != .completed
             }
-            .padding(12)
-            .singleSurfaceGlass(
-                cornerRadius: 20,
-                stableFillOpacity: GlassStyleMetrics.AssistantSurface.liveStableFillOpacity,
-                tintOpacity: GlassStyleMetrics.AssistantSurface.liveTintOpacity,
-                borderWidth: GlassStyleMetrics.AssistantSurface.borderWidth,
-                darkBorderOpacity: GlassStyleMetrics.AssistantSurface.darkBorderOpacity,
-                lightBorderOpacity: GlassStyleMetrics.AssistantSurface.lightBorderOpacity
-            )
-            .accessibilityElement(children: .contain)
-            .accessibilityLabel(String(localized: "Assistant response in progress"))
-            .accessibilityIdentifier("chat.assistant.detachedSurface")
-            .frame(maxWidth: assistantBubbleMaxWidth, alignment: .leading)
+            if hasActiveWebSearch {
+                WebSearchIndicator()
+                    .transition(.opacity.combined(with: .scale(scale: 0.95)))
+            }
 
-            Spacer(minLength: 40)
+            let hasActiveCodeInterpreter = activeToolCalls.contains {
+                $0.type == .codeInterpreter && $0.status != .completed
+            }
+            if hasActiveCodeInterpreter {
+                CodeInterpreterIndicator()
+                    .transition(.opacity.combined(with: .scale(scale: 0.95)))
+            }
+
+            let hasActiveFileSearch = activeToolCalls.contains {
+                $0.type == .fileSearch && $0.status != .completed
+            }
+            if hasActiveFileSearch {
+                FileSearchIndicator()
+                    .transition(.opacity.combined(with: .scale(scale: 0.95)))
+            }
+
+            let completedCodeCalls = activeToolCalls.filter {
+                $0.type == .codeInterpreter && $0.status == .completed
+            }
+            ForEach(completedCodeCalls) { toolCall in
+                CodeInterpreterResultView(toolCall: toolCall)
+                    .transition(.opacity.combined(with: .move(edge: .top)))
+            }
+
+            if isThinking, currentThinkingText.isEmpty, currentStreamingText.isEmpty {
+                ThinkingIndicator()
+                    .transition(.opacity.combined(with: .scale(scale: 0.95)))
+            }
+
+            if !currentThinkingText.isEmpty {
+                ThinkingView(
+                    text: currentThinkingText,
+                    phase: thinkingPresentationState ?? .completed,
+                    externalIsExpanded: $streamingThinkingExpanded
+                )
+                .transition(.opacity.combined(with: .move(edge: .top)))
+            }
+
+            if !currentStreamingText.isEmpty {
+                StreamingTextView(
+                    text: currentStreamingText,
+                    allowsSelection: false
+                )
+            } else if !isThinking, currentThinkingText.isEmpty,
+                      activeToolCalls.allSatisfy({ $0.status == .completed }) {
+                TypingIndicator()
+            }
+
+            if !liveCitations.isEmpty {
+                CitationLinksView(citations: liveCitations)
+            }
         }
+        .padding(12)
+        .singleSurfaceGlass(
+            cornerRadius: 20,
+            stableFillOpacity: GlassStyleMetrics.AssistantSurface.liveStableFillOpacity,
+            tintOpacity: GlassStyleMetrics.AssistantSurface.liveTintOpacity,
+            borderWidth: GlassStyleMetrics.AssistantSurface.borderWidth,
+            darkBorderOpacity: GlassStyleMetrics.AssistantSurface.darkBorderOpacity,
+            lightBorderOpacity: GlassStyleMetrics.AssistantSurface.lightBorderOpacity
+        )
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel(String(localized: "Assistant response in progress"))
+        .accessibilityIdentifier("chat.assistant.detachedSurface")
+        .frame(maxWidth: assistantBubbleMaxWidth, alignment: .leading)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 

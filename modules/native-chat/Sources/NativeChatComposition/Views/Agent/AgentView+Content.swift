@@ -68,7 +68,8 @@ extension AgentView {
                 activeToolCalls: isLiveDraft ? viewModel.activeToolCalls : [],
                 liveCitations: isLiveDraft ? viewModel.liveCitations : [],
                 liveFilePathAnnotations: isLiveDraft ? viewModel.liveFilePathAnnotations : [],
-                isLiveThinking: isLiveDraft && viewModel.isThinking
+                isLiveThinking: isLiveDraft && viewModel.isThinking,
+                liveThinkingPresentationState: isLiveDraft ? viewModel.thinkingPresentationState : nil
             )
             .equatable()
             .id(message.id)

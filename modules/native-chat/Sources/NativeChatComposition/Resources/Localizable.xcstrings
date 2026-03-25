@@ -3540,6 +3540,54 @@
         }
       }
     },
+    "Done with Agent settings": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Done with Agent settings"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "完成 Agent 设置"
+          }
+        }
+      }
+    },
+    "Done with model settings": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Done with model settings"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "完成模型设置"
+          }
+        }
+      }
+    },
+    "Double-tap to dismiss": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Double-tap to dismiss"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "双击以关闭"
+          }
+        }
+      }
+    },
     "Evidence": {
       "localizations": {
         "en": {
@@ -3632,6 +3680,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "打开 Agent 设置"
+          }
+        }
+      }
+    },
+    "Open model settings": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open model settings"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "打开模型设置"
           }
         }
       }

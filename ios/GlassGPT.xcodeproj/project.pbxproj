@@ -10,6 +10,8 @@
 		00E357001AD99517003FC87E /* NativeChat in Frameworks */ = {isa = PBXBuildFile; productRef = 081B1C62D4C7E5F6EC724606 /* NativeChat */; };
 		00E357011AD99517003FC87E /* TestSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00E356F71AD99517003FC87E /* TestSupport.swift */; };
 		02FB76D317231FE3C3FE9C26 /* SnapshotTestSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = AEB7DA53CC27898C943EE0C9 /* SnapshotTestSupport.swift */; };
+		02FB76D417231FE3C3FE9C26 /* SnapshotViewTests+Helpers.swift in Sources */ = {isa = PBXBuildFile; fileRef = 02FB76D517231FE3C3FE9C26 /* SnapshotViewTests+Helpers.swift */; };
+		02FB76D617231FE3C3FE9C26 /* SnapshotViewTests+SupportSnapshots.swift in Sources */ = {isa = PBXBuildFile; fileRef = 02FB76D717231FE3C3FE9C26 /* SnapshotViewTests+SupportSnapshots.swift */; };
 		13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB51A68108700A75B9A /* Images.xcassets */; };
 		15FE2F91277A79575837BA7F /* GlassGPTUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CC5500B0A1EE5BC8728B919 /* GlassGPTUITests.swift */; };
 		2B8B6D6E7F104E4AA5B5A1C2 /* AccessibilityAuditTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C1F6A2B3D4E5F60718293A4 /* AccessibilityAuditTests.swift */; };
@@ -47,6 +49,8 @@
 		13B07FB51A68108700A75B9A /* Images.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; name = Images.xcassets; path = GlassGPT/Images.xcassets; sourceTree = "<group>"; };
 		13B07FB61A68108700A75B9A /* Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = Info.plist; path = GlassGPT/Info.plist; sourceTree = "<group>"; };
 		29704E88068307A76C6154BB /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS18.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
+		02FB76D517231FE3C3FE9C26 /* SnapshotViewTests+Helpers.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = "SnapshotViewTests+Helpers.swift"; sourceTree = "<group>"; };
+		02FB76D717231FE3C3FE9C26 /* SnapshotViewTests+SupportSnapshots.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = "SnapshotViewTests+SupportSnapshots.swift"; sourceTree = "<group>"; };
 		5991E9E08763AFDD43672213 /* SnapshotViewTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SnapshotViewTests.swift; sourceTree = "<group>"; };
 		5CC5500B0A1EE5BC8728B919 /* GlassGPTUITests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = GlassGPTUITests.swift; sourceTree = "<group>"; };
 		69358B5C464810283E740D47 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xml; name = PrivacyInfo.xcprivacy; path = GlassGPT/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
@@ -102,6 +106,8 @@
 			children = (
 				00E356F71AD99517003FC87E /* TestSupport.swift */,
 				AEB7DA53CC27898C943EE0C9 /* SnapshotTestSupport.swift */,
+				02FB76D517231FE3C3FE9C26 /* SnapshotViewTests+Helpers.swift */,
+				02FB76D717231FE3C3FE9C26 /* SnapshotViewTests+SupportSnapshots.swift */,
 				5991E9E08763AFDD43672213 /* SnapshotViewTests.swift */,
 			);
 			path = "../modules/native-chat/Tests/NativeChatTests";
@@ -338,6 +344,8 @@
 			files = (
 				00E357011AD99517003FC87E /* TestSupport.swift in Sources */,
 				02FB76D317231FE3C3FE9C26 /* SnapshotTestSupport.swift in Sources */,
+				02FB76D417231FE3C3FE9C26 /* SnapshotViewTests+Helpers.swift in Sources */,
+				02FB76D617231FE3C3FE9C26 /* SnapshotViewTests+SupportSnapshots.swift in Sources */,
 				B3846B13491743A06766F455 /* SnapshotViewTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

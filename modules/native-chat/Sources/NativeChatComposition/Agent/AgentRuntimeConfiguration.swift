@@ -1,6 +1,7 @@
 import ChatDomain
 import ChatPersistenceCore
 import ChatPersistenceSwiftData
+import ChatPresentation
 import ChatUIComponents
 import Foundation
 import OpenAITransport
@@ -29,6 +30,32 @@ package extension AgentController {
     /// Compact top-bar summary of the current Agent runtime configuration.
     var compactConfigurationSummary: String {
         "L \(shortLabel(for: leaderReasoningEffort)) · W \(shortLabel(for: workerReasoningEffort))"
+    }
+
+    /// Enabled top-bar status icons for the visible Agent configuration.
+    var selectorStatusIcons: [String] {
+        var icons: [String] = []
+        if backgroundModeEnabled {
+            icons.append("arrow.triangle.2.circlepath")
+        }
+        if flexModeEnabled {
+            icons.append("leaf.fill")
+        }
+        return icons
+    }
+
+    /// The current presentation phase for the visible leader reasoning summary.
+    var thinkingPresentationState: ThinkingPresentationState? {
+        guard !currentThinkingText.isEmpty else {
+            return nil
+        }
+
+        return ThinkingPresentationState.resolve(
+            hasResponseText: !currentStreamingText.isEmpty,
+            isThinking: isThinking,
+            isAwaitingResponse: isStreaming ||
+                activeToolCalls.contains(where: { $0.status != .completed })
+        )
     }
 
     /// The persisted configuration bound to the currently visible Agent conversation.

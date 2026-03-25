@@ -25,32 +25,22 @@ extension ChatView {
 
     var chatTopBar: some View {
         HStack(alignment: .center, spacing: 12) {
-            ModelBadge(
-                model: viewModel.selectedModel,
-                effort: viewModel.reasoningEffort,
-                onTap: { presentModelSelector() }
+            ConversationSelectorCapsuleButton(
+                title: viewModel.configurationSummary,
+                trailingSystemIcons: viewModel.selectorStatusIcons,
+                accessibilityLabel: String(localized: "Model"),
+                accessibilityValue: viewModel.configurationSummary,
+                accessibilityHint: String(localized: "Open model settings"),
+                accessibilityIdentifier: "chat.modelSelectorButton",
+                onTap: presentModelSelector
             )
 
-            Spacer(minLength: 12)
-
-            Button {
+            ConversationNewButton(
+                accessibilityLabel: String(localized: "Start new chat"),
+                accessibilityIdentifier: "chat.newChat"
+            ) {
                 startNewChat()
-            } label: {
-                Image(systemName: "square.and.pencil")
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.primary)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
-                    .singleFrameGlassCapsuleControl(
-                        tintOpacity: GlassStyleMetrics.CapsuleControl.tintOpacity,
-                        borderWidth: GlassStyleMetrics.CapsuleControl.borderWidth,
-                        darkBorderOpacity: GlassStyleMetrics.CapsuleControl.darkBorderOpacity,
-                        lightBorderOpacity: GlassStyleMetrics.CapsuleControl.lightBorderOpacity
-                    )
             }
-            .buttonStyle(GlassPressButtonStyle())
-            .accessibilityLabel(String(localized: "Start new chat"))
-            .accessibilityIdentifier("chat.newChat")
         }
         .padding(.horizontal, 16)
         .padding(.top, 8)

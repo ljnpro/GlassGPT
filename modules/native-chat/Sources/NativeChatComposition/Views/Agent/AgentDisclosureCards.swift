@@ -10,7 +10,7 @@ struct AgentProcessCard: View {
     var body: some View {
         AgentDisclosureCard(
             title: String(localized: "Agent Process"),
-            subtitle: trace.outcome,
+            subtitle: AgentSummaryFormatter.summarize(trace.outcome, maxLength: 72),
             symbolName: "checkmark.circle.fill",
             isLive: false,
             isExpanded: Binding(
@@ -47,7 +47,7 @@ struct AgentProcessCard: View {
                 VStack(alignment: .leading, spacing: 8) {
                     AgentTraceSection(
                         title: summary.role.displayName,
-                        text: summary.summary,
+                        text: AgentSummaryFormatter.summarize(summary.summary, maxLength: 120),
                         emphasis: .body
                     )
 
@@ -57,13 +57,14 @@ struct AgentProcessCard: View {
                                 .font(.caption.weight(.semibold))
                                 .foregroundStyle(.secondary)
 
-                            ForEach(summary.adoptedPoints, id: \.self) { point in
+                            ForEach(summary.adoptedPoints.prefix(2), id: \.self) { point in
                                 MarkdownContentView(
-                                    text: "- \(point)",
+                                    text: "- \(AgentSummaryFormatter.summarize(point, maxLength: 80))",
                                     surfaceStyle: .plain
                                 )
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
+                                .lineLimit(2)
                             }
                         }
                     }

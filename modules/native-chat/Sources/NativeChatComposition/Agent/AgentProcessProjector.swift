@@ -178,7 +178,7 @@ enum AgentProcessProjector {
         }
         snapshot.processSnapshot.tasks[index].status = status
         snapshot.processSnapshot.tasks[index].result = result
-        snapshot.processSnapshot.tasks[index].resultSummary = AgentSummaryFormatter.summarize(result.summary, maxLength: 220)
+        snapshot.processSnapshot.tasks[index].resultSummary = AgentSummaryFormatter.summarize(result.summary, maxLength: 150)
         snapshot.processSnapshot.tasks[index].liveStatusText = nil
         snapshot.processSnapshot.tasks[index].liveSummary = nil
         snapshot.processSnapshot.tasks[index].liveEvidence = []
@@ -195,8 +195,8 @@ enum AgentProcessProjector {
         snapshot.processSnapshot.evidence.append(
             contentsOf: AgentSummaryFormatter.summarizeBullets(
                 result.evidence,
-                maxItems: 2,
-                maxLength: 120
+                maxItems: 1,
+                maxLength: 96
             )
         )
         snapshot.updatedAt = .now
@@ -212,8 +212,8 @@ enum AgentProcessProjector {
             evidence.map {
                 $0.trimmingCharacters(in: .whitespacesAndNewlines)
             }.filter { !$0.isEmpty },
-            maxItems: 4,
-            maxLength: 120
+            maxItems: 3,
+            maxLength: 96
         )
         guard !trimmed.isEmpty else { return }
         snapshot.processSnapshot.evidence.append(contentsOf: trimmed)

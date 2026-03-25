@@ -4,6 +4,28 @@ import Foundation
 import GeneratedFilesCore
 
 extension ChatController {
+    var configurationSummary: String {
+        if reasoningEffort == .none {
+            selectedModel.displayName
+        } else {
+            "\(selectedModel.displayName) · \(reasoningEffort.displayName)"
+        }
+    }
+
+    var selectorStatusIcons: [String] {
+        var icons: [String] = []
+        if proModeEnabled {
+            icons.append("brain")
+        }
+        if backgroundModeEnabled {
+            icons.append("arrow.triangle.2.circlepath")
+        }
+        if flexModeEnabled {
+            icons.append("leaf.fill")
+        }
+        return icons
+    }
+
     var proModeEnabled: Bool {
         get { selectedModel == .gpt5_4_pro }
         set { selectedModel = newValue ? .gpt5_4_pro : .gpt5_4 }

@@ -10,7 +10,9 @@ struct CompletedAgentProcessSections: View {
         VStack(alignment: .leading, spacing: 14) {
             AgentTraceSection(
                 title: String(localized: "Leader Focus"),
-                text: process.currentFocus.isEmpty ? process.activity.displayName : process.currentFocus
+                text: process.currentFocus.isEmpty
+                    ? process.activity.displayName
+                    : AgentSummaryFormatter.summarize(process.currentFocus, maxLength: 120)
             )
 
             if !process.plan.isEmpty {
@@ -35,7 +37,7 @@ struct CompletedAgentProcessSections: View {
                         VStack(alignment: .leading, spacing: 6) {
                             AgentTraceSection(
                                 title: summary.role.displayName,
-                                text: summary.summary
+                                text: AgentSummaryFormatter.summarize(summary.summary, maxLength: 120)
                             )
 
                             if !summary.adoptedPoints.isEmpty {
@@ -44,13 +46,14 @@ struct CompletedAgentProcessSections: View {
                                         .font(.caption2.weight(.semibold))
                                         .foregroundStyle(.tertiary)
 
-                                    ForEach(summary.adoptedPoints, id: \.self) { point in
+                                    ForEach(summary.adoptedPoints.prefix(2), id: \.self) { point in
                                         MarkdownContentView(
-                                            text: "- \(point)",
+                                            text: "- \(AgentSummaryFormatter.summarize(point, maxLength: 80))",
                                             surfaceStyle: .plain
                                         )
                                         .font(.caption)
                                         .foregroundStyle(.secondary)
+                                        .lineLimit(2)
                                     }
                                 }
                             }
@@ -77,13 +80,14 @@ struct CompletedAgentProcessSections: View {
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(.secondary)
 
-                    ForEach(Array(process.evidence.prefix(4).enumerated()), id: \.offset) { _, item in
+                    ForEach(Array(process.evidence.prefix(3).enumerated()), id: \.offset) { _, item in
                         MarkdownContentView(
-                            text: "- \(item)",
+                            text: "- \(AgentSummaryFormatter.summarize(item, maxLength: 88))",
                             surfaceStyle: .plain
                         )
                         .font(.caption)
                         .foregroundStyle(.secondary)
+                        .lineLimit(2)
                     }
 
                     if let stopReason = process.stopReason {
@@ -93,9 +97,13 @@ struct CompletedAgentProcessSections: View {
                     }
 
                     if !process.outcome.isEmpty {
-                        MarkdownContentView(text: process.outcome, surfaceStyle: .plain)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                        MarkdownContentView(
+                            text: AgentSummaryFormatter.summarize(process.outcome, maxLength: 96),
+                            surfaceStyle: .plain
+                        )
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(2)
                     }
                 }
             }
@@ -122,9 +130,13 @@ private struct CompletedPlanRow: View {
                     AgentStatusChip(text: step.status.displayName, tint: color)
                 }
 
-                MarkdownContentView(text: step.summary, surfaceStyle: .plain)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                MarkdownContentView(
+                    text: AgentSummaryFormatter.summarize(step.summary, maxLength: 88),
+                    surfaceStyle: .plain
+                )
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .lineLimit(2)
             }
         }
     }
@@ -160,9 +172,13 @@ private struct CompletedDecisionRow: View {
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(.primary)
 
-                MarkdownContentView(text: decision.summary, surfaceStyle: .plain)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                MarkdownContentView(
+                    text: AgentSummaryFormatter.summarize(decision.summary, maxLength: 88),
+                    surfaceStyle: .plain
+                )
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .lineLimit(2)
             }
         }
     }

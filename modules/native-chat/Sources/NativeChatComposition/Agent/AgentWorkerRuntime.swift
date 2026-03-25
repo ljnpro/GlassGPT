@@ -132,7 +132,7 @@ final class AgentWorkerRuntime {
             toolCalls: streamState.toolCalls,
             citations: streamState.citations
         )
-        finishedTask.resultSummary = AgentSummaryFormatter.summarize(parsed.summary, maxLength: 220)
+        finishedTask.resultSummary = AgentSummaryFormatter.summarize(parsed.summary, maxLength: 150)
         finishedTask.completedAt = .now
         return AgentWorkerExecutionResult(task: finishedTask, responseID: responseID)
     }
@@ -147,10 +147,10 @@ final class AgentWorkerRuntime {
         AgentProcessProjector.updateTaskLivePreview(
             taskID: task.id,
             statusText: AgentSummaryFormatter.summarize(preview.status ?? "Running", maxLength: 40),
-            summary: AgentSummaryFormatter.summarize(preview.summary ?? task.goal, maxLength: 220),
-            evidence: AgentSummaryFormatter.summarizeBullets(preview.evidence),
+            summary: AgentSummaryFormatter.summarize(preview.summary ?? task.goal, maxLength: 140),
+            evidence: AgentSummaryFormatter.summarizeBullets(preview.evidence, maxItems: 1, maxLength: 88),
             confidence: preview.confidence,
-            risks: AgentSummaryFormatter.summarizeBullets(preview.risks, maxItems: 2, maxLength: 100),
+            risks: AgentSummaryFormatter.summarizeBullets(preview.risks, maxItems: 1, maxLength: 88),
             on: &execution.snapshot
         )
         state.runCoordinator.persistSnapshot(

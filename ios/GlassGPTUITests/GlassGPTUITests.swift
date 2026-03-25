@@ -148,8 +148,8 @@ final class GlassGPTUITests: XCTestCase {
         XCTAssertTrue(selectorButton.waitForExistence(timeout: 5))
         selectorButton.tap()
 
-        let saveButton = app.buttons["agentSelector.save"]
-        XCTAssertTrue(saveButton.waitForExistence(timeout: 5))
+        let doneButton = app.buttons["agentSelector.done"]
+        XCTAssertTrue(doneButton.waitForExistence(timeout: 5))
 
         setSwitch(app.switches["agentSelector.backgroundMode"], enabled: true)
         setSwitch(app.switches["agentSelector.flexMode"], enabled: true)
@@ -160,17 +160,20 @@ final class GlassGPTUITests: XCTestCase {
         XCTAssertTrue(workerSlider.waitForExistence(timeout: 5))
         leaderSlider.adjust(toNormalizedSliderPosition: 0.0)
         workerSlider.adjust(toNormalizedSliderPosition: 1.0)
-        saveButton.tap()
 
-        XCTAssertTrue(waitForNonExistence(of: saveButton, timeout: 5))
+        let backdrop = app.otherElements["agentSelector.backdrop"]
+        XCTAssertTrue(backdrop.waitForExistence(timeout: 5))
+        backdrop.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.15)).tap()
+
+        XCTAssertTrue(waitForNonExistence(of: doneButton, timeout: 5))
 
         selectorButton.tap()
-        XCTAssertTrue(saveButton.waitForExistence(timeout: 5))
+        XCTAssertTrue(doneButton.waitForExistence(timeout: 5))
         XCTAssertTrue(waitForValue(of: app.sliders["agentSelector.leaderSlider"], "None", timeout: 5))
         XCTAssertTrue(waitForValue(of: app.sliders["agentSelector.workerSlider"], "XHigh", timeout: 5))
-        XCTAssertEqual(app.switches["agentSelector.backgroundMode"].value as? String, "1")
-        XCTAssertEqual(app.switches["agentSelector.flexMode"].value as? String, "1")
-        saveButton.tap()
+        XCTAssertTrue(isSwitchEnabled(app.switches["agentSelector.backgroundMode"]))
+        XCTAssertTrue(isSwitchEnabled(app.switches["agentSelector.flexMode"]))
+        doneButton.tap()
     }
 
     @MainActor
@@ -724,15 +727,15 @@ final class GlassGPTUITests: XCTestCase {
     func testStreamingScenarioCanOpenAndDismissModelSelector() {
         let app = launchApp(scenario: "streaming")
 
-        let modelBadge = app.buttons["chat.modelBadge"]
-        XCTAssertTrue(modelBadge.waitForExistence(timeout: 5))
-        modelBadge.tap()
+        let selectorButton = app.buttons["chat.modelSelectorButton"]
+        XCTAssertTrue(selectorButton.waitForExistence(timeout: 5))
+        selectorButton.tap()
 
-        let saveButton = app.buttons["modelSelector.save"]
-        XCTAssertTrue(saveButton.waitForExistence(timeout: 5))
-        saveButton.tap()
+        let doneButton = app.buttons["modelSelector.done"]
+        XCTAssertTrue(doneButton.waitForExistence(timeout: 5))
+        doneButton.tap()
 
-        XCTAssertTrue(waitForNonExistence(of: saveButton, timeout: 5))
+        XCTAssertTrue(waitForNonExistence(of: doneButton, timeout: 5))
         XCTAssertTrue(app.buttons["chat.newChat"].waitForExistence(timeout: 5))
     }
 
@@ -740,19 +743,28 @@ final class GlassGPTUITests: XCTestCase {
     func testStreamingScenarioCanDismissModelSelectorByTappingBackdrop() {
         let app = launchApp(scenario: "streaming")
 
-        let modelBadge = app.buttons["chat.modelBadge"]
-        XCTAssertTrue(modelBadge.waitForExistence(timeout: 5))
-        modelBadge.tap()
+        let selectorButton = app.buttons["chat.modelSelectorButton"]
+        XCTAssertTrue(selectorButton.waitForExistence(timeout: 5))
+        selectorButton.tap()
 
-        let saveButton = app.buttons["modelSelector.save"]
-        XCTAssertTrue(saveButton.waitForExistence(timeout: 5))
+        let doneButton = app.buttons["modelSelector.done"]
+        XCTAssertTrue(doneButton.waitForExistence(timeout: 5))
+
+        let flexSwitch = app.switches["modelSelector.flexMode"]
+        XCTAssertTrue(flexSwitch.waitForExistence(timeout: 5))
+        setSwitch(flexSwitch, enabled: true)
 
         let backdrop = app.otherElements["modelSelector.backdrop"]
         XCTAssertTrue(backdrop.waitForExistence(timeout: 5))
         backdrop.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.15)).tap()
 
-        XCTAssertTrue(waitForNonExistence(of: saveButton, timeout: 5))
-        XCTAssertTrue(modelBadge.waitForExistence(timeout: 5))
+        XCTAssertTrue(waitForNonExistence(of: doneButton, timeout: 5))
+        XCTAssertTrue(selectorButton.waitForExistence(timeout: 5))
+
+        selectorButton.tap()
+        XCTAssertTrue(doneButton.waitForExistence(timeout: 5))
+        XCTAssertTrue(isSwitchEnabled(app.switches["modelSelector.flexMode"]))
+        doneButton.tap()
     }
 
     @MainActor
@@ -773,16 +785,17 @@ final class GlassGPTUITests: XCTestCase {
     func testStreamingScenarioModelSelectorShowsConfigurationControls() {
         let app = launchApp(scenario: "streaming")
 
-        let modelBadge = app.buttons["chat.modelBadge"]
-        XCTAssertTrue(modelBadge.waitForExistence(timeout: 5))
-        modelBadge.tap()
+        let selectorButton = app.buttons["chat.modelSelectorButton"]
+        XCTAssertTrue(selectorButton.waitForExistence(timeout: 5))
+        selectorButton.tap()
 
-        let saveButton = app.buttons["modelSelector.save"]
-        XCTAssertTrue(saveButton.waitForExistence(timeout: 5))
+        let doneButton = app.buttons["modelSelector.done"]
+        XCTAssertTrue(doneButton.waitForExistence(timeout: 5))
         XCTAssertTrue(app.staticTexts["Pro Mode"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.staticTexts["Background Mode"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.staticTexts["Flex Mode"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.staticTexts["Reasoning"].waitForExistence(timeout: 5))
+        doneButton.tap()
     }
 
     @MainActor
@@ -906,10 +919,19 @@ final class GlassGPTUITests: XCTestCase {
 
     @MainActor
     private func setSwitch(_ element: XCUIElement, enabled: Bool) {
-        let currentValue = (element.value as? String) == "1"
+        let currentValue = isSwitchEnabled(element)
         if currentValue != enabled {
             element.tap()
         }
+    }
+
+    @MainActor
+    private func isSwitchEnabled(_ element: XCUIElement) -> Bool {
+        guard let value = element.value as? String else {
+            return false
+        }
+
+        return value == "1" || value == "On"
     }
 
     @MainActor

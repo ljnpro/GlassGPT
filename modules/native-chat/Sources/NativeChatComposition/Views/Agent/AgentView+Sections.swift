@@ -6,82 +6,27 @@ import UIKit
 extension AgentView {
     var agentTopBar: some View {
         HStack(alignment: .center, spacing: 12) {
-            Button {
-                agentSelectorDraft = viewModel.currentConfiguration
+            ConversationSelectorCapsuleButton(
+                title: viewModel.compactConfigurationSummary,
+                leadingSystemIcon: "person.3.sequence.fill",
+                trailingSystemIcons: viewModel.selectorStatusIcons,
+                accessibilityLabel: String(localized: "Agent Council"),
+                accessibilityValue: viewModel.configurationSummary,
+                accessibilityHint: String(localized: "Open Agent settings"),
+                accessibilityIdentifier: "agent.selectorButton"
+            ) {
                 isShowingAgentSelector = true
-            } label: {
-                HStack(spacing: 8) {
-                    Image(systemName: "person.3.sequence.fill")
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(.blue, .primary.opacity(0.8))
-                        .accessibilityHidden(true)
-
-                    Text(viewModel.compactConfigurationSummary)
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(.primary)
-                        .multilineTextAlignment(.leading)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-
-                    if viewModel.backgroundModeEnabled {
-                        Image(systemName: "arrow.triangle.2.circlepath")
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(.secondary)
-                            .accessibilityHidden(true)
-                    }
-
-                    if viewModel.flexModeEnabled {
-                        Image(systemName: "bolt.fill")
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(.secondary)
-                            .accessibilityHidden(true)
-                    }
-
-                    Image(systemName: "chevron.down")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.secondary)
-                        .accessibilityHidden(true)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
-                .singleFrameGlassCapsuleControl(
-                    tintOpacity: GlassStyleMetrics.CapsuleControl.tintOpacity,
-                    borderWidth: GlassStyleMetrics.CapsuleControl.borderWidth,
-                    darkBorderOpacity: GlassStyleMetrics.CapsuleControl.darkBorderOpacity,
-                    lightBorderOpacity: GlassStyleMetrics.CapsuleControl.lightBorderOpacity
-                )
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .layoutPriority(1)
-            .buttonStyle(GlassPressButtonStyle())
-            .accessibilityElement(children: .ignore)
-            .accessibilityLabel(String(localized: "Agent Council"))
-            .accessibilityValue(viewModel.configurationSummary)
-            .accessibilityHint(String(localized: "Open Agent settings"))
-            .accessibilityIdentifier("agent.selectorButton")
 
-            Button {
+            ConversationNewButton(
+                accessibilityLabel: String(localized: "Start new Agent conversation"),
+                accessibilityIdentifier: "agent.newConversation"
+            ) {
                 composerResetToken = UUID()
                 scrollRequestID = UUID()
                 expandedTraceMessageIDs.removeAll()
                 viewModel.startNewConversation()
-            } label: {
-                Image(systemName: "square.and.pencil")
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.primary)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
-                    .singleFrameGlassCapsuleControl(
-                        tintOpacity: GlassStyleMetrics.CapsuleControl.tintOpacity,
-                        borderWidth: GlassStyleMetrics.CapsuleControl.borderWidth,
-                        darkBorderOpacity: GlassStyleMetrics.CapsuleControl.darkBorderOpacity,
-                        lightBorderOpacity: GlassStyleMetrics.CapsuleControl.lightBorderOpacity
-                    )
             }
-            .buttonStyle(GlassPressButtonStyle())
-            .accessibilityLabel(String(localized: "Start new Agent conversation"))
-            .accessibilityIdentifier("agent.newConversation")
         }
         .padding(.horizontal, 16)
         .padding(.top, 8)
@@ -105,13 +50,38 @@ extension AgentView {
                     }
 
                 AgentSelectorSheet(
-                    backgroundModeEnabled: $agentSelectorDraft.backgroundModeEnabled,
-                    flexModeEnabled: Binding(
-                        get: { agentSelectorDraft.flexModeEnabled },
-                        set: { agentSelectorDraft.flexModeEnabled = $0 }
+                    backgroundModeEnabled: Binding(
+                        get: { viewModel.currentConfiguration.backgroundModeEnabled },
+                        set: { isEnabled in
+                            var configuration = viewModel.currentConfiguration
+                            configuration.backgroundModeEnabled = isEnabled
+                            viewModel.applyConfiguration(configuration)
+                        }
                     ),
-                    leaderReasoningEffort: $agentSelectorDraft.leaderReasoningEffort,
-                    workerReasoningEffort: $agentSelectorDraft.workerReasoningEffort,
+                    flexModeEnabled: Binding(
+                        get: { viewModel.currentConfiguration.flexModeEnabled },
+                        set: { isEnabled in
+                            var configuration = viewModel.currentConfiguration
+                            configuration.flexModeEnabled = isEnabled
+                            viewModel.applyConfiguration(configuration)
+                        }
+                    ),
+                    leaderReasoningEffort: Binding(
+                        get: { viewModel.currentConfiguration.leaderReasoningEffort },
+                        set: { effort in
+                            var configuration = viewModel.currentConfiguration
+                            configuration.leaderReasoningEffort = effort
+                            viewModel.applyConfiguration(configuration)
+                        }
+                    ),
+                    workerReasoningEffort: Binding(
+                        get: { viewModel.currentConfiguration.workerReasoningEffort },
+                        set: { effort in
+                            var configuration = viewModel.currentConfiguration
+                            configuration.workerReasoningEffort = effort
+                            viewModel.applyConfiguration(configuration)
+                        }
+                    ),
                     onDone: commitAgentSelectorAndDismiss
                 )
                 .frame(maxWidth: maxPanelWidth)
@@ -219,11 +189,9 @@ extension AgentView {
 
     func dismissAgentSelector() {
         isShowingAgentSelector = false
-        agentSelectorDraft = viewModel.currentConfiguration
     }
 
     func commitAgentSelectorAndDismiss() {
-        viewModel.applyConfiguration(agentSelectorDraft)
         isShowingAgentSelector = false
     }
 }

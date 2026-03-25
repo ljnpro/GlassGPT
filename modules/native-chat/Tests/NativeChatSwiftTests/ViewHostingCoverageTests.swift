@@ -200,8 +200,8 @@ private func makeDetachedStreamingChatStore() throws -> ChatController {
     store.currentConversation = conversation
     store.messages = [userMessage, assistantMessage]
     store.isStreaming = true
-    store.isThinking = true
-    store.thinkingPresentationState = .completed
+    store.isThinking = false
+    store.thinkingPresentationState = .waiting
     store.visibleSessionMessageID = UUID()
     store.currentThinkingText = "Checking the release pipeline and verifying the archive."
     store.currentStreamingText = "Archive complete. Uploading the build now."

@@ -1,5 +1,6 @@
 import ChatDomain
 import ChatPersistenceSwiftData
+import ChatPresentation
 import Foundation
 import OpenAITransport
 import Testing
@@ -8,6 +9,26 @@ import Testing
 @Suite(.serialized)
 @MainActor
 struct AgentModeRuntimeTests {
+    @Test func `agent final synthesis shows waiting while tools are still active after reasoning`() throws {
+        let controller = try makeTestAgentController(streamClient: QueuedOpenAIStreamClient(scriptedStreams: []))
+        controller.currentThinkingText = "Checking the accepted findings while tool results finish."
+        controller.currentStreamingText = ""
+        controller.isThinking = false
+        controller.isStreaming = true
+        controller.activeToolCalls = [
+            ToolCallInfo(id: "ws_live", type: .webSearch, status: .searching, queries: ["rollout checklist"])
+        ]
+
+        #expect(controller.thinkingPresentationState == .waiting)
+
+        controller.activeToolCalls = [
+            ToolCallInfo(id: "ws_done", type: .webSearch, status: .completed, queries: ["rollout checklist"])
+        ]
+        controller.isStreaming = false
+
+        #expect(controller.thinkingPresentationState == .completed)
+    }
+
     @Test func `agent mode reuses persisted response ids across follow up turns`() async throws {
         let transport = ScriptedAgentCouncilTransport(
             turns: [

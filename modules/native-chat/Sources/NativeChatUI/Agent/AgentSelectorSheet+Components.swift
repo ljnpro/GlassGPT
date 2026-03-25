@@ -21,7 +21,7 @@ extension AgentSelectorSheet {
             Spacer(minLength: 12)
 
             Button(action: onDone) {
-                Text(String(localized: "Save"))
+                Text(String(localized: "Done"))
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(.primary)
                     .padding(.horizontal, 12)
@@ -34,8 +34,8 @@ extension AgentSelectorSheet {
                     )
             }
             .buttonStyle(GlassPressButtonStyle())
-            .accessibilityLabel(String(localized: "Save Agent settings"))
-            .accessibilityIdentifier("agentSelector.save")
+            .accessibilityLabel(String(localized: "Done with Agent settings"))
+            .accessibilityIdentifier("agentSelector.done")
         }
         .padding(.horizontal, 2)
     }

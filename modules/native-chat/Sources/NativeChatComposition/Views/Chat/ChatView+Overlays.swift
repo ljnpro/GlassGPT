@@ -60,15 +60,37 @@ extension ChatView {
 
                 ModelSelectorSheet(
                     proModeEnabled: Binding(
-                        get: { modelSelectorDraft.proModeEnabled },
-                        set: { modelSelectorDraft.proModeEnabled = $0 }
+                        get: { viewModel.proModeEnabled },
+                        set: { isEnabled in
+                            var configuration = viewModel.conversationConfiguration
+                            configuration.proModeEnabled = isEnabled
+                            viewModel.applyConversationConfiguration(configuration)
+                        }
                     ),
-                    backgroundModeEnabled: $modelSelectorDraft.backgroundModeEnabled,
+                    backgroundModeEnabled: Binding(
+                        get: { viewModel.backgroundModeEnabled },
+                        set: { isEnabled in
+                            var configuration = viewModel.conversationConfiguration
+                            configuration.backgroundModeEnabled = isEnabled
+                            viewModel.applyConversationConfiguration(configuration)
+                        }
+                    ),
                     flexModeEnabled: Binding(
-                        get: { modelSelectorDraft.flexModeEnabled },
-                        set: { modelSelectorDraft.flexModeEnabled = $0 }
+                        get: { viewModel.flexModeEnabled },
+                        set: { isEnabled in
+                            var configuration = viewModel.conversationConfiguration
+                            configuration.flexModeEnabled = isEnabled
+                            viewModel.applyConversationConfiguration(configuration)
+                        }
                     ),
-                    reasoningEffort: $modelSelectorDraft.reasoningEffort,
+                    reasoningEffort: Binding(
+                        get: { viewModel.reasoningEffort },
+                        set: { effort in
+                            var configuration = viewModel.conversationConfiguration
+                            configuration.reasoningEffort = effort
+                            viewModel.applyConversationConfiguration(configuration)
+                        }
+                    ),
                     onDone: commitModelSelectorAndDismiss
                 )
                 .frame(maxWidth: maxPanelWidth)

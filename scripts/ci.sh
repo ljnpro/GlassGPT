@@ -571,7 +571,8 @@ function gate_build() {
 
 function gate_app_tests() {
   log "Running app unit tests"
-  if ! find "$ROOT_DIR/ios/GlassGPTTests" -maxdepth 1 -name '*.swift' \
+  local tests_dir="$ROOT_DIR/ios/GlassGPTTests"
+  if [[ ! -d "$tests_dir" ]] || ! find "$tests_dir" -maxdepth 1 -name '*.swift' \
     ! -name 'TestSupport.swift' \
     ! -name 'SnapshotTestSupport.swift' \
     ! -name 'SnapshotViewTests.swift' \

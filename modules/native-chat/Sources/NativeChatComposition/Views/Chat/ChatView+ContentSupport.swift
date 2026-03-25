@@ -64,7 +64,6 @@ extension ChatView {
 
     func presentModelSelector() {
         dismissKeyboard()
-        modelSelectorDraft = viewModel.conversationConfiguration
         isShowingModelSelector = true
     }
 
@@ -78,7 +77,6 @@ extension ChatView {
     }
 
     func commitModelSelectorAndDismiss() {
-        viewModel.conversationCoordinator.applyConversationConfiguration(modelSelectorDraft)
         dismissModelSelector()
     }
 }
