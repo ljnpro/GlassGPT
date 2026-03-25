@@ -80,6 +80,60 @@ func makeCompletedAgentConversationSamples(in viewModel: AgentController) -> Con
                     adoptedPoints: ["Add validation checkpoints."]
                 )
             ],
+            processSnapshot: AgentProcessSnapshot(
+                activity: .completed,
+                currentFocus: "Leader completed the rollout recommendation.",
+                plan: [
+                    AgentPlanStep(
+                        id: "step_root",
+                        owner: .leader,
+                        status: .completed,
+                        title: "Frame rollout plan",
+                        summary: "Choose the safest rollout shape."
+                    ),
+                    AgentPlanStep(
+                        id: "step_validate",
+                        parentStepID: "step_root",
+                        owner: .workerA,
+                        status: .completed,
+                        title: "Validate rollout shape",
+                        summary: "Confirm rollback, parity, and monitoring checkpoints."
+                    )
+                ],
+                tasks: [
+                    AgentTask(
+                        owner: .workerA,
+                        parentStepID: "step_validate",
+                        title: "Validate rollout shape",
+                        goal: "Confirm the safest rollout path",
+                        expectedOutput: "Concise rollout recommendation",
+                        contextSummary: "Focus on additive rollout and rollback gates.",
+                        toolPolicy: .enabled,
+                        status: .completed,
+                        resultSummary: "Use additive rollout with rollback gates.",
+                        result: AgentTaskResult(
+                            summary: "Use additive rollout with rollback gates.",
+                            evidence: ["Parity checks remain visible at every milestone."],
+                            confidence: .high
+                        )
+                    )
+                ],
+                decisions: [
+                    AgentDecision(
+                        kind: .triage,
+                        title: "Delegate",
+                        summary: "Validate the rollout path before answering."
+                    ),
+                    AgentDecision(
+                        kind: .finish,
+                        title: "Finish",
+                        summary: "The current evidence is sufficient for the final answer."
+                    )
+                ],
+                evidence: ["Rollback gates stayed explicit across the plan."],
+                stopReason: .sufficientAnswer,
+                outcome: "Completed"
+            ),
             completedStage: .finalSynthesis,
             outcome: "Completed"
         )
@@ -124,7 +178,7 @@ func makeRunningAgentConversationSamples(in viewModel: AgentController) -> Conve
     viewModel.isRunning = true
     viewModel.isStreaming = true
     viewModel.isThinking = true
-    viewModel.currentStage = .crossReview
+    viewModel.currentStage = .workersRoundOne
     viewModel.leaderReasoningEffort = .high
     viewModel.workerReasoningEffort = .medium
     viewModel.backgroundModeEnabled = true
@@ -132,16 +186,7 @@ func makeRunningAgentConversationSamples(in viewModel: AgentController) -> Conve
     viewModel.leaderBriefSummary = "Prefer a low-risk rollout with explicit failure-domain checks."
     viewModel.currentThinkingText = "Comparing the first worker round and resolving disagreements."
     viewModel.currentStreamingText = "Finalizing the safest release recommendation."
-    viewModel.workersRoundOneProgress = [
-        AgentWorkerProgress(role: .workerA, status: .completed),
-        AgentWorkerProgress(role: .workerB, status: .completed),
-        AgentWorkerProgress(role: .workerC, status: .completed)
-    ]
-    viewModel.crossReviewProgress = [
-        AgentWorkerProgress(role: .workerA, status: .completed),
-        AgentWorkerProgress(role: .workerB, status: .running),
-        AgentWorkerProgress(role: .workerC, status: .completed)
-    ]
+    viewModel.processSnapshot = makeRunningAgentProcessSnapshot()
     viewModel.activeToolCalls = [
         ToolCallInfo(
             id: "agent_web",
@@ -150,6 +195,78 @@ func makeRunningAgentConversationSamples(in viewModel: AgentController) -> Conve
             queries: ["zero-diff rollout checklist"]
         )
     ]
+    viewModel.workersRoundOneProgress = [
+        AgentWorkerProgress(role: .workerA, status: .completed),
+        AgentWorkerProgress(role: .workerB, status: .running),
+        AgentWorkerProgress(role: .workerC, status: .waiting)
+    ]
 
     return conversation
+}
+
+private func makeRunningAgentProcessSnapshot() -> AgentProcessSnapshot {
+    AgentProcessSnapshot(
+        activity: .delegation,
+        currentFocus: "Leader delegated a bounded validation wave before writing the answer.",
+        plan: [
+            AgentPlanStep(
+                id: "step_root",
+                owner: .leader,
+                status: .running,
+                title: "Shape the launch answer",
+                summary: "Choose which work stays local and which goes to workers."
+            ),
+            AgentPlanStep(
+                id: "step_checks",
+                parentStepID: "step_root",
+                owner: .workerB,
+                status: .running,
+                title: "Stress launch risks",
+                summary: "Surface edge cases and rollback needs."
+            )
+        ],
+        tasks: [
+            AgentTask(
+                owner: .workerA,
+                parentStepID: "step_root",
+                title: "Draft strongest answer",
+                goal: "Return the best launch recommendation",
+                expectedOutput: "Concise recommendation",
+                contextSummary: "Focus on release confidence and ordering.",
+                toolPolicy: .enabled,
+                status: .completed,
+                resultSummary: "Ship additively with parity checks."
+            ),
+            AgentTask(
+                owner: .workerB,
+                parentStepID: "step_checks",
+                title: "Stress launch risks",
+                goal: "Surface failure modes",
+                expectedOutput: "Concise risk summary",
+                contextSummary: "Look for rollback and monitoring gaps.",
+                toolPolicy: .enabled,
+                status: .running
+            ),
+            AgentTask(
+                owner: .workerC,
+                parentStepID: "step_root",
+                title: "Check completeness",
+                goal: "Find missing launch gates",
+                expectedOutput: "Short completeness notes",
+                contextSummary: "Keep the answer structured and complete.",
+                toolPolicy: .reasoningOnly,
+                status: .queued
+            )
+        ],
+        decisions: [
+            AgentDecision(
+                kind: .triage,
+                title: "Delegate",
+                summary: "Run one bounded validation wave before synthesis."
+            )
+        ],
+        evidence: ["Worker A already converged on additive rollout."],
+        activeTaskIDs: [],
+        outcome: "In progress"
+    )
 }

@@ -97,6 +97,20 @@ public enum AgentStage: String, Codable, CaseIterable, Identifiable, Sendable {
             "Final synthesis"
         }
     }
+
+    /// Compatibility bridge into the newer dynamic process activity model.
+    public var compatibilityProcessActivity: AgentProcessActivity {
+        switch self {
+        case .leaderBrief:
+            .triage
+        case .workersRoundOne:
+            .delegation
+        case .crossReview:
+            .reviewing
+        case .finalSynthesis:
+            .synthesis
+        }
+    }
 }
 
 /// Per-worker execution state rendered in the Agent progress summary.

@@ -4,10 +4,10 @@ import OpenAITransport
 
 extension AgentRunCoordinator {
     func finalizeSuccessfulTurn(
-        leaderBrief: String,
-        revisedWorkers: [HiddenWorkerRevision],
         prepared: PreparedAgentTurn,
-        execution: AgentExecutionState
+        execution: AgentExecutionState,
+        outcome: String,
+        stopReason _: AgentStopReason
     ) throws {
         guard let draft = prepared.conversation.messages.first(where: { $0.id == prepared.draftMessageID }) else {
             throw AgentRunFailure.missingDraft
@@ -21,10 +21,11 @@ extension AgentRunCoordinator {
         draft.annotations = execution.snapshot.liveCitations
         draft.filePathAnnotations = execution.snapshot.liveFilePathAnnotations
         draft.agentTrace = AgentTurnTrace(
-            leaderBriefSummary: leaderBrief,
-            workerSummaries: makeWorkerSummaries(from: revisedWorkers),
+            leaderBriefSummary: execution.snapshot.leaderBriefSummary ?? execution.snapshot.processSnapshot.currentFocus,
+            workerSummaries: completedWorkerSummaries(from: execution.snapshot.processSnapshot),
+            processSnapshot: execution.snapshot.processSnapshot,
             completedStage: .finalSynthesis,
-            outcome: "Completed"
+            outcome: outcome
         )
         draft.isComplete = true
 
@@ -68,6 +69,18 @@ extension AgentRunCoordinator {
         draft.filePathAnnotations = execution.snapshot.liveFilePathAnnotations
         draft.isComplete = false
 
+        let stopReason: AgentStopReason = switch failure {
+        case .cancelled:
+            .cancelled
+        default:
+            .incomplete
+        }
+        AgentProcessProjector.finalize(
+            outcome: failure.userMessage,
+            stopReason: stopReason,
+            activity: .failed,
+            on: &execution.snapshot
+        )
         execution.snapshot.updatedAt = .now
         var agentState = currentAgentState(for: prepared.conversation)
         agentState.currentStage = nil
@@ -130,38 +143,6 @@ extension AgentRunCoordinator {
         } else {
             syncVisibleStateIfNeeded(execution, in: conversation)
         }
-    }
-
-    func updateLeaderBriefSummary(
-        _ summary: String,
-        execution: AgentExecutionState,
-        conversation: Conversation
-    ) {
-        execution.snapshot.leaderBriefSummary = summary
-        execution.snapshot.updatedAt = .now
-        persistSnapshot(execution, in: conversation)
-    }
-
-    func storeWorkerRoundOneSummaries(
-        _ rounds: [HiddenWorkerRound],
-        execution: AgentExecutionState,
-        conversation: Conversation
-    ) {
-        execution.snapshot.workersRoundOneSummaries = rounds.map {
-            AgentWorkerSummary(role: $0.role, summary: $0.summary)
-        }
-        execution.snapshot.updatedAt = .now
-        persistSnapshot(execution, in: conversation)
-    }
-
-    func storeCrossReviewSummaries(
-        _ revisions: [HiddenWorkerRevision],
-        execution: AgentExecutionState,
-        conversation: Conversation
-    ) {
-        execution.snapshot.crossReviewSummaries = makeWorkerSummaries(from: revisions)
-        execution.snapshot.updatedAt = .now
-        persistSnapshot(execution, in: conversation)
     }
 
     func setAllWorkerStatuses(
@@ -232,6 +213,19 @@ extension AgentRunCoordinator {
             _ = state.conversationCoordinator.saveContext("persistSnapshot")
         }
         syncVisibleStateIfNeeded(execution, in: conversation)
+    }
+
+    func completedWorkerSummaries(from snapshot: AgentProcessSnapshot) -> [AgentWorkerSummary] {
+        snapshot.tasks
+            .filter { $0.status == .completed }
+            .compactMap { task in
+                guard let role = task.owner.role else { return nil }
+                return AgentWorkerSummary(
+                    role: role,
+                    summary: task.result?.summary ?? task.resultSummary ?? task.title,
+                    adoptedPoints: task.result?.evidence.prefix(2).map(\.self) ?? []
+                )
+            }
     }
 
     func syncVisibleStateIfNeeded(_ execution: AgentExecutionState, in conversation: Conversation) {

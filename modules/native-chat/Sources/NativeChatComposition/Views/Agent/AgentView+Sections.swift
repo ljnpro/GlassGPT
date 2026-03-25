@@ -62,8 +62,7 @@ extension AgentView {
             .accessibilityIdentifier("agent.selectorButton")
 
             Button {
-                composerText = ""
-                composerHeight = Self.minimumComposerHeight
+                composerResetToken = UUID()
                 scrollRequestID = UUID()
                 expandedTraceMessageIDs.removeAll()
                 viewModel.startNewConversation()
@@ -176,54 +175,25 @@ extension AgentView {
     }
 
     var agentComposer: some View {
-        VStack(spacing: 0) {
-            HStack(alignment: .bottom, spacing: 8) {
-                MessageComposerTextView(
-                    text: $composerText,
-                    measuredHeight: $composerHeight,
-                    placeholder: String(localized: "Ask the council"),
-                    minHeight: Self.minimumComposerHeight,
-                    maxHeight: Self.maximumComposerHeight,
-                    textInsets: UIEdgeInsets(
-                        top: Self.verticalTextInset,
-                        left: Self.horizontalTextInset,
-                        bottom: Self.verticalTextInset,
-                        right: Self.horizontalTextInset
-                    )
-                )
-                .frame(height: composerHeight)
-                .frame(
-                    maxWidth: .infinity,
-                    minHeight: Self.minimumComposerHeight,
-                    alignment: .leading
-                )
-
-                if viewModel.isRunning {
-                    Button(action: viewModel.stopGeneration) {
-                        Image(systemName: "stop.circle.fill")
-                            .font(.title2)
-                            .foregroundStyle(.red)
-                            .symbolEffect(.pulse)
-                    }
-                    .buttonStyle(.glass)
-                    .accessibilityLabel(String(localized: "Stop Agent run"))
-                    .accessibilityIdentifier("agent.stop")
-                } else {
-                    Button(action: sendMessage) {
-                        Image(systemName: "arrow.up.circle.fill")
-                            .font(.title2)
-                            .foregroundStyle(canSend ? .blue : .secondary)
-                    }
-                    .buttonStyle(.glass)
-                    .disabled(!canSend)
-                    .accessibilityLabel(String(localized: "Send Agent message"))
-                    .accessibilityIdentifier("agent.send")
+        MessageInputBar(
+            resetToken: composerResetToken,
+            isStreaming: viewModel.isRunning,
+            selectedImageData: $viewModel.selectedImageData,
+            pendingAttachments: $viewModel.pendingAttachments,
+            onSend: { text in
+                let didSend = viewModel.sendMessage(text: text)
+                if didSend {
+                    scrollRequestID = UUID()
                 }
+                return didSend
+            },
+            onStop: { viewModel.stopGeneration() },
+            onPickImage: { showPhotoPicker = true },
+            onPickDocument: { showDocumentPicker = true },
+            onRemoveAttachment: { attachment in
+                viewModel.removePendingAttachment(attachment)
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 8)
-        }
-        .background(Color(.systemBackground))
+        )
     }
 
     func agentErrorBanner(_ message: String) -> some View {

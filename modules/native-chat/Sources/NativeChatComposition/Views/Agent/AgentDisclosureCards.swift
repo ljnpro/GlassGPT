@@ -18,39 +18,53 @@ struct AgentProcessCard: View {
             ),
             accessibilityIdentifier: "agent.processCard"
         ) {
-            VStack(alignment: .leading, spacing: 12) {
-                AgentTraceSection(
-                    title: String(localized: "Leader Brief"),
-                    text: trace.leaderBriefSummary
-                )
+            if let processSnapshot = trace.processSnapshot {
+                VStack(alignment: .leading, spacing: 12) {
+                    AgentProcessSections(process: processSnapshot)
 
-                ForEach(trace.workerSummaries, id: \.role) { summary in
-                    VStack(alignment: .leading, spacing: 8) {
-                        AgentTraceSection(
-                            title: summary.role.displayName,
-                            text: summary.summary
-                        )
+                    Text(trace.completedAt.formatted(date: .abbreviated, time: .shortened))
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+            } else {
+                legacyTraceContent
+            }
+        }
+    }
 
-                        if !summary.adoptedPoints.isEmpty {
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(String(localized: "Adopted Points"))
-                                    .font(.caption.weight(.semibold))
+    private var legacyTraceContent: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            AgentTraceSection(
+                title: String(localized: "Leader Brief"),
+                text: trace.leaderBriefSummary
+            )
+
+            ForEach(trace.workerSummaries, id: \.role) { summary in
+                VStack(alignment: .leading, spacing: 8) {
+                    AgentTraceSection(
+                        title: summary.role.displayName,
+                        text: summary.summary
+                    )
+
+                    if !summary.adoptedPoints.isEmpty {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(String(localized: "Adopted Points"))
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(.secondary)
+
+                            ForEach(summary.adoptedPoints, id: \.self) { point in
+                                Text("• \(point)")
+                                    .font(.caption)
                                     .foregroundStyle(.secondary)
-
-                                ForEach(summary.adoptedPoints, id: \.self) { point in
-                                    Text("• \(point)")
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                }
                             }
                         }
                     }
                 }
-
-                Text(trace.completedAt.formatted(date: .abbreviated, time: .shortened))
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
             }
+
+            Text(trace.completedAt.formatted(date: .abbreviated, time: .shortened))
+                .font(.caption2)
+                .foregroundStyle(.secondary)
         }
     }
 }

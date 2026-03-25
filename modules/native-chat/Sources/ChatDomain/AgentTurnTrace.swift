@@ -27,6 +27,8 @@ public struct AgentTurnTrace: Codable, Equatable, Sendable {
     public let leaderBriefSummary: String
     /// The revised worker summaries.
     public let workerSummaries: [AgentWorkerSummary]
+    /// Rich dynamic process summary for modern Agent runs.
+    public let processSnapshot: AgentProcessSnapshot?
     /// The final completed stage for this run.
     public let completedStage: AgentStage
     /// When the hidden multi-agent process completed.
@@ -38,12 +40,14 @@ public struct AgentTurnTrace: Codable, Equatable, Sendable {
     public init(
         leaderBriefSummary: String,
         workerSummaries: [AgentWorkerSummary],
+        processSnapshot: AgentProcessSnapshot? = nil,
         completedStage: AgentStage,
         completedAt: Date = Date(),
         outcome: String
     ) {
         self.leaderBriefSummary = leaderBriefSummary
         self.workerSummaries = workerSummaries
+        self.processSnapshot = processSnapshot
         self.completedStage = completedStage
         self.completedAt = completedAt
         self.outcome = outcome

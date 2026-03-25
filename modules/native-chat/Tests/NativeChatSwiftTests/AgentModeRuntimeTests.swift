@@ -12,29 +12,21 @@ struct AgentModeRuntimeTests {
         let transport = ScriptedAgentCouncilTransport(
             turns: [
                 AgentTurnScript(
-                    leaderResponseID: "leader_brief_1",
-                    roundOneResponseIDs: [
-                        .workerA: "worker_a_round_1",
-                        .workerB: "worker_b_round_1",
-                        .workerC: "worker_c_round_1"
-                    ],
-                    revisionResponseIDs: [
-                        .workerA: "worker_a_revision_1",
-                        .workerB: "worker_b_revision_1",
-                        .workerC: "worker_c_revision_1"
+                    triageResponseID: "leader_triage_1",
+                    reviewResponseID: "leader_review_1",
+                    taskResponseIDs: [
+                        .workerA: "worker_a_task_1",
+                        .workerB: "worker_b_task_1",
+                        .workerC: "worker_c_task_1"
                     ]
                 ),
                 AgentTurnScript(
-                    leaderResponseID: "leader_brief_2",
-                    roundOneResponseIDs: [
-                        .workerA: "worker_a_round_2",
-                        .workerB: "worker_b_round_2",
-                        .workerC: "worker_c_round_2"
-                    ],
-                    revisionResponseIDs: [
-                        .workerA: "worker_a_revision_2",
-                        .workerB: "worker_b_revision_2",
-                        .workerC: "worker_c_revision_2"
+                    triageResponseID: "leader_triage_2",
+                    reviewResponseID: "leader_review_2",
+                    taskResponseIDs: [
+                        .workerA: "worker_a_task_2",
+                        .workerB: "worker_b_task_2",
+                        .workerC: "worker_c_task_2"
                     ]
                 )
             ]
@@ -68,17 +60,17 @@ struct AgentModeRuntimeTests {
 
         let finalState = try #require(controller.currentConversation?.agentConversationState)
         #expect(finalState.responseID(for: .leader) == "leader_final_2")
-        #expect(finalState.responseID(for: .workerA) == "worker_a_revision_2")
-        #expect(finalState.responseID(for: .workerB) == "worker_b_revision_2")
-        #expect(finalState.responseID(for: .workerC) == "worker_c_revision_2")
+        #expect(finalState.responseID(for: .workerA) == "worker_a_task_2")
+        #expect(finalState.responseID(for: .workerB) == "worker_b_task_2")
+        #expect(finalState.responseID(for: .workerC) == "worker_c_task_2")
 
         let recordedRequests = await transport.requests()
         let requestBodies = recordedRequests.compactMap(previousResponseID(from:))
 
         #expect(requestBodies.contains("leader_final_1"))
-        #expect(requestBodies.contains("worker_a_revision_1"))
-        #expect(requestBodies.contains("worker_b_revision_1"))
-        #expect(requestBodies.contains("worker_c_revision_1"))
+        #expect(requestBodies.contains("worker_a_task_1"))
+        #expect(requestBodies.contains("worker_b_task_1"))
+        #expect(requestBodies.contains("worker_c_task_1"))
     }
 
     @Test func `starting new agent conversation detaches active execution and rebinding avoids retry banner`() async throws {

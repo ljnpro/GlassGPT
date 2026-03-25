@@ -29,11 +29,13 @@ extension AgentRunCoordinator {
         }
 
         let snapshot = resumableSnapshot(in: conversation, draft: draft)
+        var preparedSnapshot = snapshot
+        AgentProcessProjector.prepareForResume(&preparedSnapshot)
         let latestUserText = latestUserText(
             in: conversation,
-            preferredUserMessageID: snapshot.latestUserMessageID
+            preferredUserMessageID: preparedSnapshot.latestUserMessageID
         )
-        guard !latestUserText.isEmpty else {
+        guard conversation.messages.contains(where: { $0.id == preparedSnapshot.latestUserMessageID }) else {
             if state.currentConversation?.id == conversation.id {
                 state.errorMessage = AgentConversationCoordinator.retryBannerMessage
             }
@@ -46,12 +48,13 @@ extension AgentRunCoordinator {
             draft: draft,
             configuration: resolvedConfiguration(for: conversation),
             latestUserText: latestUserText,
-            userMessageID: snapshot.latestUserMessageID,
-            draftMessageID: draft.id
+            userMessageID: preparedSnapshot.latestUserMessageID,
+            draftMessageID: draft.id,
+            attachmentsToUpload: []
         )
         startExecution(
             prepared,
-            snapshot: snapshot,
+            snapshot: preparedSnapshot,
             service: state.serviceFactory()
         )
     }
@@ -202,6 +205,10 @@ extension AgentRunCoordinator {
             currentStage: .finalSynthesis,
             draftMessageID: draft.id,
             latestUserMessageID: latestUserMessageID,
+            processSnapshot: AgentProcessSnapshot(
+                activity: .synthesis,
+                currentFocus: "Leader is finishing the answer."
+            ),
             currentStreamingText: draft.content,
             currentThinkingText: draft.thinking ?? "",
             activeToolCalls: draft.toolCalls,

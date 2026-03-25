@@ -75,10 +75,7 @@ extension AgentView {
 
             if message.role == .assistant, isLiveDraft || (!message.isComplete && viewModel.isRunning) {
                 AgentLiveSummaryCard(
-                    currentStage: viewModel.currentStage,
-                    leaderBriefSummary: viewModel.leaderBriefSummary,
-                    workersRoundOneProgress: viewModel.workersRoundOneProgress,
-                    crossReviewProgress: viewModel.crossReviewProgress,
+                    process: viewModel.processSnapshot,
                     isExpanded: Binding(
                         get: { liveSummaryExpanded },
                         set: { liveSummaryExpanded = $0 }
@@ -107,30 +104,22 @@ extension AgentView {
         UIDevice.current.userInterfaceIdiom == .pad ? 680 : 520
     }
 
-    var canSend: Bool {
-        !composerText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-    }
-
     var liveBottomAnchorKey: Int {
         var hasher = Hasher()
         hasher.combine(viewModel.currentConversation?.id)
-        hasher.combine(viewModel.currentStage?.rawValue ?? "")
+        hasher.combine(viewModel.processSnapshot.activity.rawValue)
         hasher.combine(viewModel.currentStreamingText)
         hasher.combine(viewModel.currentThinkingText)
         hasher.combine(viewModel.isRunning)
         hasher.combine(viewModel.isThinking)
         hasher.combine(viewModel.liveCitations.count)
         hasher.combine(viewModel.liveFilePathAnnotations.count)
-        hasher.combine(viewModel.leaderBriefSummary ?? "")
-
-        for progress in viewModel.workersRoundOneProgress {
-            hasher.combine(progress.role.rawValue)
-            hasher.combine(progress.status.rawValue)
-        }
-
-        for progress in viewModel.crossReviewProgress {
-            hasher.combine(progress.role.rawValue)
-            hasher.combine(progress.status.rawValue)
+        hasher.combine(viewModel.processSnapshot.currentFocus)
+        hasher.combine(viewModel.processSnapshot.tasks.count)
+        hasher.combine(viewModel.processSnapshot.decisions.count)
+        for task in viewModel.processSnapshot.tasks {
+            hasher.combine(task.id)
+            hasher.combine(task.status.rawValue)
         }
 
         return hasher.finalize()
@@ -138,13 +127,5 @@ extension AgentView {
 
     func dismissKeyboard() {
         KeyboardDismisser.dismiss()
-    }
-
-    func sendMessage() {
-        let text = composerText
-        guard viewModel.sendMessage(text: text) else { return }
-        composerText = ""
-        composerHeight = Self.minimumComposerHeight
-        scrollRequestID = UUID()
     }
 }

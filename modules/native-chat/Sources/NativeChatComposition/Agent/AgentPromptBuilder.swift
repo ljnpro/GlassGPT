@@ -7,116 +7,214 @@ enum AgentPromptBuilder {
     static func visibleConversationInput(
         from messages: [Message]
     ) -> [ResponsesInputMessageDTO] {
-        messages
+        let requestMessages = messages
             .sorted(by: { $0.createdAt < $1.createdAt })
             .filter { $0.role == .user || ($0.role == .assistant && $0.isComplete) }
             .map {
-                ResponsesInputMessageDTO(
-                    role: $0.role == .user ? "user" : "assistant",
-                    content: .text($0.content)
+                APIMessage(
+                    role: $0.role,
+                    content: $0.content,
+                    imageData: $0.imageData,
+                    fileAttachments: $0.fileAttachments
                 )
             }
+
+        return OpenAIRequestFactory.buildInputMessages(messages: requestMessages)
     }
 
-    static func leaderBriefInstructions() -> String {
+    static func leaderTriageInstructions() -> String {
         """
-        You are the leader in an internal four-agent council.
-        Review the user-visible conversation context, decide the best approach,
-        and produce a compact coordination brief for three workers.
+        You are the hidden leader of a dynamic Agent team. Work like a Codex leader coordinating subagents.
 
-        Output only:
-        [BRIEF]
-        <3-6 concise lines covering objective, likely answer shape, and what the workers should validate>
-        [/BRIEF]
+        Rules:
+        - Keep urgent blocking reasoning local when you need it for the next decision.
+        - Delegate only bounded side tasks that materially reduce uncertainty.
+        - Worker tasks must be concrete, non-overlapping, and owned by workerA, workerB, or workerC.
+        - Workers cannot recursively delegate. They may only suggest follow-up ideas.
+        - Spawn at most 3 worker tasks in one wave.
+        - If the answer is already sufficient, choose finish with no tasks.
+        - If the user must clarify something, choose clarify.
+
+        Output only these tagged sections:
+        [FOCUS]
+        <one concise sentence about the current leader focus>
+        [/FOCUS]
+        [DECISION]
+        <delegate|finish|clarify>
+        [/DECISION]
+        [PLAN]
+        <zero or more lines using this exact format>
+        <step_id> || <parent_step_id or root> || <owner> || <status> || <title> || <summary>
+        Allowed owners: leader, workerA, workerB, workerC
+        Allowed status: planned, running, blocked, completed, discarded
+        [/PLAN]
+        [TASKS]
+        <zero to three lines using this exact format>
+        <owner> || <step_id> || <tool_policy> || <title> || <goal> || <expected_output>
+        Allowed owners: workerA, workerB, workerC
+        Allowed tool_policy: enabled, reasoningOnly
+        [/TASKS]
+        [DECISION_NOTE]
+        <one concise sentence explaining why>
+        [/DECISION_NOTE]
+        [STOP_REASON]
+        <required only when decision is finish or clarify>
+        [/STOP_REASON]
         """
     }
 
-    static func workerRoundInstructions(for role: AgentRole) -> String {
+    static func leaderReviewInstructions() -> String {
         """
-        You are \(role.displayName) in an internal agent council.
-        Use the user-visible conversation plus the leader brief.
-        You may use tools when useful. Produce one concise worker summary.
+        You are the hidden leader of a dynamic Agent team reviewing delegated worker results.
 
-        Focus:
-        \(workerFocus(for: role))
+        Rules:
+        - Integrate good results and avoid duplicating completed work.
+        - Delegate another wave only if real uncertainty remains.
+        - Keep worker tasks bounded and non-overlapping.
+        - Spawn at most 3 worker tasks in one wave.
+        - If the answer is strong enough, choose finish.
+        - If the user must clarify something, choose clarify.
 
-        Output only:
+        Output only these tagged sections:
+        [FOCUS]
+        <one concise sentence about the current leader focus>
+        [/FOCUS]
+        [DECISION]
+        <delegate|finish|clarify>
+        [/DECISION]
+        [PLAN]
+        <zero or more lines using this exact format>
+        <step_id> || <parent_step_id or root> || <owner> || <status> || <title> || <summary>
+        [/PLAN]
+        [TASKS]
+        <zero to three lines using this exact format>
+        <owner> || <step_id> || <tool_policy> || <title> || <goal> || <expected_output>
+        [/TASKS]
+        [DECISION_NOTE]
+        <one concise sentence explaining the next move>
+        [/DECISION_NOTE]
+        [STOP_REASON]
+        <required only when decision is finish or clarify>
+        [/STOP_REASON]
+        """
+    }
+
+    static func workerTaskInstructions(
+        for owner: AgentTaskOwner,
+        toolPolicy: AgentToolPolicy
+    ) -> String {
+        """
+        You are \(owner.displayName) on a hidden Agent team.
+        You own only the task you were assigned.
+        Do not delegate.
+        \(toolPolicy == .enabled ? "You may use tools when they materially help." : "Stay reasoning-only; do not use tools.")
+
+        Output only these tagged sections:
         [SUMMARY]
-        <one concise summary>
+        <short result summary>
         [/SUMMARY]
-        """
-    }
-
-    static func crossReviewInstructions(for role: AgentRole) -> String {
-        """
-        You are \(role.displayName) in an internal agent council.
-        Review your prior answer and the other workers' summaries.
-        Revise your position, adopt good points from peers,
-        and keep the result concise.
-
-        Output only:
-        [SUMMARY]
-        <your revised summary>
-        [/SUMMARY]
-        [ADOPTED]
-        - <adopted point 1>
-        - <adopted point 2 if needed>
-        [/ADOPTED]
+        [EVIDENCE]
+        - <evidence point 1>
+        - <evidence point 2 if needed>
+        [/EVIDENCE]
+        [CONFIDENCE]
+        <low|medium|high>
+        [/CONFIDENCE]
+        [RISKS]
+        - <remaining risk 1>
+        - <remaining risk 2 if needed>
+        [/RISKS]
+        [FOLLOW_UP]
+        <zero to three lines using this exact format>
+        <title> || <goal> || <tool_policy>
+        Allowed tool_policy: enabled, reasoningOnly
+        [/FOLLOW_UP]
         """
     }
 
     static func finalSynthesisInstructions() -> String {
         """
-        You are the leader in an internal agent council.
-        Using your prior brief plus the revised worker summaries,
-        produce the final user-facing answer.
+        You are the hidden leader writing the final user-facing answer.
+        Use the accepted findings from the internal Agent process.
         You may use tools when useful.
+        Do not mention hidden workers or internal process.
         Be direct, structured, and complete.
-        Do not mention the hidden workers or internal process.
         """
     }
 
-    static func workerRoundInput(
-        latestUserText: String,
-        leaderBrief: String
+    static func triageInput(
+        baseInput: [ResponsesInputMessageDTO]
     ) -> [ResponsesInputMessageDTO] {
-        [
+        baseInput
+    }
+
+    static func workerTaskInput(
+        baseInput: [ResponsesInputMessageDTO],
+        task: AgentTask,
+        currentFocus: String,
+        priorDecisionSummary: String
+    ) -> [ResponsesInputMessageDTO] {
+        baseInput + [
             ResponsesInputMessageDTO(
                 role: "user",
                 content: .text(
                     """
-                    Latest user turn:
-                    \(latestUserText)
+                    Current leader focus:
+                    \(currentFocus)
 
-                    Leader brief:
-                    \(leaderBrief)
+                    Latest leader decision:
+                    \(priorDecisionSummary)
+
+                    Your owned task:
+                    Title: \(task.title)
+                    Goal: \(task.goal)
+                    Expected output: \(task.expectedOutput)
+                    Context: \(task.contextSummary)
                     """
                 )
             )
         ]
     }
 
-    static func crossReviewInput(
-        latestUserText: String,
-        ownSummary: String,
-        peerSummaries: [String]
+    static func leaderReviewInput(
+        baseInput: [ResponsesInputMessageDTO],
+        snapshot: AgentProcessSnapshot,
+        completedTasks: [AgentTask]
     ) -> [ResponsesInputMessageDTO] {
-        let peers = peerSummaries.enumerated()
-            .map { index, summary in "Peer \(index + 1): \(summary)" }
-            .joined(separator: "\n\n")
-        return [
+        let planLines = snapshot.plan.map {
+            "\($0.id) || \($0.parentStepID ?? "root") || \($0.owner.rawValue) || \($0.status.rawValue) || \($0.title) || \($0.summary)"
+        }
+        let taskLines = completedTasks.map { task in
+            let result = task.result?.summary ?? task.resultSummary ?? ""
+            let evidence = task.result?.evidence.joined(separator: "; ") ?? "None"
+            let followUps = task.result?.followUpRecommendations
+                .map { "\($0.title) (\($0.toolPolicy.rawValue))" }
+                .joined(separator: "; ") ?? "None"
+            return """
+            \(task.owner.rawValue) || \(task.title) || \(task.status.rawValue)
+            Summary: \(result)
+            Evidence: \(evidence)
+            Follow-up ideas: \(followUps)
+            """
+        }
+        let evidenceBlock = snapshot.evidence.isEmpty ? "None" : snapshot.evidence.joined(separator: "\n- ")
+
+        return baseInput + [
             ResponsesInputMessageDTO(
                 role: "user",
                 content: .text(
                     """
-                    Latest user turn:
-                    \(latestUserText)
+                    Current focus:
+                    \(snapshot.currentFocus)
 
-                    Your current summary:
-                    \(ownSummary)
+                    Current plan:
+                    \(planLines.joined(separator: "\n"))
 
-                    Peer summaries:
-                    \(peers)
+                    Completed worker tasks:
+                    \(taskLines.joined(separator: "\n\n"))
+
+                    Accepted evidence:
+                    - \(evidenceBlock)
                     """
                 )
             )
@@ -124,52 +222,40 @@ enum AgentPromptBuilder {
     }
 
     static func finalSynthesisInput(
-        latestUserText: String,
-        leaderBrief: String,
-        workerSummaries: [AgentWorkerSummary]
+        baseInput: [ResponsesInputMessageDTO],
+        snapshot: AgentProcessSnapshot
     ) -> [ResponsesInputMessageDTO] {
-        let workerText = workerSummaries
-            .map { summary in
-                let adopted = summary.adoptedPoints.isEmpty
-                    ? "None"
-                    : summary.adoptedPoints.joined(separator: "; ")
+        let taskSummaries = snapshot.tasks
+            .filter { $0.status == .completed }
+            .map { task in
+                let confidence = task.result?.confidence.displayName ?? AgentConfidence.medium.displayName
                 return """
-                \(summary.role.displayName):
-                Summary: \(summary.summary)
-                Adopted: \(adopted)
+                \(task.owner.displayName): \(task.result?.summary ?? task.resultSummary ?? task.title)
+                Confidence: \(confidence)
                 """
             }
             .joined(separator: "\n\n")
+        let evidenceBlock = snapshot.evidence.prefix(8).joined(separator: "\n- ")
 
-        return [
+        return baseInput + [
             ResponsesInputMessageDTO(
                 role: "user",
                 content: .text(
                     """
-                    Latest user turn:
-                    \(latestUserText)
+                    Current focus:
+                    \(snapshot.currentFocus)
 
-                    Original leader brief:
-                    \(leaderBrief)
+                    Accepted task results:
+                    \(taskSummaries)
 
-                    Revised worker summaries:
-                    \(workerText)
+                    Accepted evidence:
+                    - \(evidenceBlock.isEmpty ? "None" : evidenceBlock)
+
+                    Final stop reason:
+                    \(snapshot.stopReason?.displayName ?? "Leader judged the answer sufficient")
                     """
                 )
             )
         ]
-    }
-
-    private static func workerFocus(for role: AgentRole) -> String {
-        switch role {
-        case .leader:
-            "Leadership synthesis"
-        case .workerA:
-            "Strongest direct answer and recommended solution"
-        case .workerB:
-            "Risks, objections, edge cases, and failure modes"
-        case .workerC:
-            "Completeness, structure, missing context, and quality checks"
-        }
     }
 }

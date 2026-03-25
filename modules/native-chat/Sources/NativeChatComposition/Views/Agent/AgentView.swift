@@ -1,7 +1,9 @@
 import ChatDomain
+import ChatPersistenceCore
 import ChatPersistenceSwiftData
 import ChatUIComponents
 import NativeChatUI
+import PhotosUI
 import SwiftUI
 import UIKit
 
@@ -9,8 +11,10 @@ import UIKit
 package struct AgentView: View {
     @Bindable var viewModel: AgentController
     @AppStorage("appTheme") private var appThemeRawValue: String = AppTheme.system.rawValue
-    @State var composerText = ""
-    @State var composerHeight = Self.minimumComposerHeight
+    @State var showPhotoPicker = false
+    @State var selectedPhotoItem: PhotosPickerItem?
+    @State var showDocumentPicker = false
+    @State var composerResetToken = UUID()
     @State var isShowingAgentSelector = false
     @State var agentSelectorDraft = AgentConversationConfiguration()
     @State var liveSummaryExpanded: Bool? = true
@@ -18,11 +22,6 @@ package struct AgentView: View {
     @State var expandedTraceMessageIDs: Set<UUID> = []
 
     static let emptyConversationRootID = "agent.empty.root"
-    static let horizontalTextInset: CGFloat = 12
-    static let verticalTextInset: CGFloat = 8
-    static let composerFont = UIFont.preferredFont(forTextStyle: .body)
-    static let minimumComposerHeight = ceil(composerFont.lineHeight + (verticalTextInset * 2))
-    static let maximumComposerHeight = ceil((composerFont.lineHeight * 6) + (verticalTextInset * 2))
 
     /// Creates an Agent view backed by the given controller and optional expanded process-card state.
     package init(
@@ -51,9 +50,32 @@ package struct AgentView: View {
                 .onChange(of: viewModel.currentConversation?.id) { _, _ in
                     liveSummaryExpanded = true
                     agentSelectorDraft = viewModel.currentConfiguration
+                    composerResetToken = UUID()
                 }
                 .onAppear {
                     agentSelectorDraft = viewModel.currentConfiguration
+                }
+                .photosPicker(isPresented: $showPhotoPicker, selection: $selectedPhotoItem, matching: .images)
+                .onChange(of: selectedPhotoItem) { _, newItem in
+                    Task {
+                        do {
+                            guard
+                                let rawData = try await newItem?.loadTransferable(type: Data.self),
+                                let image = UIImage(data: rawData),
+                                let jpegData = image.jpegData(compressionQuality: 0.85)
+                            else {
+                                return
+                            }
+                            viewModel.selectedImageData = jpegData
+                        } catch {
+                            Loggers.files.error("Failed to load Agent photo: \(error.localizedDescription)")
+                        }
+                    }
+                }
+                .sheet(isPresented: $showDocumentPicker) {
+                    DocumentPicker { urls in
+                        viewModel.handlePickedDocuments(urls)
+                    }
                 }
         }
     }

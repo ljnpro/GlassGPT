@@ -6,6 +6,7 @@ import OpenAITransport
 final class AgentExecutionState {
     let conversationID: UUID
     let draftMessageID: UUID
+    let latestUserMessageID: UUID
     let apiKey: String
     let service: OpenAIService
     var task: Task<Void, Never>?
@@ -14,13 +15,14 @@ final class AgentExecutionState {
     init(
         conversationID: UUID,
         draftMessageID: UUID,
-        latestUserMessageID _: UUID,
+        latestUserMessageID: UUID,
         apiKey: String,
         service: OpenAIService,
         snapshot: AgentRunSnapshot
     ) {
         self.conversationID = conversationID
         self.draftMessageID = draftMessageID
+        self.latestUserMessageID = latestUserMessageID
         self.apiKey = apiKey
         self.service = service
         self.snapshot = snapshot

@@ -26,17 +26,6 @@ enum AgentRunFailure: Error {
     }
 }
 
-struct HiddenWorkerRound {
-    let role: AgentRole
-    let summary: String
-}
-
-struct HiddenWorkerRevision {
-    let role: AgentRole
-    let summary: String
-    let adoptedPoints: [String]
-}
-
 @MainActor
 final class AgentRunCoordinator {
     unowned let state: AgentController
@@ -46,11 +35,11 @@ final class AgentRunCoordinator {
     }
 
     func startTurn(_ prepared: PreparedAgentTurn) {
-        let snapshot = prepared.conversation.agentConversationState?.activeRun ?? AgentRunSnapshot(
-            currentStage: .leaderBrief,
-            draftMessageID: prepared.draft.id,
-            latestUserMessageID: prepared.userMessageID
-        )
+        let snapshot = prepared.conversation.agentConversationState?.activeRun
+            ?? AgentProcessProjector.makeInitialRunSnapshot(
+                draftMessageID: prepared.draft.id,
+                latestUserMessageID: prepared.userMessageID
+            )
         startExecution(
             prepared,
             snapshot: snapshot,
@@ -63,33 +52,57 @@ final class AgentRunCoordinator {
         execution: AgentExecutionState
     ) async {
         do {
+            if !prepared.attachmentsToUpload.isEmpty {
+                try await uploadAttachmentsIfNeeded(prepared)
+            }
+
+            var snapshot = execution.snapshot
+            AgentProcessProjector.prepareForResume(&snapshot)
+            execution.snapshot = snapshot
+            persistSnapshot(execution, in: prepared.conversation)
+
+            if execution.snapshot.currentStage == .finalSynthesis,
+               prepared.configuration.backgroundModeEnabled,
+               prepared.draft.responseId != nil {
+                try await recoverVisibleLeaderSynthesis(
+                    apiKey: prepared.apiKey,
+                    conversation: prepared.conversation,
+                    draft: prepared.draft,
+                    execution: execution
+                )
+                try finalizeSuccessfulTurn(
+                    prepared: prepared,
+                    execution: execution,
+                    outcome: execution.snapshot.processSnapshot.outcome.isEmpty
+                        ? "Completed"
+                        : execution.snapshot.processSnapshot.outcome,
+                    stopReason: execution.snapshot.processSnapshot.stopReason ?? .sufficientAnswer
+                )
+                return
+            }
+
             let baseInput = AgentPromptBuilder.visibleConversationInput(from: prepared.conversation.messages)
-            let leaderBrief = try await resolveLeaderBrief(
-                for: prepared,
+            let finalDirective = try await executeDynamicLoop(
+                prepared: prepared,
                 execution: execution,
                 baseInput: baseInput
             )
-            let firstRound = try await resolveWorkerRoundOne(
-                for: prepared,
+
+            applyFinalDirective(finalDirective, to: execution, in: prepared.conversation)
+            try await runVisibleLeaderSynthesis(
+                apiKey: prepared.apiKey,
+                configuration: prepared.configuration,
+                conversation: prepared.conversation,
                 execution: execution,
-                leaderBrief: leaderBrief
-            )
-            let revised = try await resolveCrossReview(
-                for: prepared,
-                execution: execution,
-                firstRound: firstRound
-            )
-            try await resolveVisibleLeaderSynthesis(
-                for: prepared,
-                execution: execution,
-                leaderBrief: leaderBrief,
-                revisedWorkers: revised
+                baseInput: baseInput
             )
             try finalizeSuccessfulTurn(
-                leaderBrief: leaderBrief,
-                revisedWorkers: revised,
                 prepared: prepared,
-                execution: execution
+                execution: execution,
+                outcome: execution.snapshot.processSnapshot.outcome.isEmpty
+                    ? "Completed"
+                    : execution.snapshot.processSnapshot.outcome,
+                stopReason: execution.snapshot.processSnapshot.stopReason ?? .sufficientAnswer
             )
         } catch is CancellationError {
             finishWithFailure(.cancelled, prepared: prepared, execution: execution)
@@ -132,110 +145,5 @@ final class AgentRunCoordinator {
             guard let self else { return }
             await executeTurn(prepared, execution: execution)
         }
-    }
-
-    private func resolveLeaderBrief(
-        for prepared: PreparedAgentTurn,
-        execution: AgentExecutionState,
-        baseInput: [ResponsesInputMessageDTO]
-    ) async throws -> String {
-        if execution.snapshot.currentStage != .leaderBrief,
-           let persisted = execution.snapshot.leaderBriefSummary,
-           !persisted.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            return persisted
-        }
-
-        return try await runLeaderBrief(
-            apiKey: prepared.apiKey,
-            configuration: prepared.configuration,
-            conversation: prepared.conversation,
-            execution: execution,
-            baseInput: baseInput
-        )
-    }
-
-    private func resolveWorkerRoundOne(
-        for prepared: PreparedAgentTurn,
-        execution: AgentExecutionState,
-        leaderBrief: String
-    ) async throws -> [HiddenWorkerRound] {
-        if execution.snapshot.currentStage == .crossReview ||
-            execution.snapshot.currentStage == .finalSynthesis,
-            execution.snapshot.workersRoundOneSummaries.count == 3 {
-            return execution.snapshot.workersRoundOneSummaries.map {
-                HiddenWorkerRound(role: $0.role, summary: $0.summary)
-            }
-        }
-
-        if execution.snapshot.currentStage == .finalSynthesis,
-           execution.snapshot.crossReviewSummaries.count == 3 {
-            return execution.snapshot.crossReviewSummaries.map {
-                HiddenWorkerRound(role: $0.role, summary: $0.summary)
-            }
-        }
-
-        return try await runWorkerRoundOne(
-            apiKey: prepared.apiKey,
-            configuration: prepared.configuration,
-            conversation: prepared.conversation,
-            execution: execution,
-            latestUserText: prepared.latestUserText,
-            leaderBrief: leaderBrief
-        )
-    }
-
-    private func resolveCrossReview(
-        for prepared: PreparedAgentTurn,
-        execution: AgentExecutionState,
-        firstRound: [HiddenWorkerRound]
-    ) async throws -> [HiddenWorkerRevision] {
-        if execution.snapshot.currentStage == .finalSynthesis,
-           execution.snapshot.crossReviewSummaries.count == 3 {
-            return execution.snapshot.crossReviewSummaries.map {
-                HiddenWorkerRevision(
-                    role: $0.role,
-                    summary: $0.summary,
-                    adoptedPoints: $0.adoptedPoints
-                )
-            }
-        }
-
-        return try await runCrossReview(
-            apiKey: prepared.apiKey,
-            configuration: prepared.configuration,
-            conversation: prepared.conversation,
-            execution: execution,
-            latestUserText: prepared.latestUserText,
-            firstRound: firstRound
-        )
-    }
-
-    private func resolveVisibleLeaderSynthesis(
-        for prepared: PreparedAgentTurn,
-        execution: AgentExecutionState,
-        leaderBrief: String,
-        revisedWorkers: [HiddenWorkerRevision]
-    ) async throws {
-        if execution.snapshot.currentStage == .finalSynthesis,
-           prepared.configuration.backgroundModeEnabled,
-           prepared.draft.responseId != nil {
-            try await recoverVisibleLeaderSynthesis(
-                apiKey: prepared.apiKey,
-                conversation: prepared.conversation,
-                draft: prepared.draft,
-                execution: execution
-            )
-            return
-        }
-
-        try await runVisibleLeaderSynthesis(
-            apiKey: prepared.apiKey,
-            configuration: prepared.configuration,
-            conversation: prepared.conversation,
-            execution: execution,
-            latestUserText: prepared.latestUserText,
-            leaderBrief: leaderBrief,
-            revisedWorkers: revisedWorkers
-        )
     }
 }

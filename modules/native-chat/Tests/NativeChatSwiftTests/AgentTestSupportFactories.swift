@@ -50,6 +50,42 @@ func makeCompletedAgentConversationSamples(in viewModel: AgentController) -> Con
                     adoptedPoints: ["Add validation checkpoints."]
                 )
             ],
+            processSnapshot: AgentProcessSnapshot(
+                activity: .completed,
+                currentFocus: "Leader completed the rollout recommendation.",
+                plan: [
+                    AgentPlanStep(
+                        id: "step_root",
+                        owner: .leader,
+                        status: .completed,
+                        title: "Frame rollout plan",
+                        summary: "Choose the safest rollout shape."
+                    )
+                ],
+                tasks: [
+                    AgentTask(
+                        owner: .workerA,
+                        parentStepID: "step_root",
+                        title: "Validate rollout shape",
+                        goal: "Confirm the safest rollout path",
+                        expectedOutput: "Concise rollout recommendation",
+                        contextSummary: "Focus on additive rollout and rollback gates.",
+                        toolPolicy: .enabled,
+                        status: .completed,
+                        resultSummary: "Use additive rollout with rollback gates."
+                    )
+                ],
+                decisions: [
+                    AgentDecision(
+                        kind: .finish,
+                        title: "Finish",
+                        summary: "The answer is strong enough to deliver."
+                    )
+                ],
+                evidence: ["Rollback gates remained explicit."],
+                stopReason: .sufficientAnswer,
+                outcome: "Completed"
+            ),
             completedStage: .finalSynthesis,
             outcome: "Completed"
         )

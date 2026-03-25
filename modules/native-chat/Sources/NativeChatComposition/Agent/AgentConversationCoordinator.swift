@@ -21,6 +21,7 @@ struct PreparedAgentTurn {
     let latestUserText: String
     let userMessageID: UUID
     let draftMessageID: UUID
+    let attachmentsToUpload: [FileAttachment]
 }
 
 @MainActor
@@ -35,6 +36,8 @@ final class AgentConversationCoordinator {
         state.sessionRegistry.bindVisibleConversation(nil)
         state.currentConversation = nil
         state.messages = []
+        state.selectedImageData = nil
+        state.pendingAttachments = []
         loadDefaultsFromSettings()
         clearVisibleRunState(clearDraft: true)
         state.errorMessage = nil
@@ -45,19 +48,25 @@ final class AgentConversationCoordinator {
         state.sessionRegistry.bindVisibleConversation(nil)
         state.currentConversation = conversation
         state.messages = visibleMessages(for: conversation)
+        state.selectedImageData = nil
+        state.pendingAttachments = []
         applyConversationConfiguration(resolvedConfiguration(for: conversation), persist: false)
         state.errorMessage = nil
         restoreDraftIfNeeded(from: conversation)
     }
 
-    func prepareNewTurn(text rawText: String) throws(AgentPreparationError) -> PreparedAgentTurn {
+    func prepareNewTurn(
+        text rawText: String,
+        imageData: Data?,
+        attachments: [FileAttachment]
+    ) throws(AgentPreparationError) -> PreparedAgentTurn {
         if let conversation = state.currentConversation,
            state.sessionRegistry.execution(for: conversation.id) != nil {
             throw .alreadyRunning
         }
 
         let text = rawText.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !text.isEmpty else {
+        guard !text.isEmpty || imageData != nil || !attachments.isEmpty else {
             throw .emptyInput
         }
 
@@ -69,7 +78,15 @@ final class AgentConversationCoordinator {
 
         let conversation = ensureConversation()
         let configuration = currentConversationConfiguration
-        let userMessage = Message(role: .user, content: text, conversation: conversation)
+        let userMessage = Message(
+            role: .user,
+            content: text,
+            imageData: imageData,
+            conversation: conversation
+        )
+        if !attachments.isEmpty {
+            userMessage.fileAttachments = attachments
+        }
         conversation.messages.append(userMessage)
         userMessage.conversation = conversation
 
@@ -94,8 +111,7 @@ final class AgentConversationCoordinator {
         var agentState = conversation.agentConversationState ?? AgentConversationState()
         agentState.currentStage = .leaderBrief
         agentState.configuration = configuration
-        agentState.activeRun = AgentRunSnapshot(
-            currentStage: .leaderBrief,
+        agentState.activeRun = AgentProcessProjector.makeInitialRunSnapshot(
             draftMessageID: draft.id,
             latestUserMessageID: userMessage.id
         )
@@ -107,6 +123,8 @@ final class AgentConversationCoordinator {
             with: draft,
             latestUserMessageID: userMessage.id
         )
+        state.selectedImageData = nil
+        state.pendingAttachments = []
 
         guard saveContext("prepareNewTurn") else {
             throw .persistenceFailure
@@ -119,7 +137,8 @@ final class AgentConversationCoordinator {
             configuration: configuration,
             latestUserText: text,
             userMessageID: userMessage.id,
-            draftMessageID: draft.id
+            draftMessageID: draft.id,
+            attachmentsToUpload: attachments
         )
     }
 
@@ -145,7 +164,7 @@ final class AgentConversationCoordinator {
         let latestUserText = latestUserMessage?
             .content
             .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        guard !latestUserText.isEmpty else {
+        guard latestUserMessage != nil else {
             throw .missingRetryableUserMessage
         }
 
@@ -172,8 +191,7 @@ final class AgentConversationCoordinator {
         var agentState = conversation.agentConversationState ?? AgentConversationState()
         agentState.currentStage = .leaderBrief
         agentState.configuration = configuration
-        agentState.activeRun = AgentRunSnapshot(
-            currentStage: .leaderBrief,
+        agentState.activeRun = AgentProcessProjector.makeInitialRunSnapshot(
             draftMessageID: draft.id,
             latestUserMessageID: latestUserMessage?.id ?? UUID()
         )
@@ -197,7 +215,8 @@ final class AgentConversationCoordinator {
             configuration: configuration,
             latestUserText: latestUserText,
             userMessageID: latestUserMessage?.id ?? UUID(),
-            draftMessageID: draft.id
+            draftMessageID: draft.id,
+            attachmentsToUpload: latestUserMessage?.fileAttachments ?? []
         )
     }
 

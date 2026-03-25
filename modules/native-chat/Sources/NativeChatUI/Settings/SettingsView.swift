@@ -84,7 +84,6 @@ public struct SettingsView: View {
                     NavigationLink {
                         SettingsAdvancedView(
                             defaults: defaults,
-                            agentDefaults: agentDefaults,
                             cache: cache,
                             appVersionString: about.appVersionString,
                             platformString: about.platformString,
@@ -92,15 +91,28 @@ public struct SettingsView: View {
                             documentCacheFooter: documentCacheFooter
                         )
                     } label: {
-                        Label(String(localized: "Advanced"), systemImage: "slider.horizontal.3")
+                        SettingsNavigationRowLabel(
+                            title: String(localized: "Advanced"),
+                            systemImage: "slider.horizontal.3"
+                        )
                     }
                     .accessibilityIdentifier("settings.advanced")
+                    NavigationLink {
+                        SettingsAgentDefaultsView(viewModel: agentDefaults)
+                    } label: {
+                        SettingsNavigationRowLabel(
+                            title: String(localized: "Agent Mode"),
+                            systemImage: "person.3.fill"
+                        )
+                    }
+                    .accessibilityIdentifier("settings.agentMode")
                 }
                 SettingsChatDefaultsSection(viewModel: defaults)
                 SettingsAppearanceSection(viewModel: defaults)
             }
             .listSectionSpacing(.compact)
             .coordinateSpace(name: "settingsForm")
+            .scrollIndicators(.hidden)
             .scrollDismissesKeyboard(.interactively)
             .accessibilityIdentifier("settings.form")
             .onPreferenceChange(SettingsFieldFramePreferenceKey.self) { fieldFrames = $0 }

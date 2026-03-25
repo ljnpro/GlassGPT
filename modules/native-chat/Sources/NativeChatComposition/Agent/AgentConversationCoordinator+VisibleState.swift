@@ -18,13 +18,16 @@ extension AgentConversationCoordinator {
         state.isThinking = false
         state.currentStage = .leaderBrief
         state.leaderBriefSummary = nil
+        state.processSnapshot = AgentProcessSnapshot(
+            activity: .triage,
+            currentFocus: "Leader is planning the work."
+        )
         state.workersRoundOneProgress = AgentWorkerProgress.defaultProgress
         state.crossReviewProgress = AgentWorkerProgress.defaultProgress
         if let conversation = state.currentConversation {
             state.sessionRegistry.bindVisibleConversation(conversation.id)
             var agentState = conversation.agentConversationState ?? AgentConversationState()
-            agentState.activeRun = AgentRunSnapshot(
-                currentStage: .leaderBrief,
+            agentState.activeRun = AgentProcessProjector.makeInitialRunSnapshot(
                 draftMessageID: draft.id,
                 latestUserMessageID: latestUserMessageID
             )
@@ -104,6 +107,7 @@ extension AgentConversationCoordinator {
         state.isThinking = snapshot.isThinking
         state.currentStage = snapshot.currentStage
         state.leaderBriefSummary = snapshot.leaderBriefSummary
+        state.processSnapshot = snapshot.processSnapshot
         state.workersRoundOneProgress = snapshot.workersRoundOneProgress
         state.crossReviewProgress = snapshot.crossReviewProgress
     }
@@ -120,6 +124,7 @@ extension AgentConversationCoordinator {
         state.isThinking = false
         state.currentStage = nil
         state.leaderBriefSummary = nil
+        state.processSnapshot = AgentProcessSnapshot()
         state.workersRoundOneProgress = AgentWorkerProgress.defaultProgress
         state.crossReviewProgress = AgentWorkerProgress.defaultProgress
     }

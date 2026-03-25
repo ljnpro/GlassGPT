@@ -3,22 +3,18 @@ import Foundation
 import OpenAITransport
 
 struct AgentTurnScript {
-    let leaderResponseID: String
-    let roundOneResponseIDs: [AgentRole: String]
-    let revisionResponseIDs: [AgentRole: String]
+    let triageResponseID: String
+    let reviewResponseID: String
+    let taskResponseIDs: [AgentRole: String]
 
     static func singleTurn() -> AgentTurnScript {
         AgentTurnScript(
-            leaderResponseID: "leader_brief",
-            roundOneResponseIDs: [
-                .workerA: "worker_a_round",
-                .workerB: "worker_b_round",
-                .workerC: "worker_c_round"
-            ],
-            revisionResponseIDs: [
-                .workerA: "worker_a_revision",
-                .workerB: "worker_b_revision",
-                .workerC: "worker_c_revision"
+            triageResponseID: "leader_triage",
+            reviewResponseID: "leader_review",
+            taskResponseIDs: [
+                .workerA: "worker_a_task",
+                .workerB: "worker_b_task",
+                .workerC: "worker_c_task"
             ]
         )
     }
@@ -36,11 +32,9 @@ actor ScriptedAgentCouncilTransport: OpenAIDataTransport {
     ) ?? URL(fileURLWithPath: "/")
 
     private var recordedRequests: [URLRequest] = []
-    private var leaderTurnIndex = 0
-    private var roundOneTurnIndexByRole = Dictionary(
-        uniqueKeysWithValues: AgentRole.allCases.map { ($0, 0) }
-    )
-    private var revisionTurnIndexByRole = Dictionary(
+    private var triageTurnIndex = 0
+    private var reviewTurnIndex = 0
+    private var taskTurnIndexByRole = Dictionary(
         uniqueKeysWithValues: AgentRole.allCases.map { ($0, 0) }
     )
 
@@ -57,12 +51,12 @@ actor ScriptedAgentCouncilTransport: OpenAIDataTransport {
         let instructions = payload["instructions"] as? String ?? ""
 
         let responseData: Data
-        if instructions.contains("produce a compact coordination brief") {
-            responseData = try leaderBriefResponseData()
-        } else if instructions.contains("Review your prior answer and the other workers' summaries") {
-            responseData = try crossReviewResponseData(for: instructions)
-        } else if instructions.contains("Use the user-visible conversation plus the leader brief") {
-            responseData = try workerRoundResponseData(for: instructions)
+        if instructions.contains("reviewing delegated worker results") {
+            responseData = try leaderReviewResponseData()
+        } else if instructions.contains("dynamic Agent team. Work like a Codex leader coordinating subagents") {
+            responseData = try leaderTriageResponseData()
+        } else if instructions.contains("You are Worker") {
+            responseData = try workerTaskResponseData(for: instructions)
         } else {
             throw .requestFailed("Unexpected scripted Agent request.")
         }
@@ -80,20 +74,40 @@ actor ScriptedAgentCouncilTransport: OpenAIDataTransport {
         recordedRequests
     }
 
-    private func leaderBriefResponseData() throws(OpenAIServiceError) -> Data {
-        guard turns.indices.contains(leaderTurnIndex) else {
+    private func leaderTriageResponseData() throws(OpenAIServiceError) -> Data {
+        guard turns.indices.contains(triageTurnIndex) else {
             throw .requestFailed("Missing scripted leader response.")
         }
 
-        let responseID = turns[leaderTurnIndex].leaderResponseID
-        leaderTurnIndex += 1
+        let responseID = turns[triageTurnIndex].triageResponseID
+        triageTurnIndex += 1
         do {
             return try makeAgentResponseData(
                 responseID: responseID,
                 text: """
-                [BRIEF]
-                Focus on the strongest shipping path.
-                [/BRIEF]
+                [FOCUS]
+                Leader is shaping the first task wave.
+                [/FOCUS]
+                [DECISION]
+                delegate
+                [/DECISION]
+                [PLAN]
+                step_root || root || leader || running || Understand request || Frame the answer and decide what to delegate.
+                step_a || step_root || workerA || planned || Draft strongest answer || Produce the recommended solution.
+                step_b || step_root || workerB || planned || Stress risks || Surface edge cases and failure modes.
+                step_c || step_root || workerC || planned || Check completeness || Find missing context and structure gaps.
+                [/PLAN]
+                [TASKS]
+                workerA || step_a || enabled || Draft strongest answer || Produce the recommended answer path || \
+                Return the strongest concise recommendation
+                workerB || step_b || enabled || Stress risks || Surface edge cases and failure modes || \
+                Return a concise risk summary
+                workerC || step_c || reasoningOnly || Check completeness || \
+                Find missing context and structure gaps || Return concise completeness notes
+                [/TASKS]
+                [DECISION_NOTE]
+                Delegate one bounded wave before synthesizing.
+                [/DECISION_NOTE]
                 """
             )
         } catch {
@@ -101,26 +115,37 @@ actor ScriptedAgentCouncilTransport: OpenAIDataTransport {
         }
     }
 
-    private func workerRoundResponseData(
-        for instructions: String
-    ) throws(OpenAIServiceError) -> Data {
-        let role = try requestedRole(from: instructions)
-        let turnIndex = roundOneTurnIndexByRole[role] ?? 0
-        guard turns.indices.contains(turnIndex) else {
-            throw .requestFailed("Missing scripted worker round response.")
-        }
-        guard let responseID = turns[turnIndex].roundOneResponseIDs[role] else {
-            throw .requestFailed("Missing scripted worker round id.")
+    private func leaderReviewResponseData() throws(OpenAIServiceError) -> Data {
+        guard turns.indices.contains(reviewTurnIndex) else {
+            throw .requestFailed("Missing scripted leader review response.")
         }
 
-        roundOneTurnIndexByRole[role] = turnIndex + 1
+        let responseID = turns[reviewTurnIndex].reviewResponseID
+        reviewTurnIndex += 1
         do {
             return try makeAgentResponseData(
                 responseID: responseID,
                 text: """
-                [SUMMARY]
-                \(role.displayName) round summary.
-                [/SUMMARY]
+                [FOCUS]
+                Leader is satisfied with the worker evidence and ready to answer.
+                [/FOCUS]
+                [DECISION]
+                finish
+                [/DECISION]
+                [PLAN]
+                step_root || root || leader || completed || Understand request || The team converged on a stable answer.
+                step_a || step_root || workerA || completed || Draft strongest answer || Recommended path validated.
+                step_b || step_root || workerB || completed || Stress risks || Edge cases captured.
+                step_c || step_root || workerC || completed || Check completeness || Structure gaps closed.
+                [/PLAN]
+                [TASKS]
+                [/TASKS]
+                [DECISION_NOTE]
+                The current evidence is sufficient for the final answer.
+                [/DECISION_NOTE]
+                [STOP_REASON]
+                Answer completed.
+                [/STOP_REASON]
                 """
             )
         } catch {
@@ -128,29 +153,37 @@ actor ScriptedAgentCouncilTransport: OpenAIDataTransport {
         }
     }
 
-    private func crossReviewResponseData(
+    private func workerTaskResponseData(
         for instructions: String
     ) throws(OpenAIServiceError) -> Data {
         let role = try requestedRole(from: instructions)
-        let turnIndex = revisionTurnIndexByRole[role] ?? 0
+        let turnIndex = taskTurnIndexByRole[role] ?? 0
         guard turns.indices.contains(turnIndex) else {
-            throw .requestFailed("Missing scripted cross-review response.")
+            throw .requestFailed("Missing scripted worker task response.")
         }
-        guard let responseID = turns[turnIndex].revisionResponseIDs[role] else {
-            throw .requestFailed("Missing scripted cross-review id.")
+        guard let responseID = turns[turnIndex].taskResponseIDs[role] else {
+            throw .requestFailed("Missing scripted worker task id.")
         }
 
-        revisionTurnIndexByRole[role] = turnIndex + 1
+        taskTurnIndexByRole[role] = turnIndex + 1
         do {
             return try makeAgentResponseData(
                 responseID: responseID,
                 text: """
                 [SUMMARY]
-                \(role.displayName) revised summary.
+                \(role.displayName) task summary.
                 [/SUMMARY]
-                [ADOPTED]
-                - Added the strongest peer point.
-                [/ADOPTED]
+                [EVIDENCE]
+                - \(role.displayName) evidence point.
+                [/EVIDENCE]
+                [CONFIDENCE]
+                high
+                [/CONFIDENCE]
+                [RISKS]
+                - \(role.displayName) residual risk.
+                [/RISKS]
+                [FOLLOW_UP]
+                [/FOLLOW_UP]
                 """
             )
         } catch {

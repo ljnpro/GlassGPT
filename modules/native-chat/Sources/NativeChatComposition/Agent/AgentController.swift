@@ -29,6 +29,10 @@ package final class AgentController {
     package var liveFilePathAnnotations: [FilePathAnnotation] = []
     /// The user-facing error banner text, if the current run failed.
     package var errorMessage: String?
+    /// Pending image attachment for the Agent composer.
+    package var selectedImageData: Data?
+    /// Pending file attachments for the Agent composer.
+    package var pendingAttachments: [FileAttachment] = []
     /// The selected leader reasoning effort for the visible Agent conversation.
     package var leaderReasoningEffort: ReasoningEffort = .high
     /// The shared worker reasoning effort for the visible Agent conversation.
@@ -47,6 +51,8 @@ package final class AgentController {
     package var currentStage: AgentStage?
     /// The latest leader brief summary for the active run, if available.
     package var leaderBriefSummary: String?
+    /// Projected dynamic process state for the current live run.
+    package var processSnapshot = AgentProcessSnapshot()
     /// The per-worker progress pills for the first worker round.
     package var workersRoundOneProgress = AgentWorkerProgress.defaultProgress
     /// The per-worker progress pills for cross-review.
@@ -75,6 +81,10 @@ package final class AgentController {
     lazy var conversationCoordinator = AgentConversationCoordinator(state: self)
     @ObservationIgnored
     lazy var runCoordinator = AgentRunCoordinator(state: self)
+    @ObservationIgnored
+    lazy var planningEngine = AgentPlanningEngine(state: self)
+    @ObservationIgnored
+    lazy var workerRuntime = AgentWorkerRuntime(state: self)
     @ObservationIgnored
     let sessionRegistry = AgentSessionRegistry()
 
@@ -115,7 +125,11 @@ package final class AgentController {
     @discardableResult
     package func sendMessage(text: String) -> Bool {
         do {
-            let prepared = try conversationCoordinator.prepareNewTurn(text: text)
+            let prepared = try conversationCoordinator.prepareNewTurn(
+                text: text,
+                imageData: selectedImageData,
+                attachments: pendingAttachments
+            )
             runCoordinator.startTurn(prepared)
             return true
         } catch AgentPreparationError.alreadyRunning {
@@ -169,85 +183,5 @@ package final class AgentController {
 
         execution.task?.cancel()
         execution.service.cancelStream()
-    }
-
-    /// The reasoning effort levels available for Agent leader and worker configuration.
-    package var availableReasoningEfforts: [ReasoningEffort] {
-        ModelType.gpt5_4.availableEfforts
-    }
-
-    /// Human-readable summary of the current Agent runtime configuration.
-    package var configurationSummary: String {
-        var parts = [
-            "Leader \(leaderReasoningEffort.displayName)",
-            "Workers \(workerReasoningEffort.displayName)"
-        ]
-        if backgroundModeEnabled {
-            parts.append("Background")
-        }
-        if flexModeEnabled {
-            parts.append("Flex")
-        }
-        return parts.joined(separator: " · ")
-    }
-
-    /// Compact top-bar summary of the current Agent runtime configuration.
-    package var compactConfigurationSummary: String {
-        "L \(shortLabel(for: leaderReasoningEffort)) · W \(shortLabel(for: workerReasoningEffort))"
-    }
-
-    /// The persisted configuration bound to the currently visible Agent conversation.
-    package var currentConfiguration: AgentConversationConfiguration {
-        conversationCoordinator.currentConversationConfiguration
-    }
-
-    /// Applies a new Agent configuration to the currently visible conversation.
-    package func applyConfiguration(_ configuration: AgentConversationConfiguration) {
-        conversationCoordinator.applyConversationConfiguration(configuration)
-    }
-
-    /// Indicates whether the given Agent conversation currently has a live execution session.
-    package func isConversationRunning(_ conversationID: UUID?) -> Bool {
-        guard let conversationID else { return false }
-        return sessionRegistry.execution(for: conversationID) != nil
-    }
-
-    /// Seeds a detached execution session for UI-test and recovery scenarios.
-    package func seedDetachedExecution(
-        for conversation: Conversation,
-        draftMessageID: UUID,
-        latestUserMessageID: UUID,
-        snapshot: AgentRunSnapshot,
-        apiKey: String = "sk-ui-test"
-    ) {
-        let execution = AgentExecutionState(
-            conversationID: conversation.id,
-            draftMessageID: draftMessageID,
-            latestUserMessageID: latestUserMessageID,
-            apiKey: apiKey,
-            service: serviceFactory(),
-            snapshot: snapshot
-        )
-        sessionRegistry.register(execution, visible: false)
-    }
-
-    var flexModeEnabled: Bool {
-        get { serviceTier == .flex }
-        set { serviceTier = newValue ? .flex : .standard }
-    }
-
-    private func shortLabel(for effort: ReasoningEffort) -> String {
-        switch effort {
-        case .none:
-            "Off"
-        case .low:
-            "Low"
-        case .medium:
-            "Med"
-        case .high:
-            "High"
-        case .xhigh:
-            "Max"
-        }
     }
 }
