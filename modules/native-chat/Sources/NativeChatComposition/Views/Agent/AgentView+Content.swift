@@ -74,9 +74,15 @@ extension AgentView {
             .id(message.id)
 
             if message.role == .assistant, isLiveDraft || (!message.isComplete && viewModel.isRunning) {
-                AgentProgressCard(
+                AgentLiveSummaryCard(
                     currentStage: viewModel.currentStage,
-                    workerProgress: viewModel.workerProgress
+                    leaderBriefSummary: viewModel.leaderBriefSummary,
+                    workersRoundOneProgress: viewModel.workersRoundOneProgress,
+                    crossReviewProgress: viewModel.crossReviewProgress,
+                    isExpanded: Binding(
+                        get: { liveSummaryExpanded },
+                        set: { liveSummaryExpanded = $0 }
+                    )
                 )
                 .frame(maxWidth: assistantBubbleMaxWidth, alignment: .leading)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -115,8 +121,14 @@ extension AgentView {
         hasher.combine(viewModel.isThinking)
         hasher.combine(viewModel.liveCitations.count)
         hasher.combine(viewModel.liveFilePathAnnotations.count)
+        hasher.combine(viewModel.leaderBriefSummary ?? "")
 
-        for progress in viewModel.workerProgress {
+        for progress in viewModel.workersRoundOneProgress {
+            hasher.combine(progress.role.rawValue)
+            hasher.combine(progress.status.rawValue)
+        }
+
+        for progress in viewModel.crossReviewProgress {
             hasher.combine(progress.role.rawValue)
             hasher.combine(progress.status.rawValue)
         }

@@ -47,6 +47,13 @@ package func makeSettingsPresenter(
         cloudflareEnabled: settingsStore.cloudflareGatewayEnabled,
         controller: controller
     )
+    let agentDefaults = AgentSettingsDefaultsStore(
+        defaultLeaderEffort: settingsStore.defaultAgentLeaderEffort,
+        defaultWorkerEffort: settingsStore.defaultAgentWorkerEffort,
+        defaultBackgroundModeEnabled: settingsStore.defaultAgentBackgroundModeEnabled,
+        defaultServiceTier: settingsStore.defaultAgentServiceTier,
+        controller: controller
+    )
 
     let credentials = SettingsCredentialsStore(
         apiKey: apiKeyStore.loadAPIKey() ?? "",
@@ -64,6 +71,7 @@ package func makeSettingsPresenter(
     return SettingsPresenter(
         credentials: credentials,
         defaults: defaults,
+        agentDefaults: agentDefaults,
         cache: cache,
         about: SettingsAboutInfo(
             appVersionString: diagnostics.appVersionString,

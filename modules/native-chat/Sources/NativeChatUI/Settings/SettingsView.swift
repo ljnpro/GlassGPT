@@ -34,6 +34,7 @@ private enum SettingsKeyboardDismisser {
 public struct SettingsView: View {
     @State private var credentials: SettingsCredentialsStore
     @State private var defaults: SettingsDefaultsStore
+    @State private var agentDefaults: AgentSettingsDefaultsStore
     @State private var cache: SettingsCacheStore
     @State private var fieldFrames: [SettingsFocusedField: CGRect] = [:]
     @FocusState private var focusedField: SettingsFocusedField?
@@ -44,6 +45,7 @@ public struct SettingsView: View {
     public init(viewModel: SettingsPresenter) {
         _credentials = State(initialValue: viewModel.credentials)
         _defaults = State(initialValue: viewModel.defaults)
+        _agentDefaults = State(initialValue: viewModel.agentDefaults)
         _cache = State(initialValue: viewModel.cache)
         about = viewModel.about
     }
@@ -82,6 +84,7 @@ public struct SettingsView: View {
                     NavigationLink {
                         SettingsAdvancedView(
                             defaults: defaults,
+                            agentDefaults: agentDefaults,
                             cache: cache,
                             appVersionString: about.appVersionString,
                             platformString: about.platformString,

@@ -37,6 +37,9 @@ struct SettingsChatDefaultsSection: View {
             )
 
             SettingsInlineReasoningEffortControl(
+                title: String(localized: "Reasoning Effort"),
+                accessibilityLabel: String(localized: "Default reasoning effort"),
+                accessibilityIdentifier: "settings.defaultEffort",
                 selectedEffort: $viewModel.defaultEffort,
                 availableEfforts: viewModel.availableDefaultEfforts
             )
@@ -93,6 +96,9 @@ private struct SettingsAdaptiveToggleRow: View {
 }
 
 private struct SettingsInlineReasoningEffortControl: View {
+    let title: String
+    let accessibilityLabel: String
+    let accessibilityIdentifier: String
     @Binding var selectedEffort: ReasoningEffort
     let availableEfforts: [ReasoningEffort]
     @Environment(\.hapticsEnabled) private var hapticsEnabled
@@ -100,7 +106,7 @@ private struct SettingsInlineReasoningEffortControl: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 12) {
-                Text(String(localized: "Reasoning Effort"))
+                Text(title)
                     .frame(maxWidth: .infinity, alignment: .leading)
 
                 Text(visibleEffortLabel(selectedEffort))
@@ -114,9 +120,9 @@ private struct SettingsInlineReasoningEffortControl: View {
         .padding(.vertical, 0)
         .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: .contain)
-        .accessibilityLabel(String(localized: "Default reasoning effort"))
+        .accessibilityLabel(accessibilityLabel)
         .accessibilityValue(visibleEffortLabel(selectedEffort))
-        .accessibilityIdentifier("settings.defaultEffort")
+        .accessibilityIdentifier(accessibilityIdentifier)
     }
 
     private var effortSlider: some View {
@@ -125,12 +131,12 @@ private struct SettingsInlineReasoningEffortControl: View {
             in: 0 ... Double(max(availableEfforts.count - 1, 1)),
             step: 1
         ) {
-            Text(String(localized: "Reasoning Effort"))
+            Text(title)
         }
         .tint(.accentColor)
-        .accessibilityLabel(String(localized: "Default reasoning effort"))
+        .accessibilityLabel(accessibilityLabel)
         .accessibilityValue(visibleEffortLabel(selectedEffort))
-        .accessibilityIdentifier("settings.defaultEffortSlider")
+        .accessibilityIdentifier("\(accessibilityIdentifier)Slider")
     }
 
     private var sliderBinding: Binding<Double> {
@@ -198,5 +204,52 @@ struct SettingsFeedbackSection: View {
                 )
             }
         }
+    }
+}
+
+struct SettingsAgentDefaultsView: View {
+    @Bindable var viewModel: AgentSettingsDefaultsStore
+
+    var body: some View {
+        Form {
+            Section {
+                SettingsAdaptiveToggleRow(
+                    title: String(localized: "Background Mode"),
+                    accessibilityLabel: String(localized: "Default Agent Background Mode"),
+                    accessibilityIdentifier: "settings.agentDefaultBackgroundMode",
+                    isOn: $viewModel.defaultBackgroundModeEnabled
+                )
+
+                SettingsAdaptiveToggleRow(
+                    title: String(localized: "Flex Mode"),
+                    accessibilityLabel: String(localized: "Default Agent Flex Mode"),
+                    accessibilityIdentifier: "settings.agentDefaultFlexMode",
+                    isOn: Binding(
+                        get: { viewModel.defaultFlexModeEnabled },
+                        set: { viewModel.defaultFlexModeEnabled = $0 }
+                    )
+                )
+
+                SettingsInlineReasoningEffortControl(
+                    title: String(localized: "Leader Reasoning"),
+                    accessibilityLabel: String(localized: "Default Agent Leader Reasoning"),
+                    accessibilityIdentifier: "settings.agentDefaultLeaderEffort",
+                    selectedEffort: $viewModel.defaultLeaderEffort,
+                    availableEfforts: viewModel.availableEfforts
+                )
+
+                SettingsInlineReasoningEffortControl(
+                    title: String(localized: "Worker Reasoning"),
+                    accessibilityLabel: String(localized: "Default Agent Worker Reasoning"),
+                    accessibilityIdentifier: "settings.agentDefaultWorkerEffort",
+                    selectedEffort: $viewModel.defaultWorkerEffort,
+                    availableEfforts: viewModel.availableEfforts
+                )
+            } header: {
+                SettingsSectionHeaderText(text: String(localized: "Agent Defaults"))
+            }
+        }
+        .listSectionSpacing(.compact)
+        .navigationTitle(String(localized: "Agent Settings"))
     }
 }

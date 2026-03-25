@@ -130,7 +130,9 @@ package enum UITestScenarioLoader {
         applyScenario(
             scenario,
             conversations: seededConversations,
-            to: chatController
+            chatController: chatController,
+            agentController: agentController,
+            serviceFactory: serviceFactory
         )
 
         return UITestBootstrap(
@@ -171,28 +173,47 @@ package enum UITestScenarioLoader {
     private static func applyScenario(
         _ scenario: UITestScenario,
         conversations: [Conversation],
-        to viewModel: ChatController
+        chatController: ChatController,
+        agentController: AgentController,
+        serviceFactory: @MainActor () -> OpenAIService
     ) {
         switch scenario {
         case .empty, .history, .settings, .settingsGateway, .reinstallSeed, .reinstallVerify, .freshInstall:
             return
 
+        case .agentRunning:
+            guard let conversation = conversations.first(where: { $0.mode == .agent }),
+                  let draft = conversation.messages.last(where: { $0.role == .assistant && !$0.isComplete }),
+                  let snapshot = conversation.agentConversationState?.activeRun
+            else {
+                return
+            }
+
+            agentController.seedDetachedExecution(
+                for: conversation,
+                draftMessageID: draft.id,
+                latestUserMessageID: snapshot.latestUserMessageID,
+                snapshot: snapshot,
+                apiKey: "sk-ui-test"
+            )
+            return
+
         case .seeded, .replySplit:
             if let conversation = conversations.first {
-                viewModel.conversationCoordinator.loadConversation(conversation)
+                chatController.conversationCoordinator.loadConversation(conversation)
             }
 
         case .streaming:
             if let conversation = conversations.first {
-                viewModel.conversationCoordinator.loadConversation(conversation)
+                chatController.conversationCoordinator.loadConversation(conversation)
             }
 
-            viewModel.isStreaming = true
-            viewModel.isThinking = true
-            viewModel.currentThinkingText = "Gathering the recovery plan before finalizing the response."
-            viewModel.currentStreamingText = "The streaming session is active and will resume cleanly after a reconnect."
-            viewModel.thinkingPresentationState = .completed
-            viewModel.activeToolCalls = [
+            chatController.isStreaming = true
+            chatController.isThinking = true
+            chatController.currentThinkingText = "Gathering the recovery plan before finalizing the response."
+            chatController.currentStreamingText = "The streaming session is active and will resume cleanly after a reconnect."
+            chatController.thinkingPresentationState = .completed
+            chatController.activeToolCalls = [
                 ToolCallInfo(
                     id: "ci_ui",
                     type: .codeInterpreter,
@@ -204,11 +225,11 @@ package enum UITestScenarioLoader {
 
         case .preview:
             if let conversation = conversations.first {
-                viewModel.conversationCoordinator.loadConversation(conversation)
+                chatController.conversationCoordinator.loadConversation(conversation)
             }
 
             if let previewURL = makePreviewImageURL() {
-                viewModel.filePreviewItem = FilePreviewItem(
+                chatController.filePreviewItem = FilePreviewItem(
                     url: previewURL,
                     kind: .generatedImage,
                     displayName: "Generated Chart",

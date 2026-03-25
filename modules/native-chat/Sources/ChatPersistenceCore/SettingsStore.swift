@@ -55,6 +55,14 @@ public final class SettingsStore {
         public static let defaultBackgroundModeEnabled = "defaultBackgroundModeEnabled"
         /// Key for the default service tier preference.
         public static let defaultServiceTier = "defaultServiceTier"
+        /// Key for the default Agent leader reasoning effort preference.
+        public static let defaultAgentLeaderEffort = "defaultAgentLeaderEffort"
+        /// Key for the default Agent worker reasoning effort preference.
+        public static let defaultAgentWorkerEffort = "defaultAgentWorkerEffort"
+        /// Key for the default Agent background mode preference.
+        public static let defaultAgentBackgroundModeEnabled = "defaultAgentBackgroundModeEnabled"
+        /// Key for the default Agent service tier preference.
+        public static let defaultAgentServiceTier = "defaultAgentServiceTier"
         /// Key for the selected app theme.
         public static let appTheme = "appTheme"
         /// Key for the haptic feedback toggle.
@@ -135,6 +143,61 @@ public final class SettingsStore {
         }
     }
 
+    /// The user's preferred default Agent leader reasoning effort.
+    public var defaultAgentLeaderEffort: ReasoningEffort {
+        get {
+            guard let raw = valueStore.string(forKey: Keys.defaultAgentLeaderEffort),
+                  let effort = ReasoningEffort(rawValue: raw)
+            else {
+                return .high
+            }
+            return effort
+        }
+        set {
+            valueStore.set(newValue.rawValue, forKey: Keys.defaultAgentLeaderEffort)
+        }
+    }
+
+    /// The user's preferred default Agent worker reasoning effort.
+    public var defaultAgentWorkerEffort: ReasoningEffort {
+        get {
+            guard let raw = valueStore.string(forKey: Keys.defaultAgentWorkerEffort),
+                  let effort = ReasoningEffort(rawValue: raw)
+            else {
+                return .low
+            }
+            return effort
+        }
+        set {
+            valueStore.set(newValue.rawValue, forKey: Keys.defaultAgentWorkerEffort)
+        }
+    }
+
+    /// Whether background mode is enabled by default for new Agent conversations.
+    public var defaultAgentBackgroundModeEnabled: Bool {
+        get {
+            valueStore.object(forKey: Keys.defaultAgentBackgroundModeEnabled) as? Bool ?? false
+        }
+        set {
+            valueStore.set(newValue, forKey: Keys.defaultAgentBackgroundModeEnabled)
+        }
+    }
+
+    /// The user's preferred Agent service tier. Falls back to `.standard` if unset.
+    public var defaultAgentServiceTier: ServiceTier {
+        get {
+            guard let raw = valueStore.string(forKey: Keys.defaultAgentServiceTier),
+                  let tier = ServiceTier(rawValue: raw)
+            else {
+                return .standard
+            }
+            return tier
+        }
+        set {
+            valueStore.set(newValue.rawValue, forKey: Keys.defaultAgentServiceTier)
+        }
+    }
+
     /// The selected appearance theme. Falls back to `.system` if unset.
     public var appTheme: AppTheme {
         get {
@@ -204,6 +267,16 @@ public final class SettingsStore {
             reasoningEffort: resolvedEffort,
             backgroundModeEnabled: defaultBackgroundModeEnabled,
             serviceTier: defaultServiceTier
+        )
+    }
+
+    /// Builds an ``AgentConversationConfiguration`` from the current Agent default settings.
+    public var defaultAgentConversationConfiguration: AgentConversationConfiguration {
+        AgentConversationConfiguration(
+            leaderReasoningEffort: defaultAgentLeaderEffort,
+            workerReasoningEffort: defaultAgentWorkerEffort,
+            backgroundModeEnabled: defaultAgentBackgroundModeEnabled,
+            serviceTier: defaultAgentServiceTier
         )
     }
 }

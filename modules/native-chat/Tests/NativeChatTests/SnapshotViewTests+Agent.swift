@@ -15,6 +15,13 @@ extension SnapshotViewTests {
             AgentView(viewModel: runningViewModel)
         }
 
+        assertViewSnapshots(named: "agent-running-collapsed") {
+            AgentView(
+                viewModel: runningViewModel,
+                initialLiveSummaryExpanded: false
+            )
+        }
+
         let completedViewModel = try makeSnapshotAgentScreenStore(hasAPIKey: true)
         let completedConversation = makeCompletedAgentConversationSamples(in: completedViewModel)
         assertViewSnapshots(named: "agent-completed-collapsed") {

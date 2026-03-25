@@ -9,6 +9,7 @@ package enum UITestScenario: String {
     case preview
     case replySplit
     case history
+    case agentRunning
     case settings
     case settingsGateway
     case reinstallSeed
@@ -17,7 +18,7 @@ package enum UITestScenario: String {
 
     package var initialTab: Int {
         switch self {
-        case .history:
+        case .history, .agentRunning:
             2
         case .settings, .settingsGateway, .reinstallSeed, .reinstallVerify:
             3

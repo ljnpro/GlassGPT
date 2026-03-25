@@ -56,7 +56,7 @@ final class GlassGPTUITests: XCTestCase {
         agentRow.tap()
 
         XCTAssertTrue(app.buttons["agent.newConversation"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.staticTexts["Agent Council"].waitForExistence(timeout: 5))
+        XCTAssertTrue(agentSelector(in: app).waitForExistence(timeout: 5))
         XCTAssertTrue(app.staticTexts["What is the safest rollout plan?"].waitForExistence(timeout: 5))
         XCTAssertTrue(
             app.staticTexts["Use an additive rollout with rollback gates and parity checks."].waitForExistence(timeout: 5)
@@ -81,6 +81,135 @@ final class GlassGPTUITests: XCTestCase {
 
         XCTAssertTrue(app.staticTexts["Ask the Agent Council"].waitForExistence(timeout: 5))
         XCTAssertTrue(waitForNonExistence(of: priorUserMessage, timeout: 5))
+    }
+
+    @MainActor
+    func testAgentRunningScenarioHistoryOpenBindsLiveSummaryWithoutRetryBanner() {
+        let app = launchApp(scenario: "agentRunning")
+        openHistory(in: app)
+
+        let agentRow = app.buttons["history.row.Agent Review"]
+        XCTAssertTrue(agentRow.waitForExistence(timeout: 5))
+        agentRow.tap()
+
+        let liveSummary = app.descendants(matching: .any).matching(identifier: "agent.liveSummary").firstMatch
+        XCTAssertTrue(liveSummary.waitForExistence(timeout: 5))
+        XCTAssertFalse(app.staticTexts["The last Agent run did not complete. Retry to continue."].exists)
+        XCTAssertTrue(app.staticTexts["Cross-review"].waitForExistence(timeout: 5))
+    }
+
+    @MainActor
+    func testAgentRunningScenarioCanStartNewConversationAndReopenLiveRun() {
+        let app = launchApp(scenario: "agentRunning")
+        openHistory(in: app)
+
+        let agentRow = app.buttons["history.row.Agent Review"]
+        XCTAssertTrue(agentRow.waitForExistence(timeout: 5))
+        agentRow.tap()
+
+        let liveSummary = app.descendants(matching: .any).matching(identifier: "agent.liveSummary").firstMatch
+        XCTAssertTrue(liveSummary.waitForExistence(timeout: 5))
+
+        let newAgentButton = app.buttons["agent.newConversation"]
+        XCTAssertTrue(newAgentButton.waitForExistence(timeout: 5))
+        newAgentButton.tap()
+
+        XCTAssertTrue(app.staticTexts["Ask the Agent Council"].waitForExistence(timeout: 5))
+
+        openHistory(in: app)
+        XCTAssertTrue(agentRow.waitForExistence(timeout: 5))
+        agentRow.tap()
+
+        XCTAssertTrue(liveSummary.waitForExistence(timeout: 5))
+        XCTAssertFalse(app.staticTexts["The last Agent run did not complete. Retry to continue."].exists)
+    }
+
+    @MainActor
+    func testHistoryScenarioAgentSelectorPersistsChangesWithinSession() {
+        let app = launchApp(scenario: "history")
+        openHistory(in: app)
+
+        let agentRow = app.buttons["history.row.Agent Review"]
+        XCTAssertTrue(agentRow.waitForExistence(timeout: 5))
+        agentRow.tap()
+
+        let selectorButton = agentSelector(in: app)
+        XCTAssertTrue(selectorButton.waitForExistence(timeout: 5))
+        selectorButton.tap()
+
+        let saveButton = app.buttons["agentSelector.save"]
+        XCTAssertTrue(saveButton.waitForExistence(timeout: 5))
+
+        setSwitch(app.switches["agentSelector.backgroundMode"], enabled: true)
+        setSwitch(app.switches["agentSelector.flexMode"], enabled: true)
+
+        let leaderSlider = app.sliders["agentSelector.leaderSlider"]
+        let workerSlider = app.sliders["agentSelector.workerSlider"]
+        XCTAssertTrue(leaderSlider.waitForExistence(timeout: 5))
+        XCTAssertTrue(workerSlider.waitForExistence(timeout: 5))
+        leaderSlider.adjust(toNormalizedSliderPosition: 0.0)
+        workerSlider.adjust(toNormalizedSliderPosition: 1.0)
+        saveButton.tap()
+
+        XCTAssertTrue(waitForNonExistence(of: saveButton, timeout: 5))
+
+        selectorButton.tap()
+        XCTAssertTrue(saveButton.waitForExistence(timeout: 5))
+        XCTAssertTrue(waitForValue(of: app.sliders["agentSelector.leaderSlider"], "None", timeout: 5))
+        XCTAssertTrue(waitForValue(of: app.sliders["agentSelector.workerSlider"], "XHigh", timeout: 5))
+        XCTAssertEqual(app.switches["agentSelector.backgroundMode"].value as? String, "1")
+        XCTAssertEqual(app.switches["agentSelector.flexMode"].value as? String, "1")
+        saveButton.tap()
+    }
+
+    @MainActor
+    func testSettingsScenarioAgentDefaultsPersistWithinSession() {
+        let app = launchApp(scenario: "settings")
+        _ = openSettings(in: app)
+
+        let advancedLink = app.buttons["settings.advanced"]
+        revealIfNeeded(advancedLink, in: app)
+        XCTAssertTrue(advancedLink.waitForExistence(timeout: 5))
+        advancedLink.tap()
+
+        let agentDefaultsLink = app.buttons["settings.agentDefaults"]
+        XCTAssertTrue(agentDefaultsLink.waitForExistence(timeout: 5))
+        agentDefaultsLink.tap()
+
+        let backgroundToggle = app.switches["settings.agentDefaultBackgroundMode"]
+        let flexToggle = app.switches["settings.agentDefaultFlexMode"]
+        XCTAssertTrue(backgroundToggle.waitForExistence(timeout: 5))
+        XCTAssertTrue(flexToggle.waitForExistence(timeout: 5))
+        setSwitch(backgroundToggle, enabled: true)
+        setSwitch(flexToggle, enabled: true)
+
+        let leaderControl = app.descendants(matching: .any)
+            .matching(identifier: "settings.agentDefaultLeaderEffort")
+            .firstMatch
+        let workerControl = app.descendants(matching: .any)
+            .matching(identifier: "settings.agentDefaultWorkerEffort")
+            .firstMatch
+        XCTAssertTrue(leaderControl.waitForExistence(timeout: 5))
+        XCTAssertTrue(workerControl.waitForExistence(timeout: 5))
+
+        let leaderSlider = app.sliders["settings.agentDefaultLeaderEffortSlider"]
+        let workerSlider = app.sliders["settings.agentDefaultWorkerEffortSlider"]
+        XCTAssertTrue(leaderSlider.waitForExistence(timeout: 5))
+        XCTAssertTrue(workerSlider.waitForExistence(timeout: 5))
+        leaderSlider.adjust(toNormalizedSliderPosition: 0.75)
+        workerSlider.adjust(toNormalizedSliderPosition: 0.25)
+
+        XCTAssertTrue(waitForValue(of: leaderControl, "High", timeout: 5))
+        XCTAssertTrue(waitForValue(of: workerControl, "Low", timeout: 5))
+
+        app.navigationBars["Agent Settings"].buttons.firstMatch.tap()
+        XCTAssertTrue(agentDefaultsLink.waitForExistence(timeout: 5))
+        agentDefaultsLink.tap()
+
+        XCTAssertEqual(backgroundToggle.value as? String, "1")
+        XCTAssertEqual(flexToggle.value as? String, "1")
+        XCTAssertTrue(waitForValue(of: leaderControl, "High", timeout: 5))
+        XCTAssertTrue(waitForValue(of: workerControl, "Low", timeout: 5))
     }
 
     @MainActor
@@ -766,6 +895,13 @@ final class GlassGPTUITests: XCTestCase {
         if currentValue != enabled {
             element.tap()
         }
+    }
+
+    @MainActor
+    private func agentSelector(in app: XCUIApplication) -> XCUIElement {
+        app.descendants(matching: .any)
+            .matching(identifier: "agent.selectorButton")
+            .firstMatch
     }
 
     @MainActor

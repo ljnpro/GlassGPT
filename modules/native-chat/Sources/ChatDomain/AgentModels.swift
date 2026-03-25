@@ -41,6 +41,37 @@ public enum AgentRole: String, Codable, CaseIterable, Identifiable, Sendable {
     }
 }
 
+/// User-configurable runtime settings for one Agent conversation.
+public struct AgentConversationConfiguration: Codable, Equatable, Sendable {
+    /// Reasoning effort used by the leader.
+    public var leaderReasoningEffort: ReasoningEffort
+    /// Shared reasoning effort used by all three workers.
+    public var workerReasoningEffort: ReasoningEffort
+    /// Whether Agent requests should continue in background mode.
+    public var backgroundModeEnabled: Bool
+    /// Service tier used by the Agent council.
+    public var serviceTier: ServiceTier
+
+    /// Creates Agent configuration values for one conversation.
+    public init(
+        leaderReasoningEffort: ReasoningEffort = .high,
+        workerReasoningEffort: ReasoningEffort = .low,
+        backgroundModeEnabled: Bool = false,
+        serviceTier: ServiceTier = .standard
+    ) {
+        self.leaderReasoningEffort = leaderReasoningEffort
+        self.workerReasoningEffort = workerReasoningEffort
+        self.backgroundModeEnabled = backgroundModeEnabled
+        self.serviceTier = serviceTier
+    }
+
+    /// Convenience toggle for switching between standard and flex service tiers.
+    public var flexModeEnabled: Bool {
+        get { serviceTier == .flex }
+        set { serviceTier = newValue ? .flex : .standard }
+    }
+}
+
 /// The visible execution stages for one Agent turn.
 public enum AgentStage: String, Codable, CaseIterable, Identifiable, Sendable {
     case leaderBrief
@@ -68,118 +99,36 @@ public enum AgentStage: String, Codable, CaseIterable, Identifiable, Sendable {
     }
 }
 
-/// The persisted hidden state for one Agent conversation.
-public struct AgentConversationState: Codable, Equatable, Sendable {
-    /// The leader chain response identifier.
-    public var leaderResponseID: String?
-    /// Worker A chain response identifier.
-    public var workerAResponseID: String?
-    /// Worker B chain response identifier.
-    public var workerBResponseID: String?
-    /// Worker C chain response identifier.
-    public var workerCResponseID: String?
-    /// The currently active stage, if a foreground run is underway.
-    public var currentStage: AgentStage?
-    /// Last update timestamp for the hidden state payload.
-    public var updatedAt: Date
-
-    /// Creates persisted hidden state for one Agent conversation and its per-role response chains.
-    public init(
-        leaderResponseID: String? = nil,
-        workerAResponseID: String? = nil,
-        workerBResponseID: String? = nil,
-        workerCResponseID: String? = nil,
-        currentStage: AgentStage? = nil,
-        updatedAt: Date = .now
-    ) {
-        self.leaderResponseID = leaderResponseID
-        self.workerAResponseID = workerAResponseID
-        self.workerBResponseID = workerBResponseID
-        self.workerCResponseID = workerCResponseID
-        self.currentStage = currentStage
-        self.updatedAt = updatedAt
-    }
-
-    /// Returns the current response identifier for the given internal role.
-    public func responseID(for role: AgentRole) -> String? {
-        switch role {
-        case .leader:
-            leaderResponseID
-        case .workerA:
-            workerAResponseID
-        case .workerB:
-            workerBResponseID
-        case .workerC:
-            workerCResponseID
-        }
-    }
-
-    /// Updates the response identifier for the given role.
-    public mutating func setResponseID(
-        _ responseID: String?,
-        for role: AgentRole,
-        updatedAt: Date = .now
-    ) {
-        switch role {
-        case .leader:
-            leaderResponseID = responseID
-        case .workerA:
-            workerAResponseID = responseID
-        case .workerB:
-            workerBResponseID = responseID
-        case .workerC:
-            workerCResponseID = responseID
-        }
-        self.updatedAt = updatedAt
-    }
-}
-
-/// One persisted worker summary shown in the collapsible Agent process card.
-public struct AgentWorkerSummary: Codable, Equatable, Sendable {
-    /// The worker role that produced this summary.
+/// Per-worker execution state rendered in the Agent progress summary.
+public struct AgentWorkerProgress: Codable, Equatable, Identifiable, Sendable {
+    /// The worker role represented by this progress item.
     public let role: AgentRole
-    /// The revised worker summary after peer review.
-    public let summary: String
-    /// Explicitly adopted points from the peer round.
-    public let adoptedPoints: [String]
+    /// The current execution status for that worker role.
+    public var status: Status
 
-    /// Creates a worker summary for the persisted Agent process trace.
-    public init(
-        role: AgentRole,
-        summary: String,
-        adoptedPoints: [String]
-    ) {
+    /// Supported progress states for one worker.
+    public enum Status: String, Codable, Equatable, Sendable {
+        case waiting
+        case running
+        case completed
+        case failed
+    }
+
+    /// Stable identifier derived from the worker role.
+    public var id: AgentRole {
+        role
+    }
+
+    /// Creates worker progress for one role.
+    public init(role: AgentRole, status: Status) {
         self.role = role
-        self.summary = summary
-        self.adoptedPoints = adoptedPoints
+        self.status = status
     }
-}
 
-/// Persisted per-answer metadata for Agent mode.
-public struct AgentTurnTrace: Codable, Equatable, Sendable {
-    /// The compact leader brief summary.
-    public let leaderBriefSummary: String
-    /// The revised worker summaries.
-    public let workerSummaries: [AgentWorkerSummary]
-    /// The final completed stage for this run.
-    public let completedStage: AgentStage
-    /// When the hidden multi-agent process completed.
-    public let completedAt: Date
-    /// Human-readable outcome string for the run.
-    public let outcome: String
-
-    /// Creates persisted per-answer trace metadata for the visible Agent process card.
-    public init(
-        leaderBriefSummary: String,
-        workerSummaries: [AgentWorkerSummary],
-        completedStage: AgentStage,
-        completedAt: Date = .now,
-        outcome: String
-    ) {
-        self.leaderBriefSummary = leaderBriefSummary
-        self.workerSummaries = workerSummaries
-        self.completedStage = completedStage
-        self.completedAt = completedAt
-        self.outcome = outcome
-    }
+    /// The default waiting state for a three-worker stage.
+    public static let defaultProgress: [AgentWorkerProgress] = [
+        AgentWorkerProgress(role: .workerA, status: .waiting),
+        AgentWorkerProgress(role: .workerB, status: .waiting),
+        AgentWorkerProgress(role: .workerC, status: .waiting)
+    ]
 }

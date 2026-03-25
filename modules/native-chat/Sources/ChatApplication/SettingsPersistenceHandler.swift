@@ -12,6 +12,14 @@ package protocol SettingsPersistenceHandler {
     func persistDefaultBackgroundModeEnabled(_ enabled: Bool)
     /// Persists the default service tier preference.
     func persistDefaultServiceTier(_ serviceTier: ServiceTier)
+    /// Persists the default Agent leader reasoning effort preference.
+    func persistDefaultAgentLeaderEffort(_ effort: ReasoningEffort)
+    /// Persists the default Agent worker reasoning effort preference.
+    func persistDefaultAgentWorkerEffort(_ effort: ReasoningEffort)
+    /// Persists the default Agent background mode toggle state.
+    func persistDefaultAgentBackgroundModeEnabled(_ enabled: Bool)
+    /// Persists the default Agent service tier preference.
+    func persistDefaultAgentServiceTier(_ serviceTier: ServiceTier)
     /// Persists the selected app theme.
     func persistAppTheme(_ theme: AppTheme)
     /// Persists the haptic feedback toggle state.

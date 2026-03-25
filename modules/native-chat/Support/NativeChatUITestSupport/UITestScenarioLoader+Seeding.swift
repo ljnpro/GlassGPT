@@ -51,6 +51,13 @@ extension UITestScenarioLoader {
                 makeConversation(title: "Snapshot Review", timeOffset: -240, backgroundModeEnabled: false),
                 makeAgentConversation(title: "Agent Review", timeOffset: -360)
             ]
+        case .agentRunning:
+            conversations = [
+                makeConversation(title: "Release Planning", timeOffset: 0, backgroundModeEnabled: false),
+                makeConversation(title: "Archive Audit", timeOffset: -120, backgroundModeEnabled: true),
+                makeConversation(title: "Snapshot Review", timeOffset: -240, backgroundModeEnabled: false),
+                makeRunningAgentConversation(title: "Agent Review", timeOffset: -360)
+            ]
         }
 
         for conversation in conversations {
@@ -146,6 +153,68 @@ extension UITestScenarioLoader {
         conversation.messages = [userMessage, assistantMessage]
         userMessage.conversation = conversation
         assistantMessage.conversation = conversation
+        return conversation
+    }
+
+    static func makeRunningAgentConversation(
+        title: String,
+        timeOffset: TimeInterval
+    ) -> Conversation {
+        let createdAt = Date(timeIntervalSinceNow: timeOffset)
+        let updatedAt = Date(timeIntervalSinceNow: timeOffset)
+        let conversation = Conversation(
+            title: title,
+            createdAt: createdAt,
+            updatedAt: updatedAt,
+            modeRawValue: ConversationMode.agent.rawValue,
+            model: ModelType.gpt5_4.rawValue,
+            reasoningEffort: ReasoningEffort.high.rawValue,
+            backgroundModeEnabled: false,
+            serviceTierRawValue: ServiceTier.standard.rawValue,
+            agentStateData: nil
+        )
+        conversation.mode = .agent
+
+        let userMessage = Message(
+            role: .user,
+            content: "What should we validate before launch?"
+        )
+        let draftMessage = Message(
+            role: .assistant,
+            content: "",
+            conversation: conversation,
+            isComplete: false
+        )
+        conversation.messages = [userMessage, draftMessage]
+        userMessage.conversation = conversation
+        draftMessage.conversation = conversation
+        conversation.agentConversationState = AgentConversationState(
+            currentStage: .crossReview,
+            configuration: AgentConversationConfiguration(),
+            activeRun: AgentRunSnapshot(
+                currentStage: .crossReview,
+                draftMessageID: draftMessage.id,
+                latestUserMessageID: userMessage.id,
+                leaderBriefSummary: "Prefer the safest release path with explicit validation gates.",
+                workersRoundOneSummaries: [
+                    AgentWorkerSummary(role: .workerA, summary: "Ship additively."),
+                    AgentWorkerSummary(role: .workerB, summary: "Call out rollback points."),
+                    AgentWorkerSummary(role: .workerC, summary: "Check monitoring gaps.")
+                ],
+                workersRoundOneProgress: [
+                    AgentWorkerProgress(role: .workerA, status: .completed),
+                    AgentWorkerProgress(role: .workerB, status: .completed),
+                    AgentWorkerProgress(role: .workerC, status: .completed)
+                ],
+                crossReviewProgress: [
+                    AgentWorkerProgress(role: .workerA, status: .completed),
+                    AgentWorkerProgress(role: .workerB, status: .running),
+                    AgentWorkerProgress(role: .workerC, status: .waiting)
+                ],
+                currentStreamingText: "Comparing the strongest recommendations before writing the final answer.",
+                currentThinkingText: "Cross-review is still active."
+            )
+        )
         return conversation
     }
 

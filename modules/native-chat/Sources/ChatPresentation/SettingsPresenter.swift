@@ -21,6 +21,8 @@ public final class SettingsPresenter {
     public let credentials: SettingsCredentialsStore
     /// Default model, theme, and toggle state for the settings scene.
     public let defaults: SettingsDefaultsStore
+    /// Agent-specific default settings for the settings scene.
+    public let agentDefaults: AgentSettingsDefaultsStore
     /// Generated-file cache state for the settings scene.
     public let cache: SettingsCacheStore
     /// About/version metadata for the settings scene.
@@ -30,11 +32,13 @@ public final class SettingsPresenter {
     public init(
         credentials: SettingsCredentialsStore,
         defaults: SettingsDefaultsStore,
+        agentDefaults: AgentSettingsDefaultsStore,
         cache: SettingsCacheStore,
         about: SettingsAboutInfo
     ) {
         self.credentials = credentials
         self.defaults = defaults
+        self.agentDefaults = agentDefaults
         self.cache = cache
         self.about = about
 

@@ -24,6 +24,22 @@ struct SettingsPersistenceHandlerImpl: SettingsPersistenceHandler {
         settingsStore.defaultServiceTier = serviceTier
     }
 
+    func persistDefaultAgentLeaderEffort(_ effort: ReasoningEffort) {
+        settingsStore.defaultAgentLeaderEffort = effort
+    }
+
+    func persistDefaultAgentWorkerEffort(_ effort: ReasoningEffort) {
+        settingsStore.defaultAgentWorkerEffort = effort
+    }
+
+    func persistDefaultAgentBackgroundModeEnabled(_ enabled: Bool) {
+        settingsStore.defaultAgentBackgroundModeEnabled = enabled
+    }
+
+    func persistDefaultAgentServiceTier(_ serviceTier: ServiceTier) {
+        settingsStore.defaultAgentServiceTier = serviceTier
+    }
+
     func persistAppTheme(_ theme: AppTheme) {
         settingsStore.appTheme = theme
     }

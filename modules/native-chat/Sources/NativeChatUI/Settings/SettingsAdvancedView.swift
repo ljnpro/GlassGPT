@@ -3,6 +3,7 @@ import SwiftUI
 
 struct SettingsAdvancedView: View {
     @Bindable var defaults: SettingsDefaultsStore
+    @Bindable var agentDefaults: AgentSettingsDefaultsStore
     @Bindable var cache: SettingsCacheStore
     let appVersionString: String
     let platformString: String
@@ -11,6 +12,14 @@ struct SettingsAdvancedView: View {
 
     var body: some View {
         Form {
+            Section {
+                NavigationLink {
+                    SettingsAgentDefaultsView(viewModel: agentDefaults)
+                } label: {
+                    Label(String(localized: "Agent Settings"), systemImage: "person.3.sequence.fill")
+                }
+                .accessibilityIdentifier("settings.agentDefaults")
+            }
             SettingsCacheSection(
                 title: String(localized: "Image Cache"),
                 usedValue: cache.generatedImageCacheSizeString,

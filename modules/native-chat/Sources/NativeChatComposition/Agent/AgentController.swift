@@ -29,6 +29,14 @@ package final class AgentController {
     package var liveFilePathAnnotations: [FilePathAnnotation] = []
     /// The user-facing error banner text, if the current run failed.
     package var errorMessage: String?
+    /// The selected leader reasoning effort for the visible Agent conversation.
+    package var leaderReasoningEffort: ReasoningEffort = .high
+    /// The shared worker reasoning effort for the visible Agent conversation.
+    package var workerReasoningEffort: ReasoningEffort = .low
+    /// Whether background mode is enabled for the visible Agent conversation.
+    package var backgroundModeEnabled = false
+    /// The selected service tier for the visible Agent conversation.
+    package var serviceTier: ServiceTier = .standard
     /// Whether any Agent turn work is currently active.
     package var isRunning = false
     /// Whether the visible leader synthesis is currently streaming.
@@ -37,8 +45,12 @@ package final class AgentController {
     package var isThinking = false
     /// The current visible stage of the Agent council pipeline.
     package var currentStage: AgentStage?
-    /// The per-worker progress pills shown during hidden worker stages.
-    package var workerProgress = AgentWorkerProgress.defaultProgress
+    /// The latest leader brief summary for the active run, if available.
+    package var leaderBriefSummary: String?
+    /// The per-worker progress pills for the first worker round.
+    package var workersRoundOneProgress = AgentWorkerProgress.defaultProgress
+    /// The per-worker progress pills for cross-review.
+    package var crossReviewProgress = AgentWorkerProgress.defaultProgress
 
     @ObservationIgnored
     let modelContext: ModelContext
@@ -60,13 +72,11 @@ package final class AgentController {
     @ObservationIgnored
     let hapticService = HapticService()
     @ObservationIgnored
-    var activeRunTask: Task<Void, Never>?
-    @ObservationIgnored
-    var visibleStreamService: OpenAIService?
-    @ObservationIgnored
     lazy var conversationCoordinator = AgentConversationCoordinator(state: self)
     @ObservationIgnored
     lazy var runCoordinator = AgentRunCoordinator(state: self)
+    @ObservationIgnored
+    let sessionRegistry = AgentSessionRegistry()
 
     /// Creates an Agent controller with persistence, transport, and service dependencies for council orchestration.
     package init(
@@ -86,14 +96,13 @@ package final class AgentController {
         self.transport = transport
         conversationRepository = ConversationRepository(modelContext: modelContext)
         self.serviceFactory = serviceFactory
+        conversationCoordinator.loadDefaultsFromSettings()
     }
 
     deinit {
-        let activeRunTask = activeRunTask
-        let visibleStreamService = visibleStreamService
+        let sessionRegistry = sessionRegistry
         Task { @MainActor in
-            activeRunTask?.cancel()
-            visibleStreamService?.cancelStream()
+            sessionRegistry.removeAll()
         }
     }
 
@@ -146,15 +155,99 @@ package final class AgentController {
 
     /// Stops the active Agent run and surfaces a user-visible stopped state.
     package func stopGeneration() {
-        cancelActiveRun()
+        cancelVisibleRun()
         errorMessage = "Agent run stopped."
     }
 
-    /// Cancels any active hidden or visible Agent work without resetting the loaded conversation.
-    package func cancelActiveRun() {
-        activeRunTask?.cancel()
-        activeRunTask = nil
-        visibleStreamService?.cancelStream()
-        visibleStreamService = nil
+    /// Cancels the run for the currently visible Agent conversation, if one exists.
+    package func cancelVisibleRun() {
+        guard let conversationID = currentConversation?.id,
+              let execution = sessionRegistry.execution(for: conversationID)
+        else {
+            return
+        }
+
+        execution.task?.cancel()
+        execution.service.cancelStream()
+    }
+
+    /// The reasoning effort levels available for Agent leader and worker configuration.
+    package var availableReasoningEfforts: [ReasoningEffort] {
+        ModelType.gpt5_4.availableEfforts
+    }
+
+    /// Human-readable summary of the current Agent runtime configuration.
+    package var configurationSummary: String {
+        var parts = [
+            "Leader \(leaderReasoningEffort.displayName)",
+            "Workers \(workerReasoningEffort.displayName)"
+        ]
+        if backgroundModeEnabled {
+            parts.append("Background")
+        }
+        if flexModeEnabled {
+            parts.append("Flex")
+        }
+        return parts.joined(separator: " · ")
+    }
+
+    /// Compact top-bar summary of the current Agent runtime configuration.
+    package var compactConfigurationSummary: String {
+        "L \(shortLabel(for: leaderReasoningEffort)) · W \(shortLabel(for: workerReasoningEffort))"
+    }
+
+    /// The persisted configuration bound to the currently visible Agent conversation.
+    package var currentConfiguration: AgentConversationConfiguration {
+        conversationCoordinator.currentConversationConfiguration
+    }
+
+    /// Applies a new Agent configuration to the currently visible conversation.
+    package func applyConfiguration(_ configuration: AgentConversationConfiguration) {
+        conversationCoordinator.applyConversationConfiguration(configuration)
+    }
+
+    /// Indicates whether the given Agent conversation currently has a live execution session.
+    package func isConversationRunning(_ conversationID: UUID?) -> Bool {
+        guard let conversationID else { return false }
+        return sessionRegistry.execution(for: conversationID) != nil
+    }
+
+    /// Seeds a detached execution session for UI-test and recovery scenarios.
+    package func seedDetachedExecution(
+        for conversation: Conversation,
+        draftMessageID: UUID,
+        latestUserMessageID: UUID,
+        snapshot: AgentRunSnapshot,
+        apiKey: String = "sk-ui-test"
+    ) {
+        let execution = AgentExecutionState(
+            conversationID: conversation.id,
+            draftMessageID: draftMessageID,
+            latestUserMessageID: latestUserMessageID,
+            apiKey: apiKey,
+            service: serviceFactory(),
+            snapshot: snapshot
+        )
+        sessionRegistry.register(execution, visible: false)
+    }
+
+    var flexModeEnabled: Bool {
+        get { serviceTier == .flex }
+        set { serviceTier = newValue ? .flex : .standard }
+    }
+
+    private func shortLabel(for effort: ReasoningEffort) -> String {
+        switch effort {
+        case .none:
+            "Off"
+        case .low:
+            "Low"
+        case .medium:
+            "Med"
+        case .high:
+            "High"
+        case .xhigh:
+            "Max"
+        }
     }
 }

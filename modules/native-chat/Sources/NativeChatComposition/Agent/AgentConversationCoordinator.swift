@@ -15,6 +15,9 @@ enum AgentPreparationError: Error {
 @MainActor
 struct PreparedAgentTurn {
     let apiKey: String
+    let conversation: Conversation
+    let draft: Message
+    let configuration: AgentConversationConfiguration
     let latestUserText: String
     let userMessageID: UUID
     let draftMessageID: UUID
@@ -29,39 +32,27 @@ final class AgentConversationCoordinator {
     }
 
     func startNewConversation() {
-        state.cancelActiveRun()
+        state.sessionRegistry.bindVisibleConversation(nil)
         state.currentConversation = nil
         state.messages = []
-        state.draftMessage = nil
-        state.currentStreamingText = ""
-        state.currentThinkingText = ""
-        state.activeToolCalls = []
-        state.liveCitations = []
-        state.liveFilePathAnnotations = []
+        loadDefaultsFromSettings()
+        clearVisibleRunState(clearDraft: true)
         state.errorMessage = nil
-        state.isRunning = false
-        state.isStreaming = false
-        state.isThinking = false
-        state.currentStage = nil
-        state.workerProgress = AgentWorkerProgress.defaultProgress
         state.hapticService.selection(isEnabled: state.hapticsEnabled)
     }
 
     func loadConversation(_ conversation: Conversation) {
-        state.cancelActiveRun()
+        state.sessionRegistry.bindVisibleConversation(nil)
         state.currentConversation = conversation
         state.messages = visibleMessages(for: conversation)
+        applyConversationConfiguration(resolvedConfiguration(for: conversation), persist: false)
         state.errorMessage = nil
-        state.isRunning = false
-        state.isStreaming = false
-        state.isThinking = false
-        state.currentStage = conversation.agentConversationState?.currentStage
-        state.workerProgress = AgentWorkerProgress.defaultProgress
         restoreDraftIfNeeded(from: conversation)
     }
 
     func prepareNewTurn(text rawText: String) throws(AgentPreparationError) -> PreparedAgentTurn {
-        guard !state.isRunning else {
+        if let conversation = state.currentConversation,
+           state.sessionRegistry.execution(for: conversation.id) != nil {
             throw .alreadyRunning
         }
 
@@ -77,6 +68,7 @@ final class AgentConversationCoordinator {
         }
 
         let conversation = ensureConversation()
+        let configuration = currentConversationConfiguration
         let userMessage = Message(role: .user, content: text, conversation: conversation)
         conversation.messages.append(userMessage)
         userMessage.conversation = conversation
@@ -87,7 +79,7 @@ final class AgentConversationCoordinator {
             thinking: nil,
             conversation: conversation,
             lastSequenceNumber: nil,
-            usedBackgroundMode: false,
+            usedBackgroundMode: configuration.backgroundModeEnabled,
             isComplete: false
         )
         conversation.messages.append(draft)
@@ -96,16 +88,25 @@ final class AgentConversationCoordinator {
         conversation.updatedAt = .now
         conversation.mode = .agent
         conversation.model = ModelType.gpt5_4.rawValue
-        conversation.reasoningEffort = ReasoningEffort.high.rawValue
-        conversation.backgroundModeEnabled = false
-        conversation.serviceTierRawValue = ServiceTier.standard.rawValue
+        conversation.reasoningEffort = configuration.leaderReasoningEffort.rawValue
+        conversation.backgroundModeEnabled = configuration.backgroundModeEnabled
+        conversation.serviceTierRawValue = configuration.serviceTier.rawValue
         var agentState = conversation.agentConversationState ?? AgentConversationState()
         agentState.currentStage = .leaderBrief
+        agentState.configuration = configuration
+        agentState.activeRun = AgentRunSnapshot(
+            currentStage: .leaderBrief,
+            draftMessageID: draft.id,
+            latestUserMessageID: userMessage.id
+        )
         agentState.updatedAt = .now
         conversation.agentConversationState = agentState
 
         state.messages = visibleMessages(for: conversation)
-        beginLiveRun(with: draft)
+        beginVisibleRun(
+            with: draft,
+            latestUserMessageID: userMessage.id
+        )
 
         guard saveContext("prepareNewTurn") else {
             throw .persistenceFailure
@@ -113,6 +114,9 @@ final class AgentConversationCoordinator {
 
         return PreparedAgentTurn(
             apiKey: apiKey,
+            conversation: conversation,
+            draft: draft,
+            configuration: configuration,
             latestUserText: text,
             userMessageID: userMessage.id,
             draftMessageID: draft.id
@@ -120,10 +124,6 @@ final class AgentConversationCoordinator {
     }
 
     func prepareRetryTurn() throws(AgentPreparationError) -> PreparedAgentTurn {
-        guard !state.isRunning else {
-            throw .alreadyRunning
-        }
-
         let apiKey = (state.apiKeyStore.loadAPIKey() ?? "")
             .trimmingCharacters(in: .whitespacesAndNewlines)
         guard !apiKey.isEmpty else {
@@ -133,10 +133,16 @@ final class AgentConversationCoordinator {
         guard let conversation = state.currentConversation else {
             throw .missingRetryableUserMessage
         }
+        guard state.sessionRegistry.execution(for: conversation.id) == nil else {
+            throw .alreadyRunning
+        }
 
-        let latestUserText = conversation.messages
+        let configuration = currentConversationConfiguration
+
+        let latestUserMessage = conversation.messages
             .sorted(by: { $0.createdAt < $1.createdAt })
-            .last(where: { $0.role == .user })?
+            .last(where: { $0.role == .user })
+        let latestUserText = latestUserMessage?
             .content
             .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         guard !latestUserText.isEmpty else {
@@ -157,7 +163,7 @@ final class AgentConversationCoordinator {
             thinking: nil,
             conversation: conversation,
             lastSequenceNumber: nil,
-            usedBackgroundMode: false,
+            usedBackgroundMode: configuration.backgroundModeEnabled,
             isComplete: false
         )
         conversation.messages.append(draft)
@@ -165,11 +171,20 @@ final class AgentConversationCoordinator {
         conversation.updatedAt = .now
         var agentState = conversation.agentConversationState ?? AgentConversationState()
         agentState.currentStage = .leaderBrief
+        agentState.configuration = configuration
+        agentState.activeRun = AgentRunSnapshot(
+            currentStage: .leaderBrief,
+            draftMessageID: draft.id,
+            latestUserMessageID: latestUserMessage?.id ?? UUID()
+        )
         agentState.updatedAt = .now
         conversation.agentConversationState = agentState
 
         state.messages = visibleMessages(for: conversation)
-        beginLiveRun(with: draft)
+        beginVisibleRun(
+            with: draft,
+            latestUserMessageID: latestUserMessage?.id ?? UUID()
+        )
 
         guard saveContext("prepareRetryTurn") else {
             throw .persistenceFailure
@@ -177,8 +192,11 @@ final class AgentConversationCoordinator {
 
         return PreparedAgentTurn(
             apiKey: apiKey,
+            conversation: conversation,
+            draft: draft,
+            configuration: configuration,
             latestUserText: latestUserText,
-            userMessageID: UUID(),
+            userMessageID: latestUserMessage?.id ?? UUID(),
             draftMessageID: draft.id
         )
     }
@@ -198,60 +216,41 @@ final class AgentConversationCoordinator {
         conversation.messages.sorted(by: { $0.createdAt < $1.createdAt })
     }
 
-    private func ensureConversation() -> Conversation {
-        if let conversation = state.currentConversation {
-            return conversation
-        }
-
-        let conversation = Conversation(
-            modeRawValue: ConversationMode.agent.rawValue,
-            model: ModelType.gpt5_4.rawValue,
-            reasoningEffort: ReasoningEffort.high.rawValue,
-            backgroundModeEnabled: false,
-            serviceTierRawValue: ServiceTier.standard.rawValue
+    func loadDefaultsFromSettings() {
+        applyConversationConfiguration(
+            state.settingsStore.defaultAgentConversationConfiguration,
+            persist: false
         )
-        conversation.mode = .agent
-        state.modelContext.insert(conversation)
-        state.currentConversation = conversation
-        return conversation
     }
 
-    private func beginLiveRun(with draft: Message) {
-        state.draftMessage = draft
-        state.currentStreamingText = ""
-        state.currentThinkingText = ""
-        state.activeToolCalls = []
-        state.liveCitations = []
-        state.liveFilePathAnnotations = []
-        state.errorMessage = nil
-        state.isRunning = true
-        state.isStreaming = false
-        state.isThinking = false
-        state.currentStage = .leaderBrief
-        state.workerProgress = AgentWorkerProgress.defaultProgress
-        state.hapticService.impact(.light, isEnabled: state.hapticsEnabled)
+    func applyConversationConfiguration(
+        _ configuration: AgentConversationConfiguration,
+        persist: Bool = true
+    ) {
+        state.leaderReasoningEffort = configuration.leaderReasoningEffort
+        state.workerReasoningEffort = configuration.workerReasoningEffort
+        state.backgroundModeEnabled = configuration.backgroundModeEnabled
+        state.serviceTier = configuration.serviceTier
+
+        guard persist, let conversation = state.currentConversation else { return }
+
+        var agentState = conversation.agentConversationState ?? AgentConversationState()
+        agentState.configuration = configuration
+        agentState.updatedAt = .now
+        conversation.agentConversationState = agentState
+        conversation.reasoningEffort = configuration.leaderReasoningEffort.rawValue
+        conversation.backgroundModeEnabled = configuration.backgroundModeEnabled
+        conversation.serviceTierRawValue = configuration.serviceTier.rawValue
+        conversation.updatedAt = .now
+        _ = saveContext("applyConversationConfiguration")
     }
 
-    private func restoreDraftIfNeeded(from conversation: Conversation) {
-        guard let draft = conversation.messages
-            .sorted(by: { $0.createdAt < $1.createdAt })
-            .last(where: { $0.role == .assistant && !$0.isComplete })
-        else {
-            state.draftMessage = nil
-            state.currentStreamingText = ""
-            state.currentThinkingText = ""
-            state.activeToolCalls = []
-            state.liveCitations = []
-            state.liveFilePathAnnotations = []
-            return
-        }
-
-        state.draftMessage = draft
-        state.currentStreamingText = draft.content
-        state.currentThinkingText = draft.thinking ?? ""
-        state.activeToolCalls = draft.toolCalls
-        state.liveCitations = draft.annotations
-        state.liveFilePathAnnotations = draft.filePathAnnotations
-        state.errorMessage = "The last Agent run did not complete. Retry to continue."
+    var currentConversationConfiguration: AgentConversationConfiguration {
+        AgentConversationConfiguration(
+            leaderReasoningEffort: state.leaderReasoningEffort,
+            workerReasoningEffort: state.workerReasoningEffort,
+            backgroundModeEnabled: state.backgroundModeEnabled,
+            serviceTier: state.serviceTier
+        )
     }
 }

@@ -180,6 +180,26 @@ public final class SettingsSceneController {
         persistenceHandler.persistDefaultServiceTier(serviceTier)
     }
 
+    /// Persists the default Agent leader reasoning effort preference.
+    public func persistDefaultAgentLeaderEffort(_ effort: ReasoningEffort) {
+        persistenceHandler.persistDefaultAgentLeaderEffort(effort)
+    }
+
+    /// Persists the default Agent worker reasoning effort preference.
+    public func persistDefaultAgentWorkerEffort(_ effort: ReasoningEffort) {
+        persistenceHandler.persistDefaultAgentWorkerEffort(effort)
+    }
+
+    /// Persists the default Agent background mode toggle state.
+    public func persistDefaultAgentBackgroundModeEnabled(_ enabled: Bool) {
+        persistenceHandler.persistDefaultAgentBackgroundModeEnabled(enabled)
+    }
+
+    /// Persists the default Agent service tier preference.
+    public func persistDefaultAgentServiceTier(_ serviceTier: ServiceTier) {
+        persistenceHandler.persistDefaultAgentServiceTier(serviceTier)
+    }
+
     /// Persists the selected app theme.
     public func persistAppTheme(_ theme: AppTheme) {
         persistenceHandler.persistAppTheme(theme)

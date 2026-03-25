@@ -125,9 +125,19 @@ func makeRunningAgentConversationSamples(in viewModel: AgentController) -> Conve
     viewModel.isStreaming = true
     viewModel.isThinking = true
     viewModel.currentStage = .crossReview
+    viewModel.leaderReasoningEffort = .high
+    viewModel.workerReasoningEffort = .medium
+    viewModel.backgroundModeEnabled = true
+    viewModel.serviceTier = .flex
+    viewModel.leaderBriefSummary = "Prefer a low-risk rollout with explicit failure-domain checks."
     viewModel.currentThinkingText = "Comparing the first worker round and resolving disagreements."
     viewModel.currentStreamingText = "Finalizing the safest release recommendation."
-    viewModel.workerProgress = [
+    viewModel.workersRoundOneProgress = [
+        AgentWorkerProgress(role: .workerA, status: .completed),
+        AgentWorkerProgress(role: .workerB, status: .completed),
+        AgentWorkerProgress(role: .workerC, status: .completed)
+    ]
+    viewModel.crossReviewProgress = [
         AgentWorkerProgress(role: .workerA, status: .completed),
         AgentWorkerProgress(role: .workerB, status: .running),
         AgentWorkerProgress(role: .workerC, status: .completed)

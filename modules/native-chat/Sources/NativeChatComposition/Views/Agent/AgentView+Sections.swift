@@ -1,29 +1,65 @@
 import ChatUIComponents
+import NativeChatUI
 import SwiftUI
 import UIKit
 
 extension AgentView {
     var agentTopBar: some View {
         HStack(alignment: .center, spacing: 12) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(String(localized: "Agent Council"))
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.primary)
-                Text(String(localized: "Leader High · 3 Workers Low"))
-                    .font(.caption.weight(.medium))
-                    .foregroundStyle(.primary)
-            }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
-            .singleFrameGlassRoundedControl(
-                cornerRadius: 18,
-                tintOpacity: GlassStyleMetrics.CapsuleControl.tintOpacity,
-                borderWidth: GlassStyleMetrics.CapsuleControl.borderWidth,
-                darkBorderOpacity: GlassStyleMetrics.CapsuleControl.darkBorderOpacity,
-                lightBorderOpacity: GlassStyleMetrics.CapsuleControl.lightBorderOpacity
-            )
+            Button {
+                agentSelectorDraft = viewModel.currentConfiguration
+                isShowingAgentSelector = true
+            } label: {
+                HStack(spacing: 8) {
+                    Image(systemName: "person.3.sequence.fill")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.blue, .primary.opacity(0.8))
+                        .accessibilityHidden(true)
 
-            Spacer(minLength: 12)
+                    Text(viewModel.compactConfigurationSummary)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.primary)
+                        .multilineTextAlignment(.leading)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+
+                    if viewModel.backgroundModeEnabled {
+                        Image(systemName: "arrow.triangle.2.circlepath")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                            .accessibilityHidden(true)
+                    }
+
+                    if viewModel.flexModeEnabled {
+                        Image(systemName: "bolt.fill")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                            .accessibilityHidden(true)
+                    }
+
+                    Image(systemName: "chevron.down")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                        .accessibilityHidden(true)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .singleFrameGlassCapsuleControl(
+                    tintOpacity: GlassStyleMetrics.CapsuleControl.tintOpacity,
+                    borderWidth: GlassStyleMetrics.CapsuleControl.borderWidth,
+                    darkBorderOpacity: GlassStyleMetrics.CapsuleControl.darkBorderOpacity,
+                    lightBorderOpacity: GlassStyleMetrics.CapsuleControl.lightBorderOpacity
+                )
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .layoutPriority(1)
+            .buttonStyle(GlassPressButtonStyle())
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(String(localized: "Agent Council"))
+            .accessibilityValue(viewModel.configurationSummary)
+            .accessibilityHint(String(localized: "Open Agent settings"))
+            .accessibilityIdentifier("agent.selectorButton")
 
             Button {
                 composerText = ""
@@ -53,6 +89,40 @@ extension AgentView {
         .padding(.bottom, 10)
     }
 
+    var agentSelectorPresentation: some View {
+        GeometryReader { geometry in
+            let idiom = UIDevice.current.userInterfaceIdiom
+            let horizontalInset = idiom == .pad ? 32.0 : 16.0
+            let maxPanelWidth = idiom == .pad ? 680.0 : min(geometry.size.width - (horizontalInset * 2), 560.0)
+            let topInset = idiom == .pad ? 76.0 : 60.0
+
+            ZStack(alignment: .top) {
+                Color.black.opacity(0.08)
+                    .ignoresSafeArea()
+                    .contentShape(Rectangle())
+                    .accessibilityIdentifier("agentSelector.backdrop")
+                    .onTapGesture {
+                        dismissAgentSelector()
+                    }
+
+                AgentSelectorSheet(
+                    backgroundModeEnabled: $agentSelectorDraft.backgroundModeEnabled,
+                    flexModeEnabled: Binding(
+                        get: { agentSelectorDraft.flexModeEnabled },
+                        set: { agentSelectorDraft.flexModeEnabled = $0 }
+                    ),
+                    leaderReasoningEffort: $agentSelectorDraft.leaderReasoningEffort,
+                    workerReasoningEffort: $agentSelectorDraft.workerReasoningEffort,
+                    onDone: commitAgentSelectorAndDismiss
+                )
+                .frame(maxWidth: maxPanelWidth)
+                .padding(.top, topInset)
+                .padding(.horizontal, horizontalInset)
+            }
+        }
+        .preferredColorScheme(selectedTheme.colorScheme)
+    }
+
     var agentEmptyState: some View {
         VStack(spacing: 18) {
             ZStack {
@@ -69,7 +139,6 @@ extension AgentView {
                 Image(systemName: "person.3.sequence.fill")
                     .font(.system(size: 38, weight: .semibold))
                     .foregroundStyle(.blue, .primary.opacity(0.75))
-                    .symbolEffect(.breathe)
             }
             .accessibilityHidden(true)
 
@@ -176,5 +245,15 @@ extension AgentView {
         )
         .accessibilityElement(children: .combine)
         .accessibilityIdentifier("agent.errorBanner")
+    }
+
+    func dismissAgentSelector() {
+        isShowingAgentSelector = false
+        agentSelectorDraft = viewModel.currentConfiguration
+    }
+
+    func commitAgentSelectorAndDismiss() {
+        viewModel.applyConfiguration(agentSelectorDraft)
+        isShowingAgentSelector = false
     }
 }

@@ -2,12 +2,12 @@ import ChatDomain
 import ChatPersistenceSwiftData
 import ChatPresentation
 import GeneratedFilesCore
-import NativeChatUI
 import SnapshotTesting
 import SwiftUI
 import Testing
 import UIKit
 @testable import NativeChatComposition
+@testable import NativeChatUI
 
 @Suite(.serialized)
 @MainActor
@@ -80,21 +80,40 @@ struct ViewHostingCoverageTests {
         }
     }
 
-    @Test func `agent snapshot matches phone light reference`() throws {
-        let store = try makeSnapshotAgentScreenStore(hasAPIKey: true)
-        let conversation = makeCompletedAgentConversationSamples(in: store)
-        let expandedMessageIDs = Set(conversation.messages.map(\.id))
-
+    @Test func `agent selector snapshot matches phone light reference`() {
         assertHostedSnapshot(
-            named: "agent-phone-light",
-            testName: "testAgentCoverageSnapshot",
-            size: snapshotVariant.canvasSize,
+            named: "agent-selector-phone-light",
+            testName: "testAgentSelectorSnapshot",
+            size: CGSize(width: 393, height: 520),
             delay: 0.15
         ) {
-            AgentView(
-                viewModel: store,
-                initialExpandedTraceMessageIDs: expandedMessageIDs
+            AgentSelectorSheet(
+                backgroundModeEnabled: .constant(true),
+                flexModeEnabled: .constant(true),
+                leaderReasoningEffort: .constant(.high),
+                workerReasoningEffort: .constant(.medium),
+                onDone: {}
             )
+            .padding()
+        }
+    }
+
+    @Test func `agent settings snapshot matches phone light reference`() {
+        let viewModel = makeTestSettingsScreenStoreHarness(apiKey: "sk-hosted").store
+        viewModel.agentDefaults.defaultBackgroundModeEnabled = true
+        viewModel.agentDefaults.defaultFlexModeEnabled = true
+        viewModel.agentDefaults.defaultLeaderEffort = ReasoningEffort.xhigh
+        viewModel.agentDefaults.defaultWorkerEffort = ReasoningEffort.medium
+
+        assertHostedSnapshot(
+            named: "agent-settings-phone-light",
+            testName: "testAgentSettingsSnapshot",
+            size: CGSize(width: 393, height: 720),
+            delay: 0.15
+        ) {
+            NavigationStack {
+                SettingsAgentDefaultsView(viewModel: viewModel.agentDefaults)
+            }
         }
     }
 
