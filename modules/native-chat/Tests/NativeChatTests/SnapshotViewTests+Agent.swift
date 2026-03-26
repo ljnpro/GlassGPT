@@ -24,6 +24,10 @@ extension SnapshotViewTests {
 
         let waitingViewModel = try makeSnapshotAgentScreenStore(hasAPIKey: true)
         _ = makeRunningAgentConversationSamples(in: waitingViewModel)
+        waitingViewModel.currentStage = .finalSynthesis
+        waitingViewModel.processSnapshot.activity = .synthesis
+        waitingViewModel.processSnapshot.leaderLiveStatus = "Waiting for tool results"
+        waitingViewModel.processSnapshot.leaderLiveSummary = "Waiting for the last tool result before synthesis continues."
         waitingViewModel.isThinking = false
         waitingViewModel.currentStreamingText = ""
         waitingViewModel.currentThinkingText = "Waiting for the last tool result before synthesis."

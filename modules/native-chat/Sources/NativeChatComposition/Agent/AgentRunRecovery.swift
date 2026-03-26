@@ -29,6 +29,12 @@ extension AgentRunCoordinator {
         }
 
         let snapshot = resumableSnapshot(in: conversation, draft: draft)
+        guard snapshot.phase.supportsAutomaticResume else {
+            if state.currentConversation?.id == conversation.id {
+                state.errorMessage = AgentConversationCoordinator.retryBannerMessage
+            }
+            return
+        }
         var preparedSnapshot = snapshot
         AgentProcessProjector.prepareForResume(&preparedSnapshot)
         let latestUserText = latestUserText(
@@ -50,7 +56,10 @@ extension AgentRunCoordinator {
             latestUserText: latestUserText,
             userMessageID: preparedSnapshot.latestUserMessageID,
             draftMessageID: draft.id,
-            attachmentsToUpload: []
+            attachmentsToUpload: conversation.messages
+                .first(where: { $0.id == preparedSnapshot.latestUserMessageID })?
+                .fileAttachments
+                .filter { $0.fileId == nil || $0.uploadStatus != .uploaded } ?? []
         )
         startExecution(
             prepared,
@@ -203,11 +212,16 @@ extension AgentRunCoordinator {
 
         return AgentRunSnapshot(
             currentStage: .finalSynthesis,
+            phase: .finalSynthesis,
             draftMessageID: draft.id,
             latestUserMessageID: latestUserMessageID,
+            runConfiguration: resolvedConfiguration(for: conversation),
             processSnapshot: AgentProcessSnapshot(
                 activity: .synthesis,
-                currentFocus: "Leader is finishing the answer."
+                currentFocus: "Leader is finishing the answer.",
+                leaderAcceptedFocus: "Leader is finishing the answer.",
+                leaderLiveStatus: "Writing final answer",
+                leaderLiveSummary: "Writing final answer from accepted findings."
             ),
             currentStreamingText: draft.content,
             currentThinkingText: draft.thinking ?? "",
@@ -238,6 +252,11 @@ extension AgentRunCoordinator {
     }
 
     func resolvedConfiguration(for conversation: Conversation) -> AgentConversationConfiguration {
+        if let activeRun = conversation.agentConversationState?.activeRun,
+           activeRun.hasExplicitRunConfiguration {
+            return activeRun.runConfiguration
+        }
+
         if let configuration = conversation.agentConversationState?.configuration {
             return configuration
         }

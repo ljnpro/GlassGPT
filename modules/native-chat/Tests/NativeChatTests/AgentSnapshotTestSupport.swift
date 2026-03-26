@@ -38,7 +38,8 @@ func makeSnapshotAgentScreenStore(hasAPIKey: Bool = false) throws -> AgentContro
         requestBuilder: requestBuilder,
         responseParser: responseParser,
         transport: transport,
-        serviceFactory: { service }
+        serviceFactory: { service },
+        bootstrapPolicy: .testing
     )
 }
 
@@ -61,82 +62,7 @@ func makeCompletedAgentConversationSamples(in viewModel: AgentController) -> Con
     let assistantMessage = Message(
         role: .assistant,
         content: "Ship additively with parity checks and a rollback gate at every milestone.",
-        agentTrace: AgentTurnTrace(
-            leaderBriefSummary: "Prefer the lowest-risk rollout path.",
-            workerSummaries: [
-                AgentWorkerSummary(
-                    role: .workerA,
-                    summary: "Use an additive rollout with rollback gates.",
-                    adoptedPoints: ["Keep parity checks visible."]
-                ),
-                AgentWorkerSummary(
-                    role: .workerB,
-                    summary: "Do not mutate existing data flows in place.",
-                    adoptedPoints: ["Call out failure domains."]
-                ),
-                AgentWorkerSummary(
-                    role: .workerC,
-                    summary: "Document missing monitoring and launch sequencing.",
-                    adoptedPoints: ["Add validation checkpoints."]
-                )
-            ],
-            processSnapshot: AgentProcessSnapshot(
-                activity: .completed,
-                currentFocus: "Leader completed the rollout recommendation.",
-                plan: [
-                    AgentPlanStep(
-                        id: "step_root",
-                        owner: .leader,
-                        status: .completed,
-                        title: "Frame rollout plan",
-                        summary: "Choose the safest rollout shape."
-                    ),
-                    AgentPlanStep(
-                        id: "step_validate",
-                        parentStepID: "step_root",
-                        owner: .workerA,
-                        status: .completed,
-                        title: "Validate rollout shape",
-                        summary: "Confirm rollback, parity, and monitoring checkpoints."
-                    )
-                ],
-                tasks: [
-                    AgentTask(
-                        owner: .workerA,
-                        parentStepID: "step_validate",
-                        title: "Validate rollout shape",
-                        goal: "Confirm the safest rollout path",
-                        expectedOutput: "Concise rollout recommendation",
-                        contextSummary: "Focus on additive rollout and rollback gates.",
-                        toolPolicy: .enabled,
-                        status: .completed,
-                        resultSummary: "Use additive rollout with rollback gates.",
-                        result: AgentTaskResult(
-                            summary: "Use additive rollout with rollback gates.",
-                            evidence: ["Parity checks remain visible at every milestone."],
-                            confidence: .high
-                        )
-                    )
-                ],
-                decisions: [
-                    AgentDecision(
-                        kind: .triage,
-                        title: "Delegate",
-                        summary: "Validate the rollout path before answering."
-                    ),
-                    AgentDecision(
-                        kind: .finish,
-                        title: "Finish",
-                        summary: "The current evidence is sufficient for the final answer."
-                    )
-                ],
-                evidence: ["Rollback gates stayed explicit across the plan."],
-                stopReason: .sufficientAnswer,
-                outcome: "Completed"
-            ),
-            completedStage: .finalSynthesis,
-            outcome: "Completed"
-        )
+        agentTrace: makeCompletedAgentTrace()
     )
     conversation.messages = [userMessage, assistantMessage]
     userMessage.conversation = conversation
@@ -144,6 +70,101 @@ func makeCompletedAgentConversationSamples(in viewModel: AgentController) -> Con
     viewModel.currentConversation = conversation
     viewModel.messages = [userMessage, assistantMessage]
     return conversation
+}
+
+private func makeCompletedAgentTrace() -> AgentTurnTrace {
+    AgentTurnTrace(
+        leaderBriefSummary: "Prefer the lowest-risk rollout path.",
+        workerSummaries: [
+            AgentWorkerSummary(
+                role: .workerA,
+                summary: "Use an additive rollout with rollback gates.",
+                adoptedPoints: ["Keep parity checks visible."]
+            ),
+            AgentWorkerSummary(
+                role: .workerB,
+                summary: "Do not mutate existing data flows in place.",
+                adoptedPoints: ["Call out failure domains."]
+            ),
+            AgentWorkerSummary(
+                role: .workerC,
+                summary: "Document missing monitoring and launch sequencing.",
+                adoptedPoints: ["Add validation checkpoints."]
+            )
+        ],
+        processSnapshot: makeCompletedAgentProcessSnapshot(),
+        completedStage: .finalSynthesis,
+        outcome: "Completed"
+    )
+}
+
+private func makeCompletedAgentProcessSnapshot() -> AgentProcessSnapshot {
+    AgentProcessSnapshot(
+        activity: .completed,
+        currentFocus: "Leader completed the rollout recommendation.",
+        leaderAcceptedFocus: "Leader completed the rollout recommendation.",
+        leaderLiveStatus: "Completed",
+        leaderLiveSummary: "The rollout recommendation is grounded in the accepted worker findings.",
+        plan: [
+            AgentPlanStep(
+                id: "step_root",
+                owner: .leader,
+                status: .completed,
+                title: "Frame rollout plan",
+                summary: "Choose the safest rollout shape."
+            ),
+            AgentPlanStep(
+                id: "step_validate",
+                parentStepID: "step_root",
+                owner: .workerA,
+                status: .completed,
+                title: "Validate rollout shape",
+                summary: "Confirm rollback, parity, and monitoring checkpoints."
+            )
+        ],
+        tasks: [
+            AgentTask(
+                id: "task_validate_rollout",
+                owner: .workerA,
+                parentStepID: "step_validate",
+                title: "Validate rollout shape",
+                goal: "Confirm the safest rollout path",
+                expectedOutput: "Concise rollout recommendation",
+                contextSummary: "Focus on additive rollout and rollback gates.",
+                toolPolicy: .enabled,
+                status: .completed,
+                resultSummary: "Use additive rollout with rollback gates.",
+                result: AgentTaskResult(
+                    summary: "Use additive rollout with rollback gates.",
+                    evidence: ["Parity checks remain visible at every milestone."],
+                    confidence: .high
+                )
+            )
+        ],
+        decisions: [
+            AgentDecision(
+                kind: .triage,
+                title: "Delegate",
+                summary: "Validate the rollout recommendation before answering."
+            ),
+            AgentDecision(
+                kind: .finish,
+                title: "Finish",
+                summary: "The current evidence is sufficient for the final answer."
+            )
+        ],
+        events: [
+            AgentEvent(kind: .started, summary: "Started Agent run"),
+            AgentEvent(kind: .synthesisStarted, summary: "Leader began final synthesis")
+        ],
+        evidence: ["Rollback gates stayed explicit across the plan."],
+        recentUpdates: [
+            "Worker A validated additive rollout with rollback gates.",
+            "Leader adopted explicit monitoring checkpoints."
+        ],
+        stopReason: .sufficientAnswer,
+        outcome: "Completed"
+    )
 }
 
 @MainActor
@@ -176,16 +197,16 @@ func makeRunningAgentConversationSamples(in viewModel: AgentController) -> Conve
     viewModel.messages = [userMessage, draftMessage]
     viewModel.draftMessage = draftMessage
     viewModel.isRunning = true
-    viewModel.isStreaming = true
-    viewModel.isThinking = true
+    viewModel.isStreaming = false
+    viewModel.isThinking = false
     viewModel.currentStage = .workersRoundOne
     viewModel.leaderReasoningEffort = .high
     viewModel.workerReasoningEffort = .medium
     viewModel.backgroundModeEnabled = true
     viewModel.serviceTier = .flex
     viewModel.leaderBriefSummary = "Prefer a low-risk rollout with explicit failure-domain checks."
-    viewModel.currentThinkingText = "Comparing the first worker round and resolving disagreements."
-    viewModel.currentStreamingText = "Finalizing the safest release recommendation."
+    viewModel.currentThinkingText = ""
+    viewModel.currentStreamingText = ""
     viewModel.processSnapshot = makeRunningAgentProcessSnapshot()
     viewModel.activeToolCalls = [
         ToolCallInfo(
@@ -208,6 +229,9 @@ private func makeRunningAgentProcessSnapshot() -> AgentProcessSnapshot {
     AgentProcessSnapshot(
         activity: .delegation,
         currentFocus: "Leader delegated a bounded validation wave before writing the answer.",
+        leaderAcceptedFocus: "Leader delegated a bounded validation wave before writing the answer.",
+        leaderLiveStatus: "Reviewing worker results",
+        leaderLiveSummary: "Comparing the strongest worker recommendation with the risk findings.",
         plan: [
             AgentPlanStep(
                 id: "step_root",
@@ -227,6 +251,7 @@ private func makeRunningAgentProcessSnapshot() -> AgentProcessSnapshot {
         ],
         tasks: [
             AgentTask(
+                id: "task_answer",
                 owner: .workerA,
                 parentStepID: "step_root",
                 title: "Draft strongest answer",
@@ -238,6 +263,7 @@ private func makeRunningAgentProcessSnapshot() -> AgentProcessSnapshot {
                 resultSummary: "Ship additively with parity checks."
             ),
             AgentTask(
+                id: "task_risks",
                 owner: .workerB,
                 parentStepID: "step_checks",
                 title: "Stress launch risks",
@@ -252,6 +278,7 @@ private func makeRunningAgentProcessSnapshot() -> AgentProcessSnapshot {
                 liveConfidence: .medium
             ),
             AgentTask(
+                id: "task_completeness",
                 owner: .workerC,
                 parentStepID: "step_root",
                 title: "Check completeness",
@@ -269,8 +296,17 @@ private func makeRunningAgentProcessSnapshot() -> AgentProcessSnapshot {
                 summary: "Run one bounded validation wave before synthesis."
             )
         ],
+        events: [
+            AgentEvent(kind: .started, summary: "Started Agent run"),
+            AgentEvent(kind: .taskStarted, summary: "Worker B started stress-testing the launch plan")
+        ],
         evidence: ["Worker A already converged on additive rollout."],
-        activeTaskIDs: [],
+        activeTaskIDs: ["task_risks"],
+        recentUpdates: [
+            "Leader split the work into answer, risk, and completeness tracks.",
+            "Worker A completed the strongest answer path.",
+            "Worker B is checking rollback wording."
+        ],
         outcome: "In progress"
     )
 }

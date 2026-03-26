@@ -30,7 +30,7 @@ public struct FileAttachment: PayloadCodable, Identifiable, Equatable {
     public var localData: Data?
 
     enum CodingKeys: String, CodingKey {
-        case id, filename, fileSize, fileType, fileId, uploadStatus
+        case id, filename, fileSize, fileType, fileId, uploadStatus, localData
     }
 
     /// Alias for ``fileId`` providing semantic clarity when used with OpenAI APIs.

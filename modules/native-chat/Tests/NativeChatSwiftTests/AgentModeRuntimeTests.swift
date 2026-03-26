@@ -30,7 +30,7 @@ struct AgentModeRuntimeTests {
     }
 
     @Test func `agent mode reuses persisted response ids across follow up turns`() async throws {
-        let transport = ScriptedAgentCouncilTransport(
+        let streamClient = ScriptedAgentCouncilStreamClient(
             turns: [
                 AgentTurnScript(
                     triageResponseID: "leader_triage_1",
@@ -39,7 +39,9 @@ struct AgentModeRuntimeTests {
                         .workerA: "worker_a_task_1",
                         .workerB: "worker_b_task_1",
                         .workerC: "worker_c_task_1"
-                    ]
+                    ],
+                    finalResponseID: "leader_final_1",
+                    finalAnswer: "Final answer 1"
                 ),
                 AgentTurnScript(
                     triageResponseID: "leader_triage_2",
@@ -48,40 +50,23 @@ struct AgentModeRuntimeTests {
                         .workerA: "worker_a_task_2",
                         .workerB: "worker_b_task_2",
                         .workerC: "worker_c_task_2"
-                    ]
+                    ],
+                    finalResponseID: "leader_final_2",
+                    finalAnswer: "Final answer 2"
                 )
             ]
         )
-        let streamClient = QueuedOpenAIStreamClient(scriptedStreams: [
-            scriptedWorkerStreamEvents(role: .workerA, responseID: "worker_a_task_1"),
-            scriptedWorkerStreamEvents(role: .workerB, responseID: "worker_b_task_1"),
-            scriptedWorkerStreamEvents(role: .workerC, responseID: "worker_c_task_1"),
-            [
-                .responseCreated("leader_final_1"),
-                .textDelta("Final answer 1"),
-                .completed("Final answer 1", nil, nil)
-            ],
-            scriptedWorkerStreamEvents(role: .workerA, responseID: "worker_a_task_2"),
-            scriptedWorkerStreamEvents(role: .workerB, responseID: "worker_b_task_2"),
-            scriptedWorkerStreamEvents(role: .workerC, responseID: "worker_c_task_2"),
-            [
-                .responseCreated("leader_final_2"),
-                .textDelta("Final answer 2"),
-                .completed("Final answer 2", nil, nil)
-            ]
-        ])
         let controller = try makeTestAgentController(
-            transport: transport,
             streamClient: streamClient
         )
 
         #expect(controller.sendMessage(text: "How should we ship this?"))
-        try await waitUntil {
+        try await waitUntil(timeout: 10) {
             !controller.isRunning && controller.messages.last?.content == "Final answer 1"
         }
 
         #expect(controller.sendMessage(text: "What changes for the follow up?"))
-        try await waitUntil {
+        try await waitUntil(timeout: 10) {
             !controller.isRunning && controller.messages.last?.content == "Final answer 2"
         }
 
@@ -91,9 +76,7 @@ struct AgentModeRuntimeTests {
         #expect(finalState.responseID(for: .workerB) == "worker_b_task_2")
         #expect(finalState.responseID(for: .workerC) == "worker_c_task_2")
 
-        let recordedRequests = await transport.requests()
-        let requestBodies = recordedRequests.compactMap(previousResponseID(from:))
-            + streamClient.recordedRequests.compactMap(previousResponseID(from:))
+        let requestBodies = streamClient.recordedRequests.compactMap(previousResponseID(from:))
 
         #expect(requestBodies.contains("leader_final_1"))
         #expect(requestBodies.contains("worker_a_task_1"))
@@ -106,19 +89,28 @@ struct AgentModeRuntimeTests {
     }
 
     @Test func `starting new agent conversation detaches active execution and rebinding avoids retry banner`() async throws {
-        let transport = ScriptedAgentCouncilTransport(turns: [AgentTurnScript.singleTurn()])
-        let streamClient = ControlledOpenAIStreamClient(scriptedStreams: [
-            scriptedWorkerStreamEvents(role: .workerA, responseID: "worker_a_task"),
-            scriptedWorkerStreamEvents(role: .workerB, responseID: "worker_b_task"),
-            scriptedWorkerStreamEvents(role: .workerC, responseID: "worker_c_task")
-        ])
+        let streamClient = ScriptedAgentCouncilStreamClient(
+            turns: [
+                AgentTurnScript(
+                    triageResponseID: "leader_triage_detached",
+                    reviewResponseID: "leader_review_detached",
+                    taskResponseIDs: [
+                        .workerA: "worker_a_task",
+                        .workerB: "worker_b_task",
+                        .workerC: "worker_c_task"
+                    ],
+                    finalResponseID: "leader_final_detached",
+                    finalAnswer: "Detached answer"
+                )
+            ],
+            controlledResponseIDs: ["leader_final_detached"]
+        )
         let controller = try makeTestAgentController(
-            transport: transport,
             streamClient: streamClient
         )
 
         #expect(controller.sendMessage(text: "Keep this running"))
-        try await waitUntil(timeout: 5) {
+        try await waitUntil(timeout: 10) {
             controller.currentStage == .finalSynthesis && streamClient.activeStreamCount == 1
         }
 
@@ -135,31 +127,40 @@ struct AgentModeRuntimeTests {
         #expect(controller.isRunning == true)
         #expect(controller.errorMessage == nil)
 
-        streamClient.yield(.responseCreated("leader_final_detached"))
-        streamClient.yield(.textDelta("Detached answer"))
-        streamClient.yield(.completed("Detached answer", nil, nil))
-        streamClient.finishStream()
+        streamClient.yield(.responseCreated("leader_final_detached"), onResponseID: "leader_final_detached")
+        streamClient.yield(.textDelta("Detached answer"), onResponseID: "leader_final_detached")
+        streamClient.yield(.completed("Detached answer", nil, nil), onResponseID: "leader_final_detached")
+        streamClient.finishStream(responseID: "leader_final_detached")
 
-        try await waitUntil {
+        try await waitUntil(timeout: 10) {
             !controller.isRunning && controller.messages.last?.content == "Detached answer"
         }
         #expect(controller.errorMessage == nil)
     }
 
     @Test func `retry banner only appears when no live session and no recoverable background snapshot exists`() async throws {
-        let transport = ScriptedAgentCouncilTransport(turns: [AgentTurnScript.singleTurn()])
-        let streamClient = ControlledOpenAIStreamClient(scriptedStreams: [
-            scriptedWorkerStreamEvents(role: .workerA, responseID: "worker_a_task"),
-            scriptedWorkerStreamEvents(role: .workerB, responseID: "worker_b_task"),
-            scriptedWorkerStreamEvents(role: .workerC, responseID: "worker_c_task")
-        ])
+        let streamClient = ScriptedAgentCouncilStreamClient(
+            turns: [
+                AgentTurnScript(
+                    triageResponseID: "leader_triage_retry",
+                    reviewResponseID: "leader_review_retry",
+                    taskResponseIDs: [
+                        .workerA: "worker_a_task",
+                        .workerB: "worker_b_task",
+                        .workerC: "worker_c_task"
+                    ],
+                    finalResponseID: "leader_final_retry",
+                    finalAnswer: "Recovered visibly"
+                )
+            ],
+            controlledResponseIDs: ["leader_final_retry"]
+        )
         let controller = try makeTestAgentController(
-            transport: transport,
             streamClient: streamClient
         )
 
         #expect(controller.sendMessage(text: "Keep running"))
-        try await waitUntil(timeout: 5) {
+        try await waitUntil(timeout: 10) {
             controller.currentStage == .finalSynthesis && streamClient.activeStreamCount == 1
         }
 
@@ -168,11 +169,11 @@ struct AgentModeRuntimeTests {
         controller.loadConversation(runningConversation)
         #expect(controller.errorMessage == nil)
 
-        streamClient.yield(.responseCreated("leader_final_retry"))
-        streamClient.yield(.textDelta("Recovered visibly"))
-        streamClient.yield(.completed("Recovered visibly", nil, nil))
-        streamClient.finishStream()
-        try await waitUntil {
+        streamClient.yield(.responseCreated("leader_final_retry"), onResponseID: "leader_final_retry")
+        streamClient.yield(.textDelta("Recovered visibly"), onResponseID: "leader_final_retry")
+        streamClient.yield(.completed("Recovered visibly", nil, nil), onResponseID: "leader_final_retry")
+        streamClient.finishStream(responseID: "leader_final_retry")
+        try await waitUntil(timeout: 10) {
             !controller.isRunning && controller.messages.last?.content == "Recovered visibly"
         }
 

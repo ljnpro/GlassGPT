@@ -53,6 +53,9 @@ func makeCompletedAgentConversationSamples(in viewModel: AgentController) -> Con
             processSnapshot: AgentProcessSnapshot(
                 activity: .completed,
                 currentFocus: "Leader completed the rollout recommendation.",
+                leaderAcceptedFocus: "Leader completed the rollout recommendation.",
+                leaderLiveStatus: "Completed",
+                leaderLiveSummary: "The rollout recommendation is grounded in the accepted worker findings.",
                 plan: [
                     AgentPlanStep(
                         id: "step_root",
@@ -64,6 +67,7 @@ func makeCompletedAgentConversationSamples(in viewModel: AgentController) -> Con
                 ],
                 tasks: [
                     AgentTask(
+                        id: "task_validate_rollout",
                         owner: .workerA,
                         parentStepID: "step_root",
                         title: "Validate rollout shape",
@@ -77,12 +81,25 @@ func makeCompletedAgentConversationSamples(in viewModel: AgentController) -> Con
                 ],
                 decisions: [
                     AgentDecision(
+                        kind: .triage,
+                        title: "Delegate",
+                        summary: "Validate the rollout recommendation before answering."
+                    ),
+                    AgentDecision(
                         kind: .finish,
                         title: "Finish",
                         summary: "The answer is strong enough to deliver."
                     )
                 ],
+                events: [
+                    AgentEvent(kind: .started, summary: "Started Agent run"),
+                    AgentEvent(kind: .synthesisStarted, summary: "Leader began final synthesis")
+                ],
                 evidence: ["Rollback gates remained explicit."],
+                recentUpdates: [
+                    "Worker A validated additive rollout with rollback gates.",
+                    "Leader adopted explicit monitoring checkpoints."
+                ],
                 stopReason: .sufficientAnswer,
                 outcome: "Completed"
             ),

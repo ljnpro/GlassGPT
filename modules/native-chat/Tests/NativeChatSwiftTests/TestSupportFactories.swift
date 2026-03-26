@@ -73,10 +73,13 @@ func makeTestAgentController(
         = RuntimeTestOpenAIConfigurationProvider(),
     transport: OpenAIDataTransport = StubOpenAITransport(),
     streamClient: OpenAIStreamClient,
-    hapticsEnabled: Bool = true
+    hapticsEnabled: Bool = true,
+    bootstrapPolicy: FeatureBootstrapPolicy = .testing,
+    seedModelContext: (@MainActor (ModelContext) throws -> Void)? = nil
 ) throws -> AgentController {
     let container = try makeInMemoryModelContainer()
     let context = ModelContext(container)
+    try seedModelContext?(context)
     let settingsValueStore = makeDefaultSettingsValueStore(
         cloudflareEnabled: configurationProvider.useCloudflareGateway
     )
@@ -94,13 +97,6 @@ func makeTestAgentController(
         configuration: configurationProvider
     )
     let responseParser = OpenAIResponseParser()
-    let sharedService = OpenAIService(
-        requestBuilder: requestBuilder,
-        responseParser: responseParser,
-        streamClient: streamClient,
-        transport: transport
-    )
-
     return AgentController(
         modelContext: context,
         settingsStore: settingsStore,
@@ -108,7 +104,15 @@ func makeTestAgentController(
         requestBuilder: requestBuilder,
         responseParser: responseParser,
         transport: transport,
-        serviceFactory: { sharedService }
+        serviceFactory: {
+            OpenAIService(
+                requestBuilder: requestBuilder,
+                responseParser: responseParser,
+                streamClient: streamClient,
+                transport: transport
+            )
+        },
+        bootstrapPolicy: bootstrapPolicy
     )
 }
 

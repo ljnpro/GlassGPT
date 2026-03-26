@@ -955,12 +955,12 @@ EOF
     fail "gate_performance_tests should reuse the shared SourcePackages cache path."
   fi
 
-  if ! printf '%s\n' "$performance_tests_block" | grep -Fq 'Hosted performance regression detected; rerunning benchmarks once to rule out runner variance.'; then
-    fail "gate_performance_tests should retry hosted performance regressions once to rule out runner noise."
+  if ! printf '%s\n' "$performance_tests_block" | grep -Fq 'Performance regression detected; rerunning benchmarks to rule out measurement variance'; then
+    fail "gate_performance_tests should retry performance regressions to rule out measurement noise."
   fi
 
   if ! printf '%s\n' "$performance_tests_block" | grep -Fq 'regression_attempt_limit=3'; then
-    fail "gate_performance_tests should allow two extra hosted retries before failing."
+    fail "gate_performance_tests should allow two extra retries before failing."
   fi
 
   if ! grep -Fq 'performance-tests coverage-report' "$ROOT_DIR/scripts/ci.sh"; then

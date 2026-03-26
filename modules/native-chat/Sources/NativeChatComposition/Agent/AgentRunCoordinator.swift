@@ -52,17 +52,41 @@ final class AgentRunCoordinator {
         execution: AgentExecutionState
     ) async {
         do {
+            execution.snapshot.runConfiguration = frozenRunConfiguration(
+                for: execution,
+                conversation: prepared.conversation
+            )
+            execution.snapshot.hasExplicitRunConfiguration = true
+
             if !prepared.attachmentsToUpload.isEmpty {
-                try await uploadAttachmentsIfNeeded(prepared)
+                AgentProcessProjector.updatePhase(
+                    .attachmentUpload,
+                    leaderStatus: "Uploading attachments",
+                    on: &execution.snapshot
+                )
+                AgentProcessProjector.updateLeaderLivePreview(
+                    status: "Uploading attachments",
+                    summary: "Preparing the current turn's files before planning begins.",
+                    on: &execution.snapshot
+                )
+                persistCheckpointIfNeeded(
+                    execution,
+                    in: prepared.conversation,
+                    forceSave: execution.snapshot.runConfiguration.backgroundModeEnabled
+                )
+                try await uploadAttachmentsIfNeeded(prepared, execution: execution)
             }
 
             var snapshot = execution.snapshot
             AgentProcessProjector.prepareForResume(&snapshot)
             execution.snapshot = snapshot
+            if shouldReplayCheckpoint(for: execution.snapshot) {
+                AgentProcessProjector.updateRecoveryState(.replayingCheckpoint, on: &execution.snapshot)
+            }
             persistSnapshot(execution, in: prepared.conversation)
 
             if execution.snapshot.currentStage == .finalSynthesis,
-               prepared.configuration.backgroundModeEnabled,
+               execution.snapshot.runConfiguration.backgroundModeEnabled,
                prepared.draft.responseId != nil {
                 try await recoverVisibleLeaderSynthesis(
                     apiKey: prepared.apiKey,
@@ -91,7 +115,7 @@ final class AgentRunCoordinator {
             applyFinalDirective(finalDirective, to: execution, in: prepared.conversation)
             try await runVisibleLeaderSynthesis(
                 apiKey: prepared.apiKey,
-                configuration: prepared.configuration,
+                configuration: execution.snapshot.runConfiguration,
                 conversation: prepared.conversation,
                 execution: execution,
                 baseInput: baseInput
@@ -138,12 +162,31 @@ final class AgentRunCoordinator {
         )
         state.sessionRegistry.register(
             execution,
-            visible: state.currentConversation?.id == prepared.conversation.id
+            visible: state.sessionRegistry.isVisible(prepared.conversation.id)
         )
         syncVisibleStateIfNeeded(execution, in: prepared.conversation)
         execution.task = Task { @MainActor [weak self] in
             guard let self else { return }
             await executeTurn(prepared, execution: execution)
+        }
+    }
+
+    private func shouldReplayCheckpoint(for snapshot: AgentRunSnapshot) -> Bool {
+        guard snapshot.runConfiguration.backgroundModeEnabled else {
+            return false
+        }
+
+        switch snapshot.phase {
+        case .leaderTriage, .leaderLocalPass, .leaderReview:
+            return snapshot.leaderTicket?.responseID == nil
+        case .workerWave:
+            let runningRoles = snapshot.processSnapshot.tasks
+                .filter { $0.status == .running || $0.status == .queued }
+                .compactMap(\.owner.role)
+            guard !runningRoles.isEmpty else { return false }
+            return runningRoles.contains { snapshot.ticket(for: $0)?.responseID == nil }
+        default:
+            return false
         }
     }
 }

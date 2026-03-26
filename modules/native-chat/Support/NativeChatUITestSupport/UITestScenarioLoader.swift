@@ -87,7 +87,8 @@ package enum UITestScenarioLoader {
             requestBuilder: requestBuilder,
             responseParser: responseParser,
             transport: transport,
-            serviceFactory: serviceFactory
+            serviceFactory: serviceFactory,
+            bootstrapPolicy: .testing
         )
         let openAIService = serviceFactory()
         let settingsPresenter = makeSettingsPresenter(
@@ -175,7 +176,7 @@ package enum UITestScenarioLoader {
         conversations: [Conversation],
         chatController: ChatController,
         agentController: AgentController,
-        serviceFactory: @MainActor () -> OpenAIService
+        serviceFactory _: @MainActor () -> OpenAIService
     ) {
         switch scenario {
         case .empty, .history, .settings, .settingsGateway, .reinstallSeed, .reinstallVerify, .freshInstall:

@@ -17,6 +17,14 @@ enum AgentTaggedOutputParser {
         let stopReason: String?
     }
 
+    struct LeaderDirectivePreview: Equatable {
+        let status: String?
+        let focus: String?
+        let decisionNote: String?
+        let plan: [AgentPlanStep]
+        let tasks: [AgentTask]
+    }
+
     struct WorkerRevision: Equatable {
         let summary: String
         let adoptedPoints: [String]
@@ -59,6 +67,18 @@ enum AgentTaggedOutputParser {
             tasks: tasks,
             decisionNote: decisionNote,
             stopReason: stopReason
+        )
+    }
+
+    static func parseLeaderDirectivePreview(from text: String) -> LeaderDirectivePreview {
+        let plan = parseLines(in: "PLAN", text: text, allowPartial: true).compactMap(parsePlanStep)
+        let tasks = parseLines(in: "TASKS", text: text, allowPartial: true).compactMap(parseTask)
+        return LeaderDirectivePreview(
+            status: parseSection("STATUS", in: text, allowPartial: true),
+            focus: parseSection("FOCUS", in: text, allowPartial: true),
+            decisionNote: parseSection("DECISION_NOTE", in: text, allowPartial: true),
+            plan: plan,
+            tasks: tasks
         )
     }
 
@@ -158,8 +178,12 @@ enum AgentTaggedOutputParser {
         )
     }
 
-    private static func parseLines(in name: String, text: String) -> [String] {
-        let block = parseSection(name, in: text) ?? ""
+    private static func parseLines(
+        in name: String,
+        text: String,
+        allowPartial: Bool = false
+    ) -> [String] {
+        let block = parseSection(name, in: text, allowPartial: allowPartial) ?? ""
         return block
             .split(separator: "\n")
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }

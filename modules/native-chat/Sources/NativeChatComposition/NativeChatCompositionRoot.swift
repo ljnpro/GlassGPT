@@ -54,7 +54,8 @@ package struct NativeChatCompositionRoot {
             requestBuilder: services.requestBuilder,
             responseParser: services.responseParser,
             transport: services.transport,
-            serviceFactory: services.serviceFactory
+            serviceFactory: services.serviceFactory,
+            bootstrapPolicy: bootstrapPolicy
         )
         let settingsPresenter = makeSettingsPresenter(
             settingsStore: settingsStore,

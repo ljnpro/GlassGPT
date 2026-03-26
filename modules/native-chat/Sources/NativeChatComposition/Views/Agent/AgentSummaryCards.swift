@@ -21,96 +21,128 @@ struct AgentLiveSummaryCard: View {
     }
 
     private var headerSubtitle: String {
-        let focus = process.currentFocus.trimmingCharacters(in: .whitespacesAndNewlines)
-        if !focus.isEmpty {
-            return "\(process.activity.displayName) · \(process.progressSummary)"
+        let headline = process.recoveryState == .idle
+            ? (process.leaderLiveStatus.isEmpty ? process.activity.displayName : process.leaderLiveStatus)
+            : process.recoveryState.displayName
+        let progress = process.progressSummary.trimmingCharacters(in: .whitespacesAndNewlines)
+        if progress.isEmpty || progress == headline {
+            return headline
         }
-        return process.activity.displayName
+        return "\(headline) · \(progress)"
     }
 }
 
 struct AgentProcessSections: View {
     let process: AgentProcessSnapshot
 
+    private var leaderSummaryText: String {
+        let summary = process.leaderLiveSummary.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !summary.isEmpty {
+            return AgentSummaryFormatter.summarize(summary, maxLength: 72)
+        }
+        let acceptedFocus = process.leaderAcceptedFocus.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !acceptedFocus.isEmpty {
+            return AgentSummaryFormatter.summarize(acceptedFocus, maxLength: 72)
+        }
+        let focus = process.currentFocus.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !focus.isEmpty {
+            return AgentSummaryFormatter.summarize(focus, maxLength: 72)
+        }
+        return process.activity.displayName
+    }
+
+    private var leaderChips: [(String, Color)] {
+        var chips: [(String, Color)] = []
+        let status = process.leaderLiveStatus.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !status.isEmpty {
+            chips.append((status, .blue))
+        }
+        if process.recoveryState != .idle {
+            chips.append((process.recoveryState.displayName, .orange))
+        }
+        if !process.activeTasks.isEmpty {
+            chips.append(("\(process.activeTasks.count) active", .blue))
+        }
+        return chips
+    }
+
+    private var activeWorkerTasks: [AgentTask] {
+        let activeTasks = process.activeTasks.filter { $0.owner.role != nil }
+        if !activeTasks.isEmpty {
+            return activeTasks
+        }
+        return process.tasks
+            .filter { $0.owner.role != nil && $0.status == .running }
+    }
+
+    private var authoredPlan: [AgentPlanStep] {
+        Array(process.plan.prefix(5))
+    }
+
+    private var recentUpdates: [String] {
+        Array(process.recentUpdates.suffix(5))
+    }
+
+    private var historyEvents: [AgentEvent] {
+        let recentSet = Set(process.recentUpdates)
+        return Array(
+            process.events
+                .filter { !recentSet.contains($0.summary) }
+                .sorted { lhs, rhs in
+                    lhs.createdAt > rhs.createdAt
+                }
+                .prefix(3)
+        )
+    }
+
+    private func planDepth(for step: AgentPlanStep) -> Int {
+        guard let parentID = step.parentStepID else { return 0 }
+        guard let parent = process.plan.first(where: { $0.id == parentID }) else { return 1 }
+        return min(planDepth(for: parent) + 1, 2)
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             AgentTraceSection(
-                title: String(localized: "Leader Focus"),
-                text: process.currentFocus.isEmpty
-                    ? process.activity.displayName
-                    : AgentSummaryFormatter.summarize(process.currentFocus, maxLength: 120)
+                title: String(localized: "Leader Now"),
+                text: leaderSummaryText
             )
 
-            if !process.plan.isEmpty {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text(String(localized: "Plan Progress"))
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.secondary)
+            if !leaderChips.isEmpty {
+                FlexibleChipRow(items: leaderChips)
+            }
 
-                    VStack(alignment: .leading, spacing: 8) {
-                        ForEach(Array(process.plan.prefix(5))) { step in
-                            AgentPlanStepRow(step: step)
-                        }
+            if !activeWorkerTasks.isEmpty {
+                AgentProcessSectionHeader(title: String(localized: "Active Workers"))
+                AgentTaskBoard(tasks: activeWorkerTasks)
+            }
+
+            if !recentUpdates.isEmpty {
+                AgentProcessSectionHeader(title: String(localized: "Recent Updates"))
+                VStack(alignment: .leading, spacing: 6) {
+                    ForEach(Array(recentUpdates.enumerated()), id: \.offset) { _, update in
+                        AgentRecentUpdateRow(text: update)
                     }
                 }
             }
 
-            if !process.tasks.isEmpty {
+            if !authoredPlan.isEmpty {
+                AgentProcessSectionHeader(title: String(localized: "Plan"))
                 VStack(alignment: .leading, spacing: 8) {
-                    Text(String(localized: "Delegated Tasks"))
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.secondary)
-
-                    AgentTaskBoard(tasks: process.tasks)
-                }
-            }
-
-            if !process.decisions.isEmpty {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text(String(localized: "Leader Decisions"))
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.secondary)
-
-                    VStack(alignment: .leading, spacing: 6) {
-                        ForEach(Array(process.decisions.suffix(4))) { decision in
-                            AgentDecisionRow(decision: decision)
-                        }
-                    }
-                }
-            }
-
-            if !process.evidence.isEmpty || process.stopReason != nil || !process.outcome.isEmpty {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text(String(localized: "Evidence"))
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.secondary)
-
-                    if !process.evidence.isEmpty {
-                        ForEach(Array(process.evidence.prefix(3).enumerated()), id: \.offset) { _, item in
-                            MarkdownContentView(
-                                text: "- \(AgentSummaryFormatter.summarize(item, maxLength: 88))",
-                                surfaceStyle: .plain
-                            )
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(2)
-                        }
-                    }
-
-                    if let stopReason = process.stopReason {
-                        Text("\(String(localized: "Stop Reason")): \(stopReason.displayName)")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-
-                    if !process.outcome.isEmpty {
-                        MarkdownContentView(
-                            text: AgentSummaryFormatter.summarize(process.outcome, maxLength: 96),
-                            surfaceStyle: .plain
+                    ForEach(authoredPlan) { step in
+                        AgentPlanStepRow(
+                            step: step,
+                            depth: planDepth(for: step)
                         )
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(2)
+                    }
+                }
+            }
+
+            if !historyEvents.isEmpty {
+                AgentProcessSectionHeader(title: String(localized: "History"))
+                VStack(alignment: .leading, spacing: 8) {
+                    ForEach(historyEvents) { event in
+                        AgentHistoryEventRow(event: event)
                     }
                 }
             }
@@ -118,82 +150,12 @@ struct AgentProcessSections: View {
     }
 }
 
-private struct AgentPlanStepRow: View {
-    let step: AgentPlanStep
+struct AgentProcessSectionHeader: View {
+    let title: String
 
     var body: some View {
-        HStack(alignment: .top, spacing: 10) {
-            Circle()
-                .fill(stepColor)
-                .frame(width: 7, height: 7)
-                .padding(.top, 6)
-
-            VStack(alignment: .leading, spacing: 2) {
-                HStack(spacing: 8) {
-                    Text(step.title)
-                        .font(.callout.weight(.semibold))
-                        .foregroundStyle(.primary)
-
-                    AgentStatusChip(
-                        text: step.status.displayName,
-                        tint: stepColor
-                    )
-                }
-
-                MarkdownContentView(
-                    text: AgentSummaryFormatter.summarize(step.summary, maxLength: 88),
-                    surfaceStyle: .plain
-                )
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .lineLimit(2)
-
-                Text(step.owner.displayName)
-                    .font(.caption2.weight(.semibold))
-                    .foregroundStyle(.tertiary)
-            }
-        }
-    }
-
-    private var stepColor: Color {
-        switch step.status {
-        case .planned:
-            .secondary
-        case .running:
-            .blue
-        case .blocked:
-            .orange
-        case .completed:
-            .green
-        case .discarded:
-            .secondary.opacity(0.7)
-        }
-    }
-}
-
-private struct AgentDecisionRow: View {
-    let decision: AgentDecision
-
-    var body: some View {
-        HStack(alignment: .top, spacing: 10) {
-            Image(systemName: "arrow.turn.down.right")
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(.secondary)
-                .padding(.top, 2)
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text(decision.title)
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.primary)
-
-                MarkdownContentView(
-                    text: AgentSummaryFormatter.summarize(decision.summary, maxLength: 88),
-                    surfaceStyle: .plain
-                )
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .lineLimit(2)
-            }
-        }
+        Text(title)
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(.secondary)
     }
 }

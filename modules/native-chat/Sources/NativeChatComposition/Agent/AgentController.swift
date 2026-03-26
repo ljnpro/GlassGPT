@@ -1,3 +1,4 @@
+import ChatApplication
 import ChatDomain
 import ChatPersistenceCore
 import ChatPersistenceSwiftData
@@ -74,6 +75,10 @@ package final class AgentController {
     let conversationRepository: ConversationRepository
     @ObservationIgnored
     let serviceFactory: @MainActor () -> OpenAIService
+    @ObservationIgnored
+    let backgroundTaskCoordinator: BackgroundTaskCoordinator
+    /// Tracks whether launch bootstrap tasks already ran for the current process.
+    package var didCompleteLaunchBootstrap = false
 
     @ObservationIgnored
     let hapticService = HapticService()
@@ -87,6 +92,8 @@ package final class AgentController {
     lazy var workerRuntime = AgentWorkerRuntime(state: self)
     @ObservationIgnored
     let sessionRegistry = AgentSessionRegistry()
+    @ObservationIgnored
+    lazy var lifecycleCoordinator = AgentLifecycleCoordinator(state: self)
 
     /// Creates an Agent controller with persistence, transport, and service dependencies for council orchestration.
     package init(
@@ -96,7 +103,8 @@ package final class AgentController {
         requestBuilder: OpenAIRequestBuilder,
         responseParser: OpenAIResponseParser,
         transport: OpenAIDataTransport,
-        serviceFactory: @escaping @MainActor () -> OpenAIService
+        serviceFactory: @escaping @MainActor () -> OpenAIService,
+        bootstrapPolicy: FeatureBootstrapPolicy = .live
     ) {
         self.modelContext = modelContext
         self.settingsStore = settingsStore
@@ -106,12 +114,29 @@ package final class AgentController {
         self.transport = transport
         conversationRepository = ConversationRepository(modelContext: modelContext)
         self.serviceFactory = serviceFactory
+        backgroundTaskCoordinator = BackgroundTaskCoordinator()
+        didCompleteLaunchBootstrap = !bootstrapPolicy.runLaunchTasks
         conversationCoordinator.loadDefaultsFromSettings()
+        if bootstrapPolicy.restoreLastConversation {
+            conversationCoordinator.restoreLastConversationIfAvailable()
+        }
+        if bootstrapPolicy.setupLifecycleObservers {
+            lifecycleCoordinator.setupLifecycleObservers()
+        }
+        if bootstrapPolicy.runLaunchTasks {
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                didCompleteLaunchBootstrap = true
+                await lifecycleCoordinator.handleLaunchBootstrap()
+            }
+        }
     }
 
     deinit {
+        let backgroundTaskCoordinator = backgroundTaskCoordinator
         let sessionRegistry = sessionRegistry
         Task { @MainActor in
+            backgroundTaskCoordinator.endBackgroundTask()
             sessionRegistry.removeAll()
         }
     }
@@ -183,5 +208,18 @@ package final class AgentController {
 
         execution.task?.cancel()
         execution.service.cancelStream()
+    }
+
+    /// Rebinds the visible Agent conversation and foreground lifecycle hooks when the Agent surface appears.
+    package func handleSurfaceAppearance() {
+        if let conversation = currentConversation {
+            sessionRegistry.bindVisibleConversation(conversation.id)
+        }
+        lifecycleCoordinator.handleSurfaceAppearance()
+    }
+
+    /// Detaches the visible Agent conversation binding when the Agent surface disappears.
+    package func handleSurfaceDisappearance() {
+        sessionRegistry.bindVisibleConversation(nil)
     }
 }

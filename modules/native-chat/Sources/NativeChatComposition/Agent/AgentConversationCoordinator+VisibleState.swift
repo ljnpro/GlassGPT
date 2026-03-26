@@ -6,39 +6,29 @@ extension AgentConversationCoordinator {
     static let retryBannerMessage = "The last Agent run did not complete. Retry to continue."
 
     func beginVisibleRun(with draft: Message, latestUserMessageID: UUID) {
-        state.draftMessage = draft
-        state.currentStreamingText = ""
-        state.currentThinkingText = ""
-        state.activeToolCalls = []
-        state.liveCitations = []
-        state.liveFilePathAnnotations = []
-        state.errorMessage = nil
-        state.isRunning = true
-        state.isStreaming = false
-        state.isThinking = false
-        state.currentStage = .leaderBrief
-        state.leaderBriefSummary = nil
-        state.processSnapshot = AgentProcessSnapshot(
-            activity: .triage,
-            currentFocus: "Leader is planning the work."
-        )
-        state.workersRoundOneProgress = AgentWorkerProgress.defaultProgress
-        state.crossReviewProgress = AgentWorkerProgress.defaultProgress
         if let conversation = state.currentConversation {
             state.sessionRegistry.bindVisibleConversation(conversation.id)
             var agentState = conversation.agentConversationState ?? AgentConversationState()
-            agentState.activeRun = AgentProcessProjector.makeInitialRunSnapshot(
+            let snapshot = AgentProcessProjector.makeInitialRunSnapshot(
                 draftMessageID: draft.id,
-                latestUserMessageID: latestUserMessageID
+                latestUserMessageID: latestUserMessageID,
+                configuration: agentState.configuration
             )
+            agentState.activeRun = snapshot
             agentState.currentStage = .leaderBrief
             agentState.updatedAt = .now
             conversation.agentConversationState = agentState
+            applyPersistedSnapshot(snapshot, draft: draft)
+            state.errorMessage = nil
         }
         state.hapticService.impact(.light, isEnabled: state.hapticsEnabled)
     }
 
-    func restoreDraftIfNeeded(from conversation: Conversation) {
+    func restoreDraftIfNeeded(
+        from conversation: Conversation,
+        autoResume: Bool = true,
+        showRetryBannerWhenDormant: Bool = true
+    ) {
         clearVisibleRunState(clearDraft: true)
 
         if let execution = state.sessionRegistry.execution(for: conversation.id) {
@@ -57,12 +47,15 @@ extension AgentConversationCoordinator {
         state.draftMessage = draft
         if let snapshot = conversation.agentConversationState?.activeRun {
             applyPersistedSnapshot(snapshot, draft: draft)
-            if resolvedConfiguration(for: conversation).backgroundModeEnabled {
+            if autoResume,
+               snapshot.runConfiguration.backgroundModeEnabled,
+               snapshot.phase.supportsAutomaticResume {
                 Task { @MainActor [weak self] in
                     guard let self else { return }
                     await state.runCoordinator.resumePersistedRunIfNeeded(conversation)
                 }
-            } else {
+            } else if showRetryBannerWhenDormant,
+                      shouldShowRetryBanner(for: snapshot) {
                 state.errorMessage = Self.retryBannerMessage
             }
             return
@@ -73,12 +66,14 @@ extension AgentConversationCoordinator {
         state.activeToolCalls = draft.toolCalls
         state.liveCitations = draft.annotations
         state.liveFilePathAnnotations = draft.filePathAnnotations
-        if resolvedConfiguration(for: conversation).backgroundModeEnabled, draft.responseId != nil {
+        let backgroundEnabled = conversation.agentConversationState?.activeRun?.runConfiguration.backgroundModeEnabled
+            ?? resolvedConfiguration(for: conversation).backgroundModeEnabled
+        if autoResume, backgroundEnabled, draft.responseId != nil {
             Task { @MainActor [weak self] in
                 guard let self else { return }
                 await state.runCoordinator.resumePersistedRunIfNeeded(conversation)
             }
-        } else {
+        } else if showRetryBannerWhenDormant {
             state.errorMessage = Self.retryBannerMessage
         }
     }
@@ -127,5 +122,12 @@ extension AgentConversationCoordinator {
         state.processSnapshot = AgentProcessSnapshot()
         state.workersRoundOneProgress = AgentWorkerProgress.defaultProgress
         state.crossReviewProgress = AgentWorkerProgress.defaultProgress
+    }
+
+    private func shouldShowRetryBanner(for snapshot: AgentRunSnapshot) -> Bool {
+        if snapshot.phase == .failed {
+            return true
+        }
+        return !snapshot.runConfiguration.backgroundModeEnabled
     }
 }

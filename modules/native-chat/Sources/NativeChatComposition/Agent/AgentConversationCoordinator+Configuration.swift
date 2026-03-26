@@ -3,6 +3,44 @@ import ChatPersistenceSwiftData
 import Foundation
 
 extension AgentConversationCoordinator {
+    func loadDefaultsFromSettings() {
+        applyConversationConfiguration(
+            state.settingsStore.defaultAgentConversationConfiguration,
+            persist: false
+        )
+    }
+
+    func applyConversationConfiguration(
+        _ configuration: AgentConversationConfiguration,
+        persist: Bool = true
+    ) {
+        state.leaderReasoningEffort = configuration.leaderReasoningEffort
+        state.workerReasoningEffort = configuration.workerReasoningEffort
+        state.backgroundModeEnabled = configuration.backgroundModeEnabled
+        state.serviceTier = configuration.serviceTier
+
+        guard persist, let conversation = state.currentConversation else { return }
+
+        var agentState = conversation.agentConversationState ?? AgentConversationState()
+        agentState.configuration = configuration
+        agentState.updatedAt = .now
+        conversation.agentConversationState = agentState
+        conversation.reasoningEffort = configuration.leaderReasoningEffort.rawValue
+        conversation.backgroundModeEnabled = configuration.backgroundModeEnabled
+        conversation.serviceTierRawValue = configuration.serviceTier.rawValue
+        conversation.updatedAt = .now
+        _ = saveContext("applyConversationConfiguration")
+    }
+
+    var currentConversationConfiguration: AgentConversationConfiguration {
+        AgentConversationConfiguration(
+            leaderReasoningEffort: state.leaderReasoningEffort,
+            workerReasoningEffort: state.workerReasoningEffort,
+            backgroundModeEnabled: state.backgroundModeEnabled,
+            serviceTier: state.serviceTier
+        )
+    }
+
     func resolvedConfiguration(for conversation: Conversation) -> AgentConversationConfiguration {
         if let configuration = conversation.agentConversationState?.configuration {
             return configuration

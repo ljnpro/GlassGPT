@@ -83,6 +83,28 @@ public final class ConversationRepository {
         }
     }
 
+    /// Returns conversations with at least one incomplete assistant draft for the requested mode.
+    public func fetchConversationsWithIncompleteDrafts(
+        mode: ConversationMode?
+    ) throws(PersistenceError) -> [Conversation] {
+        do {
+            let descriptor = FetchDescriptor<Conversation>(
+                sortBy: [SortDescriptor(\.updatedAt, order: .reverse)]
+            )
+            return try modelContext.fetch(descriptor).filter { conversation in
+                guard conversation.messages.contains(where: { $0.role == .assistant && !$0.isComplete }) else {
+                    return false
+                }
+                guard let mode else {
+                    return true
+                }
+                return conversation.mode == mode
+            }
+        } catch {
+            throw .migrationFailure(underlying: error)
+        }
+    }
+
     /// Returns all conversations whose title is still "New Chat".
     public func fetchUntitledConversations() throws(PersistenceError) -> [Conversation] {
         do {
@@ -102,6 +124,18 @@ public final class ConversationRepository {
         do {
             let descriptor = FetchDescriptor<Message>(
                 predicate: #Predicate<Message> { $0.id == id }
+            )
+            return try modelContext.fetch(descriptor).first
+        } catch {
+            throw .migrationFailure(underlying: error)
+        }
+    }
+
+    /// Fetches a single conversation by its unique identifier.
+    public func fetchConversation(id: UUID) throws(PersistenceError) -> Conversation? {
+        do {
+            let descriptor = FetchDescriptor<Conversation>(
+                predicate: #Predicate<Conversation> { $0.id == id }
             )
             return try modelContext.fetch(descriptor).first
         } catch {

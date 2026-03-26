@@ -72,6 +72,12 @@ package struct AgentView: View {
                         viewModel.handlePickedDocuments(urls)
                     }
                 }
+                .onAppear {
+                    viewModel.handleSurfaceAppearance()
+                }
+                .onDisappear {
+                    viewModel.handleSurfaceDisappearance()
+                }
         }
     }
 

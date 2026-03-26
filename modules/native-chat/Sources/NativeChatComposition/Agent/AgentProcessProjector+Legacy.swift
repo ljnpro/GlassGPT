@@ -8,20 +8,45 @@ extension AgentProcessProjector {
         activity: AgentProcessActivity,
         on snapshot: inout AgentRunSnapshot
     ) {
+        let previousStage = snapshot.currentStage
         snapshot.processSnapshot.activity = activity
         snapshot.processSnapshot.stopReason = stopReason
         snapshot.processSnapshot.outcome = outcome
         snapshot.processSnapshot.activeTaskIDs = []
+        snapshot.processSnapshot.leaderLiveStatus = activity.displayName
+        snapshot.processSnapshot.leaderLiveSummary = ""
+        snapshot.processSnapshot.recoveryState = .idle
         snapshot.processSnapshot.events.append(
             AgentEvent(
                 kind: activity == .completed ? .completed : .failed,
                 summary: outcome
             )
         )
-        snapshot.currentStage = activity == .completed
-            ? .finalSynthesis
-            : (legacyStage(for: activity) ?? .finalSynthesis)
+        if activity == .completed {
+            snapshot.currentStage = .finalSynthesis
+        } else if activity == .failed {
+            snapshot.currentStage = previousStage
+        } else {
+            snapshot.currentStage = legacyStage(for: activity) ?? .finalSynthesis
+        }
+        switch activity {
+        case .completed, .waitingForUser:
+            snapshot.phase = .completed
+        case .failed:
+            snapshot.phase = .failed
+        case .triage:
+            snapshot.phase = .leaderTriage
+        case .localPass:
+            snapshot.phase = .leaderLocalPass
+        case .delegation:
+            snapshot.phase = .workerWave
+        case .reviewing:
+            snapshot.phase = .leaderReview
+        case .synthesis:
+            snapshot.phase = .finalSynthesis
+        }
         snapshot.updatedAt = .now
+        snapshot.lastCheckpointAt = .now
         snapshot.processSnapshot.updatedAt = .now
         syncLegacyWorkerProgress(on: &snapshot)
     }

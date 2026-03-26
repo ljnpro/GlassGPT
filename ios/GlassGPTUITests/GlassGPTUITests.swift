@@ -95,7 +95,8 @@ final class GlassGPTUITests: XCTestCase {
         let liveSummary = app.descendants(matching: .any).matching(identifier: "agent.liveSummary").firstMatch
         XCTAssertTrue(liveSummary.waitForExistence(timeout: 5))
         XCTAssertFalse(app.staticTexts["The last Agent run did not complete. Retry to continue."].exists)
-        XCTAssertTrue(app.staticTexts["Delegated Tasks"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Active Workers"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Recent Updates"].exists)
     }
 
     @MainActor
@@ -163,7 +164,7 @@ final class GlassGPTUITests: XCTestCase {
 
         let backdrop = app.otherElements["agentSelector.backdrop"]
         XCTAssertTrue(backdrop.waitForExistence(timeout: 5))
-        backdrop.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.15)).tap()
+        tapSelectorBackdrop(backdrop)
 
         XCTAssertTrue(waitForNonExistence(of: doneButton, timeout: 5))
 
@@ -756,7 +757,7 @@ final class GlassGPTUITests: XCTestCase {
 
         let backdrop = app.otherElements["modelSelector.backdrop"]
         XCTAssertTrue(backdrop.waitForExistence(timeout: 5))
-        backdrop.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.15)).tap()
+        tapSelectorBackdrop(backdrop)
 
         XCTAssertTrue(waitForNonExistence(of: doneButton, timeout: 5))
         XCTAssertTrue(selectorButton.waitForExistence(timeout: 5))
@@ -904,6 +905,13 @@ final class GlassGPTUITests: XCTestCase {
         let predicate = NSPredicate(format: "exists == false")
         let expectation = XCTNSPredicateExpectation(predicate: predicate, object: element)
         return XCTWaiter.wait(for: [expectation], timeout: timeout) == .completed
+    }
+
+    @MainActor
+    private func tapSelectorBackdrop(_ backdrop: XCUIElement) {
+        // Keep the tap above the selector sheet itself so dismiss-by-backdrop
+        // remains stable even if the panel grows taller in future releases.
+        backdrop.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.05)).tap()
     }
 
     @MainActor

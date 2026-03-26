@@ -1,109 +1,9 @@
 import ChatDomain
 import ChatPersistenceSwiftData
+import Foundation
 import OpenAITransport
 
 extension AgentRunCoordinator {
-    func finalizeSuccessfulTurn(
-        prepared: PreparedAgentTurn,
-        execution: AgentExecutionState,
-        outcome: String,
-        stopReason _: AgentStopReason
-    ) throws {
-        guard let draft = prepared.conversation.messages.first(where: { $0.id == prepared.draftMessageID }) else {
-            throw AgentRunFailure.missingDraft
-        }
-
-        draft.content = execution.snapshot.currentStreamingText
-        draft.thinking = execution.snapshot.currentThinkingText.isEmpty
-            ? nil
-            : execution.snapshot.currentThinkingText
-        draft.toolCalls = execution.snapshot.activeToolCalls
-        draft.annotations = execution.snapshot.liveCitations
-        draft.filePathAnnotations = execution.snapshot.liveFilePathAnnotations
-        let synthesisContext = finalSynthesisContext(from: execution.snapshot.processSnapshot)
-        draft.agentTrace = AgentTurnTrace(
-            leaderBriefSummary: execution.snapshot.leaderBriefSummary ?? execution.snapshot.processSnapshot.currentFocus,
-            workerSummaries: synthesisContext.workerSummaries,
-            processSnapshot: execution.snapshot.processSnapshot,
-            completedStage: .finalSynthesis,
-            outcome: outcome
-        )
-        draft.isComplete = true
-
-        prepared.conversation.updatedAt = .now
-        var agentState = currentAgentState(for: prepared.conversation)
-        agentState.currentStage = nil
-        agentState.activeRun = nil
-        agentState.updatedAt = .now
-        prepared.conversation.agentConversationState = agentState
-
-        guard state.conversationCoordinator.saveContext("finalizeSuccessfulTurn") else {
-            throw AgentRunFailure.invalidResponse("Failed to save the final Agent answer.")
-        }
-
-        let wasVisible = isVisibleConversation(prepared.conversation)
-        state.sessionRegistry.finishExecution(for: prepared.conversation.id)
-        guard wasVisible else { return }
-
-        state.messages = state.conversationCoordinator.visibleMessages(for: prepared.conversation)
-        state.conversationCoordinator.clearVisibleRunState(clearDraft: true)
-        state.errorMessage = nil
-        state.hapticService.notify(.success, isEnabled: state.hapticsEnabled)
-    }
-
-    func finishWithFailure(
-        _ failure: AgentRunFailure,
-        prepared: PreparedAgentTurn,
-        execution: AgentExecutionState
-    ) {
-        guard let draft = prepared.conversation.messages.first(where: { $0.id == prepared.draftMessageID }) else {
-            state.sessionRegistry.finishExecution(for: prepared.conversation.id)
-            return
-        }
-
-        draft.content = execution.snapshot.currentStreamingText
-        draft.thinking = execution.snapshot.currentThinkingText.isEmpty
-            ? nil
-            : execution.snapshot.currentThinkingText
-        draft.toolCalls = execution.snapshot.activeToolCalls
-        draft.annotations = execution.snapshot.liveCitations
-        draft.filePathAnnotations = execution.snapshot.liveFilePathAnnotations
-        draft.isComplete = false
-
-        let stopReason: AgentStopReason = switch failure {
-        case .cancelled:
-            .cancelled
-        default:
-            .incomplete
-        }
-        AgentProcessProjector.finalize(
-            outcome: failure.userMessage,
-            stopReason: stopReason,
-            activity: .failed,
-            on: &execution.snapshot
-        )
-        execution.snapshot.updatedAt = .now
-        var agentState = currentAgentState(for: prepared.conversation)
-        agentState.currentStage = nil
-        agentState.activeRun = execution.snapshot
-        agentState.updatedAt = .now
-        prepared.conversation.agentConversationState = agentState
-        prepared.conversation.updatedAt = .now
-        _ = state.conversationCoordinator.saveContext("finishWithFailure")
-
-        let wasVisible = isVisibleConversation(prepared.conversation)
-        state.sessionRegistry.finishExecution(for: prepared.conversation.id)
-        guard wasVisible else { return }
-
-        state.messages = state.conversationCoordinator.visibleMessages(for: prepared.conversation)
-        state.conversationCoordinator.applyPersistedSnapshot(execution.snapshot, draft: draft)
-        state.isRunning = false
-        state.isStreaming = false
-        state.isThinking = false
-        state.errorMessage = failure.userMessage
-        state.hapticService.notify(.error, isEnabled: state.hapticsEnabled)
-    }
-
     func requireResponseID(from response: ResponsesResponseDTO) throws -> String {
         guard let responseID = response.id, !responseID.isEmpty else {
             throw AgentRunFailure.invalidResponse("Responses API did not return a response id.")
@@ -117,6 +17,16 @@ extension AgentRunCoordinator {
         in conversation: Conversation
     ) {
         execution.snapshot.currentStage = stage
+        switch stage {
+        case .leaderBrief:
+            execution.snapshot.phase = .leaderTriage
+        case .workersRoundOne:
+            execution.snapshot.phase = .workerWave
+        case .crossReview:
+            execution.snapshot.phase = .leaderReview
+        case .finalSynthesis:
+            execution.snapshot.phase = .finalSynthesis
+        }
         execution.snapshot.updatedAt = .now
         switch stage {
         case .workersRoundOne:
@@ -144,6 +54,30 @@ extension AgentRunCoordinator {
         } else {
             syncVisibleStateIfNeeded(execution, in: conversation)
         }
+    }
+
+    func updateTicket(
+        _ ticket: AgentRunTicket?,
+        for role: AgentRole,
+        execution: AgentExecutionState,
+        conversation: Conversation,
+        forceSave: Bool = false
+    ) {
+        execution.snapshot.setTicket(ticket, for: role)
+        persistCheckpointIfNeeded(
+            execution,
+            in: conversation,
+            forceSave: forceSave
+        )
+    }
+
+    func clearTicket(
+        for role: AgentRole,
+        execution: AgentExecutionState,
+        conversation: Conversation,
+        forceSave: Bool = false
+    ) {
+        updateTicket(nil, for: role, execution: execution, conversation: conversation, forceSave: forceSave)
     }
 
     func setAllWorkerStatuses(
@@ -204,6 +138,7 @@ extension AgentRunCoordinator {
         save: Bool = true
     ) {
         execution.snapshot.updatedAt = .now
+        execution.snapshot.lastCheckpointAt = .now
         var agentState = currentAgentState(for: conversation)
         agentState.currentStage = execution.snapshot.currentStage
         agentState.activeRun = execution.snapshot
@@ -214,6 +149,17 @@ extension AgentRunCoordinator {
             _ = state.conversationCoordinator.saveContext("persistSnapshot")
         }
         syncVisibleStateIfNeeded(execution, in: conversation)
+    }
+
+    func persistCheckpointIfNeeded(
+        _ execution: AgentExecutionState,
+        in conversation: Conversation,
+        forceSave: Bool = false
+    ) {
+        let backgroundEnabled = execution.snapshot.runConfiguration.backgroundModeEnabled
+        let age = Date().timeIntervalSince(execution.snapshot.lastCheckpointAt)
+        let shouldSave = forceSave || (backgroundEnabled && age >= 0.5)
+        persistSnapshot(execution, in: conversation, save: shouldSave)
     }
 
     func completedWorkerSummaries(from snapshot: AgentProcessSnapshot) -> [AgentWorkerSummary] {
@@ -240,6 +186,31 @@ extension AgentRunCoordinator {
 
     func currentAgentState(for conversation: Conversation) -> AgentConversationState {
         conversation.agentConversationState ?? AgentConversationState()
+    }
+
+    func frozenRunConfiguration(
+        for execution: AgentExecutionState,
+        conversation: Conversation
+    ) -> AgentConversationConfiguration {
+        if execution.snapshot.hasExplicitRunConfiguration {
+            return execution.snapshot.runConfiguration
+        }
+        if let activeRun = conversation.agentConversationState?.activeRun,
+           activeRun.hasExplicitRunConfiguration {
+            return activeRun.runConfiguration
+        }
+        if let configuration = conversation.agentConversationState?.configuration {
+            return configuration
+        }
+        if let snapshotConfiguration = conversation.agentConversationState?.activeRun?.runConfiguration {
+            return snapshotConfiguration
+        }
+        return AgentConversationConfiguration(
+            leaderReasoningEffort: ReasoningEffort(rawValue: conversation.reasoningEffort) ?? .high,
+            workerReasoningEffort: .low,
+            backgroundModeEnabled: conversation.backgroundModeEnabled,
+            serviceTier: ServiceTier(rawValue: conversation.serviceTierRawValue) ?? .standard
+        )
     }
 
     func isVisibleConversation(_ conversation: Conversation) -> Bool {

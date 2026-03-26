@@ -10,7 +10,7 @@ struct AgentProcessCard: View {
     var body: some View {
         AgentDisclosureCard(
             title: String(localized: "Agent Process"),
-            subtitle: AgentSummaryFormatter.summarize(trace.outcome, maxLength: 72),
+            subtitle: collapsedSubtitle,
             symbolName: "checkmark.circle.fill",
             isLive: false,
             isExpanded: Binding(
@@ -75,6 +75,16 @@ struct AgentProcessCard: View {
                 .font(.caption2)
                 .foregroundStyle(.secondary)
         }
+    }
+
+    private var collapsedSubtitle: String {
+        if let snapshot = trace.processSnapshot {
+            let acceptedFocus = snapshot.leaderAcceptedFocus.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !acceptedFocus.isEmpty {
+                return AgentSummaryFormatter.summarize(acceptedFocus, maxLength: 72)
+            }
+        }
+        return AgentSummaryFormatter.summarize(trace.outcome, maxLength: 72)
     }
 }
 

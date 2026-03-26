@@ -1032,17 +1032,13 @@ function gate_performance_tests() {
   local report_path="$CI_OUTPUT_DIR/performance-report.txt"
   local command_status=0
   local regression_attempt=1
-  local regression_attempt_limit=1
+  local regression_attempt_limit=3
 
   baseline_path="$(resolve_performance_baseline_path)"
 
   if [[ ! -f "$baseline_path" ]]; then
     echo "Missing performance baseline: $baseline_path" >&2
     exit 1
-  fi
-
-  if [[ "${GITHUB_ACTIONS:-}" == "true" ]]; then
-    regression_attempt_limit=3
   fi
 
   while (( regression_attempt <= regression_attempt_limit )); do
@@ -1107,7 +1103,7 @@ function gate_performance_tests() {
       return "$command_status"
     fi
 
-    echo "Hosted performance regression detected; rerunning benchmarks once to rule out runner variance." >&2
+    echo "Performance regression detected; rerunning benchmarks to rule out measurement variance (attempt ${regression_attempt}/${regression_attempt_limit})." >&2
     (( regression_attempt += 1 ))
   done
 

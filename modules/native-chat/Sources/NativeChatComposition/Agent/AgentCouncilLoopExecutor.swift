@@ -25,9 +25,40 @@ extension AgentRunCoordinator {
                     execution: execution,
                     baseInput: baseInput
                 )
-                let outcome = evaluateDirectiveOutcome(
+                let directive = try await repairedDirectiveIfNeeded(
                     planning.directive,
-                    currentFocus: execution.snapshot.processSnapshot.currentFocus,
+                    prepared: prepared,
+                    execution: execution,
+                    baseInput: baseInput,
+                    completedTasks: completedTasksForReview,
+                    phase: .triage
+                )
+                let outcome = evaluateDirectiveOutcome(
+                    directive,
+                    prepared: prepared,
+                    waveCount: &waveCount,
+                    maxWaves: maxWaves
+                )
+                nextStep = outcome.nextStep
+                finalDirective = outcome.finalDirective
+
+            case .localPass:
+                let planning = try await performLeaderLocalPass(
+                    prepared: prepared,
+                    execution: execution,
+                    baseInput: baseInput
+                )
+                let directive = try await repairedDirectiveIfNeeded(
+                    planning.directive,
+                    prepared: prepared,
+                    execution: execution,
+                    baseInput: baseInput,
+                    completedTasks: completedTasksForReview,
+                    phase: .localPass
+                )
+                let outcome = evaluateDirectiveOutcome(
+                    directive,
+                    prepared: prepared,
                     waveCount: &waveCount,
                     maxWaves: maxWaves
                 )
@@ -56,9 +87,17 @@ extension AgentRunCoordinator {
                     baseInput: baseInput,
                     completedTasks: completedTasksForReview
                 )
-                let outcome = evaluateDirectiveOutcome(
+                let directive = try await repairedDirectiveIfNeeded(
                     planning.directive,
-                    currentFocus: execution.snapshot.processSnapshot.currentFocus,
+                    prepared: prepared,
+                    execution: execution,
+                    baseInput: baseInput,
+                    completedTasks: completedTasksForReview,
+                    phase: .review
+                )
+                let outcome = evaluateDirectiveOutcome(
+                    directive,
+                    prepared: prepared,
                     waveCount: &waveCount,
                     maxWaves: maxWaves
                 )
@@ -84,6 +123,7 @@ extension AgentRunCoordinator {
         execution: AgentExecutionState,
         baseInput: [ResponsesInputMessageDTO]
     ) async throws -> [AgentTask] {
+        let runConfiguration = frozenRunConfiguration(for: execution, conversation: prepared.conversation)
         AgentProcessProjector.updateFocus(
             execution.snapshot.processSnapshot.currentFocus.isEmpty
                 ? "Delegating bounded work to workers."
@@ -91,6 +131,12 @@ extension AgentRunCoordinator {
             activity: .delegation,
             on: &execution.snapshot
         )
+        let missingTasks = tasks.filter { task in
+            !execution.snapshot.processSnapshot.tasks.contains(where: { $0.id == task.id })
+        }
+        if !missingTasks.isEmpty {
+            AgentProcessProjector.queueTasks(missingTasks, on: &execution.snapshot)
+        }
         persistSnapshot(execution, in: prepared.conversation)
 
         var handles: [(task: AgentTask, handle: Task<AgentWorkerExecutionResult, Error>)] = []
@@ -104,7 +150,7 @@ extension AgentRunCoordinator {
                         try await self.state.workerRuntime.runTask(
                             task,
                             apiKey: prepared.apiKey,
-                            configuration: prepared.configuration,
+                            configuration: runConfiguration,
                             conversation: prepared.conversation,
                             execution: execution,
                             baseInput: baseInput,
@@ -123,154 +169,4 @@ extension AgentRunCoordinator {
             conversation: prepared.conversation
         )
     }
-}
-
-private extension AgentRunCoordinator {
-    struct DirectiveLoopOutcome {
-        let nextStep: LoopStep
-        let finalDirective: AgentTaggedOutputParser.LeaderDirective?
-    }
-
-    func initialLoopStep(for snapshot: AgentRunSnapshot) -> LoopStep {
-        let queuedTasks = currentQueuedTasks(from: snapshot)
-        if queuedTasks.isEmpty {
-            if snapshot.currentStage == .crossReview || snapshot.processSnapshot.activity == .reviewing {
-                return .review
-            }
-            return .triage
-        }
-        return .delegate(
-            tasks: queuedTasks,
-            decisionSummary: latestDecisionSummary(in: snapshot)
-        )
-    }
-
-    func performLeaderTriage(
-        prepared: PreparedAgentTurn,
-        execution: AgentExecutionState,
-        baseInput: [ResponsesInputMessageDTO]
-    ) async throws -> AgentLeaderPlanningResult {
-        AgentProcessProjector.updateFocus(
-            "Leader is classifying the request and setting the plan.",
-            activity: .triage,
-            on: &execution.snapshot
-        )
-        persistSnapshot(execution, in: prepared.conversation)
-
-        let planning = try await state.planningEngine.runTriage(
-            apiKey: prepared.apiKey,
-            configuration: prepared.configuration,
-            conversation: prepared.conversation,
-            baseInput: baseInput
-        )
-        updateRoleResponseID(planning.responseID, for: .leader, in: prepared.conversation)
-        applyLeaderDirective(
-            planning.directive,
-            decisionKind: .triage,
-            to: execution,
-            in: prepared.conversation,
-            appendTasks: planning.directive.decision == .delegate
-        )
-        return planning
-    }
-
-    func performLeaderReview(
-        prepared: PreparedAgentTurn,
-        execution: AgentExecutionState,
-        baseInput: [ResponsesInputMessageDTO],
-        completedTasks: [AgentTask]
-    ) async throws -> AgentLeaderPlanningResult {
-        AgentProcessProjector.updateFocus(
-            "Leader is reviewing worker results and deciding whether another wave is needed.",
-            activity: .reviewing,
-            on: &execution.snapshot
-        )
-        persistSnapshot(execution, in: prepared.conversation)
-
-        let planning = try await state.planningEngine.runReview(
-            apiKey: prepared.apiKey,
-            configuration: prepared.configuration,
-            conversation: prepared.conversation,
-            baseInput: baseInput,
-            snapshot: execution.snapshot.processSnapshot,
-            completedTasks: completedTasks
-        )
-        updateRoleResponseID(planning.responseID, for: .leader, in: prepared.conversation)
-        applyLeaderDirective(
-            planning.directive,
-            decisionKind: .revise,
-            to: execution,
-            in: prepared.conversation,
-            appendTasks: planning.directive.decision == .delegate
-        )
-        return planning
-    }
-
-    func evaluateDirectiveOutcome(
-        _ directive: AgentTaggedOutputParser.LeaderDirective,
-        currentFocus: String,
-        waveCount: inout Int,
-        maxWaves: Int
-    ) -> DirectiveLoopOutcome {
-        guard directive.decision == .delegate, !directive.tasks.isEmpty else {
-            return DirectiveLoopOutcome(nextStep: .review, finalDirective: directive)
-        }
-
-        waveCount += 1
-        if waveCount > maxWaves {
-            return DirectiveLoopOutcome(
-                nextStep: .review,
-                finalDirective: forceBudgetStopDirective(from: directive, focus: currentFocus)
-            )
-        }
-
-        return DirectiveLoopOutcome(
-            nextStep: .delegate(
-                tasks: pendingTasksToRun(from: directive.tasks),
-                decisionSummary: directive.decisionNote
-            ),
-            finalDirective: nil
-        )
-    }
-
-    func collectDelegationResults(
-        _ handles: [(task: AgentTask, handle: Task<AgentWorkerExecutionResult, Error>)],
-        execution: AgentExecutionState,
-        conversation: Conversation
-    ) async throws -> [AgentTask] {
-        var completedTasks: [AgentTask] = []
-        for entry in handles {
-            do {
-                let result = try await entry.handle.value
-                if let role = result.task.owner.role {
-                    updateRoleResponseID(result.responseID, for: role, in: conversation)
-                }
-                AgentProcessProjector.recordTaskResult(
-                    result.task.result ?? AgentTaskResult(summary: result.task.title),
-                    for: result.task.id,
-                    status: .completed,
-                    on: &execution.snapshot
-                )
-                markPlanStepCompleted(for: result.task, on: &execution.snapshot)
-                completedTasks.append(updatedTask(for: result.task.id, in: execution.snapshot) ?? result.task)
-                persistSnapshot(execution, in: conversation)
-            } catch {
-                AgentProcessProjector.recordTaskResult(
-                    AgentTaskResult(summary: "Worker task failed."),
-                    for: entry.task.id,
-                    status: .failed,
-                    on: &execution.snapshot
-                )
-                persistSnapshot(execution, in: conversation)
-                throw error
-            }
-        }
-        return completedTasks
-    }
-}
-
-enum LoopStep {
-    case triage
-    case delegate(tasks: [AgentTask], decisionSummary: String)
-    case review
 }

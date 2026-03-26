@@ -116,8 +116,21 @@ extension AgentView {
         hasher.combine(viewModel.liveCitations.count)
         hasher.combine(viewModel.liveFilePathAnnotations.count)
         hasher.combine(viewModel.processSnapshot.currentFocus)
+        hasher.combine(viewModel.processSnapshot.leaderAcceptedFocus)
+        hasher.combine(viewModel.processSnapshot.leaderLiveStatus)
+        hasher.combine(viewModel.processSnapshot.leaderLiveSummary)
+        hasher.combine(viewModel.processSnapshot.recoveryState.rawValue)
+        hasher.combine(viewModel.processSnapshot.recentUpdates.count)
+        hasher.combine(viewModel.processSnapshot.events.count)
         hasher.combine(viewModel.processSnapshot.tasks.count)
+        hasher.combine(viewModel.processSnapshot.activeTaskIDs.count)
         hasher.combine(viewModel.processSnapshot.decisions.count)
+        for update in viewModel.processSnapshot.recentUpdates {
+            hasher.combine(update)
+        }
+        for taskID in viewModel.processSnapshot.activeTaskIDs {
+            hasher.combine(taskID)
+        }
         for task in viewModel.processSnapshot.tasks {
             hasher.combine(task.id)
             hasher.combine(task.status.rawValue)

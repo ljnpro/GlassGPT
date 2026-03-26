@@ -4,8 +4,27 @@ import OpenAITransport
 
 struct AgentTurnScript {
     let triageResponseID: String
+    let localPassResponseID: String?
     let reviewResponseID: String
     let taskResponseIDs: [AgentRole: String]
+    let finalResponseID: String
+    let finalAnswer: String
+
+    init(
+        triageResponseID: String,
+        localPassResponseID: String? = nil,
+        reviewResponseID: String,
+        taskResponseIDs: [AgentRole: String],
+        finalResponseID: String = "leader_final",
+        finalAnswer: String = "Final answer"
+    ) {
+        self.triageResponseID = triageResponseID
+        self.localPassResponseID = localPassResponseID
+        self.reviewResponseID = reviewResponseID
+        self.taskResponseIDs = taskResponseIDs
+        self.finalResponseID = finalResponseID
+        self.finalAnswer = finalAnswer
+    }
 
     static func singleTurn() -> AgentTurnScript {
         AgentTurnScript(
@@ -15,7 +34,9 @@ struct AgentTurnScript {
                 .workerA: "worker_a_task",
                 .workerB: "worker_b_task",
                 .workerC: "worker_c_task"
-            ]
+            ],
+            finalResponseID: "leader_final",
+            finalAnswer: "Final answer"
         )
     }
 }
@@ -25,268 +46,210 @@ struct LegacyAgentConversationStatePayload: Codable {
     let currentStage: AgentStage?
 }
 
-actor ScriptedAgentCouncilTransport: OpenAIDataTransport {
-    private let turns: [AgentTurnScript]
-    private let responseURL = URL(
-        string: "https://api.test.openai.local/v1/responses/test"
-    ) ?? URL(fileURLWithPath: "/")
+@MainActor
+final class ScriptedAgentCouncilStreamClient: OpenAIStreamClient {
+    private(set) var recordedRequests: [URLRequest] = []
+    private(set) var cancelCallCount = 0
 
-    private var recordedRequests: [URLRequest] = []
+    private let turns: [AgentTurnScript]
+    private let controlledResponseIDs: Set<String>
     private var triageTurnIndex = 0
+    private var localPassTurnIndex = 0
     private var reviewTurnIndex = 0
+    private var finalTurnIndex = 0
     private var taskTurnIndexByRole = Dictionary(
         uniqueKeysWithValues: AgentRole.allCases.map { ($0, 0) }
     )
+    private var continuations: [String: AsyncStream<StreamEvent>.Continuation] = [:]
 
-    init(turns: [AgentTurnScript]) {
+    init(
+        turns: [AgentTurnScript],
+        controlledResponseIDs: Set<String> = []
+    ) {
         self.turns = turns
+        self.controlledResponseIDs = controlledResponseIDs
     }
 
-    func data(
-        for request: URLRequest
-    ) async throws(OpenAIServiceError) -> (Data, URLResponse) {
+    var activeStreamCount: Int {
+        continuations.count
+    }
+
+    func makeStream(request: URLRequest) -> AsyncStream<StreamEvent> {
         recordedRequests.append(request)
 
-        let payload = try requestPayload(from: request)
+        let payload = (try? scriptedRequestPayload(from: request)) ?? [:]
         let instructions = payload["instructions"] as? String ?? ""
 
-        let responseData: Data
-        if instructions.contains("reviewing delegated worker results") {
-            responseData = try leaderReviewResponseData()
-        } else if instructions.contains("dynamic Agent team. Work like a Codex leader coordinating subagents") {
-            responseData = try leaderTriageResponseData()
-        } else if instructions.contains("You are Worker") {
-            responseData = try workerTaskResponseData(for: instructions)
-        } else {
-            throw .requestFailed("Unexpected scripted Agent request.")
+        do {
+            if instructions.contains("writing the final user-facing answer") {
+                return try makeFinalSynthesisStream()
+            }
+            if instructions.contains("reviewing delegated worker results") {
+                return try makeLeaderReviewStream()
+            }
+            if instructions.contains("doing a short local pass before delegation") {
+                return try makeLeaderLocalPassStream()
+            }
+            if instructions.contains(
+                "dynamic Agent team. Work like a Codex leader coordinating subagents"
+            ) {
+                return try makeLeaderTriageStream()
+            }
+            if instructions.contains("You are Worker") {
+                let role = try scriptedRequestedRole(from: instructions)
+                return try makeWorkerTaskStream(for: role)
+            }
+        } catch {
+            return failingStream(message: error.localizedDescription)
         }
 
-        let response = HTTPURLResponse(
-            url: responseURL,
-            statusCode: 200,
-            httpVersion: nil,
-            headerFields: nil
-        ) ?? HTTPURLResponse()
-        return (responseData, response)
+        return failingStream(message: "Unexpected scripted Agent stream request.")
     }
 
-    func requests() -> [URLRequest] {
-        recordedRequests
+    func cancel() {
+        cancelCallCount += 1
+        finishAll()
     }
 
-    private func leaderTriageResponseData() throws(OpenAIServiceError) -> Data {
+    func yield(
+        _ event: StreamEvent,
+        onResponseID responseID: String? = nil
+    ) {
+        guard let responseID = responseID ?? continuations.keys.sorted().first,
+              let continuation = continuations[responseID]
+        else {
+            return
+        }
+
+        continuation.yield(event)
+    }
+
+    func finishStream(responseID: String? = nil) {
+        guard let responseID = responseID ?? continuations.keys.sorted().first,
+              let continuation = continuations.removeValue(forKey: responseID)
+        else {
+            return
+        }
+
+        continuation.finish()
+    }
+
+    func finishAll() {
+        let activeContinuations = continuations.values
+        continuations.removeAll()
+        for continuation in activeContinuations {
+            continuation.finish()
+        }
+    }
+
+    private func makeLeaderTriageStream() throws -> AsyncStream<StreamEvent> {
         guard turns.indices.contains(triageTurnIndex) else {
-            throw .requestFailed("Missing scripted leader response.")
+            throw NativeChatTestError.missingStubbedTransportResponse
         }
 
-        let responseID = turns[triageTurnIndex].triageResponseID
+        let turn = turns[triageTurnIndex]
         triageTurnIndex += 1
-        do {
-            return try makeAgentResponseData(
-                responseID: responseID,
-                text: """
-                [FOCUS]
-                Leader is shaping the first task wave.
-                [/FOCUS]
-                [DECISION]
-                delegate
-                [/DECISION]
-                [PLAN]
-                step_root || root || leader || running || Understand request || Frame the answer and decide what to delegate.
-                step_a || step_root || workerA || planned || Draft strongest answer || Produce the recommended solution.
-                step_b || step_root || workerB || planned || Stress risks || Surface edge cases and failure modes.
-                step_c || step_root || workerC || planned || Check completeness || Find missing context and structure gaps.
-                [/PLAN]
-                [TASKS]
-                workerA || step_a || enabled || Draft strongest answer || Produce the recommended answer path || \
-                Return the strongest concise recommendation
-                workerB || step_b || enabled || Stress risks || Surface edge cases and failure modes || \
-                Return a concise risk summary
-                workerC || step_c || reasoningOnly || Check completeness || \
-                Find missing context and structure gaps || Return concise completeness notes
-                [/TASKS]
-                [DECISION_NOTE]
-                Delegate one bounded wave before synthesizing.
-                [/DECISION_NOTE]
-                """
-            )
-        } catch {
-            throw .requestFailed(error.localizedDescription)
-        }
+        return stream(
+            scriptedLeaderTriageStreamEvents(responseID: turn.triageResponseID)
+        )
     }
 
-    private func leaderReviewResponseData() throws(OpenAIServiceError) -> Data {
+    private func makeLeaderLocalPassStream() throws -> AsyncStream<StreamEvent> {
+        guard turns.indices.contains(localPassTurnIndex) else {
+            throw NativeChatTestError.missingStubbedTransportResponse
+        }
+
+        let turn = turns[localPassTurnIndex]
+        localPassTurnIndex += 1
+        let responseID = turn.localPassResponseID ?? "\(turn.triageResponseID)_local"
+        let taskLine = [
+            "workerA",
+            "step_root",
+            "enabled",
+            "Validate approach",
+            "Test the leading answer path",
+            "Return concise validation notes"
+        ].joined(separator: " || ")
+        return stream(
+            scriptedLeaderDirectiveStreamEvents(
+                responseID: responseID,
+                status: "Refining task briefs",
+                focus: "Leader is doing a short local pass before delegating.",
+                decision: "delegate",
+                planLines: [
+                    "step_root || root || leader || running || Refine plan || Tighten the next worker wave."
+                ],
+                taskLines: [
+                    taskLine
+                ],
+                decisionNote: "Run one refined worker task before synthesis.",
+                stopReason: nil
+            )
+        )
+    }
+
+    private func makeLeaderReviewStream() throws -> AsyncStream<StreamEvent> {
         guard turns.indices.contains(reviewTurnIndex) else {
-            throw .requestFailed("Missing scripted leader review response.")
+            throw NativeChatTestError.missingStubbedTransportResponse
         }
 
-        let responseID = turns[reviewTurnIndex].reviewResponseID
+        let turn = turns[reviewTurnIndex]
         reviewTurnIndex += 1
-        do {
-            return try makeAgentResponseData(
-                responseID: responseID,
-                text: """
-                [FOCUS]
-                Leader is satisfied with the worker evidence and ready to answer.
-                [/FOCUS]
-                [DECISION]
-                finish
-                [/DECISION]
-                [PLAN]
-                step_root || root || leader || completed || Understand request || The team converged on a stable answer.
-                step_a || step_root || workerA || completed || Draft strongest answer || Recommended path validated.
-                step_b || step_root || workerB || completed || Stress risks || Edge cases captured.
-                step_c || step_root || workerC || completed || Check completeness || Structure gaps closed.
-                [/PLAN]
-                [TASKS]
-                [/TASKS]
-                [DECISION_NOTE]
-                The current evidence is sufficient for the final answer.
-                [/DECISION_NOTE]
-                [STOP_REASON]
-                Answer completed.
-                [/STOP_REASON]
-                """
-            )
-        } catch {
-            throw .requestFailed(error.localizedDescription)
-        }
+        return stream(
+            scriptedLeaderReviewStreamEvents(responseID: turn.reviewResponseID)
+        )
     }
 
-    private func workerTaskResponseData(
-        for instructions: String
-    ) throws(OpenAIServiceError) -> Data {
-        let role = try requestedRole(from: instructions)
+    private func makeWorkerTaskStream(
+        for role: AgentRole
+    ) throws -> AsyncStream<StreamEvent> {
         let turnIndex = taskTurnIndexByRole[role] ?? 0
         guard turns.indices.contains(turnIndex) else {
-            throw .requestFailed("Missing scripted worker task response.")
+            throw NativeChatTestError.missingStubbedTransportResponse
         }
         guard let responseID = turns[turnIndex].taskResponseIDs[role] else {
-            throw .requestFailed("Missing scripted worker task id.")
+            throw NativeChatTestError.missingStubbedTransportResponse
         }
 
         taskTurnIndexByRole[role] = turnIndex + 1
-        do {
-            return try makeAgentResponseData(
-                responseID: responseID,
-                text: """
-                [SUMMARY]
-                \(role.displayName) task summary.
-                [/SUMMARY]
-                [EVIDENCE]
-                - \(role.displayName) evidence point.
-                [/EVIDENCE]
-                [CONFIDENCE]
-                high
-                [/CONFIDENCE]
-                [RISKS]
-                - \(role.displayName) residual risk.
-                [/RISKS]
-                [FOLLOW_UP]
-                [/FOLLOW_UP]
-                """
+        return stream(scriptedWorkerStreamEvents(role: role, responseID: responseID))
+    }
+
+    private func makeFinalSynthesisStream() throws -> AsyncStream<StreamEvent> {
+        guard turns.indices.contains(finalTurnIndex) else {
+            throw NativeChatTestError.missingStubbedTransportResponse
+        }
+
+        let turn = turns[finalTurnIndex]
+        finalTurnIndex += 1
+
+        if controlledResponseIDs.contains(turn.finalResponseID) {
+            return AsyncStream { continuation in
+                continuations[turn.finalResponseID] = continuation
+            }
+        }
+
+        return stream(
+            scriptedFinalSynthesisStreamEvents(
+                responseID: turn.finalResponseID,
+                answer: turn.finalAnswer
             )
-        } catch {
-            throw .requestFailed(error.localizedDescription)
-        }
-    }
-
-    private func requestedRole(
-        from instructions: String
-    ) throws(OpenAIServiceError) -> AgentRole {
-        if let role = [AgentRole.workerA, .workerB, .workerC].first(where: {
-            instructions.contains($0.displayName)
-        }) {
-            return role
-        }
-
-        throw .requestFailed("Unable to resolve scripted worker role.")
-    }
-
-    private func requestPayload(
-        from request: URLRequest
-    ) throws(OpenAIServiceError) -> [String: Any] {
-        guard let body = request.httpBody else {
-            throw .requestFailed("Missing scripted request payload.")
-        }
-
-        let object: Any
-        do {
-            object = try JSONSerialization.jsonObject(with: body)
-        } catch {
-            throw .requestFailed(error.localizedDescription)
-        }
-
-        guard let payload = object as? [String: Any] else {
-            throw .requestFailed("Missing scripted request payload.")
-        }
-
-        return payload
-    }
-}
-
-func makeAgentResponseData(
-    responseID: String,
-    text: String
-) throws -> Data {
-    try JSONCoding.encode(
-        ResponsesResponseDTO(
-            id: responseID,
-            status: "completed",
-            output: [
-                ResponsesOutputItemDTO(
-                    type: "message",
-                    role: "assistant",
-                    content: [
-                        ResponsesContentPartDTO(
-                            type: "output_text",
-                            text: text
-                        )
-                    ]
-                )
-            ]
         )
-    )
-}
-
-func scriptedWorkerStreamEvents(
-    role: AgentRole,
-    responseID: String
-) -> [StreamEvent] {
-    let body = """
-    [STATUS]
-    Checking \(role.displayName.lowercased())
-    [/STATUS]
-    [SUMMARY]
-    \(role.displayName) task summary.
-    [/SUMMARY]
-    [EVIDENCE]
-    - \(role.displayName) evidence point.
-    [/EVIDENCE]
-    [CONFIDENCE]
-    high
-    [/CONFIDENCE]
-    [RISKS]
-    - \(role.displayName) residual risk.
-    [/RISKS]
-    [FOLLOW_UP]
-    [/FOLLOW_UP]
-    """
-
-    return [
-        .responseCreated(responseID),
-        .textDelta(body),
-        .completed(body, nil, nil)
-    ]
-}
-
-func previousResponseID(from request: URLRequest) -> String? {
-    guard
-        let body = request.httpBody,
-        let payload = try? JSONSerialization.jsonObject(with: body) as? [String: Any]
-    else {
-        return nil
     }
 
-    return payload["previous_response_id"] as? String
+    private func stream(_ events: [StreamEvent]) -> AsyncStream<StreamEvent> {
+        AsyncStream { continuation in
+            for event in events {
+                continuation.yield(event)
+            }
+            continuation.finish()
+        }
+    }
+
+    private func failingStream(message: String) -> AsyncStream<StreamEvent> {
+        AsyncStream { continuation in
+            continuation.yield(.error(OpenAIServiceError.requestFailed(message)))
+            continuation.finish()
+        }
+    }
 }

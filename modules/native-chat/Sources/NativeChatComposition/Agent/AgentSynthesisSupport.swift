@@ -141,7 +141,9 @@ extension AgentRunCoordinator {
             .compactMap { AgentSummaryFormatter.latestCompletedWorkerTask(role: $0, from: snapshot)?.result?.risks }
             .flatMap(\.self)
         let discussion = AgentPromptBuilder.FinalSynthesisDiscussion(
-            leaderFocus: snapshot.currentFocus.isEmpty ? "Respond to the user with the accepted findings." : snapshot.currentFocus,
+            leaderFocus: snapshot.leaderAcceptedFocus.isEmpty
+                ? (snapshot.currentFocus.isEmpty ? "Respond to the user with the accepted findings." : snapshot.currentFocus)
+                : snapshot.leaderAcceptedFocus,
             planHighlights: Array(planHighlights),
             workerSummaries: workerSummaries,
             adoptedEvidence: AgentSummaryFormatter.summarizeBullets(snapshot.evidence, maxItems: 6, maxLength: 120),
@@ -154,7 +156,10 @@ extension AgentRunCoordinator {
         )
     }
 
-    func uploadAttachmentsIfNeeded(_ prepared: PreparedAgentTurn) async throws {
+    func uploadAttachmentsIfNeeded(
+        _ prepared: PreparedAgentTurn,
+        execution: AgentExecutionState
+    ) async throws {
         var uploadedAttachments = prepared.attachmentsToUpload
         for index in uploadedAttachments.indices {
             if uploadedAttachments[index].fileId != nil {
@@ -165,7 +170,9 @@ extension AgentRunCoordinator {
             uploadedAttachments[index].uploadStatus = .uploading
             guard let data = uploadedAttachments[index].localData else {
                 uploadedAttachments[index].uploadStatus = .failed
-                continue
+                throw AgentRunFailure.incomplete(
+                    "One attachment is unavailable. Retry to continue."
+                )
             }
 
             let request = try state.requestBuilder.uploadRequest(
@@ -180,6 +187,17 @@ extension AgentRunCoordinator {
             )
             uploadedAttachments[index].openAIFileId = fileID
             uploadedAttachments[index].uploadStatus = .uploaded
+
+            AgentProcessProjector.updateLeaderLivePreview(
+                status: "Uploading attachments",
+                summary: "Uploaded \(index + 1) of \(uploadedAttachments.count) attachment(s).",
+                on: &execution.snapshot
+            )
+            persistCheckpointIfNeeded(
+                execution,
+                in: prepared.conversation,
+                forceSave: execution.snapshot.runConfiguration.backgroundModeEnabled
+            )
         }
 
         if let userMessage = prepared.conversation.messages.first(where: { $0.id == prepared.userMessageID }) {

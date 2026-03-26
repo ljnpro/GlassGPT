@@ -6,6 +6,12 @@ public struct AgentProcessSnapshot: Codable, Equatable, Sendable {
     public var activity: AgentProcessActivity
     /// Leader-owned summary of the team's current focus.
     public var currentFocus: String
+    /// Stable accepted leader focus used for final synthesis and completed traces.
+    public var leaderAcceptedFocus: String
+    /// Short transient leader status shown while hidden phases are running.
+    public var leaderLiveStatus: String
+    /// Short transient leader summary shown while hidden phases are running.
+    public var leaderLiveSummary: String
     /// Projected plan tree shown in the Agent Process.
     public var plan: [AgentPlanStep]
     /// Delegated tasks tracked for the current run.
@@ -18,6 +24,10 @@ public struct AgentProcessSnapshot: Codable, Equatable, Sendable {
     public var evidence: [String]
     /// Identifiers for tasks that are actively running.
     public var activeTaskIDs: [String]
+    /// Recent de-duplicated process updates shown in the live disclosure.
+    public var recentUpdates: [String]
+    /// Current recovery status for the live process projection.
+    public var recoveryState: AgentRecoveryState
     /// Terminal stop reason when the run has concluded.
     public var stopReason: AgentStopReason?
     /// Final outcome summary for the completed run.
@@ -29,27 +39,78 @@ public struct AgentProcessSnapshot: Codable, Equatable, Sendable {
     public init(
         activity: AgentProcessActivity = .triage,
         currentFocus: String = "",
+        leaderAcceptedFocus: String = "",
+        leaderLiveStatus: String = "",
+        leaderLiveSummary: String = "",
         plan: [AgentPlanStep] = [],
         tasks: [AgentTask] = [],
         decisions: [AgentDecision] = [],
         events: [AgentEvent] = [],
         evidence: [String] = [],
         activeTaskIDs: [String] = [],
+        recentUpdates: [String] = [],
+        recoveryState: AgentRecoveryState = .idle,
         stopReason: AgentStopReason? = nil,
         outcome: String = "",
         updatedAt: Date = Date()
     ) {
         self.activity = activity
         self.currentFocus = currentFocus
+        self.leaderAcceptedFocus = leaderAcceptedFocus.isEmpty ? currentFocus : leaderAcceptedFocus
+        self.leaderLiveStatus = leaderLiveStatus
+        self.leaderLiveSummary = leaderLiveSummary
         self.plan = plan
         self.tasks = tasks
         self.decisions = decisions
         self.events = events
         self.evidence = evidence
         self.activeTaskIDs = activeTaskIDs
+        self.recentUpdates = recentUpdates
+        self.recoveryState = recoveryState
         self.stopReason = stopReason
         self.outcome = outcome
         self.updatedAt = updatedAt
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case activity
+        case currentFocus
+        case leaderAcceptedFocus
+        case leaderLiveStatus
+        case leaderLiveSummary
+        case plan
+        case tasks
+        case decisions
+        case events
+        case evidence
+        case activeTaskIDs
+        case recentUpdates
+        case recoveryState
+        case stopReason
+        case outcome
+        case updatedAt
+    }
+
+    /// Decodes an Agent process snapshot while backfilling newer live projection fields.
+    public init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        activity = try container.decodeIfPresent(AgentProcessActivity.self, forKey: .activity) ?? .triage
+        currentFocus = try container.decodeIfPresent(String.self, forKey: .currentFocus) ?? ""
+        leaderAcceptedFocus = try container.decodeIfPresent(String.self, forKey: .leaderAcceptedFocus)
+            ?? currentFocus
+        leaderLiveStatus = try container.decodeIfPresent(String.self, forKey: .leaderLiveStatus) ?? ""
+        leaderLiveSummary = try container.decodeIfPresent(String.self, forKey: .leaderLiveSummary) ?? ""
+        plan = try container.decodeIfPresent([AgentPlanStep].self, forKey: .plan) ?? []
+        tasks = try container.decodeIfPresent([AgentTask].self, forKey: .tasks) ?? []
+        decisions = try container.decodeIfPresent([AgentDecision].self, forKey: .decisions) ?? []
+        events = try container.decodeIfPresent([AgentEvent].self, forKey: .events) ?? []
+        evidence = try container.decodeIfPresent([String].self, forKey: .evidence) ?? []
+        activeTaskIDs = try container.decodeIfPresent([String].self, forKey: .activeTaskIDs) ?? []
+        recentUpdates = try container.decodeIfPresent([String].self, forKey: .recentUpdates) ?? []
+        recoveryState = try container.decodeIfPresent(AgentRecoveryState.self, forKey: .recoveryState) ?? .idle
+        stopReason = try container.decodeIfPresent(AgentStopReason.self, forKey: .stopReason)
+        outcome = try container.decodeIfPresent(String.self, forKey: .outcome) ?? ""
+        updatedAt = try container.decodeIfPresent(Date.self, forKey: .updatedAt) ?? Date()
     }
 
     /// Tasks currently marked active by the runtime.
@@ -74,6 +135,15 @@ public struct AgentProcessSnapshot: Codable, Equatable, Sendable {
             parts.append("\(blocked) blocked")
         }
 
-        return parts.isEmpty ? "No delegated tasks yet" : parts.joined(separator: " · ")
+        if !parts.isEmpty {
+            return parts.joined(separator: " · ")
+        }
+
+        let leaderStatus = leaderLiveStatus.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !leaderStatus.isEmpty {
+            return leaderStatus
+        }
+
+        return activity.displayName
     }
 }

@@ -4,10 +4,16 @@ import Foundation
 public struct AgentRunSnapshot: Codable, Equatable, Sendable {
     /// The current visible stage, if a foreground or background run is underway.
     public var currentStage: AgentStage
+    /// The persisted execution phase for the active run.
+    public var phase: AgentRunPhase
     /// The draft assistant message being filled by the current run.
     public var draftMessageID: UUID
     /// The latest visible user message that started this run.
     public var latestUserMessageID: UUID
+    /// Frozen run configuration captured when the turn began.
+    public var runConfiguration: AgentConversationConfiguration
+    /// Whether this snapshot carried an explicit frozen run configuration in persisted state.
+    public var hasExplicitRunConfiguration: Bool
     /// The latest leader brief, if completed.
     public var leaderBriefSummary: String?
     /// Projected dynamic process state for the live Agent Process disclosure.
@@ -20,6 +26,14 @@ public struct AgentRunSnapshot: Codable, Equatable, Sendable {
     public var workersRoundOneProgress: [AgentWorkerProgress]
     /// Worker progress for cross-review.
     public var crossReviewProgress: [AgentWorkerProgress]
+    /// Resumable ticket for the leader's active request, if any.
+    public var leaderTicket: AgentRunTicket?
+    /// Resumable ticket for worker A, if any.
+    public var workerATicket: AgentRunTicket?
+    /// Resumable ticket for worker B, if any.
+    public var workerBTicket: AgentRunTicket?
+    /// Resumable ticket for worker C, if any.
+    public var workerCTicket: AgentRunTicket?
     /// Live visible synthesis text accumulated so far.
     public var currentStreamingText: String
     /// Live visible synthesis reasoning accumulated so far.
@@ -34,20 +48,29 @@ public struct AgentRunSnapshot: Codable, Equatable, Sendable {
     public var isStreaming: Bool
     /// Whether the visible synthesis is actively reasoning.
     public var isThinking: Bool
+    /// Last durable checkpoint timestamp for the persisted run.
+    public var lastCheckpointAt: Date
     /// Last update timestamp for the snapshot payload.
     public var updatedAt: Date
 
     /// Creates an in-flight run snapshot for Agent recovery and rebinding.
     public init(
         currentStage: AgentStage,
+        phase: AgentRunPhase? = nil,
         draftMessageID: UUID,
         latestUserMessageID: UUID,
+        runConfiguration: AgentConversationConfiguration = AgentConversationConfiguration(),
+        hasExplicitRunConfiguration: Bool = true,
         leaderBriefSummary: String? = nil,
         processSnapshot: AgentProcessSnapshot = AgentProcessSnapshot(),
         workersRoundOneSummaries: [AgentWorkerSummary] = [],
         crossReviewSummaries: [AgentWorkerSummary] = [],
         workersRoundOneProgress: [AgentWorkerProgress] = AgentWorkerProgress.defaultProgress,
         crossReviewProgress: [AgentWorkerProgress] = AgentWorkerProgress.defaultProgress,
+        leaderTicket: AgentRunTicket? = nil,
+        workerATicket: AgentRunTicket? = nil,
+        workerBTicket: AgentRunTicket? = nil,
+        workerCTicket: AgentRunTicket? = nil,
         currentStreamingText: String = "",
         currentThinkingText: String = "",
         activeToolCalls: [ToolCallInfo] = [],
@@ -55,35 +78,36 @@ public struct AgentRunSnapshot: Codable, Equatable, Sendable {
         liveFilePathAnnotations: [FilePathAnnotation] = [],
         isStreaming: Bool = false,
         isThinking: Bool = false,
+        lastCheckpointAt: Date = Date(),
         updatedAt: Date = Date()
     ) {
-        let resolvedProcessSnapshot: AgentProcessSnapshot = if processSnapshot.activity == .triage,
-                                                               processSnapshot.currentFocus.isEmpty,
-                                                               processSnapshot.plan.isEmpty,
-                                                               processSnapshot.tasks.isEmpty,
-                                                               processSnapshot.decisions.isEmpty,
-                                                               processSnapshot.events.isEmpty,
-                                                               processSnapshot.evidence.isEmpty,
-                                                               processSnapshot.activeTaskIDs.isEmpty,
-                                                               processSnapshot.stopReason == nil,
-                                                               processSnapshot.outcome.isEmpty {
-            AgentProcessSnapshot(
-                activity: currentStage.compatibilityProcessActivity,
-                currentFocus: leaderBriefSummary ?? ""
-            )
-        } else {
-            processSnapshot
-        }
+        let resolvedPhase = phase ?? Self.compatibilityPhase(
+            from: currentStage,
+            isStreaming: isStreaming,
+            currentStreamingText: currentStreamingText
+        )
+        let resolvedProcessSnapshot = Self.resolvedProcessSnapshot(
+            from: processSnapshot,
+            leaderBriefSummary: leaderBriefSummary,
+            phase: resolvedPhase
+        )
 
         self.currentStage = currentStage
+        self.phase = resolvedPhase
         self.draftMessageID = draftMessageID
         self.latestUserMessageID = latestUserMessageID
+        self.runConfiguration = runConfiguration
+        self.hasExplicitRunConfiguration = hasExplicitRunConfiguration
         self.leaderBriefSummary = leaderBriefSummary
         self.processSnapshot = resolvedProcessSnapshot
         self.workersRoundOneSummaries = workersRoundOneSummaries
         self.crossReviewSummaries = crossReviewSummaries
         self.workersRoundOneProgress = workersRoundOneProgress
         self.crossReviewProgress = crossReviewProgress
+        self.leaderTicket = leaderTicket
+        self.workerATicket = workerATicket
+        self.workerBTicket = workerBTicket
+        self.workerCTicket = workerCTicket
         self.currentStreamingText = currentStreamingText
         self.currentThinkingText = currentThinkingText
         self.activeToolCalls = activeToolCalls
@@ -91,70 +115,8 @@ public struct AgentRunSnapshot: Codable, Equatable, Sendable {
         self.liveFilePathAnnotations = liveFilePathAnnotations
         self.isStreaming = isStreaming
         self.isThinking = isThinking
+        self.lastCheckpointAt = lastCheckpointAt
         self.updatedAt = updatedAt
-    }
-
-    private enum CodingKeys: String, CodingKey {
-        case currentStage
-        case draftMessageID
-        case latestUserMessageID
-        case leaderBriefSummary
-        case processSnapshot
-        case workersRoundOneSummaries
-        case crossReviewSummaries
-        case workersRoundOneProgress
-        case crossReviewProgress
-        case currentStreamingText
-        case currentThinkingText
-        case activeToolCalls
-        case liveCitations
-        case liveFilePathAnnotations
-        case isStreaming
-        case isThinking
-        case updatedAt
-    }
-
-    /// Decodes a persisted run snapshot, filling newer fields with safe defaults when absent.
-    public init(from decoder: any Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        currentStage = try container.decode(AgentStage.self, forKey: .currentStage)
-        draftMessageID = try container.decode(UUID.self, forKey: .draftMessageID)
-        latestUserMessageID = try container.decode(UUID.self, forKey: .latestUserMessageID)
-        leaderBriefSummary = try container.decodeIfPresent(String.self, forKey: .leaderBriefSummary)
-        processSnapshot = try container.decodeIfPresent(
-            AgentProcessSnapshot.self,
-            forKey: .processSnapshot
-        ) ?? AgentProcessSnapshot(
-            activity: currentStage.compatibilityProcessActivity,
-            currentFocus: leaderBriefSummary ?? ""
-        )
-        workersRoundOneSummaries = try container.decodeIfPresent(
-            [AgentWorkerSummary].self,
-            forKey: .workersRoundOneSummaries
-        ) ?? []
-        crossReviewSummaries = try container.decodeIfPresent(
-            [AgentWorkerSummary].self,
-            forKey: .crossReviewSummaries
-        ) ?? []
-        workersRoundOneProgress = try container.decodeIfPresent(
-            [AgentWorkerProgress].self,
-            forKey: .workersRoundOneProgress
-        ) ?? AgentWorkerProgress.defaultProgress
-        crossReviewProgress = try container.decodeIfPresent(
-            [AgentWorkerProgress].self,
-            forKey: .crossReviewProgress
-        ) ?? AgentWorkerProgress.defaultProgress
-        currentStreamingText = try container.decodeIfPresent(String.self, forKey: .currentStreamingText) ?? ""
-        currentThinkingText = try container.decodeIfPresent(String.self, forKey: .currentThinkingText) ?? ""
-        activeToolCalls = try container.decodeIfPresent([ToolCallInfo].self, forKey: .activeToolCalls) ?? []
-        liveCitations = try container.decodeIfPresent([URLCitation].self, forKey: .liveCitations) ?? []
-        liveFilePathAnnotations = try container.decodeIfPresent(
-            [FilePathAnnotation].self,
-            forKey: .liveFilePathAnnotations
-        ) ?? []
-        isStreaming = try container.decodeIfPresent(Bool.self, forKey: .isStreaming) ?? false
-        isThinking = try container.decodeIfPresent(Bool.self, forKey: .isThinking) ?? false
-        updatedAt = try container.decodeIfPresent(Date.self, forKey: .updatedAt) ?? Date()
     }
 }
 
@@ -196,72 +158,5 @@ public struct AgentConversationState: Codable, Equatable, Sendable {
         self.configuration = configuration
         self.activeRun = activeRun
         self.updatedAt = updatedAt
-    }
-
-    /// Returns the current response identifier for the given internal role.
-    public func responseID(for role: AgentRole) -> String? {
-        switch role {
-        case .leader:
-            leaderResponseID
-        case .workerA:
-            workerAResponseID
-        case .workerB:
-            workerBResponseID
-        case .workerC:
-            workerCResponseID
-        }
-    }
-
-    /// Updates the response identifier for the given role.
-    public mutating func setResponseID(
-        _ responseID: String?,
-        for role: AgentRole,
-        updatedAt: Date = Date()
-    ) {
-        switch role {
-        case .leader:
-            leaderResponseID = responseID
-        case .workerA:
-            workerAResponseID = responseID
-        case .workerB:
-            workerBResponseID = responseID
-        case .workerC:
-            workerCResponseID = responseID
-        }
-        self.updatedAt = updatedAt
-    }
-
-    private enum CodingKeys: String, CodingKey {
-        case leaderResponseID
-        case workerAResponseID
-        case workerBResponseID
-        case workerCResponseID
-        case currentStage
-        case configuration
-        case activeRun
-        case updatedAt
-    }
-
-    /// Decodes Agent state while preserving compatibility with 4.12.0 payloads.
-    public init(from decoder: any Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        leaderResponseID = try container.decodeIfPresent(String.self, forKey: .leaderResponseID)
-        workerAResponseID = try container.decodeIfPresent(String.self, forKey: .workerAResponseID)
-        workerBResponseID = try container.decodeIfPresent(String.self, forKey: .workerBResponseID)
-        workerCResponseID = try container.decodeIfPresent(String.self, forKey: .workerCResponseID)
-        currentStage = try container.decodeIfPresent(AgentStage.self, forKey: .currentStage)
-        configuration = try container.decodeIfPresent(
-            AgentConversationConfiguration.self,
-            forKey: .configuration
-        ) ?? AgentConversationConfiguration()
-        activeRun = try container.decodeIfPresent(AgentRunSnapshot.self, forKey: .activeRun)
-        if var activeRun,
-           activeRun.processSnapshot.currentFocus.isEmpty,
-           let leaderBrief = activeRun.leaderBriefSummary,
-           !leaderBrief.isEmpty {
-            activeRun.processSnapshot.currentFocus = leaderBrief
-            self.activeRun = activeRun
-        }
-        updatedAt = try container.decodeIfPresent(Date.self, forKey: .updatedAt) ?? Date()
     }
 }
