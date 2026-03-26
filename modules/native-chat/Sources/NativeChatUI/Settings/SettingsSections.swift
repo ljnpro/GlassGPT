@@ -93,10 +93,10 @@ struct SettingsAdaptiveToggleRow: View {
                     }
                     .labelsHidden()
                     .accessibilityElement(children: .ignore)
+                    .accessibilityLabel(accessibilityLabel)
+                    .accessibilityValue(isOn ? String(localized: "On") : String(localized: "Off"))
+                    .accessibilityIdentifier(accessibilityIdentifier)
                 }
-                .accessibilityLabel(accessibilityLabel)
-                .accessibilityValue(isOn ? String(localized: "On") : String(localized: "Off"))
-                .accessibilityIdentifier(accessibilityIdentifier)
             }
         }
     }

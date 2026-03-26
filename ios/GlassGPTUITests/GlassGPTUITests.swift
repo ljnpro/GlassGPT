@@ -200,8 +200,12 @@ final class GlassGPTUITests: XCTestCase {
         XCTAssertTrue(agentModeButton.waitForExistence(timeout: 5))
         agentModeButton.tap()
 
-        let backgroundToggle = app.switches["settings.agentDefaultBackgroundMode"]
-        let flexToggle = app.switches["settings.agentDefaultFlexMode"]
+        let backgroundToggle = app.descendants(matching: .any)
+            .matching(identifier: "settings.agentDefaultBackgroundMode")
+            .firstMatch
+        let flexToggle = app.descendants(matching: .any)
+            .matching(identifier: "settings.agentDefaultFlexMode")
+            .firstMatch
         revealIfNeeded(backgroundToggle, in: app)
         XCTAssertTrue(backgroundToggle.waitForExistence(timeout: 5))
         XCTAssertTrue(flexToggle.waitForExistence(timeout: 5))
