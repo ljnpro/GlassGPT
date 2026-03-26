@@ -200,12 +200,8 @@ final class GlassGPTUITests: XCTestCase {
         XCTAssertTrue(agentModeButton.waitForExistence(timeout: 5))
         agentModeButton.tap()
 
-        let backgroundToggle = app.descendants(matching: .any)
-            .matching(identifier: "settings.agentDefaultBackgroundMode")
-            .firstMatch
-        let flexToggle = app.descendants(matching: .any)
-            .matching(identifier: "settings.agentDefaultFlexMode")
-            .firstMatch
+        let backgroundToggle = settingsControl(in: app, identifier: "settings.agentDefaultBackgroundMode")
+        let flexToggle = settingsControl(in: app, identifier: "settings.agentDefaultFlexMode")
         revealIfNeeded(backgroundToggle, in: app)
         XCTAssertTrue(backgroundToggle.waitForExistence(timeout: 5))
         XCTAssertTrue(flexToggle.waitForExistence(timeout: 5))
@@ -676,12 +672,12 @@ final class GlassGPTUITests: XCTestCase {
         let app = launchApp(scenario: "freshInstall")
 
         _ = openSettings(in: app)
-        let proToggle = app.switches["settings.defaultProMode"]
+        let proToggle = settingsControl(in: app, identifier: "settings.defaultProMode")
         revealIfNeeded(proToggle, in: app)
         XCTAssertTrue(proToggle.waitForExistence(timeout: 5))
 
-        let backgroundToggle = app.switches["settings.defaultBackgroundMode"]
-        let flexToggle = app.switches["settings.defaultFlexMode"]
+        let backgroundToggle = settingsControl(in: app, identifier: "settings.defaultBackgroundMode")
+        let flexToggle = settingsControl(in: app, identifier: "settings.defaultFlexMode")
         revealIfNeeded(backgroundToggle, in: app)
         XCTAssertTrue(backgroundToggle.waitForExistence(timeout: 5))
         XCTAssertTrue(flexToggle.waitForExistence(timeout: 5))
@@ -1040,6 +1036,13 @@ final class GlassGPTUITests: XCTestCase {
     private func defaultEffortControl(in app: XCUIApplication) -> XCUIElement {
         app.descendants(matching: .any)
             .matching(identifier: "settings.defaultEffort")
+            .firstMatch
+    }
+
+    @MainActor
+    private func settingsControl(in app: XCUIApplication, identifier: String) -> XCUIElement {
+        app.descendants(matching: .any)
+            .matching(identifier: identifier)
             .firstMatch
     }
 
