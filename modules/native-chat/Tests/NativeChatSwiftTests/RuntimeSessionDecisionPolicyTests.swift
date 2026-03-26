@@ -26,14 +26,14 @@ struct RuntimeSessionDecisionPolicyTests {
         #expect(mode == .poll)
     }
 
-    @Test func `poll when not using background mode`() {
+    @Test func `stream when a recovery cursor exists even without background mode`() {
         let mode = RuntimeSessionDecisionPolicy.recoveryResumeMode(
             preferStreamingResume: true,
             usedBackgroundMode: false,
             lastSequenceNumber: 42
         )
 
-        #expect(mode == .poll)
+        #expect(mode == .stream(lastSequenceNumber: 42))
     }
 
     @Test func `poll when no last sequence number`() {
@@ -108,7 +108,7 @@ struct RuntimeSessionDecisionPolicyTests {
         #expect(action == .poll)
     }
 
-    @Test func `poll for in progress without background mode`() {
+    @Test func `start stream for in progress without background mode when resume is preferred`() {
         let action = RuntimeSessionDecisionPolicy.recoveryFetchAction(
             status: .inProgress,
             preferStreamingResume: true,
@@ -117,7 +117,7 @@ struct RuntimeSessionDecisionPolicyTests {
             errorMessage: nil
         )
 
-        #expect(action == .poll)
+        #expect(action == .startStream(lastSequenceNumber: 10))
     }
 
     // MARK: - Should Fallback to Direct Recovery Stream
@@ -126,7 +126,7 @@ struct RuntimeSessionDecisionPolicyTests {
         let result = RuntimeSessionDecisionPolicy.shouldFallbackToDirectRecoveryStream(
             cloudflareGatewayEnabled: true,
             useDirectEndpoint: false,
-            gatewayResumeTimedOut: true,
+            resumeTimedOut: true,
             receivedAnyRecoveryEvent: true
         )
 
@@ -137,7 +137,7 @@ struct RuntimeSessionDecisionPolicyTests {
         let result = RuntimeSessionDecisionPolicy.shouldFallbackToDirectRecoveryStream(
             cloudflareGatewayEnabled: true,
             useDirectEndpoint: false,
-            gatewayResumeTimedOut: false,
+            resumeTimedOut: false,
             receivedAnyRecoveryEvent: false
         )
 
@@ -148,7 +148,7 @@ struct RuntimeSessionDecisionPolicyTests {
         let result = RuntimeSessionDecisionPolicy.shouldFallbackToDirectRecoveryStream(
             cloudflareGatewayEnabled: true,
             useDirectEndpoint: true,
-            gatewayResumeTimedOut: true,
+            resumeTimedOut: true,
             receivedAnyRecoveryEvent: false
         )
 
@@ -159,7 +159,7 @@ struct RuntimeSessionDecisionPolicyTests {
         let result = RuntimeSessionDecisionPolicy.shouldFallbackToDirectRecoveryStream(
             cloudflareGatewayEnabled: false,
             useDirectEndpoint: false,
-            gatewayResumeTimedOut: true,
+            resumeTimedOut: true,
             receivedAnyRecoveryEvent: false
         )
 
@@ -170,7 +170,7 @@ struct RuntimeSessionDecisionPolicyTests {
         let result = RuntimeSessionDecisionPolicy.shouldFallbackToDirectRecoveryStream(
             cloudflareGatewayEnabled: true,
             useDirectEndpoint: false,
-            gatewayResumeTimedOut: false,
+            resumeTimedOut: false,
             receivedAnyRecoveryEvent: true
         )
 
@@ -212,7 +212,7 @@ struct RuntimeSessionDecisionPolicyTests {
         let step = RuntimeSessionDecisionPolicy.recoveryStreamNextStep(
             cloudflareGatewayEnabled: true,
             useDirectEndpoint: false,
-            gatewayResumeTimedOut: true,
+            resumeTimedOut: true,
             receivedAnyRecoveryEvent: false,
             encounteredRecoverableFailure: false,
             responseId: nil
@@ -225,7 +225,7 @@ struct RuntimeSessionDecisionPolicyTests {
         let step = RuntimeSessionDecisionPolicy.recoveryStreamNextStep(
             cloudflareGatewayEnabled: false,
             useDirectEndpoint: true,
-            gatewayResumeTimedOut: false,
+            resumeTimedOut: false,
             receivedAnyRecoveryEvent: true,
             encounteredRecoverableFailure: true,
             responseId: "resp_abc"
@@ -238,7 +238,7 @@ struct RuntimeSessionDecisionPolicyTests {
         let step = RuntimeSessionDecisionPolicy.recoveryStreamNextStep(
             cloudflareGatewayEnabled: false,
             useDirectEndpoint: true,
-            gatewayResumeTimedOut: false,
+            resumeTimedOut: false,
             receivedAnyRecoveryEvent: true,
             encounteredRecoverableFailure: false,
             responseId: nil

@@ -108,8 +108,78 @@ extension ChatScreenStoreRuntimeTests {
         let recovered = try #require(latestAssistantMessage(in: relaunchStore))
         #expect(recovered.lastSequenceNumber == nil)
         let requestedPaths = await relaunchTransport.requestedPaths()
-        #expect(requestedPaths == ["/v1/responses/resp_relaunch_stream"])
+        #expect(requestedPaths.isEmpty)
         #expect(relaunchStreamClient.recordedRequests.count == 1)
+        let resumeURL = try #require(relaunchStreamClient.recordedRequests.first?.url?.absoluteString)
+        #expect(resumeURL.contains("starting_after=7"))
+    }
+
+    @Test func `relaunched non background session resumes streaming when a recovery cursor exists`() async throws {
+        let deps = try makeRelaunchDependencies()
+
+        let initialStreamClient = ControlledOpenAIStreamClient()
+        let initialStore = makeRelaunchableStore(deps: deps, streamClient: initialStreamClient)
+        let conversation = try seedConversation(
+            in: initialStore,
+            title: "Resume After Relaunch Without Background",
+            backgroundModeEnabled: false
+        )
+
+        initialStore.currentConversation = conversation
+        initialStore.messages = []
+        initialStore.backgroundModeEnabled = false
+        initialStore.syncConversationProjection()
+
+        #expect(initialStore.sendMessage(text: "Resume the stream without background mode"))
+        try await waitUntil {
+            initialStore.currentVisibleSession != nil && initialStreamClient.activeStreamCount > 0
+        }
+
+        initialStreamClient.yield(.responseCreated("resp_relaunch_stream_foreground"))
+        initialStreamClient.yield(.sequenceUpdate(7))
+        initialStreamClient.yield(.textDelta("Partial "))
+
+        try await waitUntil {
+            let message = self.latestAssistantMessage(in: initialStore)
+            return message?.responseId == "resp_relaunch_stream_foreground" &&
+                message?.lastSequenceNumber == 7
+        }
+
+        initialStore.handleEnterBackground()
+        await initialStore.suspendActiveSessionsForAppBackgroundNow()
+
+        let relaunchTransport = StubOpenAITransport()
+        let streamURL = try #require(
+            URL(string: "https://api.test.openai.local/v1/responses/resp_relaunch_stream_foreground")
+        )
+        try await relaunchTransport.enqueue(
+            data: makeFetchResponseData(status: .inProgress, text: ""),
+            url: streamURL
+        )
+
+        let relaunchStreamClient = QueuedOpenAIStreamClient(
+            scriptedStreams: [[
+                .sequenceUpdate(8),
+                .textDelta("continued"),
+                .completed("Partial continued", "Recovered thinking", nil)
+            ]]
+        )
+        let relaunchStore = makeRelaunchableStore(
+            deps: deps,
+            transport: relaunchTransport,
+            streamClient: relaunchStreamClient,
+            restoreConversation: true
+        )
+
+        try await waitUntil {
+            self.latestAssistantMessage(in: relaunchStore)?.isComplete == true
+        }
+
+        try assertRelaunchedRecovery(
+            in: relaunchStore,
+            expectedContent: "Partial continued",
+            expectedThinking: "Recovered thinking"
+        )
         let resumeURL = try #require(relaunchStreamClient.recordedRequests.first?.url?.absoluteString)
         #expect(resumeURL.contains("starting_after=7"))
     }
@@ -172,149 +242,111 @@ extension ChatScreenStoreRuntimeTests {
                 relaunchStore.currentStreamingText == "Persisted answer" &&
                 relaunchStore.currentThinkingText == "Persisted reasoning" &&
                 relaunchStore.isThinking &&
-                relaunchStore.thinkingPresentationState == .completed
+                relaunchStore.thinkingPresentationState == .completed &&
+                relaunchStore.isRecovering
         }
 
-        relaunchStreamClient.yield(.completed("Persisted answer", "Persisted reasoning", nil))
+        relaunchStreamClient.yield(.textDelta(" continued"))
 
         try await waitUntil {
-            self.latestAssistantMessage(in: relaunchStore)?.isComplete == true
+            !relaunchStore.isRecovering
         }
-    }
-}
 
-// MARK: - Relaunch Test Helpers
+        relaunchStreamClient.yield(.completed("Persisted answer continued", "Persisted reasoning", nil))
 
-extension ChatScreenStoreRuntimeTests {
-    struct RelaunchDependencies {
-        let container: ModelContainer
-        let settingsValueStore: InMemorySettingsValueStore
-        let apiBackend: InMemoryAPIKeyBackend
-        let configurationProvider: RuntimeTestOpenAIConfigurationProvider
+        try await waitUntil {
+            latestAssistantMessage(in: relaunchStore)?.isComplete == true
+        }
+
+        #expect(latestAssistantMessage(in: relaunchStore)?.content == "Persisted answer continued")
     }
 
-    func makeRelaunchDependencies() throws -> RelaunchDependencies {
-        let container = try makeInMemoryModelContainer()
-        let settingsValueStore = InMemorySettingsValueStore()
-        settingsValueStore.set(AppTheme.light.rawValue, forKey: SettingsStore.Keys.appTheme)
-        settingsValueStore.set(false, forKey: SettingsStore.Keys.defaultBackgroundModeEnabled)
-        settingsValueStore.set(false, forKey: SettingsStore.Keys.cloudflareGatewayEnabled)
+    @Test func `relaunched recovery automatically restarts the reply when the stored response is no longer resumable`() async throws {
+        let deps = try makeRelaunchDependencies()
 
-        let apiBackend = InMemoryAPIKeyBackend()
-        apiBackend.storedKey = "sk-test"
-        let configurationProvider = RuntimeTestOpenAIConfigurationProvider()
-
-        return RelaunchDependencies(
-            container: container,
-            settingsValueStore: settingsValueStore,
-            apiBackend: apiBackend,
-            configurationProvider: configurationProvider
-        )
-    }
-
-    func makeRelaunchableStore(
-        deps: RelaunchDependencies,
-        transport: OpenAIDataTransport? = nil,
-        streamClient: OpenAIStreamClient,
-        restoreConversation: Bool = false
-    ) -> ChatController {
-        let resolvedTransport = transport ?? StubOpenAITransport()
-        let policy: FeatureBootstrapPolicy = restoreConversation
-            ? .init(restoreLastConversation: true, setupLifecycleObservers: false, runLaunchTasks: true)
-            : .testing
-        return makeRelaunchableStore(
-            container: deps.container,
-            settingsValueStore: deps.settingsValueStore,
-            apiBackend: deps.apiBackend,
-            configurationProvider: deps.configurationProvider,
-            transport: resolvedTransport,
-            streamClient: streamClient,
-            bootstrapPolicy: policy
-        )
-    }
-
-    func simulateInitialSession(
-        store: ChatController,
-        streamClient: ControlledOpenAIStreamClient,
-        title: String,
-        backgroundModeEnabled: Bool,
-        responseId: String
-    ) async throws {
+        let initialStreamClient = ControlledOpenAIStreamClient()
+        let initialStore = makeRelaunchableStore(deps: deps, streamClient: initialStreamClient)
         let conversation = try seedConversation(
-            in: store, title: title, backgroundModeEnabled: backgroundModeEnabled
+            in: initialStore,
+            title: "Restart After Relaunch",
+            backgroundModeEnabled: false
         )
-        store.currentConversation = conversation
-        store.messages = []
-        store.backgroundModeEnabled = backgroundModeEnabled
-        store.syncConversationProjection()
+        initialStore.currentConversation = conversation
+        initialStore.messages = []
+        initialStore.backgroundModeEnabled = false
+        initialStore.syncConversationProjection()
 
-        #expect(store.sendMessage(text: "Fetch the completed result"))
+        #expect(initialStore.sendMessage(text: "Recover or restart this reply"))
         try await waitUntil {
-            store.currentVisibleSession != nil && streamClient.activeStreamCount > 0
+            initialStore.currentVisibleSession != nil && initialStreamClient.activeStreamCount > 0
         }
 
-        streamClient.yield(.responseCreated(responseId))
-        streamClient.yield(.textDelta("Partial"))
+        initialStreamClient.yield(.responseCreated("resp_relaunch_missing"))
+        initialStreamClient.yield(.sequenceUpdate(5))
+        initialStreamClient.yield(.thinkingStarted)
+        initialStreamClient.yield(.thinkingDelta("Old partial reasoning"))
+        initialStreamClient.yield(.webSearchStarted("ws_relaunch_missing"))
+        initialStreamClient.yield(.textDelta("Old partial answer"))
 
         try await waitUntil {
-            self.latestAssistantMessage(in: store)?.responseId == responseId
+            let message = self.latestAssistantMessage(in: initialStore)
+            return message?.responseId == "resp_relaunch_missing" &&
+                message?.content == "Old partial answer" &&
+                message?.thinking == "Old partial reasoning" &&
+                message?.toolCalls.count == 1
         }
 
-        store.handleEnterBackground()
-        await store.suspendActiveSessionsForAppBackgroundNow()
+        initialStore.handleEnterBackground()
+        await initialStore.suspendActiveSessionsForAppBackgroundNow()
 
-        let suspendedMessage = try #require(latestAssistantMessage(in: store))
-        #expect(suspendedMessage.responseId == responseId)
-        #expect(!suspendedMessage.isComplete)
-    }
+        let relaunchTransport = StubOpenAITransport()
+        await relaunchTransport.enqueue(error: OpenAIServiceError.httpError(404, "gone"))
 
-    func simulateInitialBackgroundSession(
-        store: ChatController,
-        streamClient: ControlledOpenAIStreamClient,
-        title: String,
-        responseId: String
-    ) async throws {
-        let conversation = try seedConversation(
-            in: store, title: title, backgroundModeEnabled: true
+        let relaunchStreamClient = ControlledOpenAIStreamClient()
+        let relaunchStore = makeRelaunchableStore(
+            deps: deps,
+            transport: relaunchTransport,
+            streamClient: relaunchStreamClient,
+            restoreConversation: true
         )
-        store.currentConversation = conversation
-        store.messages = []
-        store.backgroundModeEnabled = true
-        store.syncConversationProjection()
-
-        #expect(store.sendMessage(text: "Resume the stream"))
-        try await waitUntil {
-            store.currentVisibleSession != nil && streamClient.activeStreamCount > 0
-        }
-
-        streamClient.yield(.responseCreated(responseId))
-        streamClient.yield(.sequenceUpdate(7))
-        streamClient.yield(.textDelta("Partial "))
 
         try await waitUntil {
-            let message = self.latestAssistantMessage(in: store)
-            return message?.responseId == responseId && message?.lastSequenceNumber == 7
+            relaunchStore.currentVisibleSession != nil &&
+                relaunchStore.isThinking &&
+                relaunchStore.currentStreamingText.isEmpty &&
+                relaunchStore.currentThinkingText.isEmpty &&
+                relaunchStore.activeToolCalls.isEmpty &&
+                relaunchStore.isRecovering
         }
 
-        store.handleEnterBackground()
-        await store.suspendActiveSessionsForAppBackgroundNow()
+        relaunchStreamClient.yield(.responseCreated("resp_relaunch_restarted"))
+        relaunchStreamClient.yield(.thinkingStarted)
+        relaunchStreamClient.yield(.thinkingDelta("Retried thinking"))
+        relaunchStreamClient.yield(.webSearchStarted("ws_relaunch_restarted"))
+        relaunchStreamClient.yield(.textDelta("Restarted after relaunch"))
+        try await waitUntil {
+            !relaunchStore.isRecovering
+        }
+        relaunchStreamClient.yield(.completed("Restarted after relaunch", "Retried thinking", nil))
 
-        let suspendedMessage = try #require(latestAssistantMessage(in: store))
-        #expect(suspendedMessage.responseId == responseId)
-        #expect(suspendedMessage.lastSequenceNumber == 7)
-        #expect(!suspendedMessage.isComplete)
-    }
+        try await waitUntil {
+            self.latestAssistantMessage(in: relaunchStore)?.content == "Restarted after relaunch" &&
+                self.latestAssistantMessage(in: relaunchStore)?.isComplete == true
+        }
 
-    func assertRelaunchedRecovery(
-        in store: ChatController,
-        expectedContent: String,
-        expectedThinking: String
-    ) throws {
-        let recovered = try #require(latestAssistantMessage(in: store))
-        #expect(recovered.content == expectedContent)
-        #expect(recovered.thinking == expectedThinking)
-        #expect(recovered.isComplete)
-        #expect(store.currentVisibleSession == nil)
-        #expect(!store.isRecovering)
+        let restartedMessage = try #require(latestAssistantMessage(in: relaunchStore))
+        #expect(restartedMessage.responseId == "resp_relaunch_restarted")
+        #expect(restartedMessage.content.contains("Old partial answer") == false)
+        #expect(restartedMessage.thinking == "Retried thinking")
+        #expect(restartedMessage.toolCalls.count == 1)
+        #expect(relaunchStreamClient.recordedRequests.count == 2)
+        let recoveryResumeURL = try #require(relaunchStreamClient.recordedRequests.first?.url?.absoluteString)
+        #expect(recoveryResumeURL.contains("/v1/responses/resp_relaunch_missing"))
+        #expect(recoveryResumeURL.contains("starting_after=5"))
+        let restartedRequest = try #require(relaunchStreamClient.recordedRequests.last)
+        #expect(restartedRequest.url?.path == "/v1/responses")
+        let requestedPaths = await relaunchTransport.requestedPaths()
+        #expect(requestedPaths == ["/v1/responses/resp_relaunch_missing"])
+        #expect(!relaunchStore.isRecovering)
     }
 }

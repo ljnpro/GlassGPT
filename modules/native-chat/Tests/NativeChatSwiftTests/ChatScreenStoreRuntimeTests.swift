@@ -234,129 +234,72 @@ struct ChatScreenStoreRuntimeTests {
         #expect(store.currentVisibleSession == nil)
         #expect(!store.isStreaming)
     }
-}
 
-// MARK: - Private Helpers
-
-extension ChatScreenStoreRuntimeTests {
-    func seedConversation(
-        in store: ChatController,
-        title: String,
-        backgroundModeEnabled: Bool = false
-    ) throws -> Conversation {
-        let conversation = Conversation(
-            title: title,
-            model: ModelType.gpt5_4.rawValue,
-            reasoningEffort: ReasoningEffort.high.rawValue,
-            backgroundModeEnabled: backgroundModeEnabled,
-            serviceTierRawValue: ServiceTier.standard.rawValue
-        )
-        store.modelContext.insert(conversation)
-        try store.modelContext.save()
-        return conversation
-    }
-
-    func latestAssistantMessage(in store: ChatController) -> Message? {
-        store.messages
-            .filter { $0.role == .assistant }
-            .sorted { $0.createdAt < $1.createdAt }
-            .last
-    }
-
-    func makeRelaunchableStore(
-        container: ModelContainer,
-        settingsValueStore: InMemorySettingsValueStore,
-        apiBackend: InMemoryAPIKeyBackend,
-        configurationProvider: RuntimeTestOpenAIConfigurationProvider,
-        transport: OpenAIDataTransport,
-        streamClient: OpenAIStreamClient,
-        bootstrapPolicy: FeatureBootstrapPolicy
-    ) -> ChatController {
-        let context = ModelContext(container)
-        let settingsStore = SettingsStore(valueStore: settingsValueStore)
-        let apiKeyStore = PersistedAPIKeyStore(backend: apiBackend)
-        let requestBuilder = OpenAIRequestBuilder(configuration: configurationProvider)
-        let responseParser = OpenAIResponseParser()
-        let service = OpenAIService(
-            requestBuilder: requestBuilder,
-            responseParser: responseParser,
-            streamClient: streamClient,
-            transport: transport
+    @Test func `foreground return replaces stale in memory execution and resumes recovery streaming`() async throws {
+        let streamClient = ControlledOpenAIStreamClient()
+        let store = try makeTestChatScreenStore(streamClient: streamClient)
+        let conversation = try seedConversation(
+            in: store,
+            title: "Foreground Recovery",
+            backgroundModeEnabled: false
         )
 
-        return ChatController(
-            modelContext: context,
-            settingsStore: settingsStore,
-            apiKeyStore: apiKeyStore,
-            configurationProvider: configurationProvider,
-            transport: transport,
-            serviceFactory: { service },
-            bootstrapPolicy: bootstrapPolicy
-        )
-    }
+        store.currentConversation = conversation
+        store.messages = []
+        store.backgroundModeEnabled = false
+        store.syncConversationProjection()
 
-    func sessionMessageID(for store: ChatController) -> UUID {
-        if let session = store.currentVisibleSession {
-            return session.messageID
+        #expect(store.sendMessage(text: "Resume this reply when I come back"))
+        try await waitUntil {
+            store.currentVisibleSession != nil && streamClient.activeStreamCount > 0
         }
-        if let draft = store.draftMessage {
-            return draft.id
+
+        streamClient.yield(.responseCreated("resp_foreground_resume"))
+        streamClient.yield(.sequenceUpdate(4))
+        streamClient.yield(.thinkingStarted)
+        streamClient.yield(.thinkingDelta("Persisted foreground reasoning"))
+        streamClient.yield(.textDelta("Partial foreground answer"))
+
+        try await waitUntil {
+            let message = latestAssistantMessage(in: store)
+            return message?.responseId == "resp_foreground_resume" &&
+                message?.lastSequenceNumber == 4 &&
+                store.currentStreamingText == "Partial foreground answer"
         }
-        Issue.record("Expected an active visible session")
-        return UUID()
-    }
-}
 
-actor SlowGeneratedFileDownloadTransport: OpenAIDataTransport {
-    private var requestsSeen = 0
-    private var cancellationsSeen = 0
+        store.handleEnterBackground()
+        store.handleReturnToForeground()
 
-    func data(for request: URLRequest) async throws(OpenAIServiceError) -> (Data, URLResponse) {
-        requestsSeen += 1
-        do {
-            try await Task.sleep(nanoseconds: 60_000_000_000)
-            let fallbackURL = try URL.requireValid("https://api.test.openai.local/v1/files/file_prefetch/content")
-            let response = try HTTPURLResponse.require(
-                url: request.url ?? fallbackURL,
-                statusCode: 200
+        try await waitUntil {
+            streamClient.recordedRequests.count == 2 && store.isRecovering
+        }
+
+        let resumeURL = try #require(streamClient.recordedRequests.last?.url?.absoluteString)
+        #expect(resumeURL.contains("/v1/responses/resp_foreground_resume"))
+        #expect(resumeURL.contains("starting_after=4"))
+
+        streamClient.yield(.sequenceUpdate(5))
+        streamClient.yield(.textDelta(" resumed"))
+
+        try await waitUntil {
+            !store.isRecovering
+        }
+
+        streamClient.yield(
+            .completed(
+                "Partial foreground answer resumed",
+                "Persisted foreground reasoning",
+                nil
             )
-            return (Data("%PDF".utf8), response)
-        } catch is CancellationError {
-            cancellationsSeen += 1
-            throw .cancelled
-        } catch {
-            throw .requestFailed(error.localizedDescription)
+        )
+
+        try await waitUntil {
+            latestAssistantMessage(in: store)?.isComplete == true &&
+                latestAssistantMessage(in: store)?.content == "Partial foreground answer resumed"
         }
-    }
 
-    func requestCount() -> Int {
-        requestsSeen
-    }
-
-    func cancellationCount() -> Int {
-        cancellationsSeen
-    }
-}
-
-private extension URL {
-    static func requireValid(_ string: String) throws -> URL {
-        guard let url = URL(string: string) else {
-            throw OpenAIServiceError.invalidURL
-        }
-        return url
-    }
-}
-
-private extension HTTPURLResponse {
-    static func require(url: URL, statusCode: Int) throws -> HTTPURLResponse {
-        guard let response = HTTPURLResponse(
-            url: url,
-            statusCode: statusCode,
-            httpVersion: nil,
-            headerFields: nil
-        ) else {
-            throw OpenAIServiceError.requestFailed("Failed to create HTTPURLResponse")
-        }
-        return response
+        let assistantMessage = try #require(latestAssistantMessage(in: store))
+        #expect(assistantMessage.thinking == "Persisted foreground reasoning")
+        #expect(store.errorMessage == nil)
     }
 }

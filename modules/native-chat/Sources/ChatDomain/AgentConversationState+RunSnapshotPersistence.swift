@@ -18,6 +18,7 @@ private enum AgentRunSnapshotCodingKeys: String, CodingKey {
     case workerCTicket
     case currentStreamingText
     case currentThinkingText
+    case visibleSynthesisPresentation
     case activeToolCalls
     case liveCitations
     case liveFilePathAnnotations
@@ -31,8 +32,17 @@ public extension AgentRunSnapshot {
     init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: AgentRunSnapshotCodingKeys.self)
         currentStage = try container.decode(AgentStage.self, forKey: .currentStage)
+        let decodedCurrentStreamingText = try container.decodeIfPresent(
+            String.self,
+            forKey: .currentStreamingText
+        ) ?? ""
+        let decodedIsStreaming = try container.decodeIfPresent(Bool.self, forKey: .isStreaming) ?? false
         phase = try container.decodeIfPresent(AgentRunPhase.self, forKey: .phase)
-            ?? Self.compatibilityPhase(from: currentStage)
+            ?? Self.compatibilityPhase(
+                from: currentStage,
+                isStreaming: decodedIsStreaming,
+                currentStreamingText: decodedCurrentStreamingText
+            )
         draftMessageID = try container.decode(UUID.self, forKey: .draftMessageID)
         latestUserMessageID = try container.decode(UUID.self, forKey: .latestUserMessageID)
         let decodedRunConfiguration = try container.decodeIfPresent(
@@ -67,15 +77,19 @@ public extension AgentRunSnapshot {
         workerATicket = try container.decodeIfPresent(AgentRunTicket.self, forKey: .workerATicket)
         workerBTicket = try container.decodeIfPresent(AgentRunTicket.self, forKey: .workerBTicket)
         workerCTicket = try container.decodeIfPresent(AgentRunTicket.self, forKey: .workerCTicket)
-        currentStreamingText = try container.decodeIfPresent(String.self, forKey: .currentStreamingText) ?? ""
+        currentStreamingText = decodedCurrentStreamingText
         currentThinkingText = try container.decodeIfPresent(String.self, forKey: .currentThinkingText) ?? ""
+        visibleSynthesisPresentation = try container.decodeIfPresent(
+            AgentVisibleSynthesisPresentation.self,
+            forKey: .visibleSynthesisPresentation
+        )
         activeToolCalls = try container.decodeIfPresent([ToolCallInfo].self, forKey: .activeToolCalls) ?? []
         liveCitations = try container.decodeIfPresent([URLCitation].self, forKey: .liveCitations) ?? []
         liveFilePathAnnotations = try container.decodeIfPresent(
             [FilePathAnnotation].self,
             forKey: .liveFilePathAnnotations
         ) ?? []
-        isStreaming = try container.decodeIfPresent(Bool.self, forKey: .isStreaming) ?? false
+        isStreaming = decodedIsStreaming
         isThinking = try container.decodeIfPresent(Bool.self, forKey: .isThinking) ?? false
         lastCheckpointAt = try container.decodeIfPresent(Date.self, forKey: .lastCheckpointAt) ?? Date()
         updatedAt = try container.decodeIfPresent(Date.self, forKey: .updatedAt) ?? Date()
@@ -100,6 +114,7 @@ public extension AgentRunSnapshot {
         try container.encodeIfPresent(workerCTicket, forKey: .workerCTicket)
         try container.encode(currentStreamingText, forKey: .currentStreamingText)
         try container.encode(currentThinkingText, forKey: .currentThinkingText)
+        try container.encodeIfPresent(visibleSynthesisPresentation, forKey: .visibleSynthesisPresentation)
         try container.encode(activeToolCalls, forKey: .activeToolCalls)
         try container.encode(liveCitations, forKey: .liveCitations)
         try container.encode(liveFilePathAnnotations, forKey: .liveFilePathAnnotations)

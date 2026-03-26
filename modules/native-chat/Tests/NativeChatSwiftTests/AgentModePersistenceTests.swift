@@ -91,6 +91,30 @@ struct AgentModePersistenceTests {
         #expect(preview.evidence == ["Rollback gate is missing from the current draft."])
     }
 
+    @Test func `legacy recent update strings decode into semantic milestone rows`() throws {
+        let payloadString = """
+        {
+          "activity": "delegation",
+          "currentFocus": "Leader delegated the next worker wave.",
+          "leaderAcceptedFocus": "Leader delegated the next worker wave.",
+          "leaderLiveStatus": "Delegating work",
+          "leaderLiveSummary": "Queued the next worker wave.",
+          "recentUpdates": [
+            "Worker B completed.",
+            "Leader updated the plan."
+          ],
+          "updatedAt": 0
+        }
+        """
+        let payload = try #require(payloadString.data(using: .utf8))
+
+        let snapshot = try JSONDecoder().decode(AgentProcessSnapshot.self, from: payload)
+
+        #expect(snapshot.recentUpdates == ["Worker B completed.", "Leader updated the plan."])
+        #expect(snapshot.recentUpdateItems.map(\.summary) == snapshot.recentUpdates)
+        #expect(snapshot.recentUpdateItems.allSatisfy { $0.kind == .legacy })
+    }
+
     @Test func `final synthesis input includes accepted worker discussion bundle`() {
         let input = AgentPromptBuilder.finalSynthesisInput(
             baseInput: [],

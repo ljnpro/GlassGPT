@@ -1,65 +1,5 @@
 import Foundation
 
-/// A leader-proposed follow-up idea returned by a worker.
-public struct AgentTaskSuggestion: Codable, Equatable, Identifiable, Sendable {
-    /// Stable identifier for the follow-up suggestion.
-    public let id: String
-    /// Short title describing the suggested follow-up.
-    public var title: String
-    /// Goal the suggested follow-up should accomplish.
-    public var goal: String
-    /// Recommended tool policy for the suggested follow-up.
-    public var toolPolicy: AgentToolPolicy
-    /// Creates a worker-suggested follow-up task recommendation.
-    public init(
-        id: String = UUID().uuidString,
-        title: String,
-        goal: String,
-        toolPolicy: AgentToolPolicy
-    ) {
-        self.id = id
-        self.title = title
-        self.goal = goal
-        self.toolPolicy = toolPolicy
-    }
-}
-
-/// The bounded result of one delegated worker task.
-public struct AgentTaskResult: Codable, Equatable, Sendable {
-    /// Compact result summary returned by the worker.
-    public var summary: String
-    /// Evidence items the worker believes support the summary.
-    public var evidence: [String]
-    /// Confidence level reported for the result.
-    public var confidence: AgentConfidence
-    /// Open risks or caveats the leader should consider.
-    public var risks: [String]
-    /// Recommended follow-up tasks suggested by the worker.
-    public var followUpRecommendations: [AgentTaskSuggestion]
-    /// Tool calls performed while completing the task.
-    public var toolCalls: [ToolCallInfo]
-    /// Citations gathered while completing the task.
-    public var citations: [URLCitation]
-    /// Creates a structured worker-task result.
-    public init(
-        summary: String,
-        evidence: [String] = [],
-        confidence: AgentConfidence = .medium,
-        risks: [String] = [],
-        followUpRecommendations: [AgentTaskSuggestion] = [],
-        toolCalls: [ToolCallInfo] = [],
-        citations: [URLCitation] = []
-    ) {
-        self.summary = summary
-        self.evidence = evidence
-        self.confidence = confidence
-        self.risks = risks
-        self.followUpRecommendations = followUpRecommendations
-        self.toolCalls = toolCalls
-        self.citations = citations
-    }
-}
-
 /// One delegated worker task owned by a specific worker slot.
 public struct AgentTask: Codable, Equatable, Identifiable, Sendable {
     /// Stable identifier for the delegated task.
@@ -100,6 +40,7 @@ public struct AgentTask: Codable, Equatable, Identifiable, Sendable {
     public var startedAt: Date?
     /// Completion timestamp for the task, when known.
     public var completedAt: Date?
+
     /// Creates a delegated worker task tracked by the Agent runtime.
     public init(
         id: String = UUID().uuidString,
@@ -227,59 +168,5 @@ public struct AgentTask: Codable, Equatable, Identifiable, Sendable {
             return liveRisks
         }
         return result?.risks ?? []
-    }
-}
-
-/// A compact leader decision shown in the Agent Process log.
-public struct AgentDecision: Codable, Equatable, Identifiable, Sendable {
-    /// Stable identifier for the recorded decision.
-    public let id: String
-    /// Decision category used by the process UI.
-    public var kind: AgentDecisionKind
-    /// Short title shown in the decision log.
-    public var title: String
-    /// Concise explanation of the decision.
-    public var summary: String
-    /// Timestamp when the decision was recorded.
-    public var createdAt: Date
-
-    /// Creates a compact leader decision for process projection.
-    public init(
-        id: String = UUID().uuidString,
-        kind: AgentDecisionKind,
-        title: String,
-        summary: String,
-        createdAt: Date = Date()
-    ) {
-        self.id = id
-        self.kind = kind
-        self.title = title
-        self.summary = summary
-        self.createdAt = createdAt
-    }
-}
-
-/// A low-level event used to drive the projected Agent Process snapshot.
-public struct AgentEvent: Codable, Equatable, Identifiable, Sendable {
-    /// Stable identifier for the low-level event.
-    public let id: String
-    /// Event category used when rebuilding process state.
-    public var kind: AgentEventKind
-    /// Concise event summary used for debugging and projection.
-    public var summary: String
-    /// Timestamp when the event was recorded.
-    public var createdAt: Date
-
-    /// Creates a low-level Agent event for process projection.
-    public init(
-        id: String = UUID().uuidString,
-        kind: AgentEventKind,
-        summary: String,
-        createdAt: Date = Date()
-    ) {
-        self.id = id
-        self.kind = kind
-        self.summary = summary
-        self.createdAt = createdAt
     }
 }

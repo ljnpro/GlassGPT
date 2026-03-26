@@ -51,6 +51,12 @@ protocol ChatSessionManaging: AnyObject {
     func finalizeSessionAsPartial(_ session: ReplySession)
     func removeEmptyMessage(_ message: Message, for session: ReplySession)
     func removeSession(_ session: ReplySession)
+    func removeSession(_ session: ReplySession, cancelExecutionTask: Bool, cancelStream: Bool)
+    func removeSessionWithoutRefreshingVisibleBinding(
+        _ session: ReplySession,
+        cancelExecutionTask: Bool,
+        cancelStream: Bool
+    )
     func clearLiveGenerationState(clearDraft: Bool)
     func suspendActiveSessionsForAppBackground()
     func runtimeRoute(for session: ReplySession) -> OpenAITransportRoute

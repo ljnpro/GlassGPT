@@ -29,6 +29,7 @@ extension ChatStreamingCoordinator {
         execution.task?.cancel()
         execution.task = Task { @MainActor [weak self] in
             guard let self else { return }
+            defer { execution.task = nil }
             let streamID = UUID()
             _ = await sessions.applyRuntimeTransition(
                 .beginStreaming(

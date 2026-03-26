@@ -14,6 +14,11 @@ extension AgentVisibleSynthesisEventApplier {
         execution.snapshot.currentStreamingText = text
         execution.snapshot.isStreaming = false
         execution.snapshot.isThinking = false
+        execution.snapshot.visibleSynthesisPresentation = AgentVisibleSynthesisPresentation(
+            statusText: "Completed",
+            summaryText: "Finished writing the final answer from accepted findings.",
+            recoveryState: .idle
+        )
         draft.content = text
         if let thinking {
             execution.snapshot.currentThinkingText = thinking
@@ -56,6 +61,7 @@ extension AgentVisibleSynthesisEventApplier {
 
     static func persistVisibleLeaderTicket(
         responseID: String?,
+        checkpointBaseResponseID: String? = nil,
         sequenceNumber: Int?,
         execution: AgentExecutionState,
         conversation: Conversation,
@@ -68,10 +74,11 @@ extension AgentVisibleSynthesisEventApplier {
             backgroundEligible: execution.snapshot.runConfiguration.backgroundModeEnabled
         )
         ticket.responseID = responseID
+        ticket.checkpointBaseResponseID = checkpointBaseResponseID ?? ticket.checkpointBaseResponseID
         ticket.lastSequenceNumber = sequenceNumber
         ticket.partialOutputText = execution.snapshot.currentStreamingText
-        ticket.statusText = execution.snapshot.processSnapshot.leaderLiveStatus
-        ticket.summaryText = execution.snapshot.processSnapshot.leaderLiveSummary
+        ticket.statusText = execution.snapshot.visibleSynthesisPresentation?.statusText ?? ""
+        ticket.summaryText = execution.snapshot.visibleSynthesisPresentation?.summaryText ?? ""
         ticket.toolCalls = execution.snapshot.activeToolCalls
         coordinator.updateTicket(
             ticket,
@@ -80,14 +87,5 @@ extension AgentVisibleSynthesisEventApplier {
             conversation: conversation,
             forceSave: forceSave
         )
-    }
-
-    static func resolvedBackgroundPersistence(
-        for conversation: Conversation,
-        coordinator: AgentRunCoordinator
-    ) -> Bool {
-        let agentState = coordinator.currentAgentState(for: conversation)
-        return agentState.activeRun?.runConfiguration.backgroundModeEnabled
-            ?? agentState.configuration.backgroundModeEnabled
     }
 }

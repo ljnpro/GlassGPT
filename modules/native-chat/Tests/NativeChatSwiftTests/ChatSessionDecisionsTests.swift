@@ -19,14 +19,14 @@ struct ChatSessionDecisionsTests {
         #expect(mode == .stream(lastSequenceNumber: 42))
     }
 
-    @Test func `recovery resume mode falls back to polling when background mode is disabled`() {
+    @Test func `recovery resume mode streams when caller prefers resume and a cursor exists`() {
         let mode = RuntimeSessionDecisionPolicy.recoveryResumeMode(
             preferStreamingResume: true,
             usedBackgroundMode: false,
             lastSequenceNumber: 42
         )
 
-        #expect(mode == .poll)
+        #expect(mode == .stream(lastSequenceNumber: 42))
     }
 
     @Test func `gateway fallback triggers direct resume when no recovery events arrive`() {
@@ -34,7 +34,7 @@ struct ChatSessionDecisionsTests {
             RuntimeSessionDecisionPolicy.shouldFallbackToDirectRecoveryStream(
                 cloudflareGatewayEnabled: true,
                 useDirectEndpoint: false,
-                gatewayResumeTimedOut: false,
+                resumeTimedOut: false,
                 receivedAnyRecoveryEvent: false
             )
         )
@@ -160,6 +160,43 @@ struct ChatSessionDecisionsTests {
         #expect(snapshot.lifecycle == .completed)
         #expect(!snapshot.isRecovering)
         #expect(!snapshot.isThinking)
+    }
+
+    @Test func `recovery metadata progress clears recovering lifecycle before visible content arrives`() async {
+        let actor = ReplySessionActor(initialState: makeRuntimeState())
+
+        _ = await actor.apply(
+            .beginRecoveryStatus(
+                responseID: "resp_resume",
+                lastSequenceNumber: 7,
+                usedBackgroundMode: true,
+                route: .gateway
+            )
+        )
+        var snapshot = await actor.apply(.recordResponseCreated("resp_resume", route: .gateway))
+
+        guard case let .streaming(cursor) = snapshot.lifecycle else {
+            Issue.record("Expected streaming lifecycle after responseCreated during recovery")
+            return
+        }
+        #expect(cursor.responseID == "resp_resume")
+        #expect(!snapshot.isRecovering)
+        #expect(snapshot.isStreaming)
+
+        snapshot = await actor.apply(.beginRecoveryPoll)
+        guard case .recoveringPoll = snapshot.lifecycle else {
+            Issue.record("Expected recoveringPoll lifecycle")
+            return
+        }
+
+        snapshot = await actor.apply(.recordSequenceUpdate(12))
+        guard case let .streaming(updatedCursor) = snapshot.lifecycle else {
+            Issue.record("Expected streaming lifecycle after sequenceUpdate during recovery")
+            return
+        }
+        #expect(updatedCursor.lastSequenceNumber == 12)
+        #expect(!snapshot.isRecovering)
+        #expect(snapshot.isStreaming)
     }
 }
 

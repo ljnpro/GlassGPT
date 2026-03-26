@@ -16,6 +16,7 @@ final class ChatRecoveryCoordinator {
     unowned var conversations: (any ChatConversationManaging)!
     unowned var sessions: (any ChatSessionManaging)!
     unowned var files: (any ChatFileInteractionManaging)!
+    unowned var drafts: (any ChatDraftPreparing)!
     unowned var streaming: (any ChatStreamingRequestStarting)!
     let resultApplier: ChatRecoveryResultApplier
 

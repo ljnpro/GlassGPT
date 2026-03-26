@@ -26,13 +26,13 @@ extension ScreenStoreTests {
                 preferStreamingResume: true,
                 usedBackgroundMode: false,
                 lastSequenceNumber: 9
-            ) == .poll
+            ) == .stream(lastSequenceNumber: 9)
         )
         #expect(
             RuntimeSessionDecisionPolicy.shouldFallbackToDirectRecoveryStream(
                 cloudflareGatewayEnabled: true,
                 useDirectEndpoint: false,
-                gatewayResumeTimedOut: false,
+                resumeTimedOut: false,
                 receivedAnyRecoveryEvent: false
             )
         )
@@ -40,7 +40,7 @@ extension ScreenStoreTests {
             !RuntimeSessionDecisionPolicy.shouldFallbackToDirectRecoveryStream(
                 cloudflareGatewayEnabled: false,
                 useDirectEndpoint: false,
-                gatewayResumeTimedOut: true,
+                resumeTimedOut: true,
                 receivedAnyRecoveryEvent: false
             )
         )

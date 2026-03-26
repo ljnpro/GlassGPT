@@ -4,6 +4,7 @@ import OpenAITransport
 
 struct HiddenLeaderStreamState {
     var responseID: String?
+    var checkpointBaseResponseID: String?
     var lastSequenceNumber: Int?
     var rawText: String
     var toolCalls: [ToolCallInfo]
@@ -21,10 +22,12 @@ extension AgentRunCoordinator {
         planningPhase: AgentPlanningEngine.PlanningPhase,
         prepared: PreparedAgentTurn,
         execution: AgentExecutionState,
-        initialState: HiddenLeaderStreamState
-    ) async throws -> AgentLeaderPlanningResult {
+        initialState: HiddenLeaderStreamState,
+        finalizeWhenStreamEnds: Bool = true
+    ) async throws -> AgentLeaderPlanningResult? {
         let configuration = frozenRunConfiguration(for: execution, conversation: prepared.conversation)
         var streamState = initialState
+        var didReceiveTerminalCompletion = false
         applyRecoveredLeaderPreview(
             outputText: streamState.rawText,
             planningPhase: planningPhase,
@@ -43,10 +46,17 @@ extension AgentRunCoordinator {
             )
             switch action {
             case .none, .completed:
+                if case .completed = action {
+                    didReceiveTerminalCompletion = true
+                }
                 continue
             case let .failed(error):
                 throw error
             }
+        }
+
+        guard finalizeWhenStreamEnds || didReceiveTerminalCompletion else {
+            return nil
         }
 
         return try finalizeLeaderPlanningStream(
@@ -75,6 +85,21 @@ extension AgentRunCoordinator {
         if !preview.plan.isEmpty {
             execution.snapshot.processSnapshot.plan = preview.plan
         }
+        let retainedTasks = execution.snapshot.processSnapshot.tasks.filter { task in
+            guard let role = task.owner.role else { return true }
+            if task.status == .completed || task.status == .failed || task.status == .blocked || task.result != nil {
+                return true
+            }
+            return execution.snapshot.ticket(for: role)?.responseID?.isEmpty == false
+        }
+        var refreshedTasks = retainedTasks
+        for task in preview.tasks where refreshedTasks.contains(where: { $0.owner == task.owner && $0.title == task.title }) == false {
+            refreshedTasks.append(task)
+        }
+        execution.snapshot.processSnapshot.tasks = refreshedTasks
+        execution.snapshot.processSnapshot.activeTaskIDs = refreshedTasks
+            .filter { $0.status == .running }
+            .map(\.id)
     }
 
     func updateLeaderTicket(
@@ -92,6 +117,7 @@ extension AgentRunCoordinator {
                 role: .leader,
                 phase: phase,
                 responseID: responseID,
+                checkpointBaseResponseID: execution.snapshot.ticket(for: .leader)?.checkpointBaseResponseID,
                 lastSequenceNumber: lastSequenceNumber,
                 backgroundEligible: frozenRunConfiguration(
                     for: execution,

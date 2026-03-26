@@ -152,6 +152,8 @@ public struct AgentRunTicket: Codable, Equatable, Sendable {
     public var taskID: String?
     /// The server response identifier, when available.
     public var responseID: String?
+    /// The last accepted response identifier used as the replay base for this phase.
+    public var checkpointBaseResponseID: String?
     /// The last persisted stream sequence number, when available.
     public var lastSequenceNumber: Int?
     /// Whether this response was started with background support enabled.
@@ -173,6 +175,7 @@ public struct AgentRunTicket: Codable, Equatable, Sendable {
         phase: AgentRunPhase,
         taskID: String? = nil,
         responseID: String? = nil,
+        checkpointBaseResponseID: String? = nil,
         lastSequenceNumber: Int? = nil,
         backgroundEligible: Bool,
         partialOutputText: String = "",
@@ -185,6 +188,7 @@ public struct AgentRunTicket: Codable, Equatable, Sendable {
         self.phase = phase
         self.taskID = taskID
         self.responseID = responseID
+        self.checkpointBaseResponseID = checkpointBaseResponseID
         self.lastSequenceNumber = lastSequenceNumber
         self.backgroundEligible = backgroundEligible
         self.partialOutputText = partialOutputText

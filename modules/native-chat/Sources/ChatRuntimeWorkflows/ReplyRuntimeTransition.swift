@@ -62,4 +62,6 @@ public enum ReplyRuntimeTransition: Sendable, Equatable {
     case markCompleted
     /// Mark the reply as failed with an optional error message.
     case markFailed(String?)
+    /// Mark whether a restarted recovery request is pending new live progress.
+    case setRecoveryRestartPending(Bool)
 }

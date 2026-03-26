@@ -48,11 +48,12 @@ extension ChatSessionDecisionsTests {
         #expect(ticket.lastSequenceNumber == nil)
 
         snapshot = await actor.apply(.recordSequenceUpdate(4))
-        guard case let .recoveringStatus(updatedStatus) = snapshot.lifecycle else {
-            Issue.record("Expected recoveringStatus lifecycle after sequence update")
+        guard case let .streaming(updatedStatus) = snapshot.lifecycle else {
+            Issue.record("Expected streaming lifecycle after sequence update")
             return
         }
         #expect(updatedStatus.lastSequenceNumber == 4)
+        #expect(!snapshot.isRecovering)
 
         snapshot = await actor.apply(.beginRecoveryPoll)
         guard case let .recoveringPoll(pollTicket) = snapshot.lifecycle else {
@@ -62,11 +63,12 @@ extension ChatSessionDecisionsTests {
         #expect(pollTicket.lastSequenceNumber == 4)
 
         snapshot = await actor.apply(.recordSequenceUpdate(9))
-        guard case let .recoveringPoll(updatedPoll) = snapshot.lifecycle else {
-            Issue.record("Expected recoveringPoll lifecycle after sequence update")
+        guard case let .streaming(updatedPoll) = snapshot.lifecycle else {
+            Issue.record("Expected streaming lifecycle after sequence update during recovery poll")
             return
         }
         #expect(updatedPoll.lastSequenceNumber == 9)
+        #expect(!snapshot.isRecovering)
 
         snapshot = await actor.apply(.detachForBackground(usedBackgroundMode: true))
         guard case let .detached(detachedTicket) = snapshot.lifecycle else {

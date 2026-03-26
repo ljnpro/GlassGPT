@@ -140,10 +140,14 @@ final class ChatLifecycleCoordinator {
         if !services.sessionRegistry.allSessions.isEmpty {
             for session in services.sessionRegistry.allSessions {
                 sessions.saveSessionNow(session)
+                services.sessionRegistry.execution(for: session.messageID)?.markEnteredBackground()
             }
 
             services.backgroundTaskCoordinator.beginLongRunningTask(named: "StreamCompletion") { [weak self] in
                 guard let self else { return }
+                for session in services.sessionRegistry.allSessions {
+                    services.sessionRegistry.execution(for: session.messageID)?.markNeedsForegroundResume()
+                }
                 sessions.suspendActiveSessionsForAppBackground()
                 endBackgroundTask()
             }
@@ -176,6 +180,7 @@ final class ChatLifecycleCoordinator {
             guard let self else { return }
             await recoveryMaintenance.recoverIncompleteMessagesInCurrentConversation()
             await recoveryMaintenance.recoverIncompleteMessages()
+            await recoveryMaintenance.resendOrphanedDrafts()
         }
     }
 

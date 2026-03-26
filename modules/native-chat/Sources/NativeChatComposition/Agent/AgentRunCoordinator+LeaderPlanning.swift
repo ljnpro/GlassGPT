@@ -21,11 +21,15 @@ extension AgentRunCoordinator {
             summary: planningPhase.bootstrapSummary,
             on: &execution.snapshot
         )
+        AgentRecentUpdateProjector.recordLeaderPhaseMilestone(
+            planningPhase.milestoneSummary,
+            phase: planningPhase.runPhase,
+            on: &execution.snapshot
+        )
         AgentProcessProjector.updateRecoveryState(.idle, on: &execution.snapshot)
-        persistCheckpointIfNeeded(execution, in: prepared.conversation, forceSave: configuration.backgroundModeEnabled)
+        persistCheckpointIfNeeded(execution, in: prepared.conversation, forceSave: true)
 
-        if configuration.backgroundModeEnabled,
-           let ticket = execution.snapshot.leaderTicket,
+        if let ticket = execution.snapshot.leaderTicket,
            ticket.phase == planningPhase.runPhase,
            let responseID = ticket.responseID,
            !responseID.isEmpty {
@@ -34,156 +38,92 @@ extension AgentRunCoordinator {
                 prepared: prepared,
                 execution: execution,
                 existingTicket: ticket,
-                baseInput: baseInput
+                baseInput: baseInput,
+                allowReplayFromCheckpoint: true
             )
         }
 
+        return try await startFreshLeaderPlanningPhase(
+            planningPhase,
+            prepared: prepared,
+            execution: execution,
+            configuration: configuration,
+            baseInput: baseInput,
+            allowReplayFromCheckpoint: true
+        )
+    }
+
+    func startFreshLeaderPlanningPhase(
+        _ planningPhase: AgentPlanningEngine.PlanningPhase,
+        prepared: PreparedAgentTurn,
+        execution: AgentExecutionState,
+        configuration: AgentConversationConfiguration,
+        baseInput: [ResponsesInputMessageDTO],
+        previousResponseIDOverride: String? = nil,
+        fallbackToConversationLeaderChain: Bool = true,
+        allowReplayFromCheckpoint: Bool
+    ) async throws -> AgentLeaderPlanningResult {
+        let checkpointBaseResponseID = previousResponseIDOverride
+            ?? (fallbackToConversationLeaderChain
+                ? currentAgentState(for: prepared.conversation).responseID(for: .leader)
+                : nil)
+        updateTicket(
+            AgentRunTicket(
+                role: .leader,
+                phase: planningPhase.runPhase,
+                checkpointBaseResponseID: checkpointBaseResponseID,
+                backgroundEligible: configuration.backgroundModeEnabled,
+                partialOutputText: execution.snapshot.leaderTicket?.partialOutputText ?? "",
+                statusText: execution.snapshot.processSnapshot.leaderLiveStatus,
+                summaryText: execution.snapshot.processSnapshot.leaderLiveSummary,
+                toolCalls: execution.snapshot.leaderTicket?.toolCalls ?? []
+            ),
+            for: .leader,
+            execution: execution,
+            conversation: prepared.conversation,
+            forceSave: true
+        )
         let stream = state.planningEngine.streamPlanningPhase(
             planningPhase,
             apiKey: prepared.apiKey,
             configuration: configuration,
             conversation: prepared.conversation,
-            baseInput: baseInput
+            baseInput: baseInput,
+            previousResponseIDOverride: checkpointBaseResponseID,
+            fallbackToConversationLeaderChain: false
         )
 
-        return try await consumeLeaderPlanningStream(
-            stream,
-            planningPhase: planningPhase,
-            prepared: prepared,
-            execution: execution,
-            initialState: HiddenLeaderStreamState(
-                responseID: nil,
-                lastSequenceNumber: nil,
-                rawText: "",
-                toolCalls: []
-            )
-        )
-    }
-
-    func recoverLeaderPlanningPhase(
-        _ planningPhase: AgentPlanningEngine.PlanningPhase,
-        prepared: PreparedAgentTurn,
-        execution: AgentExecutionState,
-        existingTicket: AgentRunTicket,
-        baseInput: [ResponsesInputMessageDTO]
-    ) async throws -> AgentLeaderPlanningResult {
-        AgentProcessProjector.updateRecoveryState(.reconnecting, on: &execution.snapshot)
-        persistCheckpointIfNeeded(execution, in: prepared.conversation, forceSave: true)
-
-        guard let responseID = existingTicket.responseID, !responseID.isEmpty else {
-            throw AgentRunFailure.incomplete("Leader planning could not reconnect.")
-        }
-
-        let fetched = try await execution.service.fetchResponse(
-            responseId: responseID,
-            apiKey: prepared.apiKey
-        )
-        switch fetched.status {
-        case .completed:
-            applyRecoveredLeaderPreview(
-                outputText: fetched.text,
+        do {
+            guard let result = try await consumeLeaderPlanningStream(
+                stream,
                 planningPhase: planningPhase,
-                execution: execution
-            )
-            AgentProcessProjector.updateRecoveryState(.idle, on: &execution.snapshot)
-            persistCheckpointIfNeeded(execution, in: prepared.conversation, forceSave: true)
-            return state.planningEngine.parsePlanningResult(from: fetched.text, responseID: responseID)
-
-        case .failed:
-            throw AgentRunFailure.invalidResponse(
-                fetched.errorMessage ?? "Leader planning failed."
-            )
-
-        case .incomplete:
-            applyRecoveredLeaderPreview(
-                outputText: fetched.text,
-                planningPhase: planningPhase,
-                execution: execution
-            )
-            throw AgentRunFailure.incomplete(
-                fetched.errorMessage ?? "Leader planning was incomplete."
-            )
-
-        case .queued, .inProgress, .unknown:
-            if let lastSequenceNumber = existingTicket.lastSequenceNumber {
-                let stream = execution.service.streamRecovery(
-                    responseId: responseID,
-                    startingAfter: lastSequenceNumber,
-                    apiKey: prepared.apiKey
+                prepared: prepared,
+                execution: execution,
+                initialState: HiddenLeaderStreamState(
+                    responseID: nil,
+                    checkpointBaseResponseID: checkpointBaseResponseID,
+                    lastSequenceNumber: nil,
+                    rawText: "",
+                    toolCalls: []
                 )
-                return try await consumeLeaderPlanningStream(
-                    stream,
-                    planningPhase: planningPhase,
-                    prepared: prepared,
-                    execution: execution,
-                    initialState: HiddenLeaderStreamState(
-                        responseID: existingTicket.responseID,
-                        lastSequenceNumber: existingTicket.lastSequenceNumber,
-                        rawText: existingTicket.partialOutputText,
-                        toolCalls: existingTicket.toolCalls
-                    )
-                )
+            ) else {
+                throw AgentRunFailure.incomplete("Leader planning ended before completion.")
             }
-
-            return try await pollLeaderPlanningPhase(
+            return result
+        } catch let failure as AgentRunFailure {
+            guard let existingTicket = execution.snapshot.leaderTicket,
+                  existingTicket.phase == planningPhase.runPhase
+            else {
+                throw failure
+            }
+            return try await recoverLeaderPlanningPhase(
                 planningPhase,
                 prepared: prepared,
                 execution: execution,
-                responseID: responseID,
-                baseInput: baseInput
+                existingTicket: existingTicket,
+                baseInput: baseInput,
+                allowReplayFromCheckpoint: allowReplayFromCheckpoint
             )
         }
-    }
-
-    func pollLeaderPlanningPhase(
-        _ planningPhase: AgentPlanningEngine.PlanningPhase,
-        prepared: PreparedAgentTurn,
-        execution: AgentExecutionState,
-        responseID: String,
-        baseInput _: [ResponsesInputMessageDTO]
-    ) async throws -> AgentLeaderPlanningResult {
-        let maxAttempts = 30
-
-        for attempt in 0 ..< maxAttempts {
-            try Task.checkCancellation()
-            let fetched = try await execution.service.fetchResponse(
-                responseId: responseID,
-                apiKey: prepared.apiKey
-            )
-
-            switch fetched.status {
-            case .completed:
-                applyRecoveredLeaderPreview(
-                    outputText: fetched.text,
-                    planningPhase: planningPhase,
-                    execution: execution
-                )
-                AgentProcessProjector.updateRecoveryState(.idle, on: &execution.snapshot)
-                persistCheckpointIfNeeded(execution, in: prepared.conversation, forceSave: true)
-                return state.planningEngine.parsePlanningResult(from: fetched.text, responseID: responseID)
-
-            case .failed:
-                throw AgentRunFailure.invalidResponse(
-                    fetched.errorMessage ?? "Leader planning failed."
-                )
-
-            case .incomplete:
-                applyRecoveredLeaderPreview(
-                    outputText: fetched.text,
-                    planningPhase: planningPhase,
-                    execution: execution
-                )
-                throw AgentRunFailure.incomplete(
-                    fetched.errorMessage ?? "Leader planning was incomplete."
-                )
-
-            case .queued, .inProgress, .unknown:
-                if attempt < maxAttempts - 1 {
-                    try await Task.sleep(for: .seconds(2))
-                }
-            }
-        }
-
-        throw AgentRunFailure.incomplete("Leader planning timed out while reconnecting.")
     }
 }

@@ -11,16 +11,18 @@ extension AgentProcessProjector {
         snapshot.processSnapshot.activeTaskIDs = tasks
             .filter { $0.status == .running }
             .map(\.id)
+        var lastEventID: String?
         for task in tasks {
-            snapshot.processSnapshot.events.append(
-                AgentEvent(
-                    kind: .taskQueued,
-                    summary: "Queued \(task.owner.displayName): \(task.title)"
-                )
+            let event = AgentEvent(
+                kind: .taskQueued,
+                summary: "Queued \(task.owner.displayName): \(task.title)"
             )
+            snapshot.processSnapshot.events.append(event)
+            lastEventID = event.id
         }
         updateTaskBookkeeping(
-            queuedSummary: "Queued \(tasks.count) worker task(s)",
+            queuedCount: tasks.count,
+            sourceEventID: lastEventID,
             on: &snapshot
         )
     }
@@ -29,20 +31,22 @@ extension AgentProcessProjector {
         _ tasks: [AgentTask],
         on snapshot: inout AgentRunSnapshot
     ) {
+        var lastEventID: String?
         for task in tasks {
             snapshot.processSnapshot.tasks.append(task)
-            snapshot.processSnapshot.events.append(
-                AgentEvent(
-                    kind: .taskQueued,
-                    summary: "Queued \(task.owner.displayName): \(task.title)"
-                )
+            let event = AgentEvent(
+                kind: .taskQueued,
+                summary: "Queued \(task.owner.displayName): \(task.title)"
             )
+            snapshot.processSnapshot.events.append(event)
+            lastEventID = event.id
         }
         snapshot.processSnapshot.activeTaskIDs = snapshot.processSnapshot.tasks
             .filter { $0.status == .running }
             .map(\.id)
         updateTaskBookkeeping(
-            queuedSummary: "Queued \(tasks.count) worker task(s)",
+            queuedCount: tasks.count,
+            sourceEventID: lastEventID,
             on: &snapshot
         )
     }
@@ -64,16 +68,28 @@ extension AgentProcessProjector {
         if !snapshot.processSnapshot.activeTaskIDs.contains(taskID) {
             snapshot.processSnapshot.activeTaskIDs.append(taskID)
         }
-        snapshot.processSnapshot.events.append(
-            AgentEvent(
-                kind: .taskStarted,
-                summary: "Started \(snapshot.processSnapshot.tasks[index].title)"
-            )
+        let event = AgentEvent(
+            kind: .taskStarted,
+            summary: "Started \(snapshot.processSnapshot.tasks[index].title)"
         )
+        snapshot.processSnapshot.events.append(event)
         updateTaskBookkeeping(
-            queuedSummary: "Started \(snapshot.processSnapshot.tasks[index].owner.displayName)",
+            queuedCount: nil,
+            sourceEventID: event.id,
             on: &snapshot
         )
+        if snapshot.processSnapshot.tasks[index].owner.role != nil {
+            let workerStartedSummary =
+                "\(snapshot.processSnapshot.tasks[index].owner.displayName) "
+                    + "started \(snapshot.processSnapshot.tasks[index].title)."
+            AgentRecentUpdateProjector.recordWorkerMilestone(
+                kind: .workerStarted,
+                task: snapshot.processSnapshot.tasks[index],
+                sourceEventID: event.id,
+                summary: workerStartedSummary,
+                on: &snapshot
+            )
+        }
     }
 
     static func updateTaskLivePreview(
@@ -95,12 +111,6 @@ extension AgentProcessProjector {
         snapshot.processSnapshot.tasks[index].liveRisks = risks
         snapshot.updatedAt = .now
         snapshot.processSnapshot.updatedAt = .now
-        if let summary, !summary.isEmpty {
-            appendRecentUpdate(
-                "\(snapshot.processSnapshot.tasks[index].owner.displayName): \(summary)",
-                on: &snapshot.processSnapshot
-            )
-        }
         syncLegacyWorkerProgress(on: &snapshot)
     }
 
@@ -126,12 +136,11 @@ extension AgentProcessProjector {
         snapshot.processSnapshot.tasks[index].liveRisks = []
         snapshot.processSnapshot.tasks[index].completedAt = .now
         snapshot.processSnapshot.activeTaskIDs.removeAll { $0 == taskID }
-        snapshot.processSnapshot.events.append(
-            AgentEvent(
-                kind: status == .completed ? .taskCompleted : .taskFailed,
-                summary: "\(snapshot.processSnapshot.tasks[index].title) \(status.displayName.lowercased())"
-            )
+        let event = AgentEvent(
+            kind: status == .completed ? .taskCompleted : .taskFailed,
+            summary: "\(snapshot.processSnapshot.tasks[index].title) \(status.displayName.lowercased())"
         )
+        snapshot.processSnapshot.events.append(event)
         snapshot.processSnapshot.evidence.append(
             contentsOf: AgentSummaryFormatter.summarizeBullets(
                 result.evidence,
@@ -140,24 +149,38 @@ extension AgentProcessProjector {
             )
         )
         updateTaskBookkeeping(
-            queuedSummary: """
-            \(snapshot.processSnapshot.tasks[index].owner.displayName) \
-            \(status.displayName.lowercased())
-            """,
+            queuedCount: nil,
+            sourceEventID: event.id,
             on: &snapshot
         )
+        if snapshot.processSnapshot.tasks[index].owner.role != nil {
+            AgentRecentUpdateProjector.recordWorkerMilestone(
+                kind: status == .completed ? .workerCompleted : .workerFailed,
+                task: snapshot.processSnapshot.tasks[index],
+                sourceEventID: event.id,
+                summary: "\(snapshot.processSnapshot.tasks[index].owner.displayName) \(status.displayName.lowercased()).",
+                on: &snapshot
+            )
+        }
     }
 }
 
 private extension AgentProcessProjector {
     static func updateTaskBookkeeping(
-        queuedSummary: String,
+        queuedCount: Int?,
+        sourceEventID: String?,
         on snapshot: inout AgentRunSnapshot
     ) {
         snapshot.updatedAt = .now
         snapshot.lastCheckpointAt = .now
         snapshot.processSnapshot.updatedAt = .now
-        appendRecentUpdate(queuedSummary, on: &snapshot.processSnapshot)
+        if let queuedCount {
+            AgentRecentUpdateProjector.recordWorkerWaveQueued(
+                count: queuedCount,
+                sourceEventID: sourceEventID,
+                on: &snapshot
+            )
+        }
         syncLegacyWorkerProgress(on: &snapshot)
     }
 }

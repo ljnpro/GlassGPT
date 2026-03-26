@@ -12,10 +12,10 @@ public enum RuntimeSessionDecisionPolicy {
     /// - Returns: The resume mode to use for recovery.
     public static func recoveryResumeMode(
         preferStreamingResume: Bool,
-        usedBackgroundMode: Bool,
+        usedBackgroundMode _: Bool,
         lastSequenceNumber: Int?
     ) -> RuntimeRecoveryResumeMode {
-        guard preferStreamingResume, usedBackgroundMode, let lastSequenceNumber else {
+        guard preferStreamingResume, let lastSequenceNumber else {
             return .poll
         }
 
@@ -65,27 +65,27 @@ public enum RuntimeSessionDecisionPolicy {
     /// - Parameters:
     ///   - cloudflareGatewayEnabled: Whether the Cloudflare gateway is configured.
     ///   - useDirectEndpoint: Whether the direct endpoint is already in use.
-    ///   - gatewayResumeTimedOut: Whether the gateway resume attempt timed out.
+    ///   - resumeTimedOut: Whether the recovery stream produced no progress before the inactivity timeout.
     ///   - receivedAnyRecoveryEvent: Whether any events were received during recovery.
     /// - Returns: `true` if the runtime should fall back to a direct recovery stream.
     public static func shouldFallbackToDirectRecoveryStream(
         cloudflareGatewayEnabled: Bool,
         useDirectEndpoint: Bool,
-        gatewayResumeTimedOut: Bool,
+        resumeTimedOut: Bool,
         receivedAnyRecoveryEvent: Bool
     ) -> Bool {
         guard cloudflareGatewayEnabled, !useDirectEndpoint else {
             return false
         }
 
-        return gatewayResumeTimedOut || !receivedAnyRecoveryEvent
+        return resumeTimedOut || !receivedAnyRecoveryEvent
     }
 
     /// Determines the runtime-owned next step after a recovery stream exits.
     /// - Parameters:
     ///   - cloudflareGatewayEnabled: Whether the Cloudflare gateway is configured.
     ///   - useDirectEndpoint: Whether the direct endpoint is already in use.
-    ///   - gatewayResumeTimedOut: Whether the gateway resume attempt timed out.
+    ///   - resumeTimedOut: Whether the recovery stream produced no progress before the inactivity timeout.
     ///   - receivedAnyRecoveryEvent: Whether any events were received during recovery.
     ///   - encounteredRecoverableFailure: Whether a recoverable failure occurred.
     ///   - responseId: The API response identifier, if available.
@@ -93,7 +93,7 @@ public enum RuntimeSessionDecisionPolicy {
     public static func recoveryStreamNextStep(
         cloudflareGatewayEnabled: Bool,
         useDirectEndpoint: Bool,
-        gatewayResumeTimedOut: Bool,
+        resumeTimedOut: Bool,
         receivedAnyRecoveryEvent: Bool,
         encounteredRecoverableFailure: Bool,
         responseId: String?
@@ -104,7 +104,7 @@ public enum RuntimeSessionDecisionPolicy {
         if shouldFallbackToDirectRecoveryStream(
             cloudflareGatewayEnabled: cloudflareGatewayEnabled,
             useDirectEndpoint: useDirectEndpoint,
-            gatewayResumeTimedOut: gatewayResumeTimedOut,
+            resumeTimedOut: resumeTimedOut,
             receivedAnyRecoveryEvent: receivedAnyRecoveryEvent
         ) {
             return .retryDirectStream

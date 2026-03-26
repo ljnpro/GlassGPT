@@ -5,10 +5,14 @@ enum ReplyRuntimePresentationStateResolver {
     static func shouldShowRecoveryIndicator(
         for runtimeState: ReplyRuntimeState
     ) -> Bool {
-        switch runtimeState.lifecycle {
-        case .recoveringStatus, .recoveringPoll:
+        if runtimeState.pendingRecoveryRestart {
+            return true
+        }
+
+        return switch runtimeState.lifecycle {
+        case .recoveringStatus, .recoveringStream, .recoveringPoll:
             true
-        case .recoveringStream, .idle, .preparingInput, .uploadingAttachments,
+        case .idle, .preparingInput, .uploadingAttachments,
              .streaming, .detached, .finalizing, .completed, .failed:
             false
         }
@@ -26,6 +30,7 @@ enum ReplyRuntimePresentationStateResolver {
             isThinking: runtimeState.isThinking,
             isAwaitingResponse: runtimeState.isStreaming ||
                 runtimeState.isRecovering ||
+                runtimeState.pendingRecoveryRestart ||
                 runtimeState.buffer.toolCalls.contains(where: { $0.status != .completed })
         )
     }

@@ -139,9 +139,12 @@ enum SessionVisibilityCoordinator {
         runtimeState: ReplyRuntimeState
     ) -> Bool {
         guard !draftMessage.isComplete,
-              draftMessage.responseId != nil,
-              !runtimeState.isStreaming
+              draftMessage.responseId != nil
         else {
+            return false
+        }
+
+        if runtimeState.isStreaming {
             return false
         }
 

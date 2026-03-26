@@ -4,11 +4,6 @@ import Foundation
 import OpenAITransport
 
 extension AgentRunCoordinator {
-    struct FinalSynthesisContext {
-        let discussion: AgentPromptBuilder.FinalSynthesisDiscussion
-        let workerSummaries: [AgentWorkerSummary]
-    }
-
     func applyLeaderDirective(
         _ directive: AgentTaggedOutputParser.LeaderDirective,
         decisionKind: AgentDecisionKind,
@@ -86,9 +81,35 @@ extension AgentRunCoordinator {
         configuration: AgentConversationConfiguration,
         conversation: Conversation,
         execution: AgentExecutionState,
-        baseInput: [ResponsesInputMessageDTO]
+        baseInput: [ResponsesInputMessageDTO],
+        initialPresentation: AgentVisibleSynthesisPresentation? = nil,
+        previousResponseIDOverride: String? = nil,
+        fallbackToConversationLeaderChain: Bool = true,
+        allowReplayFromCheckpoint: Bool = true
     ) async throws {
-        AgentProcessProjector.beginSynthesis(on: &execution.snapshot)
+        let presentation = initialPresentation ?? AgentVisibleSynthesisPresentation(
+            statusText: "Writing final answer",
+            summaryText: "Writing final answer from accepted findings.",
+            recoveryState: .idle
+        )
+        let checkpointBaseResponseID = previousResponseIDOverride
+            ?? execution.snapshot.ticket(for: .leader)?.checkpointBaseResponseID
+            ?? (fallbackToConversationLeaderChain
+                ? currentAgentState(for: conversation).responseID(for: .leader)
+                : nil)
+        AgentVisibleSynthesisProjector.begin(
+            on: &execution.snapshot,
+            initialPresentation: presentation
+        )
+        AgentVisibleSynthesisEventApplier.persistVisibleLeaderTicket(
+            responseID: nil,
+            checkpointBaseResponseID: checkpointBaseResponseID,
+            sequenceNumber: nil,
+            execution: execution,
+            conversation: conversation,
+            coordinator: self,
+            forceSave: true
+        )
         persistSnapshot(execution, in: conversation)
         setStreamingFlags(
             isStreaming: true,
@@ -107,7 +128,7 @@ extension AgentRunCoordinator {
                 discussion: synthesisContext.discussion
             ),
             instructions: AgentPromptBuilder.finalSynthesisInstructions(),
-            previousResponseID: currentAgentState(for: conversation).responseID(for: .leader),
+            previousResponseID: checkpointBaseResponseID,
             reasoningEffort: configuration.leaderReasoningEffort,
             serviceTier: configuration.serviceTier,
             tools: OpenAIRequestFactory.defaultChatTools(),
@@ -118,94 +139,26 @@ extension AgentRunCoordinator {
             throw AgentRunFailure.missingDraft
         }
 
-        for await event in stream {
-            try Task.checkCancellation()
-            try applyVisibleStreamEvent(
-                event,
-                execution: execution,
-                conversation: conversation,
-                draft: draft
-            )
-        }
-    }
-
-    func finalSynthesisContext(from snapshot: AgentProcessSnapshot) -> FinalSynthesisContext {
-        let workerSummaries = AgentSummaryFormatter.workerSummaries(from: snapshot)
-        let planHighlights = snapshot.plan
-            .map {
-                "\($0.title) (\($0.status.displayName.lowercased())): \(AgentSummaryFormatter.summarize($0.summary, maxLength: 100))"
-            }
-            .prefix(4)
-            .map(\.self)
-        let remainingRisks = [AgentRole.workerA, .workerB, .workerC]
-            .compactMap { AgentSummaryFormatter.latestCompletedWorkerTask(role: $0, from: snapshot)?.result?.risks }
-            .flatMap(\.self)
-        let discussion = AgentPromptBuilder.FinalSynthesisDiscussion(
-            leaderFocus: snapshot.leaderAcceptedFocus.isEmpty
-                ? (snapshot.currentFocus.isEmpty ? "Respond to the user with the accepted findings." : snapshot.currentFocus)
-                : snapshot.leaderAcceptedFocus,
-            planHighlights: Array(planHighlights),
-            workerSummaries: workerSummaries,
-            adoptedEvidence: AgentSummaryFormatter.summarizeBullets(snapshot.evidence, maxItems: 6, maxLength: 120),
-            remainingRisks: AgentSummaryFormatter.summarizeBullets(remainingRisks, maxItems: 4, maxLength: 120),
-            stopReason: snapshot.stopReason?.displayName ?? "Leader judged the answer sufficient."
-        )
-        return FinalSynthesisContext(
-            discussion: discussion,
-            workerSummaries: workerSummaries
-        )
-    }
-
-    func uploadAttachmentsIfNeeded(
-        _ prepared: PreparedAgentTurn,
-        execution: AgentExecutionState
-    ) async throws {
-        var uploadedAttachments = prepared.attachmentsToUpload
-        for index in uploadedAttachments.indices {
-            if uploadedAttachments[index].fileId != nil {
-                uploadedAttachments[index].uploadStatus = .uploaded
-                continue
-            }
-
-            uploadedAttachments[index].uploadStatus = .uploading
-            guard let data = uploadedAttachments[index].localData else {
-                uploadedAttachments[index].uploadStatus = .failed
-                throw AgentRunFailure.incomplete(
-                    "One attachment is unavailable. Retry to continue."
+        do {
+            for await event in stream {
+                try Task.checkCancellation()
+                try applyVisibleStreamEvent(
+                    event,
+                    execution: execution,
+                    conversation: conversation,
+                    draft: draft
                 )
             }
-
-            let request = try state.requestBuilder.uploadRequest(
-                data: data,
-                filename: uploadedAttachments[index].filename,
-                apiKey: prepared.apiKey
+        } catch let failure as AgentRunFailure
+            where allowReplayFromCheckpoint {
+            _ = failure
+            try await recoverVisibleLeaderSynthesis(
+                apiKey: apiKey,
+                conversation: conversation,
+                draft: draft,
+                execution: execution,
+                allowReplayFromCheckpoint: allowReplayFromCheckpoint
             )
-            let (responseData, response) = try await state.transport.data(for: request)
-            let fileID = try state.responseParser.parseUploadedFileID(
-                responseData: responseData,
-                response: response
-            )
-            uploadedAttachments[index].openAIFileId = fileID
-            uploadedAttachments[index].uploadStatus = .uploaded
-
-            AgentProcessProjector.updateLeaderLivePreview(
-                status: "Uploading attachments",
-                summary: "Uploaded \(index + 1) of \(uploadedAttachments.count) attachment(s).",
-                on: &execution.snapshot
-            )
-            persistCheckpointIfNeeded(
-                execution,
-                in: prepared.conversation,
-                forceSave: execution.snapshot.runConfiguration.backgroundModeEnabled
-            )
-        }
-
-        if let userMessage = prepared.conversation.messages.first(where: { $0.id == prepared.userMessageID }) {
-            userMessage.fileAttachments = uploadedAttachments
-            prepared.conversation.updatedAt = .now
-            guard state.conversationCoordinator.saveContext("uploadAgentAttachments") else {
-                throw AgentRunFailure.invalidResponse("Failed to save Agent attachments.")
-            }
         }
     }
 }

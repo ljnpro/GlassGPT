@@ -91,11 +91,12 @@ extension ChatSessionDecisionsTests {
         let actor = makeRecoveringStatusActor()
 
         var snapshot = await actor.apply(.recordResponseCreated("resp_updated", route: .gateway))
-        guard case let .recoveringStatus(updatedStatusTicket) = snapshot.lifecycle else {
-            Issue.record("Expected recoveringStatus ticket update")
+        guard case let .streaming(updatedCursor) = snapshot.lifecycle else {
+            Issue.record("Expected streaming cursor after recovery response metadata")
             return
         }
-        #expect(updatedStatusTicket.responseID == "resp_updated")
+        #expect(updatedCursor.responseID == "resp_updated")
+        #expect(!snapshot.isRecovering)
 
         snapshot = await actor.apply(.recordSequenceUpdate(9))
         #expect(snapshot.lastSequenceNumber == 9)

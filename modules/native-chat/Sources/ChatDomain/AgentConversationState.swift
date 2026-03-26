@@ -38,6 +38,8 @@ public struct AgentRunSnapshot: Codable, Equatable, Sendable {
     public var currentStreamingText: String
     /// Live visible synthesis reasoning accumulated so far.
     public var currentThinkingText: String
+    /// Persisted presentation state for the visible final-answer synthesis.
+    public var visibleSynthesisPresentation: AgentVisibleSynthesisPresentation?
     /// Active tool calls during visible synthesis.
     public var activeToolCalls: [ToolCallInfo]
     /// Live citations gathered during visible synthesis.
@@ -73,6 +75,7 @@ public struct AgentRunSnapshot: Codable, Equatable, Sendable {
         workerCTicket: AgentRunTicket? = nil,
         currentStreamingText: String = "",
         currentThinkingText: String = "",
+        visibleSynthesisPresentation: AgentVisibleSynthesisPresentation? = nil,
         activeToolCalls: [ToolCallInfo] = [],
         liveCitations: [URLCitation] = [],
         liveFilePathAnnotations: [FilePathAnnotation] = [],
@@ -110,6 +113,7 @@ public struct AgentRunSnapshot: Codable, Equatable, Sendable {
         self.workerCTicket = workerCTicket
         self.currentStreamingText = currentStreamingText
         self.currentThinkingText = currentThinkingText
+        self.visibleSynthesisPresentation = visibleSynthesisPresentation
         self.activeToolCalls = activeToolCalls
         self.liveCitations = liveCitations
         self.liveFilePathAnnotations = liveFilePathAnnotations

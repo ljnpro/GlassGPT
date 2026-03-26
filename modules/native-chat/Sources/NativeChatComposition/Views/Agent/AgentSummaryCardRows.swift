@@ -25,7 +25,7 @@ struct FlexibleChipRow: View {
 }
 
 struct AgentRecentUpdateRow: View {
-    let text: String
+    let update: AgentProcessUpdate
 
     var body: some View {
         HStack(alignment: .top, spacing: 8) {
@@ -35,7 +35,7 @@ struct AgentRecentUpdateRow: View {
                 .padding(.top, 6)
 
             MarkdownContentView(
-                text: AgentSummaryFormatter.summarize(text, maxLength: 72),
+                text: AgentSummaryFormatter.summarize(update.summary, maxLength: 72),
                 surfaceStyle: .plain
             )
             .font(.caption)

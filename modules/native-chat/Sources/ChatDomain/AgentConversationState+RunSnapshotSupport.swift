@@ -35,6 +35,7 @@ private extension AgentProcessSnapshot {
             evidence.isEmpty &&
             activeTaskIDs.isEmpty &&
             recentUpdates.isEmpty &&
+            recentUpdateItems.isEmpty &&
             recoveryState == .idle &&
             stopReason == nil &&
             outcome.isEmpty

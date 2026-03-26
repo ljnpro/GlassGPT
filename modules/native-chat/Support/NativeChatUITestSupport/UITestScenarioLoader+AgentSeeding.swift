@@ -71,6 +71,54 @@ extension UITestScenarioLoader {
         return conversation
     }
 
+    static func makeCompletedVisibleSynthesisAgentConversation(
+        title: String,
+        timeOffset: TimeInterval
+    ) -> Conversation {
+        let conversation = makeAgentSeedConversation(
+            title: title,
+            timeOffset: timeOffset,
+            backgroundModeEnabled: true,
+            serviceTier: .flex
+        )
+
+        let userMessage = Message(
+            role: .user,
+            content: "What should we validate before launch?"
+        )
+        let draftMessage = Message(
+            role: .assistant,
+            content: "",
+            thinking: "Checking supporting evidence before the final answer.",
+            conversation: conversation,
+            isComplete: false
+        )
+        draftMessage.toolCalls = [
+            ToolCallInfo(
+                id: "agent_visible_search",
+                type: .webSearch,
+                status: .searching,
+                queries: ["launch checklist"]
+            )
+        ]
+
+        conversation.messages = [userMessage, draftMessage]
+        userMessage.conversation = conversation
+        draftMessage.conversation = conversation
+        conversation.agentConversationState = AgentConversationState(
+            currentStage: .finalSynthesis,
+            configuration: AgentConversationConfiguration(
+                backgroundModeEnabled: true,
+                serviceTier: .flex
+            ),
+            activeRun: makeCompletedVisibleSynthesisSnapshot(
+                draftMessageID: draftMessage.id,
+                userMessageID: userMessage.id
+            )
+        )
+        return conversation
+    }
+
     static func makeRunningAgentSnapshot(
         draftMessageID: UUID,
         userMessageID: UUID
@@ -182,9 +230,26 @@ private extension UITestScenarioLoader {
                     AgentEvent(kind: .synthesisStarted, summary: "Leader began final synthesis")
                 ],
                 evidence: ["Rollback stayed explicit across the plan."],
-                recentUpdates: [
-                    "Worker A validated additive rollout with rollback gates.",
-                    "Leader adopted explicit parity checks."
+                recentUpdateItems: [
+                    AgentProcessUpdate(
+                        kind: .councilCompleted,
+                        source: .leader,
+                        phase: .completed,
+                        summary: "Council completed"
+                    ),
+                    AgentProcessUpdate(
+                        kind: .workerCompleted,
+                        source: .workerA,
+                        phase: .workerWave,
+                        taskID: "task_validate_rollout",
+                        summary: "Worker A completed."
+                    ),
+                    AgentProcessUpdate(
+                        kind: .planUpdated,
+                        source: .leader,
+                        phase: .leaderReview,
+                        summary: "Updated plan"
+                    )
                 ],
                 stopReason: .sufficientAnswer,
                 outcome: "Completed"
@@ -192,95 +257,5 @@ private extension UITestScenarioLoader {
             completedStage: .finalSynthesis,
             outcome: "Completed"
         )
-    }
-
-    static func makeRunningAgentProcessSnapshot() -> AgentProcessSnapshot {
-        AgentProcessSnapshot(
-            activity: .delegation,
-            currentFocus: "Leader delegated a bounded validation wave before synthesis.",
-            leaderAcceptedFocus: "Leader delegated a bounded validation wave before synthesis.",
-            leaderLiveStatus: "Reviewing worker results",
-            leaderLiveSummary: "Comparing the strongest worker recommendation with the risk findings.",
-            plan: [
-                AgentPlanStep(
-                    id: "step_root",
-                    owner: .leader,
-                    status: .running,
-                    title: "Shape the launch answer",
-                    summary: "Decide what to keep local and what to delegate."
-                ),
-                AgentPlanStep(
-                    id: "step_risk",
-                    parentStepID: "step_root",
-                    owner: .workerB,
-                    status: .running,
-                    title: "Stress launch risks",
-                    summary: "Surface rollback and monitoring gaps."
-                )
-            ],
-            tasks: runningAgentTasks(),
-            decisions: [
-                AgentDecision(
-                    kind: .triage,
-                    title: "Delegate",
-                    summary: "Run one bounded validation wave before synthesis."
-                )
-            ],
-            events: [
-                AgentEvent(kind: .started, summary: "Started Agent run"),
-                AgentEvent(kind: .taskStarted, summary: "Worker B started stress-testing the launch plan")
-            ],
-            evidence: ["Worker A already converged on additive rollout."],
-            activeTaskIDs: ["task_risks"],
-            recentUpdates: [
-                "Leader split the work into answer, risk, and completeness tracks.",
-                "Worker A completed the strongest answer path.",
-                "Worker B is checking rollback wording."
-            ],
-            outcome: "In progress"
-        )
-    }
-
-    static func runningAgentTasks() -> [AgentTask] {
-        [
-            AgentTask(
-                id: "task_answer",
-                owner: .workerA,
-                parentStepID: "step_root",
-                title: "Draft strongest answer",
-                goal: "Return the best launch recommendation",
-                expectedOutput: "Concise recommendation",
-                contextSummary: "Focus on release confidence and ordering.",
-                toolPolicy: .enabled,
-                status: .completed,
-                resultSummary: "Ship additively with parity checks."
-            ),
-            AgentTask(
-                id: "task_risks",
-                owner: .workerB,
-                parentStepID: "step_risk",
-                title: "Stress launch risks",
-                goal: "Surface failure modes",
-                expectedOutput: "Concise risk summary",
-                contextSummary: "Look for rollback and monitoring gaps.",
-                toolPolicy: .enabled,
-                status: .running,
-                liveStatusText: "Checking rollback",
-                liveSummary: "The launch draft still needs an explicit rollback gate and one monitoring checkpoint.",
-                liveEvidence: ["Rollback wording is still too implicit."],
-                liveConfidence: .medium
-            ),
-            AgentTask(
-                id: "task_completeness",
-                owner: .workerC,
-                parentStepID: "step_root",
-                title: "Check completeness",
-                goal: "Find missing launch gates",
-                expectedOutput: "Short completeness notes",
-                contextSummary: "Keep the answer structured and complete.",
-                toolPolicy: .reasoningOnly,
-                status: .queued
-            )
-        ]
     }
 }

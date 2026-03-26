@@ -64,7 +64,7 @@ struct RuntimeEvaluatorTests {
         #expect(action == .finalizePartial)
     }
 
-    @Test func `recovery fetch evaluator starts stream for resumable in progress responses`() {
+    @Test func `recovery fetch evaluator starts stream when a resumable cursor exists`() {
         let action = RecoveryFetchEvaluator.evaluate(
             RecoveryFetchOutcome(
                 result: OpenAIResponseFetchResult(
@@ -123,7 +123,7 @@ struct RuntimeEvaluatorTests {
             RecoveryStreamOutcome(
                 finishedFromStream: false,
                 receivedAnyEvent: false,
-                gatewayResumeTimedOut: true,
+                resumeTimedOut: true,
                 encounteredRecoverableFailure: true,
                 cloudflareGatewayEnabled: true,
                 useDirectEndpoint: false,
@@ -139,7 +139,7 @@ struct RuntimeEvaluatorTests {
             RecoveryStreamOutcome(
                 finishedFromStream: false,
                 receivedAnyEvent: false,
-                gatewayResumeTimedOut: false,
+                resumeTimedOut: false,
                 encounteredRecoverableFailure: false,
                 cloudflareGatewayEnabled: false,
                 useDirectEndpoint: true,

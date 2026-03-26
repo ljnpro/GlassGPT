@@ -156,9 +156,8 @@ extension AgentRunCoordinator {
         in conversation: Conversation,
         forceSave: Bool = false
     ) {
-        let backgroundEnabled = execution.snapshot.runConfiguration.backgroundModeEnabled
         let age = Date().timeIntervalSince(execution.snapshot.lastCheckpointAt)
-        let shouldSave = forceSave || (backgroundEnabled && age >= 0.5)
+        let shouldSave = forceSave || age >= 0.5
         persistSnapshot(execution, in: conversation, save: shouldSave)
     }
 

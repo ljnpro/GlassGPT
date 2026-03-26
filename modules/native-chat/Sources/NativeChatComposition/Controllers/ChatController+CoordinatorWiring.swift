@@ -97,6 +97,7 @@ extension ChatController {
         coordinator.conversations = conversationCoordinator
         coordinator.sessions = sessionCoordinator
         coordinator.files = fileInteractionCoordinator
+        coordinator.drafts = sendCoordinator
         coordinator.streaming = streamingCoordinator
         coordinator.resultApplier.conversations = conversationCoordinator
         coordinator.resultApplier.sessions = sessionCoordinator

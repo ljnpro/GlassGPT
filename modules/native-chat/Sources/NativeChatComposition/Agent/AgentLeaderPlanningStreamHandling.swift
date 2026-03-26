@@ -21,6 +21,8 @@ extension AgentRunCoordinator {
                 configuration: configuration,
                 streamState: &streamState
             )
+            AgentProcessProjector.updateRecoveryState(.idle, on: &execution.snapshot)
+            execution.markProgress()
             return .none
 
         case let .sequenceUpdate(sequenceNumber):
@@ -33,8 +35,10 @@ extension AgentRunCoordinator {
                 lastSequenceNumber: sequenceNumber,
                 rawText: streamState.rawText,
                 toolCalls: streamState.toolCalls,
-                forceSave: configuration.backgroundModeEnabled
+                forceSave: true
             )
+            AgentProcessProjector.updateRecoveryState(.idle, on: &execution.snapshot)
+            execution.markProgress()
             return .none
 
         case let .textDelta(delta):
@@ -45,6 +49,8 @@ extension AgentRunCoordinator {
                 execution: execution,
                 streamState: streamState
             )
+            AgentProcessProjector.updateRecoveryState(.idle, on: &execution.snapshot)
+            execution.markProgress()
             return .none
 
         case let .replaceText(text):
@@ -55,6 +61,8 @@ extension AgentRunCoordinator {
                 execution: execution,
                 streamState: streamState
             )
+            AgentProcessProjector.updateRecoveryState(.idle, on: &execution.snapshot)
+            execution.markProgress()
             return .none
 
         case .thinkingStarted:
@@ -66,6 +74,8 @@ extension AgentRunCoordinator {
                 summary: summary,
                 on: &execution.snapshot
             )
+            AgentProcessProjector.updateRecoveryState(.idle, on: &execution.snapshot)
+            execution.markProgress()
             return .none
 
         case .thinkingFinished:
@@ -74,6 +84,8 @@ extension AgentRunCoordinator {
                 summary: execution.snapshot.processSnapshot.leaderLiveSummary,
                 on: &execution.snapshot
             )
+            AgentProcessProjector.updateRecoveryState(.idle, on: &execution.snapshot)
+            execution.markProgress()
             return .none
 
         case let .completed(text, _, _):
@@ -92,7 +104,7 @@ extension AgentRunCoordinator {
             return .failed(.incomplete(message ?? "Leader planning ended before completion."))
 
         case .connectionLost:
-            return .failed(.incomplete("Leader planning lost its connection."))
+            return .failed(.connectionLost("Leader planning lost its connection."))
 
         case let .error(error):
             return .failed(.invalidResponse(error.localizedDescription))
@@ -120,12 +132,16 @@ extension AgentRunCoordinator {
         streamState: inout HiddenLeaderStreamState
     ) {
         streamState.responseID = responseID
+        let checkpointBaseResponseID = streamState.checkpointBaseResponseID
+            ?? execution.snapshot.ticket(for: .leader)?.checkpointBaseResponseID
+        streamState.checkpointBaseResponseID = checkpointBaseResponseID
         updateRoleResponseID(responseID, for: .leader, in: prepared.conversation)
         updateTicket(
             AgentRunTicket(
                 role: .leader,
                 phase: planningPhase.runPhase,
                 responseID: responseID,
+                checkpointBaseResponseID: checkpointBaseResponseID,
                 backgroundEligible: configuration.backgroundModeEnabled,
                 partialOutputText: streamState.rawText,
                 statusText: execution.snapshot.processSnapshot.leaderLiveStatus,
@@ -185,81 +201,5 @@ extension AgentRunCoordinator {
             forceSave: true
         )
         return result
-    }
-
-    func applyHiddenLeaderToolEvent(
-        _ event: StreamEvent,
-        planningPhase: AgentPlanningEngine.PlanningPhase,
-        execution: AgentExecutionState,
-        conversation: Conversation,
-        streamState: inout HiddenLeaderStreamState
-    ) -> Bool {
-        let status: String?
-
-        switch event {
-        case let .webSearchStarted(id):
-            streamState.toolCalls.append(
-                ToolCallInfo(id: id, type: .webSearch, status: .inProgress)
-            )
-            status = "Searching the web"
-        case let .webSearchSearching(id):
-            setHiddenLeaderToolCallStatus(id: id, status: .searching, in: &streamState.toolCalls)
-            status = "Searching the web"
-        case let .webSearchCompleted(id):
-            setHiddenLeaderToolCallStatus(id: id, status: .completed, in: &streamState.toolCalls)
-            status = planningPhase.bootstrapStatus
-        case let .codeInterpreterStarted(id):
-            streamState.toolCalls.append(
-                ToolCallInfo(id: id, type: .codeInterpreter, status: .inProgress)
-            )
-            status = "Running code"
-        case let .codeInterpreterInterpreting(id):
-            setHiddenLeaderToolCallStatus(id: id, status: .interpreting, in: &streamState.toolCalls)
-            status = "Running code"
-        case let .codeInterpreterCompleted(id):
-            setHiddenLeaderToolCallStatus(id: id, status: .completed, in: &streamState.toolCalls)
-            status = planningPhase.bootstrapStatus
-        case let .fileSearchStarted(id):
-            streamState.toolCalls.append(
-                ToolCallInfo(id: id, type: .fileSearch, status: .inProgress)
-            )
-            status = "Searching files"
-        case let .fileSearchSearching(id):
-            setHiddenLeaderToolCallStatus(id: id, status: .fileSearching, in: &streamState.toolCalls)
-            status = "Searching files"
-        case let .fileSearchCompleted(id):
-            setHiddenLeaderToolCallStatus(id: id, status: .completed, in: &streamState.toolCalls)
-            status = planningPhase.bootstrapStatus
-        default:
-            return false
-        }
-
-        AgentProcessProjector.updateLeaderLivePreview(
-            status: status,
-            summary: execution.snapshot.processSnapshot.leaderLiveSummary,
-            on: &execution.snapshot
-        )
-        updateLeaderTicket(
-            execution: execution,
-            conversation: conversation,
-            phase: planningPhase.runPhase,
-            responseID: streamState.responseID,
-            lastSequenceNumber: streamState.lastSequenceNumber,
-            rawText: streamState.rawText,
-            toolCalls: streamState.toolCalls,
-            forceSave: false
-        )
-        return true
-    }
-
-    func setHiddenLeaderToolCallStatus(
-        id: String,
-        status: ToolCallStatus,
-        in toolCalls: inout [ToolCallInfo]
-    ) {
-        guard let index = toolCalls.firstIndex(where: { $0.id == id }) else {
-            return
-        }
-        toolCalls[index].status = status
     }
 }

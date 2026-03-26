@@ -39,6 +39,10 @@ extension ChatStreamingCoordinator {
             animated: animated && sessions.visibleSessionMessageID == session.messageID
         )
         applyPersistenceDirective(plan.persistence, to: session)
+        if event.countsAsExecutionProgress,
+           let execution = services.sessionRegistry.execution(for: session.messageID) {
+            execution.markProgress()
+        }
         return plan.outcome
     }
 
@@ -83,6 +87,17 @@ extension ChatStreamingCoordinator {
             sessions.saveSessionIfNeeded(session)
         case .saveNow:
             sessions.saveSessionNow(session)
+        }
+    }
+}
+
+private extension StreamEvent {
+    var countsAsExecutionProgress: Bool {
+        switch self {
+        case .connectionLost, .error:
+            false
+        default:
+            true
         }
     }
 }

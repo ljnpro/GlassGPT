@@ -6,7 +6,7 @@ import OpenAITransport
 import Testing
 
 extension ChatSessionPlannerTests {
-    @Test func `reply recovery planner starts recovery stream for resumable background responses`() {
+    @Test func `reply recovery planner starts recovery stream whenever resume is preferred and a cursor exists`() {
         let action = ReplyRecoveryPlanner.fetchAction(
             for: OpenAIResponseFetchResult(
                 status: .inProgress,
@@ -48,7 +48,7 @@ extension ChatSessionPlannerTests {
         let nextStep = ReplyRecoveryPlanner.streamNextStep(
             cloudflareGatewayEnabled: true,
             useDirectEndpoint: false,
-            gatewayResumeTimedOut: true,
+            resumeTimedOut: true,
             receivedAnyRecoveryEvent: false,
             encounteredRecoverableFailure: true,
             responseId: "resp_123"
@@ -61,7 +61,7 @@ extension ChatSessionPlannerTests {
         let nextStep = ReplyRecoveryPlanner.streamNextStep(
             cloudflareGatewayEnabled: false,
             useDirectEndpoint: false,
-            gatewayResumeTimedOut: false,
+            resumeTimedOut: false,
             receivedAnyRecoveryEvent: true,
             encounteredRecoverableFailure: true,
             responseId: "resp_123"

@@ -9,10 +9,50 @@ import OpenAITransport
 final class SessionExecutionState {
     let service: OpenAIService
     var task: Task<Void, Never>?
+    var lastProgressAt: Date
+    var lastBackgroundedAt: Date?
+    var needsForegroundResume = false
 
-    init(service: OpenAIService, task: Task<Void, Never>? = nil) {
+    init(
+        service: OpenAIService,
+        task: Task<Void, Never>? = nil,
+        lastProgressAt: Date = .now
+    ) {
         self.service = service
         self.task = task
+        self.lastProgressAt = lastProgressAt
+    }
+
+    func markProgress() {
+        lastProgressAt = .now
+        if let lastBackgroundedAt, lastProgressAt >= lastBackgroundedAt {
+            self.lastBackgroundedAt = nil
+        }
+        needsForegroundResume = false
+    }
+
+    func markEnteredBackground() {
+        lastBackgroundedAt = .now
+    }
+
+    func markNeedsForegroundResume() {
+        needsForegroundResume = true
+    }
+
+    var requiresResumeReplacement: Bool {
+        if needsForegroundResume {
+            return true
+        }
+
+        if task == nil || task?.isCancelled == true {
+            return true
+        }
+
+        if let lastBackgroundedAt, lastProgressAt <= lastBackgroundedAt {
+            return true
+        }
+
+        return false
     }
 }
 
@@ -30,6 +70,10 @@ final class ChatSessionRegistry {
 
     var allSessions: [ReplySession] {
         Array(sessions.values)
+    }
+
+    var allExecutions: [SessionExecutionState] {
+        Array(executions.values)
     }
 
     func session(for messageID: UUID) -> ReplySession? {

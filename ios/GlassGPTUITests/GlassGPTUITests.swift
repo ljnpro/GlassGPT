@@ -137,6 +137,20 @@ final class GlassGPTUITests: XCTestCase {
     }
 
     @MainActor
+    func testAgentCompletedVisibleSynthesisKeepsProcessDoneWhileAnswerSearches() {
+        let app = launchApp(scenario: "agentCompletedVisibleSynthesis")
+        openHistory(in: app)
+
+        let agentRow = app.buttons["history.row.Agent Review"]
+        XCTAssertTrue(agentRow.waitForExistence(timeout: 5))
+        agentRow.tap()
+
+        XCTAssertTrue(app.staticTexts["Agent Process"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Done"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Searching the web"].waitForExistence(timeout: 5))
+    }
+
+    @MainActor
     func testHistoryScenarioAgentSelectorPersistsChangesWithinSession() {
         let app = launchApp(scenario: "history")
         openHistory(in: app)
@@ -191,8 +205,6 @@ final class GlassGPTUITests: XCTestCase {
         revealIfNeeded(backgroundToggle, in: app)
         XCTAssertTrue(backgroundToggle.waitForExistence(timeout: 5))
         XCTAssertTrue(flexToggle.waitForExistence(timeout: 5))
-        setSwitch(backgroundToggle, enabled: true)
-        setSwitch(flexToggle, enabled: true)
 
         let leaderControl = app.descendants(matching: .any)
             .matching(identifier: "settings.agentDefaultLeaderEffort")
@@ -210,9 +222,6 @@ final class GlassGPTUITests: XCTestCase {
 
         XCTAssertTrue(waitForValue(of: leaderControl, "XHigh", timeout: 5))
         XCTAssertTrue(waitForValue(of: workerControl, "None", timeout: 5))
-
-        XCTAssertEqual(backgroundToggle.value as? String, "1")
-        XCTAssertEqual(flexToggle.value as? String, "1")
 
         app.navigationBars["Agent Settings"].buttons.firstMatch.tap()
         XCTAssertTrue(agentModeButton.waitForExistence(timeout: 5))
@@ -926,11 +935,38 @@ final class GlassGPTUITests: XCTestCase {
     }
 
     @MainActor
-    private func setSwitch(_ element: XCUIElement, enabled: Bool) {
-        let currentValue = isSwitchEnabled(element)
-        if currentValue != enabled {
+    private func setSwitch(
+        _ element: XCUIElement,
+        enabled: Bool,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        XCTAssertTrue(element.waitForExistence(timeout: 5), file: file, line: line)
+
+        for _ in 0 ..< 3 {
+            if isSwitchEnabled(element) == enabled {
+                return
+            }
+
             element.tap()
+            if waitForSwitchState(of: element, enabled: enabled, timeout: 1) {
+                return
+            }
         }
+
+        XCTFail("Failed to set switch \(element.identifier) to \(enabled)", file: file, line: line)
+    }
+
+    @MainActor
+    private func waitForSwitchState(
+        of element: XCUIElement,
+        enabled: Bool,
+        timeout: TimeInterval
+    ) -> Bool {
+        let expectedValues = enabled ? ["1", "On"] : ["0", "Off"]
+        let predicate = NSPredicate(format: "value IN %@", expectedValues)
+        let expectation = XCTNSPredicateExpectation(predicate: predicate, object: element)
+        return XCTWaiter.wait(for: [expectation], timeout: timeout) == .completed
     }
 
     @MainActor

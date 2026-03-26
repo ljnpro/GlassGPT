@@ -103,17 +103,56 @@ extension ChatSessionCoordinator {
     }
 
     func removeSession(_ session: ReplySession) {
+        removeSession(session, cancelExecutionTask: true, cancelStream: true)
+    }
+
+    func removeSession(
+        _ session: ReplySession,
+        cancelExecutionTask: Bool,
+        cancelStream: Bool
+    ) {
+        removeSession(
+            session,
+            cancelExecutionTask: cancelExecutionTask,
+            cancelStream: cancelStream,
+            refreshVisibleBinding: true
+        )
+    }
+
+    func removeSessionWithoutRefreshingVisibleBinding(
+        _ session: ReplySession,
+        cancelExecutionTask: Bool,
+        cancelStream: Bool
+    ) {
+        removeSession(
+            session,
+            cancelExecutionTask: cancelExecutionTask,
+            cancelStream: cancelStream,
+            refreshVisibleBinding: false
+        )
+    }
+
+    private func removeSession(
+        _ session: ReplySession,
+        cancelExecutionTask: Bool,
+        cancelStream: Bool,
+        refreshVisibleBinding: Bool
+    ) {
         let wasVisible = visibleSessionMessageID == session.messageID
         services.cancelGeneratedFilePrefetches(
             services.generatedFilePrefetchRegistry.cancel(messageID: session.messageID)
         )
         services.sessionRegistry.remove(session) { target in
-            target.task?.cancel()
-            target.service.cancelStream()
+            if cancelExecutionTask {
+                target.task?.cancel()
+            }
+            if cancelStream {
+                target.service.cancelStream()
+            }
         }
         removeRuntimeSession(for: session)
 
-        if wasVisible {
+        if wasVisible, refreshVisibleBinding {
             refreshVisibleBindingForCurrentConversation()
         }
     }

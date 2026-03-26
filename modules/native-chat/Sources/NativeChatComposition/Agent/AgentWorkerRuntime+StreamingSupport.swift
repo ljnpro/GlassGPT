@@ -21,6 +21,7 @@ extension AgentWorkerRuntime {
                 phase: .workerWave,
                 taskID: task.id,
                 responseID: responseID,
+                checkpointBaseResponseID: execution.snapshot.ticket(for: role)?.checkpointBaseResponseID,
                 backgroundEligible: configuration.backgroundModeEnabled,
                 partialOutputText: streamState.rawText,
                 statusText: latestTask.displayStatusText,
@@ -62,7 +63,7 @@ extension AgentWorkerRuntime {
             for: role,
             execution: execution,
             conversation: conversation,
-            forceSave: configuration.backgroundModeEnabled
+            forceSave: true
         )
     }
 
@@ -141,6 +142,7 @@ extension AgentWorkerRuntime {
                 phase: .workerWave,
                 taskID: taskID,
                 responseID: streamState.responseID,
+                checkpointBaseResponseID: execution.snapshot.ticket(for: role)?.checkpointBaseResponseID,
                 lastSequenceNumber: persistedSequence,
                 backgroundEligible: configuration.backgroundModeEnabled,
                 partialOutputText: streamState.rawText,

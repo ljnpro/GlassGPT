@@ -182,7 +182,7 @@ package enum UITestScenarioLoader {
         case .empty, .history, .settings, .settingsGateway, .reinstallSeed, .reinstallVerify, .freshInstall:
             return
 
-        case .agentRunning:
+        case .agentRunning, .agentCompletedVisibleSynthesis:
             guard let conversation = conversations.first(where: { $0.mode == .agent }),
                   let draft = conversation.messages.last(where: { $0.role == .assistant && !$0.isComplete }),
                   let snapshot = conversation.agentConversationState?.activeRun

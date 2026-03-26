@@ -3,44 +3,92 @@ import ChatRuntimeWorkflows
 import Foundation
 import OpenAITransport
 
-final class RecoveryStreamProgress {
-    var finishedFromStream = false
-    var encounteredRecoverableFailure = false
-    var receivedAnyRecoveryEvent = false
-    var gatewayResumeTimedOut = false
-}
-
 @MainActor
 extension ChatRecoveryCoordinator {
-    func makeRecoveryGatewayFallbackTask(
+    func startStreamingRecovery(
+        session: ReplySession,
+        responseId: String,
+        lastSeq: Int,
+        apiKey: String,
+        useDirectEndpoint: Bool = false
+    ) async {
+        let streamID = UUID()
+        _ = await sessions.applyRuntimeTransition(.beginRecoveryStream(streamID: streamID), to: session)
+        sessions.syncVisibleState(from: session)
+        guard let execution = services.sessionRegistry.execution(for: session.messageID) else { return }
+
+        let stream = execution.service.streamRecovery(
+            responseId: responseId,
+            startingAfter: lastSeq,
+            apiKey: apiKey,
+            useDirectBaseURL: useDirectEndpoint
+        )
+
+        let progress = RecoveryStreamProgress()
+        var timeoutTask = makeRecoveryStreamTimeoutTask(
+            session: session,
+            streamID: streamID,
+            execution: execution,
+            progress: progress
+        )
+        defer { timeoutTask?.cancel() }
+
+        for await event in stream {
+            timeoutTask?.cancel()
+            progress.receivedAnyRecoveryEvent = true
+            guard await handleRecoveryStreamEvent(
+                event,
+                session: session,
+                streamID: streamID,
+                execution: execution,
+                progress: progress
+            ) else {
+                return
+            }
+
+            if !progress.finishedFromStream, !progress.encounteredRecoverableFailure {
+                timeoutTask = makeRecoveryStreamTimeoutTask(
+                    session: session,
+                    streamID: streamID,
+                    execution: execution,
+                    progress: progress
+                )
+            }
+        }
+
+        await finishRecoveryStreaming(
+            session: session,
+            streamID: streamID,
+            responseId: responseId,
+            lastSeq: lastSeq,
+            apiKey: apiKey,
+            useDirectEndpoint: useDirectEndpoint,
+            execution: execution,
+            progress: progress
+        )
+    }
+
+    func makeRecoveryStreamTimeoutTask(
         session: ReplySession,
         streamID: UUID,
         execution: SessionExecutionState,
-        useDirectEndpoint: Bool,
         progress: RecoveryStreamProgress
     ) -> Task<Void, Never>? {
-        guard execution.service.configurationProvider.useCloudflareGateway, !useDirectEndpoint else {
-            return nil
-        }
+        RecoveryStreamMonitoring.scheduleTimeout { [weak self] in
+            Task { @MainActor [weak self] in
+                guard let self else { return }
 
-        return Task { @MainActor [weak self] in
-            guard let self else { return }
-            do {
-                try await Task.sleep(nanoseconds: 4_000_000_000)
-            } catch {
-                return
+                guard sessions.isSessionActive(session),
+                      let runtimeActor = await sessions.runtimeSession(for: session),
+                      await runtimeActor.isActiveStream(streamID),
+                      !progress.finishedFromStream
+                else {
+                    return
+                }
+
+                progress.resumeTimedOut = true
+                execution.service.cancelStream()
             }
-
-            guard sessions.isSessionActive(session),
-                  let runtimeActor = await sessions.runtimeSession(for: session),
-                  await runtimeActor.isActiveStream(streamID),
-                  !progress.receivedAnyRecoveryEvent
-            else {
-                return
-            }
-
-            progress.gatewayResumeTimedOut = true
-            execution.service.cancelStream()
         }
     }
 
@@ -49,8 +97,7 @@ extension ChatRecoveryCoordinator {
         session: ReplySession,
         streamID: UUID,
         execution _: SessionExecutionState,
-        progress: RecoveryStreamProgress,
-        gatewayFallbackTask: Task<Void, Never>?
+        progress: RecoveryStreamProgress
     ) async -> Bool {
         guard sessions.isSessionActive(session),
               let runtimeActor = await sessions.runtimeSession(for: session),
@@ -58,9 +105,6 @@ extension ChatRecoveryCoordinator {
         else {
             return false
         }
-
-        progress.receivedAnyRecoveryEvent = true
-        gatewayFallbackTask?.cancel()
 
         let isVisible = sessions.visibleSessionMessageID == session.messageID
         switch await streaming.applyStreamEvent(event, to: session, animated: isVisible) {
@@ -108,14 +152,21 @@ extension ChatRecoveryCoordinator {
             return
         }
 
+        let runtimeState = sessions.cachedRuntimeState(for: session)
+        let resolvedResponseID = normalizedRecoveryResponseID(
+            runtimeState?.responseID ?? responseId
+        )
+        let resolvedLastSequenceNumber = runtimeState?.lastSequenceNumber ?? lastSeq
+        let shouldShowRecoveryIndicator = runtimeState?.isRecovering ?? true
+
         let streamOutcome = RecoveryStreamOutcome(
             finishedFromStream: progress.finishedFromStream,
             receivedAnyEvent: progress.receivedAnyRecoveryEvent,
-            gatewayResumeTimedOut: progress.gatewayResumeTimedOut,
+            resumeTimedOut: progress.resumeTimedOut,
             encounteredRecoverableFailure: progress.encounteredRecoverableFailure,
             cloudflareGatewayEnabled: execution.service.configurationProvider.useCloudflareGateway,
             useDirectEndpoint: useDirectEndpoint,
-            responseID: sessions.cachedRuntimeState(for: session)?.responseID
+            responseID: resolvedResponseID
         )
         let nextAction = RecoveryStreamEvaluator.evaluate(streamOutcome)
 
@@ -125,24 +176,51 @@ extension ChatRecoveryCoordinator {
 
         case .retryDirectStream:
             #if DEBUG
-            Loggers.recovery.debug("[Recovery] Gateway resume stalled for \(responseId); retrying direct")
+            Loggers.recovery.debug(
+                "[Recovery] Recovery stream stalled for \(resolvedResponseID ?? responseId); retrying direct"
+            )
             #endif
+            guard let resolvedResponseID else { return }
             await startStreamingRecovery(
                 session: session,
-                responseId: responseId,
-                lastSeq: lastSeq,
+                responseId: resolvedResponseID,
+                lastSeq: resolvedLastSequenceNumber,
                 apiKey: apiKey,
                 useDirectEndpoint: true
             )
             return
 
         case .poll:
-            _ = await sessions.applyRuntimeTransition(.beginRecoveryPoll, to: session)
-            sessions.syncVisibleState(from: session)
-            await pollResponseUntilTerminal(session: session, responseId: responseId)
+            guard let resolvedResponseID else { return }
+            await pollResponseUntilTerminal(
+                session: session,
+                responseId: resolvedResponseID,
+                showRecoveryIndicator: shouldShowRecoveryIndicator
+            )
 
         case .giveUp:
-            return
+            if let resolvedResponseID {
+                await pollResponseUntilTerminal(
+                    session: session,
+                    responseId: resolvedResponseID,
+                    showRecoveryIndicator: shouldShowRecoveryIndicator
+                )
+                return
+            }
+
+            guard let message = conversations.findMessage(byId: session.messageID) else { return }
+            _ = await restartMessageAfterRecoveryExhausted(
+                message,
+                session: session,
+                visible: sessions.visibleSessionMessageID == session.messageID,
+                errorMessage: "The response could not be resumed."
+            )
         }
+    }
+
+    private func normalizedRecoveryResponseID(_ responseID: String?) -> String? {
+        guard let responseID else { return nil }
+        let trimmed = responseID.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
     }
 }

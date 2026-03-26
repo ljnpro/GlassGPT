@@ -58,6 +58,13 @@ extension UITestScenarioLoader {
                 makeConversation(title: "Snapshot Review", timeOffset: -240, backgroundModeEnabled: false),
                 makeRunningAgentConversation(title: "Agent Review", timeOffset: -360)
             ]
+        case .agentCompletedVisibleSynthesis:
+            conversations = [
+                makeConversation(title: "Release Planning", timeOffset: 0, backgroundModeEnabled: false),
+                makeConversation(title: "Archive Audit", timeOffset: -120, backgroundModeEnabled: true),
+                makeConversation(title: "Snapshot Review", timeOffset: -240, backgroundModeEnabled: false),
+                makeCompletedVisibleSynthesisAgentConversation(title: "Agent Review", timeOffset: -360)
+            ]
         }
 
         for conversation in conversations {

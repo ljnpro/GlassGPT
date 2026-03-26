@@ -161,10 +161,10 @@ struct RecoveryFetchEvaluatorEdgeCaseTests {
         )
 
         switch action {
-        case .poll:
-            break // preferStreamingResume requires usedBackgroundMode
+        case .startStream(lastSequenceNumber: 10):
+            break
         default:
-            Issue.record("Expected poll, got \(String(describing: action))")
+            Issue.record("Expected stream restart, got \(String(describing: action))")
         }
     }
 

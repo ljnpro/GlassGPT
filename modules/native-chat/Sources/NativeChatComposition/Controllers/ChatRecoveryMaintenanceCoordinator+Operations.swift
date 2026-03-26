@@ -21,7 +21,7 @@ extension ChatRecoveryMaintenanceCoordinator {
             recovery.recoverResponse(
                 messageId: activeMessage.id,
                 responseId: responseId,
-                preferStreamingResume: activeMessage.usedBackgroundMode,
+                preferStreamingResume: true,
                 visible: true
             )
         }
@@ -36,7 +36,7 @@ extension ChatRecoveryMaintenanceCoordinator {
         recovery.recoverResponse(
             messageId: message.id,
             responseId: responseId,
-            preferStreamingResume: message.usedBackgroundMode,
+            preferStreamingResume: true,
             visible: visible
         )
     }

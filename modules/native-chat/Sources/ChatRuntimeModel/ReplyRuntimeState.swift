@@ -15,6 +15,10 @@ public struct ReplyRuntimeState: Equatable, Sendable {
     public var buffer: ReplyBuffer
     /// Whether the model is currently in its thinking/reasoning phase.
     public var isThinking: Bool
+    /// Whether the active recovery flow originated from a background-mode request.
+    public var recoveryUsesBackgroundMode: Bool?
+    /// Whether a restarted recovery reply should keep showing recovery UI until live progress resumes.
+    public var pendingRecoveryRestart: Bool
 
     /// Creates a new reply runtime state.
     /// - Parameters:
@@ -24,13 +28,17 @@ public struct ReplyRuntimeState: Equatable, Sendable {
     ///   - lifecycle: The initial lifecycle phase. Defaults to `.idle`.
     ///   - buffer: The initial reply buffer. Defaults to empty.
     ///   - isThinking: Whether the model is thinking. Defaults to `false`.
+    ///   - recoveryUsesBackgroundMode: Whether a recovery flow should retain background-mode semantics.
+    ///   - pendingRecoveryRestart: Whether a restarted recovery request is waiting for new live progress.
     public init(
         assistantReplyID: AssistantReplyID,
         messageID: UUID,
         conversationID: UUID,
         lifecycle: ReplyLifecycle = .idle,
         buffer: ReplyBuffer = .init(),
-        isThinking: Bool = false
+        isThinking: Bool = false,
+        recoveryUsesBackgroundMode: Bool? = nil,
+        pendingRecoveryRestart: Bool = false
     ) {
         self.assistantReplyID = assistantReplyID
         self.messageID = messageID
@@ -38,6 +46,8 @@ public struct ReplyRuntimeState: Equatable, Sendable {
         self.lifecycle = lifecycle
         self.buffer = buffer
         self.isThinking = isThinking
+        self.recoveryUsesBackgroundMode = recoveryUsesBackgroundMode
+        self.pendingRecoveryRestart = pendingRecoveryRestart
     }
 
     /// The stream cursor derived from the current lifecycle state, or `nil` if not streaming.

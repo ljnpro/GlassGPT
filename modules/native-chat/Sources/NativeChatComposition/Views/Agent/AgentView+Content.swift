@@ -120,13 +120,15 @@ extension AgentView {
         hasher.combine(viewModel.processSnapshot.leaderLiveStatus)
         hasher.combine(viewModel.processSnapshot.leaderLiveSummary)
         hasher.combine(viewModel.processSnapshot.recoveryState.rawValue)
-        hasher.combine(viewModel.processSnapshot.recentUpdates.count)
+        hasher.combine(viewModel.processSnapshot.recentUpdateItems.count)
         hasher.combine(viewModel.processSnapshot.events.count)
         hasher.combine(viewModel.processSnapshot.tasks.count)
         hasher.combine(viewModel.processSnapshot.activeTaskIDs.count)
         hasher.combine(viewModel.processSnapshot.decisions.count)
-        for update in viewModel.processSnapshot.recentUpdates {
-            hasher.combine(update)
+        for update in viewModel.processSnapshot.recentUpdateItems {
+            hasher.combine(update.id)
+            hasher.combine(update.kind.rawValue)
+            hasher.combine(update.summary)
         }
         for taskID in viewModel.processSnapshot.activeTaskIDs {
             hasher.combine(taskID)

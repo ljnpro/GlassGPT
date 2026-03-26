@@ -81,12 +81,27 @@ extension AgentRunCoordinator {
         default:
             .incomplete
         }
-        AgentProcessProjector.finalize(
-            outcome: failure.userMessage,
-            stopReason: stopReason,
-            activity: .failed,
-            on: &execution.snapshot
-        )
+        let shouldPreserveCompletedCouncil =
+            execution.snapshot.currentStage == .finalSynthesis &&
+            (execution.snapshot.processSnapshot.activity == .completed
+                || execution.snapshot.processSnapshot.activity == .waitingForUser)
+        if shouldPreserveCompletedCouncil {
+            execution.snapshot.phase = .failed
+            execution.snapshot.updatedAt = .now
+            execution.snapshot.lastCheckpointAt = .now
+            execution.snapshot.visibleSynthesisPresentation = AgentVisibleSynthesisPresentation(
+                statusText: "Failed",
+                summaryText: failure.userMessage,
+                recoveryState: .idle
+            )
+        } else {
+            AgentProcessProjector.finalize(
+                outcome: failure.userMessage,
+                stopReason: stopReason,
+                activity: .failed,
+                on: &execution.snapshot
+            )
+        }
         execution.snapshot.updatedAt = .now
         var agentState = currentAgentState(for: prepared.conversation)
         agentState.currentStage = nil

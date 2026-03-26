@@ -9,6 +9,7 @@ enum AgentRunFailure: Error {
     case missingDraft
     case invalidResponse(String)
     case incomplete(String)
+    case connectionLost(String)
 
     var userMessage: String {
         switch self {
@@ -22,7 +23,16 @@ enum AgentRunFailure: Error {
             message
         case let .incomplete(message):
             message
+        case let .connectionLost(message):
+            message
         }
+    }
+
+    var isConnectionLost: Bool {
+        if case .connectionLost = self {
+            return true
+        }
+        return false
     }
 }
 
@@ -72,7 +82,7 @@ final class AgentRunCoordinator {
                 persistCheckpointIfNeeded(
                     execution,
                     in: prepared.conversation,
-                    forceSave: execution.snapshot.runConfiguration.backgroundModeEnabled
+                    forceSave: true
                 )
                 try await uploadAttachmentsIfNeeded(prepared, execution: execution)
             }
@@ -85,9 +95,7 @@ final class AgentRunCoordinator {
             }
             persistSnapshot(execution, in: prepared.conversation)
 
-            if execution.snapshot.currentStage == .finalSynthesis,
-               execution.snapshot.runConfiguration.backgroundModeEnabled,
-               prepared.draft.responseId != nil {
+            if execution.snapshot.currentStage == .finalSynthesis {
                 try await recoverVisibleLeaderSynthesis(
                     apiKey: prepared.apiKey,
                     conversation: prepared.conversation,
@@ -163,19 +171,17 @@ final class AgentRunCoordinator {
         state.sessionRegistry.register(
             execution,
             visible: state.sessionRegistry.isVisible(prepared.conversation.id)
+                || state.currentConversation?.id == prepared.conversation.id
         )
         syncVisibleStateIfNeeded(execution, in: prepared.conversation)
         execution.task = Task { @MainActor [weak self] in
             guard let self else { return }
+            defer { execution.task = nil }
             await executeTurn(prepared, execution: execution)
         }
     }
 
     private func shouldReplayCheckpoint(for snapshot: AgentRunSnapshot) -> Bool {
-        guard snapshot.runConfiguration.backgroundModeEnabled else {
-            return false
-        }
-
         switch snapshot.phase {
         case .leaderTriage, .leaderLocalPass, .leaderReview:
             return snapshot.leaderTicket?.responseID == nil

@@ -47,13 +47,6 @@ func makeTestChatScreenStore(
         configuration: configurationProvider
     )
     let responseParser = OpenAIResponseParser()
-    let sharedService = OpenAIService(
-        requestBuilder: requestBuilder,
-        responseParser: responseParser,
-        streamClient: streamClient,
-        transport: transport
-    )
-
     return ChatController(
         modelContext: context,
         settingsStore: settingsStore,
@@ -61,7 +54,14 @@ func makeTestChatScreenStore(
         configurationProvider: configurationProvider,
         transport: transport,
         fileDownloadService: fileDownloadService,
-        serviceFactory: { sharedService },
+        serviceFactory: {
+            OpenAIService(
+                requestBuilder: requestBuilder,
+                responseParser: responseParser,
+                streamClient: streamClient,
+                transport: transport
+            )
+        },
         bootstrapPolicy: bootstrapPolicy
     )
 }

@@ -83,13 +83,28 @@ struct AgentModeRecoveryLaunchTests {
         #expect(controller.errorMessage == nil)
     }
 
-    @Test func `launch bootstrap keeps standard mode checkpoint dormant instead of auto resuming`() async throws {
+    @Test func `launch bootstrap resumes standard mode checkpoint from the persisted phase`() async throws {
+        let streamClient = ScriptedAgentCouncilStreamClient(
+            turns: [
+                AgentTurnScript(
+                    triageResponseID: "leader_triage_standard_resume",
+                    reviewResponseID: "leader_review_standard_resume",
+                    taskResponseIDs: [
+                        .workerA: "worker_a_standard_resume",
+                        .workerB: "worker_b_standard_resume",
+                        .workerC: "worker_c_standard_resume"
+                    ],
+                    finalResponseID: "leader_final_standard_resume",
+                    finalAnswer: "Standard mode resumed from launch"
+                )
+            ]
+        )
         let controller = try makeTestAgentController(
-            streamClient: QueuedOpenAIStreamClient(scriptedStreams: []),
+            streamClient: streamClient,
             bootstrapPolicy: .live
         ) { context in
             let conversation = Conversation(
-                title: "Dormant Agent",
+                title: "Standard Resume Agent",
                 modeRawValue: ConversationMode.agent.rawValue,
                 model: ModelType.gpt5_4.rawValue,
                 reasoningEffort: ReasoningEffort.high.rawValue,
@@ -97,7 +112,7 @@ struct AgentModeRecoveryLaunchTests {
                 serviceTierRawValue: ServiceTier.standard.rawValue
             )
             conversation.mode = .agent
-            let user = Message(role: .user, content: "Do not auto resume", conversation: conversation)
+            let user = Message(role: .user, content: "Resume the current phase after launch", conversation: conversation)
             let draft = Message(role: .assistant, content: "", conversation: conversation, isComplete: false)
             conversation.messages = [user, draft]
             conversation.agentConversationState = AgentConversationState(
@@ -124,12 +139,12 @@ struct AgentModeRecoveryLaunchTests {
         }
 
         try await waitUntil(timeout: 10) {
-            controller.currentConversation?.title == "Dormant Agent"
-                && controller.processSnapshot.leaderLiveStatus == "Scoping the request"
+            !controller.isRunning &&
+                controller.messages.last?.content == "Standard mode resumed from launch"
         }
 
-        #expect(controller.isRunning == true)
-        #expect(controller.currentConversation?.messages.last?.isComplete == false)
+        #expect(controller.currentConversation?.title == "Standard Resume Agent")
+        #expect(controller.currentConversation?.messages.last?.isComplete == true)
         #expect(controller.errorMessage == nil)
     }
 }

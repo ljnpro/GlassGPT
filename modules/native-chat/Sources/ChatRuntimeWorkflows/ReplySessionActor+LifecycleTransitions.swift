@@ -11,6 +11,7 @@ extension ReplySessionActor {
         switch transition {
         case let .beginRecoveryStatus(responseID, lastSequenceNumber, usedBackgroundMode, route):
             activeStreamID = nil
+            state.recoveryUsesBackgroundMode = usedBackgroundMode
             state.lifecycle = .recoveringStatus(
                 DetachedRecoveryTicket(
                     assistantReplyID: state.assistantReplyID,
@@ -25,6 +26,15 @@ extension ReplySessionActor {
 
         case let .beginRecoveryStream(streamID):
             activeStreamID = streamID
+            if state.recoveryUsesBackgroundMode == nil {
+                switch state.lifecycle {
+                case let .recoveringStatus(ticket), let .recoveringPoll(ticket), let .detached(ticket):
+                    state.recoveryUsesBackgroundMode = ticket.usedBackgroundMode
+                case .recoveringStream, .streaming, .idle, .preparingInput, .uploadingAttachments,
+                     .finalizing, .completed, .failed:
+                    break
+                }
+            }
             let cursor = state.cursor ?? StreamCursor(
                 responseID: "",
                 lastSequenceNumber: nil,
@@ -33,53 +43,17 @@ extension ReplySessionActor {
             state.lifecycle = .recoveringStream(cursor)
 
         case .beginRecoveryPoll:
-            activeStreamID = nil
-            let usedBackgroundMode: Bool = switch state.lifecycle {
-            case let .recoveringStatus(ticket), let .recoveringPoll(ticket), let .detached(ticket):
-                ticket.usedBackgroundMode
-            case .idle, .preparingInput, .uploadingAttachments, .streaming, .recoveringStream, .finalizing, .completed, .failed:
-                false
-            }
-            if let cursor = state.cursor {
-                state.lifecycle = .recoveringPoll(
-                    DetachedRecoveryTicket(
-                        assistantReplyID: state.assistantReplyID,
-                        messageID: state.messageID,
-                        conversationID: state.conversationID,
-                        responseID: cursor.responseID,
-                        lastSequenceNumber: cursor.lastSequenceNumber,
-                        usedBackgroundMode: usedBackgroundMode,
-                        route: cursor.route
-                    )
-                )
-            } else {
-                state.lifecycle = .failed(nil)
-                state.isThinking = false
-            }
+            beginRecoveryPollLifecycle()
 
         case let .detachForBackground(usedBackgroundMode):
-            activeStreamID = nil
-            if let cursor = state.cursor {
-                state.lifecycle = .detached(
-                    DetachedRecoveryTicket(
-                        assistantReplyID: state.assistantReplyID,
-                        messageID: state.messageID,
-                        conversationID: state.conversationID,
-                        responseID: cursor.responseID,
-                        lastSequenceNumber: cursor.lastSequenceNumber,
-                        usedBackgroundMode: usedBackgroundMode,
-                        route: cursor.route
-                    )
-                )
-            } else {
-                state.lifecycle = .failed(nil)
-            }
-            state.isThinking = false
+            detachForBackgroundLifecycle(usedBackgroundMode: usedBackgroundMode)
 
         case .cancelStreaming:
             activeStreamID = nil
             state.lifecycle = .idle
             state.isThinking = false
+            state.recoveryUsesBackgroundMode = nil
+            state.pendingRecoveryRestart = false
 
         case .beginFinalizing:
             state.lifecycle = .finalizing
@@ -88,11 +62,18 @@ extension ReplySessionActor {
             activeStreamID = nil
             state.lifecycle = .completed
             state.isThinking = false
+            state.recoveryUsesBackgroundMode = nil
+            state.pendingRecoveryRestart = false
 
         case let .markFailed(message):
             activeStreamID = nil
             state.lifecycle = .failed(message)
             state.isThinking = false
+            state.recoveryUsesBackgroundMode = nil
+            state.pendingRecoveryRestart = false
+
+        case let .setRecoveryRestartPending(isPending):
+            state.pendingRecoveryRestart = isPending
 
         case .beginSubmitting, .beginUploadingAttachments, .beginStreaming,
              .recordResponseCreated, .recordSequenceUpdate,
@@ -103,6 +84,60 @@ extension ReplySessionActor {
         }
 
         return state
+    }
+
+    private func beginRecoveryPollLifecycle() {
+        activeStreamID = nil
+        let usedBackgroundMode = recoveryUsedBackgroundModeForPolling()
+        guard let cursor = state.cursor else {
+            state.lifecycle = .failed(nil)
+            state.isThinking = false
+            return
+        }
+
+        state.lifecycle = .recoveringPoll(
+            DetachedRecoveryTicket(
+                assistantReplyID: state.assistantReplyID,
+                messageID: state.messageID,
+                conversationID: state.conversationID,
+                responseID: cursor.responseID,
+                lastSequenceNumber: cursor.lastSequenceNumber,
+                usedBackgroundMode: usedBackgroundMode,
+                route: cursor.route
+            )
+        )
+    }
+
+    private func detachForBackgroundLifecycle(usedBackgroundMode: Bool) {
+        activeStreamID = nil
+        state.recoveryUsesBackgroundMode = usedBackgroundMode
+        if let cursor = state.cursor {
+            state.lifecycle = .detached(
+                DetachedRecoveryTicket(
+                    assistantReplyID: state.assistantReplyID,
+                    messageID: state.messageID,
+                    conversationID: state.conversationID,
+                    responseID: cursor.responseID,
+                    lastSequenceNumber: cursor.lastSequenceNumber,
+                    usedBackgroundMode: usedBackgroundMode,
+                    route: cursor.route
+                )
+            )
+        } else {
+            state.lifecycle = .failed(nil)
+        }
+        state.isThinking = false
+    }
+
+    private func recoveryUsedBackgroundModeForPolling() -> Bool {
+        switch state.lifecycle {
+        case let .recoveringStatus(ticket), let .recoveringPoll(ticket), let .detached(ticket):
+            ticket.usedBackgroundMode
+        case .recoveringStream, .streaming:
+            state.recoveryUsesBackgroundMode ?? false
+        case .idle, .preparingInput, .uploadingAttachments, .finalizing, .completed, .failed:
+            false
+        }
     }
 
     /// Updates the stream cursor's sequence number to the maximum of the current and provided values.
@@ -127,32 +162,11 @@ extension ReplySessionActor {
         switch state.lifecycle {
         case .streaming:
             state.lifecycle = .streaming(updatedCursor)
-        case .recoveringStream:
-            state.lifecycle = .recoveringStream(updatedCursor)
-        case let .recoveringStatus(ticket):
-            state.lifecycle = .recoveringStatus(
-                DetachedRecoveryTicket(
-                    assistantReplyID: ticket.assistantReplyID,
-                    messageID: ticket.messageID,
-                    conversationID: ticket.conversationID,
-                    responseID: ticket.responseID,
-                    lastSequenceNumber: nextSequence,
-                    usedBackgroundMode: ticket.usedBackgroundMode,
-                    route: ticket.route
-                )
-            )
-        case let .recoveringPoll(ticket):
-            state.lifecycle = .recoveringPoll(
-                DetachedRecoveryTicket(
-                    assistantReplyID: ticket.assistantReplyID,
-                    messageID: ticket.messageID,
-                    conversationID: ticket.conversationID,
-                    responseID: ticket.responseID,
-                    lastSequenceNumber: nextSequence,
-                    usedBackgroundMode: ticket.usedBackgroundMode,
-                    route: ticket.route
-                )
-            )
+            state.pendingRecoveryRestart = false
+        case .recoveringStream, .recoveringStatus, .recoveringPoll:
+            // Metadata-only resumed progress should also clear recovery UI.
+            state.lifecycle = .streaming(updatedCursor)
+            state.pendingRecoveryRestart = false
         case let .detached(ticket):
             state.lifecycle = .detached(
                 DetachedRecoveryTicket(

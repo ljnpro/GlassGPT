@@ -1,6 +1,5 @@
 import ChatDomain
 import ChatPersistenceSwiftData
-import ChatPresentation
 import Foundation
 import OpenAITransport
 import Testing
@@ -8,27 +7,7 @@ import Testing
 
 @Suite(.serialized)
 @MainActor
-struct AgentModeRuntimeTests {
-    @Test func `agent final synthesis shows waiting while tools are still active after reasoning`() throws {
-        let controller = try makeTestAgentController(streamClient: QueuedOpenAIStreamClient(scriptedStreams: []))
-        controller.currentThinkingText = "Checking the accepted findings while tool results finish."
-        controller.currentStreamingText = ""
-        controller.isThinking = false
-        controller.isStreaming = true
-        controller.activeToolCalls = [
-            ToolCallInfo(id: "ws_live", type: .webSearch, status: .searching, queries: ["rollout checklist"])
-        ]
-
-        #expect(controller.thinkingPresentationState == .waiting)
-
-        controller.activeToolCalls = [
-            ToolCallInfo(id: "ws_done", type: .webSearch, status: .completed, queries: ["rollout checklist"])
-        ]
-        controller.isStreaming = false
-
-        #expect(controller.thinkingPresentationState == .completed)
-    }
-
+struct AgentModeRuntimeConversationTests {
     @Test func `agent mode reuses persisted response ids across follow up turns`() async throws {
         let streamClient = ScriptedAgentCouncilStreamClient(
             turns: [
@@ -56,9 +35,7 @@ struct AgentModeRuntimeTests {
                 )
             ]
         )
-        let controller = try makeTestAgentController(
-            streamClient: streamClient
-        )
+        let controller = try makeTestAgentController(streamClient: streamClient)
 
         #expect(controller.sendMessage(text: "How should we ship this?"))
         try await waitUntil(timeout: 10) {
@@ -105,9 +82,7 @@ struct AgentModeRuntimeTests {
             ],
             controlledResponseIDs: ["leader_final_detached"]
         )
-        let controller = try makeTestAgentController(
-            streamClient: streamClient
-        )
+        let controller = try makeTestAgentController(streamClient: streamClient)
 
         #expect(controller.sendMessage(text: "Keep this running"))
         try await waitUntil(timeout: 10) {
@@ -138,7 +113,7 @@ struct AgentModeRuntimeTests {
         #expect(controller.errorMessage == nil)
     }
 
-    @Test func `retry banner only appears when no live session and no recoverable background snapshot exists`() async throws {
+    @Test func `dormant conversations prefer automatic restart over retry banner when progress can be reconstructed`() async throws {
         let streamClient = ScriptedAgentCouncilStreamClient(
             turns: [
                 AgentTurnScript(
@@ -155,9 +130,7 @@ struct AgentModeRuntimeTests {
             ],
             controlledResponseIDs: ["leader_final_retry"]
         )
-        let controller = try makeTestAgentController(
-            streamClient: streamClient
-        )
+        let controller = try makeTestAgentController(streamClient: streamClient)
 
         #expect(controller.sendMessage(text: "Keep running"))
         try await waitUntil(timeout: 10) {
@@ -177,28 +150,71 @@ struct AgentModeRuntimeTests {
             !controller.isRunning && controller.messages.last?.content == "Recovered visibly"
         }
 
-        let incompleteConversation = Conversation(
-            title: "Incomplete",
+        let restartableConversation = Conversation(
+            title: "Restartable",
             modeRawValue: ConversationMode.agent.rawValue,
             model: ModelType.gpt5_4.rawValue,
             reasoningEffort: ReasoningEffort.high.rawValue,
             backgroundModeEnabled: false,
             serviceTierRawValue: ServiceTier.standard.rawValue
         )
-        incompleteConversation.mode = .agent
-        let user = Message(role: .user, content: "What happened?", conversation: incompleteConversation)
-        let draft = Message(role: .assistant, content: "", conversation: incompleteConversation, isComplete: false)
-        incompleteConversation.messages = [user, draft]
-        incompleteConversation.agentConversationState = AgentConversationState(
+        restartableConversation.mode = .agent
+        let user = Message(role: .user, content: "What happened?", conversation: restartableConversation)
+        let draft = Message(role: .assistant, content: "", conversation: restartableConversation, isComplete: false)
+        restartableConversation.messages = [user, draft]
+        restartableConversation.agentConversationState = AgentConversationState(
             currentStage: nil,
             configuration: AgentConversationConfiguration(),
             activeRun: nil
         )
-        controller.modelContext.insert(incompleteConversation)
+        controller.modelContext.insert(restartableConversation)
         controller.modelContext.insert(user)
         controller.modelContext.insert(draft)
 
-        controller.loadConversation(incompleteConversation)
-        #expect(controller.errorMessage == AgentConversationCoordinator.retryBannerMessage)
+        controller.loadConversation(restartableConversation)
+        #expect(controller.errorMessage == nil)
+        #expect(controller.processSnapshot.activity == .triage)
+
+        let failedConversation = Conversation(
+            title: "Failed",
+            modeRawValue: ConversationMode.agent.rawValue,
+            model: ModelType.gpt5_4.rawValue,
+            reasoningEffort: ReasoningEffort.high.rawValue,
+            backgroundModeEnabled: false,
+            serviceTierRawValue: ServiceTier.standard.rawValue
+        )
+        failedConversation.mode = .agent
+        let failedUser = Message(role: .user, content: "Can you recover?", conversation: failedConversation)
+        let failedDraft = Message(
+            role: .assistant,
+            content: "",
+            conversation: failedConversation,
+            isComplete: false
+        )
+        failedConversation.messages = [failedUser, failedDraft]
+        failedConversation.agentConversationState = AgentConversationState(
+            currentStage: nil,
+            configuration: AgentConversationConfiguration(),
+            activeRun: AgentRunSnapshot(
+                currentStage: .leaderBrief,
+                phase: .failed,
+                draftMessageID: failedDraft.id,
+                latestUserMessageID: failedUser.id,
+                processSnapshot: AgentProcessSnapshot(
+                    activity: .failed,
+                    currentFocus: "Leader planning lost its connection.",
+                    leaderAcceptedFocus: "Leader planning lost its connection.",
+                    leaderLiveStatus: "Failed",
+                    leaderLiveSummary: "The Agent run cannot continue automatically."
+                )
+            )
+        )
+        controller.modelContext.insert(failedConversation)
+        controller.modelContext.insert(failedUser)
+        controller.modelContext.insert(failedDraft)
+
+        controller.loadConversation(failedConversation)
+        #expect(controller.errorMessage == nil)
+        #expect(controller.processSnapshot.activity == .triage)
     }
 }

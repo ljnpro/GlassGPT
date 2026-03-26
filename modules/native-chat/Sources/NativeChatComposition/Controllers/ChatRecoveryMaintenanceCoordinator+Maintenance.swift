@@ -85,7 +85,7 @@ extension ChatRecoveryMaintenanceCoordinator {
             return
         }
 
-        let draftsToResend = orphanedDrafts.filter { $0.role == .assistant && $0.content.isEmpty }
+        let draftsToResend = orphanedDrafts.filter { $0.role == .assistant }
 
         #if DEBUG
         if !draftsToResend.isEmpty {

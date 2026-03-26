@@ -10,7 +10,9 @@ extension AgentProcessProjector {
         latestUserMessageID: UUID,
         configuration: AgentConversationConfiguration = AgentConversationConfiguration()
     ) -> AgentRunSnapshot {
-        AgentRunSnapshot(
+        let startedEvent = AgentEvent(kind: .started, summary: "Started Agent run")
+
+        return AgentRunSnapshot(
             currentStage: .leaderBrief,
             phase: .leaderTriage,
             draftMessageID: draftMessageID,
@@ -22,8 +24,15 @@ extension AgentProcessProjector {
                 leaderAcceptedFocus: "Leader is scoping the request.",
                 leaderLiveStatus: "Scoping the request",
                 leaderLiveSummary: "Classifying the request and sketching the first plan.",
-                events: [
-                    AgentEvent(kind: .started, summary: "Started Agent run")
+                events: [startedEvent],
+                recentUpdateItems: [
+                    AgentProcessUpdate(
+                        kind: .runStarted,
+                        source: .system,
+                        phase: .leaderTriage,
+                        sourceEventID: startedEvent.id,
+                        summary: "Started Agent run"
+                    )
                 ]
             )
         )
@@ -45,6 +54,7 @@ extension AgentProcessProjector {
         snapshot.updatedAt = .now
         snapshot.lastCheckpointAt = .now
         snapshot.processSnapshot.updatedAt = .now
+        AgentRecentUpdateProjector.sanitizeRecentUpdates(on: &snapshot)
     }
 
     static func updateFocus(
@@ -58,15 +68,13 @@ extension AgentProcessProjector {
         if snapshot.processSnapshot.leaderLiveSummary.isEmpty {
             snapshot.processSnapshot.leaderLiveSummary = focus
         }
-        snapshot.processSnapshot.events.append(
-            AgentEvent(kind: .focusUpdated, summary: focus)
-        )
+        let event = AgentEvent(kind: .focusUpdated, summary: focus)
+        snapshot.processSnapshot.events.append(event)
         snapshot.currentStage = legacyStage(for: activity) ?? .leaderBrief
         snapshot.phase = phase(for: activity)
         snapshot.updatedAt = .now
         snapshot.lastCheckpointAt = .now
         snapshot.processSnapshot.updatedAt = .now
-        appendRecentUpdate(focus, on: &snapshot.processSnapshot)
         syncLegacyWorkerProgress(on: &snapshot)
     }
 }
@@ -83,11 +91,6 @@ extension AgentProcessProjector {
         if let summary {
             snapshot.processSnapshot.leaderLiveSummary = AgentSummaryFormatter.summarize(summary, maxLength: 96)
         }
-        if let stableUpdate = [summary, status]
-            .compactMap({ $0?.trimmingCharacters(in: .whitespacesAndNewlines) })
-            .first(where: { !$0.isEmpty }) {
-            appendRecentUpdate(stableUpdate, on: &snapshot.processSnapshot)
-        }
         snapshot.updatedAt = .now
         snapshot.processSnapshot.updatedAt = .now
     }
@@ -100,9 +103,7 @@ extension AgentProcessProjector {
         snapshot.updatedAt = .now
         snapshot.lastCheckpointAt = .now
         snapshot.processSnapshot.updatedAt = .now
-        if recoveryState != .idle {
-            appendRecentUpdate(recoveryState.displayName, on: &snapshot.processSnapshot)
-        }
+        AgentRecentUpdateProjector.updateRecoveryMilestone(recoveryState, on: &snapshot)
     }
 
     static func updatePhase(
@@ -128,13 +129,17 @@ extension AgentProcessProjector {
         on snapshot: inout AgentRunSnapshot
     ) {
         snapshot.processSnapshot.plan = plan
-        snapshot.processSnapshot.events.append(
-            AgentEvent(kind: .planUpdated, summary: "Updated Agent plan")
-        )
+        let event = AgentEvent(kind: .planUpdated, summary: "Updated Agent plan")
+        snapshot.processSnapshot.events.append(event)
         snapshot.updatedAt = .now
         snapshot.lastCheckpointAt = .now
         snapshot.processSnapshot.updatedAt = .now
-        appendRecentUpdate("Updated plan", on: &snapshot.processSnapshot)
+        AgentRecentUpdateProjector.recordPlanMilestone(
+            "Updated plan",
+            phase: snapshot.phase,
+            sourceEventID: event.id,
+            on: &snapshot
+        )
     }
 
     static func appendDecision(
@@ -152,7 +157,6 @@ extension AgentProcessProjector {
         snapshot.updatedAt = .now
         snapshot.lastCheckpointAt = .now
         snapshot.processSnapshot.updatedAt = .now
-        appendRecentUpdate(summary, on: &snapshot.processSnapshot)
     }
 
     static func appendEvidence(
@@ -174,41 +178,6 @@ extension AgentProcessProjector {
         snapshot.updatedAt = .now
         snapshot.lastCheckpointAt = .now
         snapshot.processSnapshot.updatedAt = .now
-        appendRecentUpdate("Accepted evidence updated", on: &snapshot.processSnapshot)
-    }
-
-    static func beginSynthesis(on snapshot: inout AgentRunSnapshot) {
-        snapshot.processSnapshot.activity = .synthesis
-        snapshot.phase = .finalSynthesis
-        snapshot.currentStage = .finalSynthesis
-        snapshot.processSnapshot.leaderLiveStatus = "Writing final answer"
-        snapshot.processSnapshot.leaderLiveSummary = "Writing final answer from accepted findings."
-        snapshot.processSnapshot.recoveryState = .idle
-        snapshot.processSnapshot.events.append(
-            AgentEvent(kind: .synthesisStarted, summary: "Leader began final synthesis")
-        )
-        snapshot.updatedAt = .now
-        snapshot.lastCheckpointAt = .now
-        snapshot.processSnapshot.updatedAt = .now
-        appendRecentUpdate("Leader began final synthesis", on: &snapshot.processSnapshot)
-        syncLegacyWorkerProgress(on: &snapshot)
-    }
-
-    static func appendRecentUpdate(
-        _ summary: String,
-        on process: inout AgentProcessSnapshot
-    ) {
-        let trimmed = AgentSummaryFormatter.summarize(summary, maxLength: 96)
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        let compact = AgentSummaryFormatter.summarize(trimmed, maxLength: 72)
-        guard !compact.isEmpty else { return }
-        if process.recentUpdates.last == compact {
-            return
-        }
-        process.recentUpdates.append(compact)
-        if process.recentUpdates.count > 5 {
-            process.recentUpdates.removeFirst(process.recentUpdates.count - 5)
-        }
     }
 
     private static func phase(for activity: AgentProcessActivity) -> AgentRunPhase {

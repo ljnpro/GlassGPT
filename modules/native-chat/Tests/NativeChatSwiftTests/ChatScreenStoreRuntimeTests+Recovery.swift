@@ -59,12 +59,12 @@ extension ChatScreenStoreRuntimeTests {
 
         try assertRecoveredMessage(in: store, content: "Recovered via stream", thinking: "Recovered reasoning")
         let requestedPaths = await transport.requestedPaths()
-        #expect(requestedPaths == ["/v1/responses/resp_stream_resume"])
+        #expect(requestedPaths.isEmpty)
         #expect(streamClient.recordedRequests.count == 1)
     }
 
-    @Test func `recover response404 uses fallback and clears visible runtime state`() async throws {
-        let streamClient = QueuedOpenAIStreamClient(scriptedStreams: [])
+    @Test func `recover response404 automatically restarts with a clean visible draft`() async throws {
+        let streamClient = ControlledOpenAIStreamClient()
         let transport = StubOpenAITransport()
         let missingURL = try #require(
             URL(string: "https://api.test.openai.local/v1/responses/resp_missing")
@@ -82,8 +82,12 @@ extension ChatScreenStoreRuntimeTests {
             content: "Partial response",
             thinking: "Keep this reasoning",
             responseId: "resp_missing",
-            lastSequenceNumber: 5,
+            lastSequenceNumber: nil,
             usedBackgroundMode: true
+        )
+        MessagePayloadStore.setToolCalls(
+            [ToolCallInfo(id: "ws_missing", type: .webSearch, status: .searching)],
+            on: draft
         )
         conversation.messages.append(draft)
         store.modelContext.insert(draft)
@@ -101,13 +105,112 @@ extension ChatScreenStoreRuntimeTests {
         )
 
         try await waitUntil {
-            self.latestAssistantMessage(in: store)?.isComplete == true
+            store.currentVisibleSession != nil &&
+                store.isThinking &&
+                store.currentStreamingText.isEmpty &&
+                store.currentThinkingText.isEmpty &&
+                store.activeToolCalls.isEmpty &&
+                store.isRecovering
         }
 
-        try assertRecoveredMessage(in: store, content: "Partial response", thinking: "Keep this reasoning")
-        #expect(store.errorMessage == "This response is no longer resumable.")
+        streamClient.yield(.responseCreated("resp_missing_restarted"))
+        streamClient.yield(.thinkingStarted)
+        streamClient.yield(.thinkingDelta("Retried reasoning"))
+        streamClient.yield(.webSearchStarted("ws_missing_restarted"))
+        streamClient.yield(.textDelta("Restarted response"))
+        try await waitUntil {
+            !store.isRecovering
+        }
+        streamClient.yield(.completed("Restarted response", "Retried reasoning", nil))
+
+        try await waitUntil {
+            self.latestAssistantMessage(in: store)?.content == "Restarted response" &&
+                self.latestAssistantMessage(in: store)?.isComplete == true
+        }
+
+        let restarted = try #require(latestAssistantMessage(in: store))
+        #expect(restarted.content == "Restarted response")
+        #expect(restarted.content.contains("Partial response") == false)
+        #expect(restarted.thinking == "Retried reasoning")
+        #expect(restarted.toolCalls.count == 1)
+        #expect(store.errorMessage == nil)
         let requestedPaths = await transport.requestedPaths()
         #expect(requestedPaths == ["/v1/responses/resp_missing"])
+    }
+
+    @Test func `foreground return automatically restarts an orphaned draft with no persisted response id`() async throws {
+        let streamClient = ControlledOpenAIStreamClient()
+        let store = try makeTestChatScreenStore(streamClient: streamClient)
+        let conversation = try seedConversation(
+            in: store,
+            title: "Foreground Orphan Restart",
+            backgroundModeEnabled: false
+        )
+
+        store.currentConversation = conversation
+        store.messages = []
+        store.backgroundModeEnabled = false
+        store.syncConversationProjection()
+
+        #expect(store.sendMessage(text: "Restart this orphaned foreground draft"))
+        try await waitUntil {
+            store.currentVisibleSession != nil && streamClient.activeStreamCount > 0
+        }
+
+        streamClient.yield(.thinkingStarted)
+        streamClient.yield(.thinkingDelta("Old foreground orphan reasoning"))
+        streamClient.yield(.webSearchStarted("ws_orphan_foreground"))
+        streamClient.yield(.textDelta("Old foreground orphan answer"))
+
+        try await waitUntil {
+            let message = self.latestAssistantMessage(in: store)
+            return message?.responseId == nil &&
+                message?.content == "Old foreground orphan answer" &&
+                message?.thinking == "Old foreground orphan reasoning" &&
+                message?.toolCalls.count == 1
+        }
+
+        store.handleEnterBackground()
+        await store.suspendActiveSessionsForAppBackgroundNow()
+
+        let suspendedMessage = try #require(latestAssistantMessage(in: store))
+        #expect(suspendedMessage.responseId == nil)
+        #expect(suspendedMessage.content == "Old foreground orphan answer")
+        #expect(suspendedMessage.thinking == "Old foreground orphan reasoning")
+        #expect(suspendedMessage.toolCalls.count == 1)
+        #expect(!suspendedMessage.isComplete)
+
+        store.handleReturnToForeground()
+
+        try await waitUntil {
+            store.currentVisibleSession != nil &&
+                store.isThinking &&
+                store.currentStreamingText.isEmpty &&
+                store.currentThinkingText.isEmpty &&
+                store.activeToolCalls.isEmpty
+        }
+
+        streamClient.yield(.responseCreated("resp_orphan_foreground_restarted"))
+        streamClient.yield(.thinkingStarted)
+        streamClient.yield(.thinkingDelta("Retried foreground orphan reasoning"))
+        streamClient.yield(.webSearchStarted("ws_orphan_foreground_restarted"))
+        streamClient.yield(.textDelta("Restarted foreground orphan reply"))
+        streamClient.yield(.completed("Restarted foreground orphan reply", "Retried foreground orphan reasoning", nil))
+
+        try await waitUntil {
+            self.latestAssistantMessage(in: store)?.content == "Restarted foreground orphan reply" &&
+                self.latestAssistantMessage(in: store)?.isComplete == true
+        }
+
+        let restartedMessage = try #require(latestAssistantMessage(in: store))
+        #expect(restartedMessage.responseId == "resp_orphan_foreground_restarted")
+        #expect(restartedMessage.content == "Restarted foreground orphan reply")
+        #expect(restartedMessage.content.contains("Old foreground orphan answer") == false)
+        #expect(restartedMessage.thinking == "Retried foreground orphan reasoning")
+        #expect(restartedMessage.toolCalls.count == 1)
+        #expect(streamClient.recordedRequests.count == 2)
+        let restartedRequest = try #require(streamClient.recordedRequests.last)
+        #expect(restartedRequest.url?.path == "/v1/responses")
     }
 
     @Test func `start new chat cancels tracked generated file prefetch`() async throws {
@@ -159,7 +262,7 @@ extension ChatScreenStoreRuntimeTests {
         }
     }
 
-    @Test func `recover response invisible polling finalizes message without binding visible session`() async throws {
+    @Test func `recover response without a recovery cursor fetches the completed message without binding visible session`() async throws {
         let streamClient = QueuedOpenAIStreamClient(scriptedStreams: [])
         let transport = StubOpenAITransport()
         let hiddenResumeURL = try #require(
@@ -179,7 +282,7 @@ extension ChatScreenStoreRuntimeTests {
         let draft = makeIncompleteDraft(
             conversation: conversation,
             responseId: "resp_hidden_resume",
-            lastSequenceNumber: 2,
+            lastSequenceNumber: nil,
             usedBackgroundMode: false
         )
         conversation.messages.append(draft)
@@ -257,42 +360,5 @@ extension ChatScreenStoreRuntimeTests {
         let recovered = try #require(latestAssistantMessage(in: store))
         #expect(recovered.content == "Recovered without tool metadata")
         #expect(recovered.toolCalls.isEmpty)
-    }
-}
-
-// MARK: - Recovery Helpers
-
-extension ChatScreenStoreRuntimeTests {
-    func makeIncompleteDraft(
-        conversation: Conversation,
-        content: String = "",
-        thinking: String? = nil,
-        responseId: String,
-        lastSequenceNumber: Int,
-        usedBackgroundMode: Bool
-    ) -> Message {
-        Message(
-            role: .assistant,
-            content: content,
-            thinking: thinking,
-            conversation: conversation,
-            responseId: responseId,
-            lastSequenceNumber: lastSequenceNumber,
-            usedBackgroundMode: usedBackgroundMode,
-            isComplete: false
-        )
-    }
-
-    func assertRecoveredMessage(
-        in store: ChatController,
-        content: String,
-        thinking: String
-    ) throws {
-        let recovered = try #require(latestAssistantMessage(in: store))
-        #expect(recovered.content == content)
-        #expect(recovered.thinking == thinking)
-        #expect(recovered.isComplete)
-        #expect(store.currentVisibleSession == nil)
-        #expect(!store.isRecovering)
     }
 }

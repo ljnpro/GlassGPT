@@ -40,17 +40,18 @@ extension ChatSessionCoordinator {
                 message.conversation?.updatedAt = .now
                 conversations.upsertMessage(message)
             } else {
-                message.content = interruptedResponseFallbackText(
-                    recoveryFallbackText(
-                        for: message,
-                        session: session,
-                        runtimeState: cachedRuntimeState(for: session),
-                        visibleSessionMessageID: visibleSessionMessageID,
-                        currentStreamingText: state.currentStreamingText
-                    )
+                message.content = recoveryFallbackText(
+                    for: message,
+                    session: session,
+                    runtimeState: cachedRuntimeState(for: session),
+                    visibleSessionMessageID: visibleSessionMessageID,
+                    currentStreamingText: state.currentStreamingText
                 )
                 message.thinking = runtimeState.buffer.thinking.isEmpty ? nil : runtimeState.buffer.thinking
-                message.isComplete = true
+                message.toolCalls = runtimeState.buffer.toolCalls
+                message.annotations = runtimeState.buffer.citations
+                message.filePathAnnotations = runtimeState.buffer.filePathAnnotations
+                message.isComplete = false
                 message.lastSequenceNumber = nil
                 message.conversation?.updatedAt = .now
                 conversations.upsertMessage(message)
@@ -108,7 +109,13 @@ extension ChatSessionCoordinator {
         _ transition: ReplyRuntimeTransition,
         to session: ReplySession
     ) async -> ReplyRuntimeState? {
+        guard isSessionActive(session) else {
+            return nil
+        }
         await ensureRuntimeSessionRegisteredNow(for: session)
+        guard isSessionActive(session) else {
+            return nil
+        }
         guard let runtimeActor = await runtimeSession(for: session) else {
             return nil
         }

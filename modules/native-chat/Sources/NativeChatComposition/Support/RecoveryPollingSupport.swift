@@ -8,30 +8,41 @@ import OpenAITransport
 @MainActor
 extension ChatRecoveryCoordinator {
     func pollResponseUntilTerminal(session: ReplySession, responseId: String) async {
+        await pollResponseUntilTerminal(
+            session: session,
+            responseId: responseId,
+            showRecoveryIndicator: true
+        )
+    }
+
+    func pollResponseUntilTerminal(
+        session: ReplySession,
+        responseId: String,
+        showRecoveryIndicator: Bool = true
+    ) async {
         let key = resultApplier.activeAPIKey(for: session)
         guard !key.isEmpty else { return }
-        _ = await sessions.applyRuntimeTransition(.beginRecoveryPoll, to: session)
-        sessions.syncVisibleState(from: session)
+        if showRecoveryIndicator {
+            _ = await sessions.applyRuntimeTransition(.beginRecoveryPoll, to: session)
+            sessions.syncVisibleState(from: session)
+        }
 
         let maxAttempts = RecoveryPollEvaluator.defaultMaxAttempts
         var attempts = 0
-        var lastResult: OpenAIResponseFetchResult?
         var lastError: String?
 
         while !Task.isCancelled, attempts < maxAttempts {
             attempts += 1
 
-            // Collect facts from this poll attempt
             let attemptOutcome: PollAttemptOutcome
             do {
                 guard let execution = services.sessionRegistry.execution(for: session.messageID) else { return }
                 let result = try await execution.service.fetchResponse(responseId: responseId, apiKey: key)
-                lastResult = result
+                execution.markProgress()
                 attemptOutcome = PollAttemptOutcome(result: result, attempt: attempts, maxAttempts: maxAttempts)
             } catch {
-                // Check for unrecoverable errors before evaluating
                 if let message = conversations.findMessage(byId: session.messageID),
-                   resultApplier.handleUnrecoverableRecoveryError(
+                   await restartRecoveryIfUnrecoverable(
                        error,
                        for: message,
                        responseId: responseId,
@@ -44,7 +55,6 @@ extension ChatRecoveryCoordinator {
                 attemptOutcome = PollAttemptOutcome(error: error, attempt: attempts, maxAttempts: maxAttempts)
             }
 
-            // Runtime evaluator decides this step
             let stepAction = RecoveryPollEvaluator.evaluate(attemptOutcome)
 
             switch stepAction {
@@ -62,16 +72,25 @@ extension ChatRecoveryCoordinator {
 
             case let .terminal(result, errorMessage):
                 if let message = conversations.findMessage(byId: session.messageID) {
-                    if let errorMessage, sessions.visibleSessionMessageID == session.messageID {
-                        state.errorMessage = errorMessage
+                    if result.status == .completed {
+                        if let errorMessage, sessions.visibleSessionMessageID == session.messageID {
+                            state.errorMessage = errorMessage
+                        }
+                        resultApplier.finishRecovery(
+                            for: message,
+                            session: session,
+                            result: result,
+                            fallbackText: resultApplier.recoveryFallbackText(for: message, session: session),
+                            fallbackThinking: resultApplier.recoveryFallbackThinking(for: message, session: session)
+                        )
+                    } else {
+                        _ = await restartMessageAfterRecoveryExhausted(
+                            message,
+                            session: session,
+                            visible: sessions.visibleSessionMessageID == session.messageID,
+                            errorMessage: errorMessage
+                        )
                     }
-                    resultApplier.finishRecovery(
-                        for: message,
-                        session: session,
-                        result: result,
-                        fallbackText: resultApplier.recoveryFallbackText(for: message, session: session),
-                        fallbackThinking: resultApplier.recoveryFallbackThinking(for: message, session: session)
-                    )
                 }
                 return
 
@@ -80,19 +99,12 @@ extension ChatRecoveryCoordinator {
             }
         }
 
-        // Loop exhausted — finish with whatever we have
         guard !Task.isCancelled, let message = conversations.findMessage(byId: session.messageID) else { return }
-
-        if sessions.visibleSessionMessageID == session.messageID,
-           let lastError, !lastError.isEmpty {
-            state.errorMessage = lastError
-        }
-        resultApplier.finishRecovery(
-            for: message,
+        _ = await restartMessageAfterRecoveryExhausted(
+            message,
             session: session,
-            result: lastResult,
-            fallbackText: resultApplier.recoveryFallbackText(for: message, session: session),
-            fallbackThinking: resultApplier.recoveryFallbackThinking(for: message, session: session)
+            visible: sessions.visibleSessionMessageID == session.messageID,
+            errorMessage: lastError
         )
 
         #if DEBUG

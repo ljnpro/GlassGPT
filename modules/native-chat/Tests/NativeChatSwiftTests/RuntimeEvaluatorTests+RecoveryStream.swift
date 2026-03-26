@@ -11,7 +11,7 @@ struct RecoveryStreamEvaluatorEdgeCaseTests {
             RecoveryStreamOutcome(
                 finishedFromStream: true,
                 receivedAnyEvent: true,
-                gatewayResumeTimedOut: false,
+                resumeTimedOut: false,
                 encounteredRecoverableFailure: false,
                 cloudflareGatewayEnabled: true,
                 useDirectEndpoint: false,
@@ -27,7 +27,7 @@ struct RecoveryStreamEvaluatorEdgeCaseTests {
             RecoveryStreamOutcome(
                 finishedFromStream: true,
                 receivedAnyEvent: false,
-                gatewayResumeTimedOut: true,
+                resumeTimedOut: true,
                 encounteredRecoverableFailure: true,
                 cloudflareGatewayEnabled: true,
                 useDirectEndpoint: false,
@@ -45,7 +45,7 @@ struct RecoveryStreamEvaluatorEdgeCaseTests {
             RecoveryStreamOutcome(
                 finishedFromStream: false,
                 receivedAnyEvent: false,
-                gatewayResumeTimedOut: true,
+                resumeTimedOut: true,
                 encounteredRecoverableFailure: false,
                 cloudflareGatewayEnabled: true,
                 useDirectEndpoint: false,
@@ -61,7 +61,7 @@ struct RecoveryStreamEvaluatorEdgeCaseTests {
             RecoveryStreamOutcome(
                 finishedFromStream: false,
                 receivedAnyEvent: false,
-                gatewayResumeTimedOut: false,
+                resumeTimedOut: false,
                 encounteredRecoverableFailure: false,
                 cloudflareGatewayEnabled: true,
                 useDirectEndpoint: false,
@@ -77,7 +77,7 @@ struct RecoveryStreamEvaluatorEdgeCaseTests {
             RecoveryStreamOutcome(
                 finishedFromStream: false,
                 receivedAnyEvent: false,
-                gatewayResumeTimedOut: true,
+                resumeTimedOut: true,
                 encounteredRecoverableFailure: true,
                 cloudflareGatewayEnabled: true,
                 useDirectEndpoint: true,
@@ -94,7 +94,7 @@ struct RecoveryStreamEvaluatorEdgeCaseTests {
             RecoveryStreamOutcome(
                 finishedFromStream: false,
                 receivedAnyEvent: false,
-                gatewayResumeTimedOut: true,
+                resumeTimedOut: true,
                 encounteredRecoverableFailure: true,
                 cloudflareGatewayEnabled: false,
                 useDirectEndpoint: false,
@@ -112,7 +112,7 @@ struct RecoveryStreamEvaluatorEdgeCaseTests {
             RecoveryStreamOutcome(
                 finishedFromStream: false,
                 receivedAnyEvent: true,
-                gatewayResumeTimedOut: false,
+                resumeTimedOut: false,
                 encounteredRecoverableFailure: true,
                 cloudflareGatewayEnabled: false,
                 useDirectEndpoint: true,
@@ -128,7 +128,7 @@ struct RecoveryStreamEvaluatorEdgeCaseTests {
             RecoveryStreamOutcome(
                 finishedFromStream: false,
                 receivedAnyEvent: true,
-                gatewayResumeTimedOut: false,
+                resumeTimedOut: false,
                 encounteredRecoverableFailure: false,
                 cloudflareGatewayEnabled: false,
                 useDirectEndpoint: true,
@@ -146,7 +146,7 @@ struct RecoveryStreamEvaluatorEdgeCaseTests {
             RecoveryStreamOutcome(
                 finishedFromStream: false,
                 receivedAnyEvent: true,
-                gatewayResumeTimedOut: false,
+                resumeTimedOut: false,
                 encounteredRecoverableFailure: false,
                 cloudflareGatewayEnabled: false,
                 useDirectEndpoint: true,
@@ -162,7 +162,7 @@ struct RecoveryStreamEvaluatorEdgeCaseTests {
             RecoveryStreamOutcome(
                 finishedFromStream: false,
                 receivedAnyEvent: false,
-                gatewayResumeTimedOut: false,
+                resumeTimedOut: false,
                 encounteredRecoverableFailure: false,
                 cloudflareGatewayEnabled: false,
                 useDirectEndpoint: true,
@@ -180,7 +180,7 @@ struct RecoveryStreamEvaluatorEdgeCaseTests {
             RecoveryStreamOutcome(
                 finishedFromStream: false,
                 receivedAnyEvent: true,
-                gatewayResumeTimedOut: false,
+                resumeTimedOut: false,
                 encounteredRecoverableFailure: false,
                 cloudflareGatewayEnabled: true,
                 useDirectEndpoint: false,
@@ -197,7 +197,7 @@ struct RecoveryStreamEvaluatorEdgeCaseTests {
             RecoveryStreamOutcome(
                 finishedFromStream: false,
                 receivedAnyEvent: true,
-                gatewayResumeTimedOut: false,
+                resumeTimedOut: false,
                 encounteredRecoverableFailure: false,
                 cloudflareGatewayEnabled: true,
                 useDirectEndpoint: false,

@@ -32,7 +32,19 @@ extension AgentConversationCoordinator {
         clearVisibleRunState(clearDraft: true)
 
         if let execution = state.sessionRegistry.execution(for: conversation.id) {
-            bindVisibleExecution(execution, in: conversation)
+            if let draft = conversation.messages.first(where: { $0.id == execution.draftMessageID }) {
+                state.sessionRegistry.bindVisibleConversation(conversation.id)
+                applyPersistedSnapshot(execution.snapshot, draft: draft)
+            }
+            let disposition = state.runCoordinator.resumeReplacementDisposition(for: execution, in: conversation)
+            if autoResume, disposition != .keep {
+                Task { @MainActor [weak self] in
+                    guard let self else { return }
+                    await state.runCoordinator.resumePersistedRunIfNeeded(conversation)
+                }
+            } else {
+                bindVisibleExecution(execution, in: conversation)
+            }
             return
         }
 
@@ -45,10 +57,10 @@ extension AgentConversationCoordinator {
         }
 
         state.draftMessage = draft
-        if let snapshot = conversation.agentConversationState?.activeRun {
+        if conversation.agentConversationState?.activeRun != nil {
+            let snapshot = state.runCoordinator.resumableSnapshot(in: conversation, draft: draft)
             applyPersistedSnapshot(snapshot, draft: draft)
             if autoResume,
-               snapshot.runConfiguration.backgroundModeEnabled,
                snapshot.phase.supportsAutomaticResume {
                 Task { @MainActor [weak self] in
                     guard let self else { return }
@@ -61,14 +73,9 @@ extension AgentConversationCoordinator {
             return
         }
 
-        state.currentStreamingText = draft.content
-        state.currentThinkingText = draft.thinking ?? ""
-        state.activeToolCalls = draft.toolCalls
-        state.liveCitations = draft.annotations
-        state.liveFilePathAnnotations = draft.filePathAnnotations
-        let backgroundEnabled = conversation.agentConversationState?.activeRun?.runConfiguration.backgroundModeEnabled
-            ?? resolvedConfiguration(for: conversation).backgroundModeEnabled
-        if autoResume, backgroundEnabled, draft.responseId != nil {
+        let snapshot = state.runCoordinator.resumableSnapshot(in: conversation, draft: draft)
+        applyPersistedSnapshot(snapshot, draft: draft)
+        if autoResume, snapshot.phase.supportsAutomaticResume {
             Task { @MainActor [weak self] in
                 guard let self else { return }
                 await state.runCoordinator.resumePersistedRunIfNeeded(conversation)
@@ -128,6 +135,6 @@ extension AgentConversationCoordinator {
         if snapshot.phase == .failed {
             return true
         }
-        return !snapshot.runConfiguration.backgroundModeEnabled
+        return !snapshot.phase.supportsAutomaticResume
     }
 }

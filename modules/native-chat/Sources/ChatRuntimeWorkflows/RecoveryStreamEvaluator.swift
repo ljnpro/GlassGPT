@@ -8,7 +8,7 @@ public struct RecoveryStreamOutcome: Sendable, Equatable {
     /// Whether any recovery event was received before the stream ended.
     public let receivedAnyEvent: Bool
     /// Whether the gateway resume attempt timed out.
-    public let gatewayResumeTimedOut: Bool
+    public let resumeTimedOut: Bool
     /// Whether the stream encountered a recoverable failure.
     public let encounteredRecoverableFailure: Bool
     /// Whether Cloudflare gateway is enabled.
@@ -22,7 +22,7 @@ public struct RecoveryStreamOutcome: Sendable, Equatable {
     public init(
         finishedFromStream: Bool,
         receivedAnyEvent: Bool,
-        gatewayResumeTimedOut: Bool,
+        resumeTimedOut: Bool,
         encounteredRecoverableFailure: Bool,
         cloudflareGatewayEnabled: Bool,
         useDirectEndpoint: Bool,
@@ -30,7 +30,7 @@ public struct RecoveryStreamOutcome: Sendable, Equatable {
     ) {
         self.finishedFromStream = finishedFromStream
         self.receivedAnyEvent = receivedAnyEvent
-        self.gatewayResumeTimedOut = gatewayResumeTimedOut
+        self.resumeTimedOut = resumeTimedOut
         self.encounteredRecoverableFailure = encounteredRecoverableFailure
         self.cloudflareGatewayEnabled = cloudflareGatewayEnabled
         self.useDirectEndpoint = useDirectEndpoint
@@ -64,7 +64,7 @@ public enum RecoveryStreamEvaluator {
         let plannerStep = ReplyRecoveryPlanner.streamNextStep(
             cloudflareGatewayEnabled: outcome.cloudflareGatewayEnabled,
             useDirectEndpoint: outcome.useDirectEndpoint,
-            gatewayResumeTimedOut: outcome.gatewayResumeTimedOut,
+            resumeTimedOut: outcome.resumeTimedOut,
             receivedAnyRecoveryEvent: outcome.receivedAnyEvent,
             encounteredRecoverableFailure: outcome.encounteredRecoverableFailure,
             responseId: outcome.responseID

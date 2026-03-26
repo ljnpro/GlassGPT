@@ -79,15 +79,15 @@ struct AgentProcessSections: View {
         Array(process.plan.prefix(5))
     }
 
-    private var recentUpdates: [String] {
-        Array(process.recentUpdates.suffix(5))
+    private var recentUpdates: [AgentProcessUpdate] {
+        Array(process.recentUpdateItems.prefix(5))
     }
 
     private var historyEvents: [AgentEvent] {
-        let recentSet = Set(process.recentUpdates)
+        let recentSourceEventIDs = Set(process.recentUpdateItems.compactMap(\.sourceEventID))
         return Array(
             process.events
-                .filter { !recentSet.contains($0.summary) }
+                .filter { !recentSourceEventIDs.contains($0.id) }
                 .sorted { lhs, rhs in
                     lhs.createdAt > rhs.createdAt
                 }
@@ -120,8 +120,8 @@ struct AgentProcessSections: View {
             if !recentUpdates.isEmpty {
                 AgentProcessSectionHeader(title: String(localized: "Recent Updates"))
                 VStack(alignment: .leading, spacing: 6) {
-                    ForEach(Array(recentUpdates.enumerated()), id: \.offset) { _, update in
-                        AgentRecentUpdateRow(text: update)
+                    ForEach(recentUpdates) { update in
+                        AgentRecentUpdateRow(update: update)
                     }
                 }
             }

@@ -30,7 +30,7 @@ public enum ReplyRecoveryPlanner {
     /// - Parameters:
     ///   - cloudflareGatewayEnabled: Whether the gateway is enabled.
     ///   - useDirectEndpoint: Whether the direct endpoint is already active.
-    ///   - gatewayResumeTimedOut: Whether the gateway attempt timed out.
+    ///   - resumeTimedOut: Whether the recovery stream produced no progress before the inactivity timeout.
     ///   - receivedAnyRecoveryEvent: Whether any recovery event arrived.
     ///   - encounteredRecoverableFailure: Whether a recoverable failure occurred.
     ///   - responseId: The response identifier tracked by runtime state, if any.
@@ -38,7 +38,7 @@ public enum ReplyRecoveryPlanner {
     public static func streamNextStep(
         cloudflareGatewayEnabled: Bool,
         useDirectEndpoint: Bool,
-        gatewayResumeTimedOut: Bool,
+        resumeTimedOut: Bool,
         receivedAnyRecoveryEvent: Bool,
         encounteredRecoverableFailure: Bool,
         responseId: String?
@@ -46,7 +46,7 @@ public enum ReplyRecoveryPlanner {
         RuntimeSessionDecisionPolicy.recoveryStreamNextStep(
             cloudflareGatewayEnabled: cloudflareGatewayEnabled,
             useDirectEndpoint: useDirectEndpoint,
-            gatewayResumeTimedOut: gatewayResumeTimedOut,
+            resumeTimedOut: resumeTimedOut,
             receivedAnyRecoveryEvent: receivedAnyRecoveryEvent,
             encounteredRecoverableFailure: encounteredRecoverableFailure,
             responseId: responseId

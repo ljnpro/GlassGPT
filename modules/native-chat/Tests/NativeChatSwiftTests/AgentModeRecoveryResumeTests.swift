@@ -7,7 +7,7 @@ import Testing
 
 @Suite(.serialized)
 @MainActor
-struct AgentModeRecoveryTests {
+struct AgentModeRecoveryResumeTests {
     @Test func `launch bootstrap resumes restored background agent conversation without waiting for surface appearance`() async throws {
         let streamClient = ScriptedAgentCouncilStreamClient(
             turns: [
@@ -105,9 +105,7 @@ struct AgentModeRecoveryTests {
                 )
             ]
         )
-        let controller = try makeTestAgentController(
-            streamClient: streamClient
-        )
+        let controller = try makeTestAgentController(streamClient: streamClient)
 
         let conversation = Conversation(
             title: "Resume Hidden",

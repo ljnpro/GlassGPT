@@ -241,13 +241,13 @@ extension SourceTargetBoundaryTests {
                 usedBackgroundMode: false,
                 lastSequenceNumber: 7
             ) ==
-                .poll
+                .stream(lastSequenceNumber: 7)
         )
         #expect(
             RuntimeSessionDecisionPolicy.shouldFallbackToDirectRecoveryStream(
                 cloudflareGatewayEnabled: true,
                 useDirectEndpoint: false,
-                gatewayResumeTimedOut: false,
+                resumeTimedOut: false,
                 receivedAnyRecoveryEvent: false
             )
         )

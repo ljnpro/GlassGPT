@@ -34,6 +34,9 @@ final class AgentLifecycleCoordinator {
     }
 
     func handleEnterBackground() {
+        for execution in state.sessionRegistry.allExecutions {
+            execution.markEnteredBackground()
+        }
         persistAllExecutions()
         let backgroundEligibleExecutions = state.sessionRegistry.allExecutions
             .filter(\.snapshot.runConfiguration.backgroundModeEnabled)
@@ -41,6 +44,9 @@ final class AgentLifecycleCoordinator {
 
         state.backgroundTaskCoordinator.beginLongRunningTask(named: "AgentProcess") { [weak self] in
             guard let self else { return }
+            for execution in backgroundEligibleExecutions {
+                execution.markNeedsForegroundResume()
+            }
             persistExecutions(backgroundEligibleExecutions)
             endBackgroundTask()
         }
@@ -54,14 +60,11 @@ final class AgentLifecycleCoordinator {
         guard state.didCompleteLaunchBootstrap else { return }
 
         endBackgroundTask()
-
-        if let conversation = state.currentConversation,
-           let execution = state.sessionRegistry.execution(for: conversation.id),
-           state.sessionRegistry.isVisible(conversation.id) {
-            state.runCoordinator.syncVisibleStateIfNeeded(execution, in: conversation)
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            await resumeForegroundEligibleExecutionsIfNeeded()
+            maybeRecoverVisibleConversationIfNeeded()
         }
-
-        maybeRecoverVisibleConversationIfNeeded()
     }
 
     func endBackgroundTask() {
@@ -95,8 +98,16 @@ final class AgentLifecycleCoordinator {
         }
 
         for conversation in conversations {
-            guard state.sessionRegistry.execution(for: conversation.id) == nil else {
-                continue
+            if let execution = state.sessionRegistry.execution(for: conversation.id) {
+                switch state.runCoordinator.resumeReplacementDisposition(for: execution, in: conversation) {
+                case .keep:
+                    continue
+                case .replaceAndPersistExecutionSnapshot:
+                    state.runCoordinator.persistSnapshot(execution, in: conversation)
+                    state.sessionRegistry.removeExecution(for: conversation.id)
+                case .replaceUsingPersistedRecoverableState:
+                    state.sessionRegistry.removeExecution(for: conversation.id)
+                }
             }
 
             let snapshot = conversation.agentConversationState?.activeRun
@@ -118,9 +129,7 @@ final class AgentLifecycleCoordinator {
                 )
             }
 
-            guard snapshot.runConfiguration.backgroundModeEnabled,
-                  snapshot.phase.supportsAutomaticResume
-            else {
+            guard snapshot.phase.supportsAutomaticResume else {
                 continue
             }
 
@@ -137,7 +146,15 @@ final class AgentLifecycleCoordinator {
         }
 
         if let execution = state.sessionRegistry.execution(for: conversation.id) {
-            state.runCoordinator.syncVisibleStateIfNeeded(execution, in: conversation)
+            switch state.runCoordinator.resumeReplacementDisposition(for: execution, in: conversation) {
+            case .keep:
+                state.runCoordinator.syncVisibleStateIfNeeded(execution, in: conversation)
+            case .replaceAndPersistExecutionSnapshot, .replaceUsingPersistedRecoverableState:
+                Task { @MainActor [weak self] in
+                    guard let self else { return }
+                    await state.runCoordinator.resumePersistedRunIfNeeded(conversation)
+                }
+            }
             return
         }
 
@@ -150,5 +167,39 @@ final class AgentLifecycleCoordinator {
             autoResume: true,
             showRetryBannerWhenDormant: true
         )
+    }
+
+    private func resumeForegroundEligibleExecutionsIfNeeded() async {
+        var persistedConversationIDs: [UUID]
+        do {
+            persistedConversationIDs = try state.conversationRepository
+                .fetchConversationsWithIncompleteDrafts(mode: .agent)
+                .map(\.id)
+        } catch {
+            Loggers.persistence.error(
+                "[AgentLifecycleCoordinator.resumeForegroundEligibleExecutionsIfNeeded] \(error.localizedDescription)"
+            )
+            persistedConversationIDs = []
+        }
+
+        let executionConversationIDs = state.sessionRegistry.allExecutions.map(\.conversationID)
+        let conversationIDs = Array(Set(executionConversationIDs + persistedConversationIDs))
+
+        for conversationID in conversationIDs {
+            let conversation: Conversation?
+            do {
+                conversation = try state.conversationRepository.fetchConversation(id: conversationID)
+            } catch {
+                continue
+            }
+            guard let conversation else { continue }
+            if let execution = state.sessionRegistry.execution(for: conversationID) {
+                let disposition = state.runCoordinator.resumeReplacementDisposition(for: execution, in: conversation)
+                if disposition == .keep {
+                    continue
+                }
+            }
+            await state.runCoordinator.resumePersistedRunIfNeeded(conversation)
+        }
     }
 }

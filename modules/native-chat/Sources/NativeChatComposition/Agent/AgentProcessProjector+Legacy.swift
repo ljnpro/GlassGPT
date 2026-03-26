@@ -13,15 +13,19 @@ extension AgentProcessProjector {
         snapshot.processSnapshot.stopReason = stopReason
         snapshot.processSnapshot.outcome = outcome
         snapshot.processSnapshot.activeTaskIDs = []
-        snapshot.processSnapshot.leaderLiveStatus = activity.displayName
+        snapshot.processSnapshot.leaderLiveStatus = switch activity {
+        case .completed, .waitingForUser:
+            "Done"
+        default:
+            activity.displayName
+        }
         snapshot.processSnapshot.leaderLiveSummary = ""
         snapshot.processSnapshot.recoveryState = .idle
-        snapshot.processSnapshot.events.append(
-            AgentEvent(
-                kind: activity == .completed ? .completed : .failed,
-                summary: outcome
-            )
+        let event = AgentEvent(
+            kind: activity == .completed ? .completed : .failed,
+            summary: outcome
         )
+        snapshot.processSnapshot.events.append(event)
         if activity == .completed {
             snapshot.currentStage = .finalSynthesis
         } else if activity == .failed {
@@ -44,6 +48,42 @@ extension AgentProcessProjector {
             snapshot.phase = .leaderReview
         case .synthesis:
             snapshot.phase = .finalSynthesis
+        }
+        snapshot.updatedAt = .now
+        snapshot.lastCheckpointAt = .now
+        snapshot.processSnapshot.updatedAt = .now
+        if activity == .completed || activity == .waitingForUser {
+            AgentRecentUpdateProjector.recordCouncilCompleted(
+                "Council completed.",
+                sourceEventID: event.id,
+                on: &snapshot
+            )
+        }
+        syncLegacyWorkerProgress(on: &snapshot)
+    }
+
+    static func freezeCouncilForVisibleSynthesis(on snapshot: inout AgentRunSnapshot) {
+        let acceptedFocus = snapshot.processSnapshot.leaderAcceptedFocus
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let currentFocus = snapshot.processSnapshot.currentFocus
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let resolvedFocus = acceptedFocus.isEmpty
+            ? (currentFocus.isEmpty ? "Leader completed the internal Agent council." : currentFocus)
+            : acceptedFocus
+
+        if snapshot.processSnapshot.activity != .waitingForUser, snapshot.processSnapshot.activity != .completed {
+            snapshot.processSnapshot.activity = .completed
+        }
+        snapshot.processSnapshot.currentFocus = resolvedFocus
+        snapshot.processSnapshot.leaderAcceptedFocus = resolvedFocus
+        snapshot.processSnapshot.leaderLiveStatus = "Done"
+        snapshot.processSnapshot.activeTaskIDs = []
+        snapshot.processSnapshot.recoveryState = .idle
+        if snapshot.processSnapshot.recentUpdateItems.contains(where: { $0.kind == .councilCompleted }) == false {
+            AgentRecentUpdateProjector.recordCouncilCompleted(
+                "Council completed.",
+                on: &snapshot
+            )
         }
         snapshot.updatedAt = .now
         snapshot.lastCheckpointAt = .now

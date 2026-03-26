@@ -24,8 +24,10 @@ public struct AgentProcessSnapshot: Codable, Equatable, Sendable {
     public var evidence: [String]
     /// Identifiers for tasks that are actively running.
     public var activeTaskIDs: [String]
-    /// Recent de-duplicated process updates shown in the live disclosure.
+    /// Legacy string-based process updates kept for compatibility decoding/encoding.
     public var recentUpdates: [String]
+    /// Semantic milestone updates shown in the live disclosure.
+    public var recentUpdateItems: [AgentProcessUpdate]
     /// Current recovery status for the live process projection.
     public var recoveryState: AgentRecoveryState
     /// Terminal stop reason when the run has concluded.
@@ -49,11 +51,15 @@ public struct AgentProcessSnapshot: Codable, Equatable, Sendable {
         evidence: [String] = [],
         activeTaskIDs: [String] = [],
         recentUpdates: [String] = [],
+        recentUpdateItems: [AgentProcessUpdate] = [],
         recoveryState: AgentRecoveryState = .idle,
         stopReason: AgentStopReason? = nil,
         outcome: String = "",
         updatedAt: Date = Date()
     ) {
+        let resolvedRecentUpdateItems = recentUpdateItems.isEmpty
+            ? recentUpdates.map(AgentProcessUpdate.legacy)
+            : recentUpdateItems
         self.activity = activity
         self.currentFocus = currentFocus
         self.leaderAcceptedFocus = leaderAcceptedFocus.isEmpty ? currentFocus : leaderAcceptedFocus
@@ -65,7 +71,10 @@ public struct AgentProcessSnapshot: Codable, Equatable, Sendable {
         self.events = events
         self.evidence = evidence
         self.activeTaskIDs = activeTaskIDs
-        self.recentUpdates = recentUpdates
+        self.recentUpdates = recentUpdates.isEmpty
+            ? resolvedRecentUpdateItems.map(\.summary)
+            : recentUpdates
+        self.recentUpdateItems = resolvedRecentUpdateItems
         self.recoveryState = recoveryState
         self.stopReason = stopReason
         self.outcome = outcome
@@ -85,6 +94,7 @@ public struct AgentProcessSnapshot: Codable, Equatable, Sendable {
         case evidence
         case activeTaskIDs
         case recentUpdates
+        case recentUpdateItems
         case recoveryState
         case stopReason
         case outcome
@@ -106,7 +116,21 @@ public struct AgentProcessSnapshot: Codable, Equatable, Sendable {
         events = try container.decodeIfPresent([AgentEvent].self, forKey: .events) ?? []
         evidence = try container.decodeIfPresent([String].self, forKey: .evidence) ?? []
         activeTaskIDs = try container.decodeIfPresent([String].self, forKey: .activeTaskIDs) ?? []
+        if container.contains(.recentUpdateItems) {
+            recentUpdateItems = try container.decodeIfPresent(
+                [AgentProcessUpdate].self,
+                forKey: .recentUpdateItems
+            ) ?? []
+        } else {
+            recentUpdateItems = []
+        }
         recentUpdates = try container.decodeIfPresent([String].self, forKey: .recentUpdates) ?? []
+        if recentUpdateItems.isEmpty, !recentUpdates.isEmpty {
+            recentUpdateItems = recentUpdates.map(AgentProcessUpdate.legacy)
+        }
+        if recentUpdates.isEmpty, !recentUpdateItems.isEmpty {
+            recentUpdates = recentUpdateItems.map(\.summary)
+        }
         recoveryState = try container.decodeIfPresent(AgentRecoveryState.self, forKey: .recoveryState) ?? .idle
         stopReason = try container.decodeIfPresent(AgentStopReason.self, forKey: .stopReason)
         outcome = try container.decodeIfPresent(String.self, forKey: .outcome) ?? ""

@@ -58,6 +58,17 @@ final class AgentPlanningEngine {
                 "Reviewing worker results and deciding the next move."
             }
         }
+
+        var milestoneSummary: String {
+            switch self {
+            case .triage:
+                "Leader began triage."
+            case .localPass:
+                "Leader started the local pass."
+            case .review:
+                "Leader began review."
+            }
+        }
     }
 
     unowned let state: AgentController
@@ -71,7 +82,9 @@ final class AgentPlanningEngine {
         apiKey: String,
         configuration: AgentConversationConfiguration,
         conversation: Conversation,
-        baseInput: [ResponsesInputMessageDTO]
+        baseInput: [ResponsesInputMessageDTO],
+        previousResponseIDOverride: String? = nil,
+        fallbackToConversationLeaderChain: Bool = true
     ) -> AsyncStream<StreamEvent> {
         let input: [ResponsesInputMessageDTO]
         let instructions: String
@@ -95,12 +108,17 @@ final class AgentPlanningEngine {
             instructions = AgentPromptBuilder.leaderReviewInstructions()
         }
 
+        let previousResponseID = previousResponseIDOverride
+            ?? (fallbackToConversationLeaderChain
+                ? conversation.agentConversationState?.responseID(for: .leader)
+                : nil)
+
         return state.serviceFactory().streamResponse(
             apiKey: apiKey,
             modelIdentifier: ModelType.gpt5_4.rawValue,
             input: input,
             instructions: instructions,
-            previousResponseID: conversation.agentConversationState?.responseID(for: .leader),
+            previousResponseID: previousResponseID,
             reasoningEffort: configuration.leaderReasoningEffort,
             serviceTier: configuration.serviceTier,
             tools: OpenAIRequestFactory.defaultChatTools(),

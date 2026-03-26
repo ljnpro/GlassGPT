@@ -158,9 +158,26 @@ private func makeCompletedAgentProcessSnapshot() -> AgentProcessSnapshot {
             AgentEvent(kind: .synthesisStarted, summary: "Leader began final synthesis")
         ],
         evidence: ["Rollback gates stayed explicit across the plan."],
-        recentUpdates: [
-            "Worker A validated additive rollout with rollback gates.",
-            "Leader adopted explicit monitoring checkpoints."
+        recentUpdateItems: [
+            AgentProcessUpdate(
+                kind: .councilCompleted,
+                source: .leader,
+                phase: .completed,
+                summary: "Council completed"
+            ),
+            AgentProcessUpdate(
+                kind: .workerCompleted,
+                source: .workerA,
+                phase: .workerWave,
+                taskID: "task_validate_rollout",
+                summary: "Worker A completed."
+            ),
+            AgentProcessUpdate(
+                kind: .planUpdated,
+                source: .leader,
+                phase: .leaderReview,
+                summary: "Updated plan"
+            )
         ],
         stopReason: .sufficientAnswer,
         outcome: "Completed"
@@ -193,6 +210,23 @@ func makeRunningAgentConversationSamples(in viewModel: AgentController) -> Conve
     userMessage.conversation = conversation
     draftMessage.conversation = conversation
 
+    configureRunningAgentSamples(
+        viewModel,
+        conversation: conversation,
+        userMessage: userMessage,
+        draftMessage: draftMessage
+    )
+
+    return conversation
+}
+
+@MainActor
+private func configureRunningAgentSamples(
+    _ viewModel: AgentController,
+    conversation: Conversation,
+    userMessage: Message,
+    draftMessage: Message
+) {
     viewModel.currentConversation = conversation
     viewModel.messages = [userMessage, draftMessage]
     viewModel.draftMessage = draftMessage
@@ -221,8 +255,6 @@ func makeRunningAgentConversationSamples(in viewModel: AgentController) -> Conve
         AgentWorkerProgress(role: .workerB, status: .running),
         AgentWorkerProgress(role: .workerC, status: .waiting)
     ]
-
-    return conversation
 }
 
 private func makeRunningAgentProcessSnapshot() -> AgentProcessSnapshot {
@@ -230,65 +262,10 @@ private func makeRunningAgentProcessSnapshot() -> AgentProcessSnapshot {
         activity: .delegation,
         currentFocus: "Leader delegated a bounded validation wave before writing the answer.",
         leaderAcceptedFocus: "Leader delegated a bounded validation wave before writing the answer.",
-        leaderLiveStatus: "Reviewing worker results",
+        leaderLiveStatus: "Leader review",
         leaderLiveSummary: "Comparing the strongest worker recommendation with the risk findings.",
-        plan: [
-            AgentPlanStep(
-                id: "step_root",
-                owner: .leader,
-                status: .running,
-                title: "Shape the launch answer",
-                summary: "Choose which work stays local and which goes to workers."
-            ),
-            AgentPlanStep(
-                id: "step_checks",
-                parentStepID: "step_root",
-                owner: .workerB,
-                status: .running,
-                title: "Stress launch risks",
-                summary: "Surface edge cases and rollback needs."
-            )
-        ],
-        tasks: [
-            AgentTask(
-                id: "task_answer",
-                owner: .workerA,
-                parentStepID: "step_root",
-                title: "Draft strongest answer",
-                goal: "Return the best launch recommendation",
-                expectedOutput: "Concise recommendation",
-                contextSummary: "Focus on release confidence and ordering.",
-                toolPolicy: .enabled,
-                status: .completed,
-                resultSummary: "Ship additively with parity checks."
-            ),
-            AgentTask(
-                id: "task_risks",
-                owner: .workerB,
-                parentStepID: "step_checks",
-                title: "Stress launch risks",
-                goal: "Surface failure modes",
-                expectedOutput: "Concise risk summary",
-                contextSummary: "Look for rollback and monitoring gaps.",
-                toolPolicy: .enabled,
-                status: .running,
-                liveStatusText: "Checking rollback",
-                liveSummary: "The current draft still needs an explicit rollback gate and one monitoring checkpoint.",
-                liveEvidence: ["Rollback gate is not named yet."],
-                liveConfidence: .medium
-            ),
-            AgentTask(
-                id: "task_completeness",
-                owner: .workerC,
-                parentStepID: "step_root",
-                title: "Check completeness",
-                goal: "Find missing launch gates",
-                expectedOutput: "Short completeness notes",
-                contextSummary: "Keep the answer structured and complete.",
-                toolPolicy: .reasoningOnly,
-                status: .queued
-            )
-        ],
+        plan: runningAgentPlan(),
+        tasks: runningAgentTasks(),
         decisions: [
             AgentDecision(
                 kind: .triage,
@@ -302,11 +279,107 @@ private func makeRunningAgentProcessSnapshot() -> AgentProcessSnapshot {
         ],
         evidence: ["Worker A already converged on additive rollout."],
         activeTaskIDs: ["task_risks"],
-        recentUpdates: [
-            "Leader split the work into answer, risk, and completeness tracks.",
-            "Worker A completed the strongest answer path.",
-            "Worker B is checking rollback wording."
-        ],
+        recentUpdateItems: runningAgentRecentUpdates(),
         outcome: "In progress"
     )
+}
+
+private func runningAgentPlan() -> [AgentPlanStep] {
+    [
+        AgentPlanStep(
+            id: "step_root",
+            owner: .leader,
+            status: .running,
+            title: "Shape the launch answer",
+            summary: "Choose which work stays local and which goes to workers."
+        ),
+        AgentPlanStep(
+            id: "step_checks",
+            parentStepID: "step_root",
+            owner: .workerB,
+            status: .running,
+            title: "Stress launch risks",
+            summary: "Surface edge cases and rollback needs."
+        )
+    ]
+}
+
+private func runningAgentTasks() -> [AgentTask] {
+    [
+        AgentTask(
+            id: "task_answer",
+            owner: .workerA,
+            parentStepID: "step_root",
+            title: "Draft strongest answer",
+            goal: "Return the best launch recommendation",
+            expectedOutput: "Concise recommendation",
+            contextSummary: "Focus on release confidence and ordering.",
+            toolPolicy: .enabled,
+            status: .completed,
+            resultSummary: "Ship additively with parity checks."
+        ),
+        AgentTask(
+            id: "task_risks",
+            owner: .workerB,
+            parentStepID: "step_checks",
+            title: "Stress launch risks",
+            goal: "Surface failure modes",
+            expectedOutput: "Concise risk summary",
+            contextSummary: "Look for rollback and monitoring gaps.",
+            toolPolicy: .enabled,
+            status: .running,
+            liveStatusText: "Checking rollback",
+            liveSummary: "The current draft still needs an explicit rollback gate and one monitoring checkpoint.",
+            liveEvidence: ["Rollback gate is not named yet."],
+            liveConfidence: .medium
+        ),
+        AgentTask(
+            id: "task_completeness",
+            owner: .workerC,
+            parentStepID: "step_root",
+            title: "Check completeness",
+            goal: "Find missing launch gates",
+            expectedOutput: "Short completeness notes",
+            contextSummary: "Keep the answer structured and complete.",
+            toolPolicy: .reasoningOnly,
+            status: .queued
+        )
+    ]
+}
+
+private func runningAgentRecentUpdates() -> [AgentProcessUpdate] {
+    [
+        AgentProcessUpdate(
+            kind: .workerStarted,
+            source: .workerB,
+            phase: .workerWave,
+            taskID: "task_risks",
+            summary: "Worker B started Stress launch risks."
+        ),
+        AgentProcessUpdate(
+            kind: .workerCompleted,
+            source: .workerA,
+            phase: .workerWave,
+            taskID: "task_answer",
+            summary: "Worker A completed."
+        ),
+        AgentProcessUpdate(
+            kind: .workerWaveQueued,
+            source: .leader,
+            phase: .workerWave,
+            summary: "Queued 3 worker task(s)."
+        ),
+        AgentProcessUpdate(
+            kind: .leaderPhase,
+            source: .leader,
+            phase: .leaderReview,
+            summary: "Reviewing worker results."
+        ),
+        AgentProcessUpdate(
+            kind: .runStarted,
+            source: .system,
+            phase: .leaderTriage,
+            summary: "Started Agent run"
+        )
+    ]
 }

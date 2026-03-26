@@ -62,36 +62,43 @@ struct SettingsAdaptiveToggleRow: View {
                 VStack(alignment: .leading, spacing: 10) {
                     Text(title)
                         .multilineTextAlignment(.leading)
+                        .lineLimit(nil)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .accessibilityHidden(true)
 
                     HStack {
                         Spacer(minLength: 0)
-                        visualToggle
+                        Toggle(isOn: $isOn) {
+                            EmptyView()
+                        }
+                        .labelsHidden()
+                        .accessibilityElement(children: .ignore)
+                        .accessibilityLabel(accessibilityLabel)
+                        .accessibilityValue(isOn ? String(localized: "On") : String(localized: "Off"))
+                        .accessibilityIdentifier(accessibilityIdentifier)
                     }
                 }
             } else {
                 HStack(spacing: 12) {
                     Text(title)
                         .multilineTextAlignment(.leading)
+                        .lineLimit(nil)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .accessibilityHidden(true)
 
-                    Spacer(minLength: 12)
-
-                    visualToggle
+                    Toggle(isOn: $isOn) {
+                        EmptyView()
+                    }
+                    .labelsHidden()
+                    .accessibilityElement(children: .ignore)
                 }
-            }
-        }
-        .accessibilityElement(children: .ignore)
-        .accessibilityRepresentation {
-            Toggle(accessibilityLabel, isOn: $isOn)
                 .accessibilityLabel(accessibilityLabel)
                 .accessibilityValue(isOn ? String(localized: "On") : String(localized: "Off"))
                 .accessibilityIdentifier(accessibilityIdentifier)
+            }
         }
-    }
-
-    private var visualToggle: some View {
-        Toggle("", isOn: $isOn)
-            .labelsHidden()
-            .accessibilityHidden(true)
     }
 }
 

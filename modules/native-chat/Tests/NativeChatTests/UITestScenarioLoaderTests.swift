@@ -35,6 +35,7 @@ final class UITestScenarioLoaderTests: XCTestCase {
     func testScenarioMetadataCapturesTabsAndLiveKeychainUsage() {
         XCTAssertEqual(UITestScenario.history.initialTab, 2)
         XCTAssertEqual(UITestScenario.agentRunning.initialTab, 2)
+        XCTAssertEqual(UITestScenario.agentCompletedVisibleSynthesis.initialTab, 2)
         XCTAssertEqual(UITestScenario.settings.initialTab, 3)
         XCTAssertEqual(UITestScenario.reinstallVerify.initialTab, 3)
         XCTAssertTrue(UITestScenario.reinstallSeed.usesLiveKeychain)
@@ -100,6 +101,22 @@ final class UITestScenarioLoaderTests: XCTestCase {
         let context = ModelContext(container)
 
         let bootstrap = UITestScenarioLoader.makeBootstrap(for: .agentRunning, modelContext: context)
+        let seededConversations = try context.fetch(FetchDescriptor<Conversation>())
+        let runningConversation = try XCTUnwrap(
+            seededConversations.first(where: { $0.mode == .agent && $0.title == "Agent Review" })
+        )
+
+        XCTAssertEqual(bootstrap.initialTab, 2)
+        XCTAssertEqual(seededConversations.count, 4)
+        XCTAssertTrue(bootstrap.agentController.isConversationRunning(runningConversation.id))
+        XCTAssertNil(bootstrap.agentController.currentConversation)
+    }
+
+    func testMakeBootstrapForCompletedVisibleSynthesisSeedsDetachedExecution() throws {
+        let container = try makeInMemoryModelContainer()
+        let context = ModelContext(container)
+
+        let bootstrap = UITestScenarioLoader.makeBootstrap(for: .agentCompletedVisibleSynthesis, modelContext: context)
         let seededConversations = try context.fetch(FetchDescriptor<Conversation>())
         let runningConversation = try XCTUnwrap(
             seededConversations.first(where: { $0.mode == .agent && $0.title == "Agent Review" })

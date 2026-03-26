@@ -13,7 +13,7 @@ extension ChatSessionDecisionsTests {
     @Test func `session visibility coordinator renders visible state from runtime snapshot`() {
         let session = makeReplySession()
         let draft = Message(role: .assistant, content: "draft")
-        let runtimeState = makeRecoveringStreamRuntimeState(for: session)
+        let runtimeState = makeStreamingRuntimeState(for: session)
 
         let visibleState = SessionVisibilityCoordinator.visibleState(
             from: session,
@@ -36,12 +36,12 @@ extension ChatSessionDecisionsTests {
         #expect(visibleState.draftMessage?.id == draft.id)
     }
 
-    private func makeRecoveringStreamRuntimeState(for session: ReplySession) -> ReplyRuntimeState {
+    private func makeStreamingRuntimeState(for session: ReplySession) -> ReplyRuntimeState {
         ReplyRuntimeState(
             assistantReplyID: session.assistantReplyID,
             messageID: session.messageID,
             conversationID: session.conversationID,
-            lifecycle: .recoveringStream(
+            lifecycle: .streaming(
                 StreamCursor(
                     responseID: "resp_visible",
                     lastSequenceNumber: 42,

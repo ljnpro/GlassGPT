@@ -22,11 +22,13 @@ extension AgentVisibleSynthesisEventApplier {
         summary: String,
         execution: AgentExecutionState
     ) {
-        AgentProcessProjector.updateLeaderLivePreview(
+        AgentVisibleSynthesisProjector.updatePresentation(
             status: status,
             summary: summary,
+            recoveryState: .idle,
             on: &execution.snapshot
         )
+        execution.markProgress()
     }
 
     static func startToolCall(
@@ -40,6 +42,7 @@ extension AgentVisibleSynthesisEventApplier {
             ToolCallInfo(id: id, type: type, status: .inProgress)
         )
         draft.toolCalls = execution.snapshot.activeToolCalls
+        execution.markProgress()
     }
 
     static func setToolCallStatus(
@@ -51,6 +54,7 @@ extension AgentVisibleSynthesisEventApplier {
         guard let index = execution.snapshot.activeToolCalls.firstIndex(where: { $0.id == id }) else { return }
         execution.snapshot.activeToolCalls[index].status = status
         draft.toolCalls = execution.snapshot.activeToolCalls
+        execution.markProgress()
     }
 
     static func appendToolCode(
@@ -63,6 +67,7 @@ extension AgentVisibleSynthesisEventApplier {
         let currentCode = execution.snapshot.activeToolCalls[index].code ?? ""
         execution.snapshot.activeToolCalls[index].code = currentCode + delta
         draft.toolCalls = execution.snapshot.activeToolCalls
+        execution.markProgress()
     }
 
     static func setToolCode(
@@ -74,5 +79,6 @@ extension AgentVisibleSynthesisEventApplier {
         guard let index = execution.snapshot.activeToolCalls.firstIndex(where: { $0.id == id }) else { return }
         execution.snapshot.activeToolCalls[index].code = code
         draft.toolCalls = execution.snapshot.activeToolCalls
+        execution.markProgress()
     }
 }

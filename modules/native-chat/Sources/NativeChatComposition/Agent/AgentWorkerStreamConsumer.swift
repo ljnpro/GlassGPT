@@ -25,10 +25,12 @@ extension AgentWorkerRuntime {
         configuration: AgentConversationConfiguration,
         conversation: Conversation,
         execution: AgentExecutionState,
-        initialState: AgentWorkerStreamState
-    ) async throws -> AgentWorkerExecutionResult {
+        initialState: AgentWorkerStreamState,
+        finalizeWhenStreamEnds: Bool = true
+    ) async throws -> AgentWorkerExecutionResult? {
         var streamState = initialState
         var latestTask = task
+        var didReceiveTerminalCompletion = false
 
         for await event in stream {
             try Task.checkCancellation()
@@ -64,10 +66,15 @@ extension AgentWorkerRuntime {
                     forceSave: forceSave
                 )
             case .completed:
+                didReceiveTerminalCompletion = true
                 continue
             case let .failed(error):
                 throw error
             }
+        }
+
+        guard finalizeWhenStreamEnds || didReceiveTerminalCompletion else {
+            return nil
         }
 
         return try finalizeTaskStream(
@@ -77,40 +84,6 @@ extension AgentWorkerRuntime {
             conversation: conversation,
             streamState: streamState
         )
-    }
-
-    func finishRecoveredTask(
-        _ task: AgentTask,
-        role: AgentRole,
-        rawText: String,
-        responseID: String,
-        toolCalls: [ToolCallInfo],
-        citations: [URLCitation],
-        execution: AgentExecutionState,
-        conversation: Conversation
-    ) -> AgentWorkerExecutionResult {
-        let parsed = AgentTaggedOutputParser.parseWorkerTaskResult(from: rawText)
-        var finishedTask = syncPreview(
-            for: task,
-            rawText: rawText,
-            execution: execution,
-            conversation: conversation
-        )
-        finishedTask.result = makeTaskResult(
-            parsed: parsed,
-            toolCalls: toolCalls,
-            citations: citations
-        )
-        finishedTask.resultSummary = AgentSummaryFormatter.summarize(parsed.summary, maxLength: 150)
-        finishedTask.completedAt = .now
-        state.runCoordinator.clearTicket(
-            for: role,
-            execution: execution,
-            conversation: conversation,
-            forceSave: true
-        )
-        AgentProcessProjector.updateRecoveryState(.idle, on: &execution.snapshot)
-        return AgentWorkerExecutionResult(task: finishedTask, responseID: responseID)
     }
 }
 
@@ -137,6 +110,7 @@ private extension AgentWorkerRuntime {
                 streamState: &streamState,
                 latestTask: latestTask
             )
+            execution.markProgress()
             return .none
 
         case let .sequenceUpdate(sequenceNumber):
@@ -150,16 +124,20 @@ private extension AgentWorkerRuntime {
                 streamState: streamState,
                 latestTask: latestTask
             )
+            AgentProcessProjector.updateRecoveryState(.idle, on: &execution.snapshot)
+            execution.markProgress()
             return .none
 
         case let .textDelta(delta):
             streamState.rawText += delta
             AgentProcessProjector.updateRecoveryState(.idle, on: &execution.snapshot)
+            execution.markProgress()
             return .refreshPreview
 
         case let .replaceText(text):
             streamState.rawText = text
             AgentProcessProjector.updateRecoveryState(.idle, on: &execution.snapshot)
+            execution.markProgress()
             return .refreshPreview
 
         case let .completed(text, _, _):
@@ -187,7 +165,7 @@ private extension AgentWorkerRuntime {
             return .failed(.incomplete(message ?? "Worker task ended before completion."))
 
         case .connectionLost:
-            return .failed(.incomplete("Worker task lost its connection."))
+            return .failed(.connectionLost("Worker task lost its connection."))
 
         case let .error(error):
             return .failed(.invalidResponse(error.localizedDescription))
@@ -196,10 +174,13 @@ private extension AgentWorkerRuntime {
             if !streamState.citations.contains(annotation) {
                 streamState.citations.append(annotation)
             }
+            execution.markProgress()
             return .none
 
         default:
             applyToolEvent(event, streamState: &streamState)
+            AgentProcessProjector.updateRecoveryState(.idle, on: &execution.snapshot)
+            execution.markProgress()
             return .persistPreview(forceSave: false)
         }
     }
