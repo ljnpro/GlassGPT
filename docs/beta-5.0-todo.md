@@ -240,6 +240,25 @@
   - exported IPA contains `BackendBaseURLHost = glassgpt-beta-5-0.glassgpt.workers.dev`
   - no `BackendBaseURL` legacy key remains in the exported IPA
   - a fresh TestFlight build is published only after manual IPA inspection confirms the fix
+- Resolution:
+  - replaced the single `BACKEND_BASE_URL` xcconfig setting with split `BACKEND_BASE_URL_SCHEME` and `BACKEND_BASE_URL_HOST`
+  - updated the app to reconstruct the backend URL from those two Info.plist keys
+  - updated architecture tests to forbid the legacy single-key URL metadata shape
+  - updated `scripts/release_testflight.sh` to reject exported IPAs that are missing backend URL components or still carry the legacy `BackendBaseURL` key
+  - added stage-specific Sign in with Apple diagnostics so future failures distinguish Apple-authorization failures from backend-authentication failures
+- Verification evidence:
+  - serial iOS validation passed again after the fix:
+    - `./scripts/ci_ios_engine.sh package-tests,app-tests,lint,build`
+    - logs:
+      - `.local/build/ci/nativechat-package-tests.log`
+      - `.local/build/ci/glassgpt-unit-tests.log`
+      - `.local/build/ci/glassgpt-build.log`
+  - release-readiness passed during `5.0.0 (20209)` publication
+  - exported IPA inspection after the fix showed:
+    - `BackendBaseURLScheme = https`
+    - `BackendBaseURLHost = glassgpt-beta-5-0.glassgpt.workers.dev`
+    - `CFBundleVersion = 20209`
+  - TestFlight upload completed successfully for `5.0.0 (20209)`
 
 ## Phase 8 Current Findings
 - The original `package-tests` / `architecture-tests` gate failed because it targeted the workspace auto-generated `NativeChat` scheme, which can build but has no usable `TestAction`.
