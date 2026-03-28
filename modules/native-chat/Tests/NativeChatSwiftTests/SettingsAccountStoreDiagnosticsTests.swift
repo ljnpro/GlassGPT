@@ -8,6 +8,16 @@ import Testing
 @Suite(.tags(.presentation))
 @MainActor
 struct SettingsAccountStoreDiagnosticsTests {
+    @Test func `sign-in flow error exposes stage label and underlying error`() {
+        let appleError = SignInFlowError.appleAuthorization(underlying: URLError(.timedOut))
+        #expect(appleError.stageLabel == "apple-auth")
+        #expect((appleError.underlyingError as? URLError)?.code == .timedOut)
+
+        let backendError = SignInFlowError.backendAuthentication(underlying: URLError(.notConnectedToInternet))
+        #expect(backendError.stageLabel == "backend-auth")
+        #expect((backendError.underlyingError as? URLError)?.code == .notConnectedToInternet)
+    }
+
     @Test func `settings account store distinguishes apple auth and backend auth failures`() async {
         let sessionStore = BackendSessionStore()
         let client = SettingsAccountDiagnosticsBackendRequester()
@@ -38,27 +48,69 @@ struct SettingsAccountStoreDiagnosticsTests {
 
 @MainActor
 private final class SettingsAccountDiagnosticsBackendRequester: BackendRequesting {
-    func cancelRun(_: String) async throws -> RunSummaryDTO { throw DiagnosticsTestError.unimplemented }
+    func cancelRun(_: String) async throws -> RunSummaryDTO {
+        throw DiagnosticsTestError.unimplemented
+    }
+
     func createConversation(
         title _: String,
         mode _: ConversationModeDTO
-    ) async throws -> ConversationDTO { throw DiagnosticsTestError.unimplemented }
-    func fetchConversationDetail(_: String) async throws -> ConversationDetailDTO { throw DiagnosticsTestError.unimplemented }
-    func fetchConversations() async throws -> [ConversationDTO] { throw DiagnosticsTestError.unimplemented }
-    func fetchCurrentUser() async throws -> UserDTO { throw DiagnosticsTestError.unimplemented }
-    func fetchRun(_: String) async throws -> RunSummaryDTO { throw DiagnosticsTestError.unimplemented }
-    func connectionCheck() async throws -> ConnectionCheckDTO { throw DiagnosticsTestError.unimplemented }
+    ) async throws -> ConversationDTO {
+        throw DiagnosticsTestError.unimplemented
+    }
+
+    func fetchConversationDetail(_: String) async throws -> ConversationDetailDTO {
+        throw DiagnosticsTestError.unimplemented
+    }
+
+    func fetchConversations() async throws -> [ConversationDTO] {
+        throw DiagnosticsTestError.unimplemented
+    }
+
+    func fetchCurrentUser() async throws -> UserDTO {
+        throw DiagnosticsTestError.unimplemented
+    }
+
+    func fetchRun(_: String) async throws -> RunSummaryDTO {
+        throw DiagnosticsTestError.unimplemented
+    }
+
+    func connectionCheck() async throws -> ConnectionCheckDTO {
+        throw DiagnosticsTestError.unimplemented
+    }
+
     func authenticateWithApple(
         _: AppleSignInPayload,
         deviceID _: String
-    ) async throws -> SessionDTO { throw DiagnosticsTestError.unimplemented }
-    func refreshSession() async throws -> SessionDTO { throw DiagnosticsTestError.unimplemented }
-    func retryRun(_: String) async throws -> RunSummaryDTO { throw DiagnosticsTestError.unimplemented }
-    func sendMessage(_: String, to _: String) async throws -> RunSummaryDTO { throw DiagnosticsTestError.unimplemented }
-    func startAgentRun(prompt _: String?, in _: String) async throws -> RunSummaryDTO { throw DiagnosticsTestError.unimplemented }
-    func syncEvents(after _: String?) async throws -> SyncEnvelopeDTO { throw DiagnosticsTestError.unimplemented }
+    ) async throws -> SessionDTO {
+        throw DiagnosticsTestError.unimplemented
+    }
+
+    func refreshSession() async throws -> SessionDTO {
+        throw DiagnosticsTestError.unimplemented
+    }
+
+    func retryRun(_: String) async throws -> RunSummaryDTO {
+        throw DiagnosticsTestError.unimplemented
+    }
+
+    func sendMessage(_: String, to _: String) async throws -> RunSummaryDTO {
+        throw DiagnosticsTestError.unimplemented
+    }
+
+    func startAgentRun(prompt _: String?, in _: String) async throws -> RunSummaryDTO {
+        throw DiagnosticsTestError.unimplemented
+    }
+
+    func syncEvents(after _: String?) async throws -> SyncEnvelopeDTO {
+        throw DiagnosticsTestError.unimplemented
+    }
+
     func logout() async throws {}
-    func storeOpenAIKey(_: String) async throws -> CredentialStatusDTO { throw DiagnosticsTestError.unimplemented }
+    func storeOpenAIKey(_: String) async throws -> CredentialStatusDTO {
+        throw DiagnosticsTestError.unimplemented
+    }
+
     func deleteOpenAIKey() async throws {}
 }
 

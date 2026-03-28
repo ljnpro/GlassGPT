@@ -16,8 +16,8 @@ extension SignInFlowError: LocalizedError {
     }
 }
 
-extension SignInFlowError {
-    public var stageLabel: String {
+public extension SignInFlowError {
+    var stageLabel: String {
         switch self {
         case .appleAuthorization:
             "apple-auth"
@@ -26,7 +26,7 @@ extension SignInFlowError {
         }
     }
 
-    public var underlyingError: Error {
+    var underlyingError: Error {
         switch self {
         case let .appleAuthorization(underlying), let .backendAuthentication(underlying):
             underlying

@@ -1,6 +1,7 @@
 import ChatPresentation
 import ChatUIComponents
 import SwiftUI
+import UIKit
 
 struct SettingsAPIConfigurationSection: View {
     @Bindable var viewModel: SettingsCredentialsStore
@@ -11,7 +12,6 @@ struct SettingsAPIConfigurationSection: View {
         Section {
             SecureField(String(localized: "sk-proj-..."), text: $viewModel.apiKey)
                 .focused(focusedField, equals: .apiKey)
-                .textContentType(.password)
                 .autocorrectionDisabled()
                 .textInputAutocapitalization(.never)
                 .background(
@@ -51,15 +51,25 @@ struct SettingsAPIConfigurationSection: View {
 
                     Spacer()
 
-                    Button(String(localized: "Revoke"), role: .destructive) {
-                        dismissKeyboard()
-                        Task { @MainActor in
-                            await viewModel.deleteAPIKey()
+                    if viewModel.apiKey.isEmpty {
+                        Button(String(localized: "Paste")) {
+                            if let clipboardString = UIPasteboard.general.string {
+                                viewModel.apiKey = clipboardString
+                            }
                         }
+                        .buttonStyle(SettingsActionButtonStyle(kind: .prominent))
+                        .accessibilityIdentifier("settings.pasteAPIKey")
+                    } else {
+                        Button(String(localized: "Revoke"), role: .destructive) {
+                            dismissKeyboard()
+                            Task { @MainActor in
+                                await viewModel.deleteAPIKey()
+                            }
+                        }
+                        .buttonStyle(SettingsActionButtonStyle(kind: .destructive))
+                        .disabled(viewModel.isDeleting)
+                        .accessibilityIdentifier("settings.clearAPIKey")
                     }
-                    .buttonStyle(SettingsActionButtonStyle(kind: .destructive))
-                    .disabled(viewModel.isDeleting)
-                    .accessibilityIdentifier("settings.clearAPIKey")
 
                     Button(String(localized: "Save")) {
                         dismissKeyboard()

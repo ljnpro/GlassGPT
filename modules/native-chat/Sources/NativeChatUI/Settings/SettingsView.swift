@@ -82,7 +82,7 @@ public struct SettingsView: View {
                     } label: {
                         SettingsNavigationRowLabel(
                             title: String(localized: "Agent Defaults"),
-                            systemImage: "person.3.fill"
+                            systemImage: "person.3"
                         )
                     }
                     .buttonStyle(.plain)
