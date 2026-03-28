@@ -44,7 +44,7 @@ import {
   rotateSessionRefreshToken,
 } from './persistence/session-repository.js';
 import { findUserById, upsertAppleUser } from './persistence/user-repository.js';
-import { publishConversationCursor } from './realtime/conversation-event-hub.js';
+import { broadcastStreamDelta, publishConversationCursor } from './realtime/conversation-event-hub.js';
 import { issueAccessToken, verifyAccessToken } from './security/access-token-codec.js';
 import { verifyAppleIdentityToken } from './security/apple-identity-verifier.js';
 import { decryptSecret, encryptSecret } from './security/credential-encryption.js';
@@ -52,6 +52,7 @@ import { hashRefreshToken, issueRefreshToken } from './security/refresh-token-cr
 
 export const createBackendServices = () => {
   const chatRunService = createChatRunService({
+    broadcastStreamDelta,
     createChatCompletion,
     createStreamingChatCompletion,
     decryptSecret,
@@ -72,6 +73,7 @@ export const createBackendServices = () => {
   });
 
   const agentRunService = createAgentRunService({
+    broadcastStreamDelta,
     createChatCompletion,
     createStreamingChatCompletion,
     decryptSecret,

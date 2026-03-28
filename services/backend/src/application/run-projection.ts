@@ -18,6 +18,11 @@ export interface WorkflowStarter<TParams> {
 }
 
 export interface RunProjectionDependencies {
+  readonly broadcastStreamDelta: (
+    env: BackendRuntimeContext,
+    conversationId: string,
+    delta: { type: 'delta' | 'status' | 'stage' | 'done' | 'error'; data: unknown },
+  ) => Promise<void>;
   readonly insertRunEvent: (
     env: BackendRuntimeContext,
     event: RunEventInsertRecord,

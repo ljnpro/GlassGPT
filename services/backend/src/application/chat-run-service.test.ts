@@ -101,6 +101,7 @@ const createServiceHarness = (options?: {
       (async () => {
         return 'Assistant reply';
       }),
+    broadcastStreamDelta: async () => {},
     createStreamingChatCompletion:
       async function* () {
         yield 'Assistant reply';

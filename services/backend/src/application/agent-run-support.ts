@@ -244,7 +244,19 @@ export const createAgentRunSupport = (deps: AgentRunServiceDependencies) => {
       pendingDelta += delta;
       chunkCount++;
 
-      // Flush delta events for real-time stage progress
+      // Broadcast every token directly to SSE clients (bypasses D1)
+      if (activeContext) {
+        try {
+          await deps.broadcastStreamDelta(env, activeContext.conversation.id, {
+            type: 'delta',
+            data: { textDelta: delta, runId: input.runId, stage: activeContext.run.stage },
+          });
+        } catch {
+          // Non-fatal
+        }
+      }
+
+      // Persist to D1 less frequently (for catch-up and history)
       if (chunkCount % DELTA_FLUSH_THRESHOLD === 0 && activeContext) {
         const result = await persistProjectedEvent(deps, env, {
           conversation: activeContext.conversation,

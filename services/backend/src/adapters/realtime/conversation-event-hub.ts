@@ -6,6 +6,11 @@ interface ConversationHubSnapshot {
   readonly updatedAt: string;
 }
 
+interface StreamDelta {
+  readonly type: 'delta' | 'status' | 'stage' | 'done' | 'error';
+  readonly data: unknown;
+}
+
 export class ConversationEventHub extends DurableObject<Env> {
   private sseClients: Set<ReadableStreamDefaultController<Uint8Array>> = new Set();
   private readonly encoder = new TextEncoder();
@@ -19,12 +24,10 @@ export class ConversationEventHub extends DurableObject<Env> {
 
     if (request.method === 'GET') {
       const snapshot = (await this.ctx.storage.get<ConversationHubSnapshot>('snapshot')) ?? null;
-      return Response.json({
-        ok: true,
-        snapshot,
-      });
+      return Response.json({ ok: true, snapshot });
     }
 
+    // POST /events — cursor update (from persistProjectedEvent)
     if (request.method === 'POST' && url.pathname.endsWith('/events')) {
       const body = (await request.json()) as { cursor?: string };
       if (!body.cursor || typeof body.cursor !== 'string' || body.cursor.length > 64) {
@@ -35,17 +38,15 @@ export class ConversationEventHub extends DurableObject<Env> {
         lastEventCursor: body.cursor,
         updatedAt: new Date().toISOString(),
       };
-
       await this.ctx.storage.put('snapshot', snapshot);
-      this.broadcastCursorUpdate(body.cursor);
+      return Response.json({ ok: true, snapshot }, { status: 202 });
+    }
 
-      return Response.json(
-        {
-          ok: true,
-          snapshot,
-        },
-        { status: 202 },
-      );
+    // POST /stream-delta — real-time token broadcast (from workflow, bypasses D1)
+    if (request.method === 'POST' && url.pathname.endsWith('/stream-delta')) {
+      const delta = (await request.json()) as StreamDelta;
+      this.broadcastDelta(delta);
+      return Response.json({ ok: true }, { status: 202 });
     }
 
     return Response.json({ error: 'method_not_allowed' }, { status: 405 });
@@ -55,8 +56,6 @@ export class ConversationEventHub extends DurableObject<Env> {
     const stream = new ReadableStream<Uint8Array>({
       start: (controller) => {
         this.sseClients.add(controller);
-
-        // Send initial ping
         const ping = this.encoder.encode(': connected\n\n');
         controller.enqueue(ping);
       },
@@ -74,8 +73,10 @@ export class ConversationEventHub extends DurableObject<Env> {
     });
   }
 
-  private broadcastCursorUpdate(cursor: string): void {
-    const frame = this.encoder.encode(`event: cursor\ndata: ${JSON.stringify({ cursor })}\n\n`);
+  private broadcastDelta(delta: StreamDelta): void {
+    const frame = this.encoder.encode(
+      `event: ${delta.type}\ndata: ${JSON.stringify(delta.data)}\n\n`,
+    );
     const staleClients: ReadableStreamDefaultController<Uint8Array>[] = [];
 
     for (const client of this.sseClients) {
@@ -101,9 +102,21 @@ export const publishConversationCursor = async (
   const stub = env.CONVERSATION_EVENT_HUB.get(durableObjectId);
   await stub.fetch('https://conversation-event-hub/events', {
     body: JSON.stringify({ cursor }),
-    headers: {
-      'content-type': 'application/json',
-    },
+    headers: { 'content-type': 'application/json' },
+    method: 'POST',
+  });
+};
+
+export const broadcastStreamDelta = async (
+  env: BackendEnv,
+  conversationId: string,
+  delta: { type: 'delta' | 'status' | 'stage' | 'done' | 'error'; data: unknown },
+): Promise<void> => {
+  const durableObjectId = env.CONVERSATION_EVENT_HUB.idFromName(conversationId);
+  const stub = env.CONVERSATION_EVENT_HUB.get(durableObjectId);
+  await stub.fetch('https://conversation-event-hub/stream-delta', {
+    body: JSON.stringify(delta),
+    headers: { 'content-type': 'application/json' },
     method: 'POST',
   });
 };

@@ -289,7 +289,17 @@ export const createChatRunService = (deps: ChatRunServiceDependencies): ChatRunS
           pendingDelta += delta;
           chunkCount++;
 
-          // Flush delta events periodically for real-time UI updates
+          // Broadcast every token directly to SSE clients via Durable Object (bypasses D1)
+          try {
+            await deps.broadcastStreamDelta(env, conversation.id, {
+              type: 'delta',
+              data: { textDelta: delta, runId: run.id },
+            });
+          } catch {
+            // Non-fatal: broadcast failure doesn't block execution
+          }
+
+          // Persist delta events to D1 less frequently (for catch-up and history)
           if (chunkCount % DELTA_FLUSH_THRESHOLD === 0) {
             ({ conversation, run } = await persistProjectedEvent(deps, env, {
               conversation,
@@ -310,7 +320,7 @@ export const createChatRunService = (deps: ChatRunServiceDependencies): ChatRunS
           throw new Error('openai_response_empty');
         }
 
-        // Flush any remaining delta
+        // Flush any remaining delta to D1
         if (pendingDelta.length > 0) {
           ({ conversation, run } = await persistProjectedEvent(deps, env, {
             conversation,
@@ -322,6 +332,16 @@ export const createChatRunService = (deps: ChatRunServiceDependencies): ChatRunS
             run,
             syncMessageCursor: false,
           }));
+        }
+
+        // Broadcast completion to SSE clients
+        try {
+          await deps.broadcastStreamDelta(env, conversation.id, {
+            type: 'done',
+            data: { runId: run.id, status: 'completed' },
+          });
+        } catch {
+          // Non-fatal
         }
 
         // Create the final assistant message with full text

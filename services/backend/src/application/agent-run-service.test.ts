@@ -104,6 +104,7 @@ const createServiceHarness = (options?: {
   );
 
   const service = createAgentRunService({
+    broadcastStreamDelta: async () => {},
     createChatCompletion:
       options?.createChatCompletion ??
       (() => {
