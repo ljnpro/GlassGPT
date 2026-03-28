@@ -2,7 +2,7 @@
 #include? "Local-Secrets.xcconfig"
 
 ALWAYS_SEARCH_USER_PATHS = NO
-BACKEND_BASE_URL = https://glassgpt.workers.dev
+BACKEND_BASE_URL = https://glassgpt-beta-5-0.glassgpt.workers.dev
 CLANG_ANALYZER_LOCALIZABILITY_NONLOCALIZED = YES
 CLANG_CXX_LANGUAGE_STANDARD = c++20
 CLANG_CXX_LIBRARY = libc++

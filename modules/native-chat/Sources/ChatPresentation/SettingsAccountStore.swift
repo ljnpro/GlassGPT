@@ -15,7 +15,7 @@ public final class SettingsAccountStore {
 
     private let sessionStore: BackendSessionStore
     private let client: any BackendRequesting
-    private let signInAction: (@MainActor () async -> Void)?
+    private let signInAction: (@MainActor () async throws -> Void)?
     private let signOutAction: (@MainActor () async -> Void)?
 
     private static let relativeDateFormatter: RelativeDateTimeFormatter = {
@@ -28,7 +28,7 @@ public final class SettingsAccountStore {
     public init(
         sessionStore: BackendSessionStore,
         client: any BackendRequesting,
-        signInAction: (@MainActor () async -> Void)? = nil,
+        signInAction: (@MainActor () async throws -> Void)? = nil,
         signOutAction: (@MainActor () async -> Void)? = nil
     ) {
         self.sessionStore = sessionStore
@@ -125,9 +125,13 @@ public final class SettingsAccountStore {
         guard let signInAction, !isAuthenticating else { return }
         isAuthenticating = true
         defer { isAuthenticating = false }
-        await signInAction()
-        if isSignedIn {
+        do {
+            try await signInAction()
             lastErrorMessage = nil
+        } catch is CancellationError {
+            lastErrorMessage = nil
+        } catch {
+            lastErrorMessage = error.localizedDescription
         }
     }
 

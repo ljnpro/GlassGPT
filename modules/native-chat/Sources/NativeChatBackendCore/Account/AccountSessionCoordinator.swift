@@ -35,7 +35,7 @@ package final class AccountSessionCoordinator {
         self.refreshHistory = refreshHistory
     }
 
-    func signIn() async {
+    func signIn() async throws {
         do {
             let payload = try await appleSignInCoordinator.signIn()
             _ = try await client.authenticateWithApple(
@@ -46,6 +46,7 @@ package final class AccountSessionCoordinator {
             refreshHistory()
         } catch {
             Loggers.app.error("[AccountSessionCoordinator.signIn] \(error.localizedDescription)")
+            throw error
         }
     }
 

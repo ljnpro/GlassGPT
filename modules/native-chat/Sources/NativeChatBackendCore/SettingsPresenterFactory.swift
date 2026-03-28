@@ -12,7 +12,7 @@ package func makeSettingsPresenter(
     backendSessionStore: BackendSessionStore,
     backendClient: BackendClient,
     cacheManager: GeneratedFileCacheManager,
-    signInAction: (@MainActor () async -> Void)? = nil,
+    signInAction: (@MainActor () async throws -> Void)? = nil,
     signOutAction: (@MainActor () async -> Void)? = nil,
     appVersionString: String? = nil,
     platformString: String? = nil

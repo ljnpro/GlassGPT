@@ -108,7 +108,7 @@ package struct NativeChatCompositionRoot {
             backendClient: services.backendClient,
             cacheManager: services.cacheManager,
             signInAction: {
-                await accountSessionCoordinator.signIn()
+                try await accountSessionCoordinator.signIn()
                 await store.settingsPresenter.credentials.refreshStatus()
             },
             signOutAction: {
