@@ -83,7 +83,7 @@
 - `Phase 8B` completed
 - `Phase 8B (new)` completed
 - `Phase 9` completed
-- `Phase 10` pending
+- `Phase 10` completed
 
 ## Current Architectural State
 - The shipping application root now routes through `NativeChatBackendComposition` instead of the legacy `NativeChatComposition` target.
@@ -1093,7 +1093,7 @@
 - Updated `scripts/release_testflight.sh` to align its usage/help text and branch-allowlist with the Beta 5.0 release path.
 
 ## Current Next Step
-- Prepare the worktree for the tracked `5.0.0` TestFlight release path and execute `scripts/release_testflight.sh`.
+- All planned phases are complete. Preserve this ledger as the authoritative record of the Beta 5.0 cutover and TestFlight publication.
 
 ## Phase 8 / Phase 9 Closeout
 - `./scripts/ci.sh release-readiness` now passes directly with a real zero exit code.
@@ -1113,3 +1113,27 @@
   - `Phase 8A` complete
   - `Phase 8B (new)` complete
   - `Phase 9` complete
+
+## Phase 10 Release Execution
+- Prepared the release tree by committing the Beta 5.0 cutover work on `feature/beta-5.0-cloudflare-all-in`.
+- Verified release preflight successfully:
+  - `PUSH_RELEASE=0 ./scripts/release_testflight.sh 5.0.0 20206 --branch feature/beta-5.0-cloudflare-all-in --skip-main-promotion --skip-ci --preflight-only`
+- Executed the tracked release wrapper successfully:
+  - `PUSH_RELEASE=0 ./scripts/release_testflight.sh 5.0.0 20206 --branch feature/beta-5.0-cloudflare-all-in --skip-main-promotion --skip-ci`
+- Release outputs:
+  - archive: `.local/build/GlassGPT-5.0.0.xcarchive`
+  - IPA: `.local/build/export-5.0.0/GlassGPT.ipa`
+  - upload log: `.local/build/upload-5.0.0.log`
+  - Delivery UUID: `4e7d5cc6-4c24-4b33-96ad-125e6cf451d5`
+- Final manual release-log review:
+  - `.local/build/archive-5.0.0.log`
+  - `.local/build/export-5.0.0.log`
+  - `.local/build/upload-5.0.0.log`
+  - no `warning:`, `error:`, or failed-state markers found in those logs
+- Final repository state after release:
+  - release metadata commit created: `Release 5.0.0 (20206)`
+  - release tag created: `v5.0.0`
+  - `ios/GlassGPT/Config/Versions.xcconfig` now records `MARKETING_VERSION = 5.0.0` and `CURRENT_PROJECT_VERSION = 20206`
+  - worktree clean after release
+- Phase conclusion:
+  - `Phase 10` complete
