@@ -37,11 +37,21 @@ package final class AccountSessionCoordinator {
 
     func signIn() async throws {
         do {
-            let payload = try await appleSignInCoordinator.signIn()
-            _ = try await client.authenticateWithApple(
-                payload,
-                deviceID: deviceIdentityStore.deviceID
-            )
+            let payload: AppleSignInPayload
+            do {
+                payload = try await appleSignInCoordinator.signIn()
+            } catch {
+                throw SignInFlowError.appleAuthorization(underlying: error)
+            }
+
+            do {
+                _ = try await client.authenticateWithApple(
+                    payload,
+                    deviceID: deviceIdentityStore.deviceID
+                )
+            } catch {
+                throw SignInFlowError.backendAuthentication(underlying: error)
+            }
             await reloadProjectionSurfaces()
             refreshHistory()
         } catch {

@@ -388,7 +388,19 @@ actual_version = info["CFBundleShortVersionString"]
 actual_build = info["CFBundleVersion"]
 if actual_version != expected_version or actual_build != expected_build:
     raise SystemExit(f"IPA metadata mismatch. expected {expected_version} ({expected_build}), found {actual_version} ({actual_build})")
+scheme = info.get("BackendBaseURLScheme", "").strip()
+host = info.get("BackendBaseURLHost", "").strip()
+legacy_url = info.get("BackendBaseURL", "").strip()
+if legacy_url:
+    raise SystemExit(f"IPA must not embed legacy BackendBaseURL key. Found: {legacy_url!r}")
+if not scheme or not host:
+    raise SystemExit("IPA backend URL components are incomplete. Expected non-empty BackendBaseURLScheme and BackendBaseURLHost.")
+if scheme != "https":
+    raise SystemExit(f"IPA backend URL scheme mismatch. Expected 'https', found {scheme!r}")
+if "." not in host:
+    raise SystemExit(f"IPA backend host looks invalid: {host!r}")
 print(f"Verified IPA version: {actual_version} ({actual_build})")
+print(f"Verified IPA backend URL components: {scheme}://{host}")
 PY
 
 echo "==> Uploading to TestFlight"

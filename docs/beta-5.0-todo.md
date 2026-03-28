@@ -218,6 +218,29 @@
 3. Eliminate stale CI dependencies, dead script assumptions, and remaining noisy test harness behavior.
 4. Validate Phase 8 with full serial CI script runs and direct log inspection before advancing.
 
+## Post-Release Follow-Up: Apple Sign-In Incident
+- A real-device Sign in with Apple failure was reproduced after `5.0.0 (20208)` shipped.
+- Root cause was verified by unpacking the exported IPA and inspecting `Payload/GlassGPT.app/Info.plist`:
+  - `BackendBaseURL` resolved to `https:`
+  - this proved the shipped build was not carrying a valid backend URL even though source config looked correct
+- Cause:
+  - `ios/GlassGPT/Config/Project-Base.xcconfig` stored `BACKEND_BASE_URL = https://glassgpt-beta-5-0.glassgpt.workers.dev`
+  - xcconfig parsing treated `//` as a comment start, truncating the effective build setting to `https:`
+- Impact:
+  - device-side backend requests timed out before reaching Cloudflare
+  - Cloudflare tail showed no `/v1/auth/apple` traffic for user taps
+  - the failure looked like Apple auth flakiness but was actually a shipped build configuration defect
+- Remediation in progress:
+  - replace the single URL build setting with split `scheme + host` settings
+  - rebuild and revalidate the exported IPA metadata
+  - harden `scripts/release_testflight.sh` so release fails if the IPA backend URL components are missing, truncated, or still use the legacy single-key form
+- Exit criteria for this incident fix:
+  - package tests, app tests, lint, and build all pass cleanly
+  - exported IPA contains `BackendBaseURLScheme = https`
+  - exported IPA contains `BackendBaseURLHost = glassgpt-beta-5-0.glassgpt.workers.dev`
+  - no `BackendBaseURL` legacy key remains in the exported IPA
+  - a fresh TestFlight build is published only after manual IPA inspection confirms the fix
+
 ## Phase 8 Current Findings
 - The original `package-tests` / `architecture-tests` gate failed because it targeted the workspace auto-generated `NativeChat` scheme, which can build but has no usable `TestAction`.
 - The package-local `NativeChat-Package` scheme in `modules/native-chat` is the correct executable test surface; direct validation succeeded for:

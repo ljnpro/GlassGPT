@@ -168,6 +168,11 @@ public final class SettingsAccountStore {
     }
 
     private static func describeSignInError(_ error: Error) -> String {
+        if let signInFlowError = error as? SignInFlowError {
+            let nsError = signInFlowError.underlyingError as NSError
+            return "\(signInFlowError.localizedDescription) [\(nsError.domain):\(nsError.code)]"
+        }
+
         let nsError = error as NSError
         guard nsError.domain != NSCocoaErrorDomain else {
             return error.localizedDescription

@@ -35,8 +35,10 @@
 	</array>
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
-	<key>BackendBaseURL</key>
-	<string>$(BACKEND_BASE_URL)</string>
+	<key>BackendBaseURLHost</key>
+	<string>$(BACKEND_BASE_URL_HOST)</string>
+	<key>BackendBaseURLScheme</key>
+	<string>$(BACKEND_BASE_URL_SCHEME)</string>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
 	<key>LSRequiresIPhoneOS</key>

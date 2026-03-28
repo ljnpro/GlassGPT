@@ -23,15 +23,23 @@ extension NativeChatCompositionRoot {
     }
 
     private func resolvedBackendBaseURL() -> URL {
-        if let value = Bundle.main.object(forInfoDictionaryKey: "BackendBaseURL") as? String,
-           let url = URL(string: value),
-           !value.isEmpty {
-            return url
+        if let scheme = Bundle.main.object(forInfoDictionaryKey: "BackendBaseURLScheme") as? String,
+           let host = Bundle.main.object(forInfoDictionaryKey: "BackendBaseURLHost") as? String {
+            let trimmedScheme = scheme.trimmingCharacters(in: .whitespacesAndNewlines)
+            let trimmedHost = host.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !trimmedScheme.isEmpty, !trimmedHost.isEmpty {
+                var components = URLComponents()
+                components.scheme = trimmedScheme
+                components.host = trimmedHost
+                if let url = components.url {
+                    return url
+                }
+            }
         }
 
         var components = URLComponents()
         components.scheme = "https"
-        components.host = "glassgpt.workers.dev"
+        components.host = "glassgpt-beta-5-0.glassgpt.workers.dev"
         return components.url ?? URL(fileURLWithPath: "/")
     }
 }

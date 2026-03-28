@@ -150,6 +150,46 @@ final class NativeChatArchitectureTests: XCTestCase {
         )
     }
 
+    func testShippingAppMetadataUsesSplitBackendURLComponents() throws {
+        let infoPlist = try String(
+            contentsOf: workspaceRoot.appendingPathComponent("ios/GlassGPT/Info.plist"),
+            encoding: .utf8
+        )
+
+        XCTAssertTrue(
+            infoPlist.contains("<key>BackendBaseURLScheme</key>"),
+            "Shipping app metadata should expose BackendBaseURLScheme"
+        )
+        XCTAssertTrue(
+            infoPlist.contains("<key>BackendBaseURLHost</key>"),
+            "Shipping app metadata should expose BackendBaseURLHost"
+        )
+        XCTAssertFalse(
+            infoPlist.contains("<key>BackendBaseURL</key>"),
+            "Shipping app metadata must not use a single URL key that can be truncated during xcconfig substitution"
+        )
+    }
+
+    func testProjectBaseXcconfigAvoidsLiteralBackendURLValue() throws {
+        let projectBase = try String(
+            contentsOf: workspaceRoot.appendingPathComponent("ios/GlassGPT/Config/Project-Base.xcconfig"),
+            encoding: .utf8
+        )
+
+        XCTAssertTrue(
+            projectBase.contains("BACKEND_BASE_URL_SCHEME = https"),
+            "Project base config should define the backend URL scheme separately"
+        )
+        XCTAssertTrue(
+            projectBase.contains("BACKEND_BASE_URL_HOST = glassgpt-beta-5-0.glassgpt.workers.dev"),
+            "Project base config should define the backend URL host separately"
+        )
+        XCTAssertFalse(
+            projectBase.contains("BACKEND_BASE_URL = https://"),
+            "Project base config must not store a literal URL containing // because xcconfig treats // as a comment"
+        )
+    }
+
     @MainActor
     func testNewArchitectureModulesAreDirectlyCallable() throws {
         let settingsStore = SettingsStore(valueStore: InMemorySettingsValueStore())
