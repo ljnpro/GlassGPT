@@ -1,5 +1,5 @@
-import ChatApplication
 import ChatDomain
+import ChatPersistenceCore
 import Observation
 
 /// Observable default-setting state for Agent-specific settings.
@@ -9,31 +9,24 @@ public final class AgentSettingsDefaultsStore {
     /// The user's selected default leader reasoning effort.
     public var defaultLeaderEffort: ReasoningEffort {
         didSet {
-            controller.persistDefaultAgentLeaderEffort(defaultLeaderEffort)
+            settingsStore.defaultAgentLeaderEffort = defaultLeaderEffort
         }
     }
 
     /// The user's selected default worker reasoning effort.
     public var defaultWorkerEffort: ReasoningEffort {
         didSet {
-            controller.persistDefaultAgentWorkerEffort(defaultWorkerEffort)
-        }
-    }
-
-    /// Whether Agent background mode is enabled by default.
-    public var defaultBackgroundModeEnabled: Bool {
-        didSet {
-            controller.persistDefaultAgentBackgroundModeEnabled(defaultBackgroundModeEnabled)
+            settingsStore.defaultAgentWorkerEffort = defaultWorkerEffort
         }
     }
 
     private var defaultServiceTier: ServiceTier {
         didSet {
-            controller.persistDefaultAgentServiceTier(defaultServiceTier)
+            settingsStore.defaultAgentServiceTier = defaultServiceTier
         }
     }
 
-    private let controller: SettingsSceneController
+    private let settingsStore: SettingsStore
 
     /// Whether flex mode is enabled for new Agent conversations.
     public var defaultFlexModeEnabled: Bool {
@@ -48,17 +41,12 @@ public final class AgentSettingsDefaultsStore {
 
     /// Creates Agent default-setting state from persisted values.
     public init(
-        defaultLeaderEffort: ReasoningEffort,
-        defaultWorkerEffort: ReasoningEffort,
-        defaultBackgroundModeEnabled: Bool,
-        defaultServiceTier: ServiceTier,
-        controller: SettingsSceneController
+        settingsStore: SettingsStore
     ) {
-        self.defaultLeaderEffort = defaultLeaderEffort
-        self.defaultWorkerEffort = defaultWorkerEffort
-        self.defaultBackgroundModeEnabled = defaultBackgroundModeEnabled
-        self.defaultServiceTier = defaultServiceTier
-        self.controller = controller
+        self.settingsStore = settingsStore
+        defaultLeaderEffort = settingsStore.defaultAgentLeaderEffort
+        defaultWorkerEffort = settingsStore.defaultAgentWorkerEffort
+        defaultServiceTier = settingsStore.defaultAgentServiceTier
     }
 
     /// The current Agent default conversation configuration.
@@ -66,7 +54,6 @@ public final class AgentSettingsDefaultsStore {
         AgentConversationConfiguration(
             leaderReasoningEffort: defaultLeaderEffort,
             workerReasoningEffort: defaultWorkerEffort,
-            backgroundModeEnabled: defaultBackgroundModeEnabled,
             serviceTier: defaultServiceTier
         )
     }

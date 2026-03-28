@@ -1,6 +1,7 @@
 import ChatPersistenceSwiftData
-import ChatPresentation
-import NativeChatComposition
+import Foundation
+import NativeChatBackendCore
+import NativeChatBackendComposition
 import SwiftData
 import SwiftUI
 
@@ -16,36 +17,33 @@ public struct NativeChatUITestRootOverrideFactory: NativeChatRootOverrideFactory
             return nil
         }
 
-        guard let bootstrap = UITestScenarioLoader.makeBootstrap(modelContext: resolvedModelContext) else {
-            return nil
+        let scenario = UITestScenarioLoader.currentScenario(
+            arguments: ProcessInfo.processInfo.arguments,
+            environment: ProcessInfo.processInfo.environment
+        )
+
+        if let scenario,
+           let scenarioStore = UITestScenarioAppStoreFactory.makeStore(
+               for: scenario,
+               modelContext: resolvedModelContext
+           ) {
+            return AnyView(ContentView(appStore: scenarioStore))
         }
 
-        let store = NativeChatAppStore(
-            chatController: bootstrap.chatController,
-            agentController: bootstrap.agentController,
-            settingsPresenter: bootstrap.settingsPresenter,
-            historyPresenter: HistoryPresenter(
-                loadConversations: { [] },
-                selectConversation: { _ in },
-                deleteConversation: { _ in },
-                deleteAllConversations: {}
-            ),
-            selectedTab: bootstrap.initialTab,
-            isUITestPreviewMode: bootstrap.scenario == .preview,
-            uiTestPreviewItem: bootstrap.initialPreviewItem
-        )
-        store.historyPresenter = NativeChatHistoryPresenterFactory.makePresenter(
-            modelContext: resolvedModelContext,
-            chatController: bootstrap.chatController,
-            agentController: bootstrap.agentController,
-            showChatTab: { store.selectTab(0) },
-            showAgentTab: { store.selectTab(1) }
-        )
-        let initialTab = bootstrap.initialTab
+        let store = NativeChatCompositionRoot(modelContext: resolvedModelContext).makeAppStore()
+        store.isUITestPreviewMode = scenario == .preview
+
+        if let scenario {
+            store.selectTab(scenario.initialTab)
+        }
+
         Task { @MainActor in
             await Task.yield()
-            store.selectTab(initialTab)
+            if let scenario {
+                store.selectTab(scenario.initialTab)
+            }
         }
+
         return AnyView(ContentView(appStore: store))
     }
 

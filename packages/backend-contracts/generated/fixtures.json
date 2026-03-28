@@ -1,0 +1,235 @@
+{
+  "AppleAuthRequestDTO": {
+    "identityToken": "identity-token",
+    "authorizationCode": "auth-code",
+    "deviceId": "device_01"
+  },
+  "ArtifactDTO": {
+    "id": "art_01",
+    "conversationId": "conv_01",
+    "runId": "run_01",
+    "kind": "document",
+    "filename": "artifact.txt",
+    "contentType": "text/plain",
+    "byteCount": 128,
+    "createdAt": "2026-03-27T00:00:00.000Z",
+    "downloadUrl": "https://example.com/artifacts/art_01"
+  },
+  "ArtifactDownloadDTO": {
+    "artifact": {
+      "id": "art_01",
+      "conversationId": "conv_01",
+      "runId": "run_01",
+      "kind": "document",
+      "filename": "artifact.txt",
+      "contentType": "text/plain",
+      "byteCount": 128,
+      "createdAt": "2026-03-27T00:00:00.000Z",
+      "downloadUrl": "https://example.com/artifacts/art_01"
+    },
+    "url": "https://example.com/artifacts/art_01/download"
+  },
+  "ConnectionCheckDTO": {
+    "backend": "healthy",
+    "auth": "missing",
+    "openaiCredential": "missing",
+    "sse": "healthy",
+    "checkedAt": "2026-03-27T00:00:00.000Z",
+    "latencyMilliseconds": 18
+  },
+  "ConversationDTO": {
+    "id": "conv_01",
+    "title": "Beta 5.0",
+    "mode": "chat",
+    "createdAt": "2026-03-27T00:00:00.000Z",
+    "updatedAt": "2026-03-27T00:00:00.000Z",
+    "lastRunId": "run_01",
+    "lastSyncCursor": "cur_00000000000000000001"
+  },
+  "ConversationDetailDTO": {
+    "conversation": {
+      "id": "conv_01",
+      "title": "Beta 5.0",
+      "mode": "chat",
+      "createdAt": "2026-03-27T00:00:00.000Z",
+      "updatedAt": "2026-03-27T00:00:00.000Z",
+      "lastRunId": "run_01",
+      "lastSyncCursor": "cur_00000000000000000001"
+    },
+    "messages": [
+      {
+        "id": "msg_01",
+        "conversationId": "conv_01",
+        "role": "assistant",
+        "content": "Hello from the backend scaffold.",
+        "createdAt": "2026-03-27T00:00:00.000Z",
+        "completedAt": "2026-03-27T00:00:00.000Z",
+        "serverCursor": "cur_00000000000000000001",
+        "runId": "run_01"
+      }
+    ],
+    "runs": [
+      {
+        "id": "run_01",
+        "conversationId": "conv_01",
+        "kind": "chat",
+        "status": "running",
+        "createdAt": "2026-03-27T00:00:00.000Z",
+        "updatedAt": "2026-03-27T00:00:00.000Z",
+        "lastEventCursor": "cur_00000000000000000001",
+        "visibleSummary": "Streaming assistant output"
+      }
+    ]
+  },
+  "ConversationListDTO": [
+    {
+      "id": "conv_01",
+      "title": "Beta 5.0",
+      "mode": "chat",
+      "createdAt": "2026-03-27T00:00:00.000Z",
+      "updatedAt": "2026-03-27T00:00:00.000Z",
+      "lastRunId": "run_01",
+      "lastSyncCursor": "cur_00000000000000000001"
+    }
+  ],
+  "CreateConversationRequestDTO": {
+    "title": "New Conversation",
+    "mode": "chat"
+  },
+  "CreateMessageRequestDTO": {
+    "content": "Tell me something useful."
+  },
+  "CredentialStatusDTO": {
+    "provider": "openai",
+    "state": "valid",
+    "checkedAt": "2026-03-27T00:00:00.000Z"
+  },
+  "MessageDTO": {
+    "id": "msg_01",
+    "conversationId": "conv_01",
+    "role": "assistant",
+    "content": "Hello from the backend scaffold.",
+    "createdAt": "2026-03-27T00:00:00.000Z",
+    "completedAt": "2026-03-27T00:00:00.000Z",
+    "serverCursor": "cur_00000000000000000001",
+    "runId": "run_01"
+  },
+  "OpenAiCredentialRequestDTO": {
+    "apiKey": "sk-example"
+  },
+  "RefreshSessionRequestDTO": {
+    "refreshToken": "refresh-token"
+  },
+  "RunEventDTO": {
+    "id": "evt_01",
+    "cursor": "cur_00000000000000000001",
+    "runId": "run_01",
+    "conversationId": "conv_01",
+    "kind": "message_created",
+    "createdAt": "2026-03-27T00:00:00.000Z",
+    "conversation": {
+      "id": "conv_01",
+      "title": "Beta 5.0",
+      "mode": "chat",
+      "createdAt": "2026-03-27T00:00:00.000Z",
+      "updatedAt": "2026-03-27T00:00:00.000Z",
+      "lastRunId": "run_01",
+      "lastSyncCursor": "cur_00000000000000000001"
+    },
+    "message": {
+      "id": "msg_02",
+      "conversationId": "conv_01",
+      "role": "user",
+      "content": "Tell me something useful.",
+      "createdAt": "2026-03-27T00:00:00.000Z",
+      "completedAt": "2026-03-27T00:00:00.000Z",
+      "serverCursor": "cur_00000000000000000001",
+      "runId": "run_01"
+    },
+    "run": {
+      "id": "run_01",
+      "conversationId": "conv_01",
+      "kind": "chat",
+      "status": "queued",
+      "createdAt": "2026-03-27T00:00:00.000Z",
+      "updatedAt": "2026-03-27T00:00:00.000Z",
+      "lastEventCursor": "cur_00000000000000000001",
+      "visibleSummary": "Queued chat run"
+    }
+  },
+  "RunSummaryDTO": {
+    "id": "run_01",
+    "conversationId": "conv_01",
+    "kind": "chat",
+    "status": "running",
+    "createdAt": "2026-03-27T00:00:00.000Z",
+    "updatedAt": "2026-03-27T00:00:00.000Z",
+    "lastEventCursor": "cur_00000000000000000001",
+    "visibleSummary": "Streaming assistant output"
+  },
+  "SessionDTO": {
+    "accessToken": "access-token",
+    "refreshToken": "refresh-token",
+    "expiresAt": "2026-03-27T00:00:00.000Z",
+    "deviceId": "device_01",
+    "user": {
+      "id": "usr_01",
+      "appleSubject": "apple-subject-01",
+      "displayName": "Glass User",
+      "email": "glass@example.com",
+      "createdAt": "2026-03-27T00:00:00.000Z"
+    }
+  },
+  "StartAgentRunRequestDTO": {
+    "prompt": "Investigate the current codebase state."
+  },
+  "SyncEnvelopeDTO": {
+    "nextCursor": "cur_00000000000000000002",
+    "events": [
+      {
+        "id": "evt_01",
+        "cursor": "cur_00000000000000000001",
+        "runId": "run_01",
+        "conversationId": "conv_01",
+        "kind": "message_created",
+        "createdAt": "2026-03-27T00:00:00.000Z",
+        "conversation": {
+          "id": "conv_01",
+          "title": "Beta 5.0",
+          "mode": "chat",
+          "createdAt": "2026-03-27T00:00:00.000Z",
+          "updatedAt": "2026-03-27T00:00:00.000Z",
+          "lastRunId": "run_01",
+          "lastSyncCursor": "cur_00000000000000000001"
+        },
+        "message": {
+          "id": "msg_02",
+          "conversationId": "conv_01",
+          "role": "user",
+          "content": "Tell me something useful.",
+          "createdAt": "2026-03-27T00:00:00.000Z",
+          "completedAt": "2026-03-27T00:00:00.000Z",
+          "serverCursor": "cur_00000000000000000001",
+          "runId": "run_01"
+        },
+        "run": {
+          "id": "run_01",
+          "conversationId": "conv_01",
+          "kind": "chat",
+          "status": "queued",
+          "createdAt": "2026-03-27T00:00:00.000Z",
+          "updatedAt": "2026-03-27T00:00:00.000Z",
+          "lastEventCursor": "cur_00000000000000000001",
+          "visibleSummary": "Queued chat run"
+        }
+      }
+    ]
+  },
+  "UserDTO": {
+    "id": "usr_01",
+    "appleSubject": "apple-subject-01",
+    "displayName": "Glass User",
+    "email": "glass@example.com",
+    "createdAt": "2026-03-27T00:00:00.000Z"
+  }
+}

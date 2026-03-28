@@ -4,8 +4,6 @@ import UIKit
 
 enum SettingsFocusedField: Hashable {
     case apiKey
-    case cloudflareGatewayBaseURL
-    case cloudflareAIGToken
 }
 
 struct SettingsFieldFramePreferenceKey: PreferenceKey {
@@ -30,8 +28,9 @@ private enum SettingsKeyboardDismisser {
     }
 }
 
-/// Main settings screen with API key, Cloudflare gateway, chat defaults, appearance, and cache management.
+/// Main settings screen with account, backend credential, defaults, appearance, and cache management.
 public struct SettingsView: View {
+    @State private var account: SettingsAccountStore
     @State private var credentials: SettingsCredentialsStore
     @State private var defaults: SettingsDefaultsStore
     @State private var agentDefaults: AgentSettingsDefaultsStore
@@ -43,6 +42,7 @@ public struct SettingsView: View {
     /// Creates a settings view backed by the given presenter.
     @MainActor
     public init(viewModel: SettingsPresenter) {
+        _account = State(initialValue: viewModel.account)
         _credentials = State(initialValue: viewModel.credentials)
         _defaults = State(initialValue: viewModel.defaults)
         _agentDefaults = State(initialValue: viewModel.agentDefaults)
@@ -70,42 +70,52 @@ public struct SettingsView: View {
 
         NavigationStack {
             Form {
+                SettingsAccountSection(viewModel: account)
                 SettingsAPIConfigurationSection(
                     viewModel: credentials,
                     focusedField: $focusedField,
                     dismissKeyboard: dismissKeyboard
                 )
-                SettingsCloudflareSection(
-                    credentials: credentials,
-                    defaults: defaults,
-                    focusedField: $focusedField
-                )
                 Section {
                     NavigationLink {
-                        SettingsAdvancedView(
-                            defaults: defaults,
+                        SettingsAgentDefaultsView(viewModel: agentDefaults)
+                    } label: {
+                        SettingsNavigationRowLabel(
+                            title: String(localized: "Agent Defaults"),
+                            systemImage: "person.3.fill"
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("settings.agentDefaults")
+
+                    NavigationLink {
+                        SettingsCacheManagementView(
                             cache: cache,
-                            appVersionString: about.appVersionString,
-                            platformString: about.platformString,
                             imageCacheFooter: imageCacheFooter,
                             documentCacheFooter: documentCacheFooter
                         )
                     } label: {
                         SettingsNavigationRowLabel(
-                            title: String(localized: "Advanced"),
-                            systemImage: "slider.horizontal.3"
+                            title: String(localized: "Cache"),
+                            systemImage: "internaldrive"
                         )
                     }
-                    .accessibilityIdentifier("settings.advanced")
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("settings.cache")
+
                     NavigationLink {
-                        SettingsAgentDefaultsView(viewModel: agentDefaults)
+                        SettingsAboutView(
+                            appVersionString: about.appVersionString,
+                            platformString: about.platformString
+                        )
                     } label: {
                         SettingsNavigationRowLabel(
-                            title: String(localized: "Agent Mode"),
-                            systemImage: "person.3.fill"
+                            title: String(localized: "About"),
+                            systemImage: "info.circle"
                         )
                     }
-                    .accessibilityIdentifier("settings.agentMode")
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("settings.about")
                 }
                 SettingsChatDefaultsSection(viewModel: defaults)
                 SettingsAppearanceSection(viewModel: defaults)
@@ -137,10 +147,13 @@ public struct SettingsView: View {
                 including: focusedField != nil ? .all : .none
             )
             .navigationTitle(String(localized: "Settings"))
+            .task(id: account.isSignedIn) {
+                await credentials.refreshStatus()
+            }
             .alert(String(localized: "API Key Saved"), isPresented: saveConfirmationBinding) {
                 Button(String(localized: "OK"), role: .cancel) {}
             } message: {
-                Text(String(localized: "Your OpenAI API key has been saved to Keychain."))
+                Text(String(localized: "Your OpenAI API key has been stored on the backend for this account."))
             }
         }
     }

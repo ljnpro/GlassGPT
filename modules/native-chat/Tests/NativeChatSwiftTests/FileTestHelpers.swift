@@ -1,6 +1,10 @@
 import Foundation
 import UIKit
 
+enum NativeChatTestError: Error {
+    case saveFailed
+}
+
 @MainActor
 func makeSnapshotImageFile() throws -> URL {
     let size = CGSize(width: 1200, height: 900)

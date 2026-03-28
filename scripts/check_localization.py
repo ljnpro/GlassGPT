@@ -14,7 +14,7 @@ XCSTRINGS_PATH = (
     / "modules"
     / "native-chat"
     / "Sources"
-    / "NativeChatComposition"
+    / "NativeChatBackendComposition"
     / "Resources"
     / "Localizable.xcstrings"
 )
@@ -22,9 +22,9 @@ XCSTRINGS_PATH = (
 REQUIRED_LOCALES = ["zh-Hans"]
 LOCALIZATION_SURFACE_PATHS = [
     ROOT / "modules" / "native-chat" / "Sources" / "NativeChatUI",
-    ROOT / "modules" / "native-chat" / "Sources" / "NativeChatComposition",
+    ROOT / "modules" / "native-chat" / "Sources" / "NativeChatBackendComposition",
+    ROOT / "modules" / "native-chat" / "Sources" / "ChatUIComponents",
     ROOT / "modules" / "native-chat" / "Sources" / "NativeChat",
-    ROOT / "modules" / "native-chat" / "Sources" / "ChatApplication",
 ]
 
 SINGLE_LINE_LOCALIZATION_KEY_RE = re.compile(

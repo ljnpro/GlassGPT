@@ -24,7 +24,7 @@ MAX_FATAL_ERRORS = int(os.environ.get("MAX_FATAL_ERRORS", "0"))
 MAX_PRECONDITION_FAILURES = int(os.environ.get("MAX_PRECONDITION_FAILURES", "0"))
 MAX_UNCHECKED_SENDABLE = int(os.environ.get("MAX_UNCHECKED_SENDABLE", "0"))
 MAX_EMPTY_CATCH = int(os.environ.get("MAX_EMPTY_CATCH", "0"))
-MAX_SWIFTLINT_DISABLES = int(os.environ.get("MAX_SWIFTLINT_DISABLES", "36"))
+MAX_SWIFTLINT_DISABLES = int(os.environ.get("MAX_SWIFTLINT_DISABLES", "0"))
 MAX_NON_UI_FAMILY_LINES = int(os.environ.get("MAX_NON_UI_FAMILY_LINES", "550"))
 MAX_UI_FAMILY_LINES = int(os.environ.get("MAX_UI_FAMILY_LINES", "700"))
 MAX_SCREEN_STORE_FAMILY_LINES = int(os.environ.get("MAX_SCREEN_STORE_FAMILY_LINES", "260"))
@@ -134,7 +134,7 @@ def classify_ui(path: Path) -> bool:
         or "/ScreenStores/" in relative_path
         or "/Sources/NativeChatUI/" in relative_path
         or "/Sources/ChatUIComponents/" in relative_path
-        or "/Sources/NativeChatComposition/Views/" in relative_path
+        or "/Sources/NativeChatBackendComposition/Views/" in relative_path
     )
 
 

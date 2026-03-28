@@ -1,5 +1,5 @@
-import ChatApplication
 import ChatDomain
+import ChatPersistenceCore
 import Observation
 
 /// Observable default-setting state for the settings scene.
@@ -11,54 +11,37 @@ public final class SettingsDefaultsStore {
     /// The user's selected default reasoning effort.
     public var defaultEffort: ReasoningEffort {
         didSet {
-            controller.persistDefaultEffort(defaultEffort)
-        }
-    }
-
-    /// Whether background mode is enabled by default.
-    public var defaultBackgroundModeEnabled: Bool {
-        didSet {
-            controller.persistDefaultBackgroundModeEnabled(defaultBackgroundModeEnabled)
+            settingsStore.defaultEffort = defaultEffort
         }
     }
 
     /// The selected app theme.
     public var appTheme: AppTheme {
         didSet {
-            controller.persistAppTheme(appTheme)
+            settingsStore.appTheme = appTheme
         }
     }
 
     /// Whether haptic feedback is enabled.
     public var hapticEnabled: Bool {
         didSet {
-            controller.persistHapticEnabled(hapticEnabled)
-        }
-    }
-
-    /// Whether the Cloudflare gateway is enabled.
-    public var cloudflareEnabled: Bool {
-        didSet {
-            guard cloudflareEnabled != oldValue else { return }
-            controller.persistCloudflareEnabled(cloudflareEnabled)
-            cloudflareGatewayObserver?(cloudflareEnabled)
+            settingsStore.hapticEnabled = hapticEnabled
         }
     }
 
     private var defaultModel: ModelType {
         didSet {
-            controller.persistDefaultModel(defaultModel)
+            settingsStore.defaultModel = defaultModel
         }
     }
 
     private var defaultServiceTier: ServiceTier {
         didSet {
-            controller.persistDefaultServiceTier(defaultServiceTier)
+            settingsStore.defaultServiceTier = defaultServiceTier
         }
     }
 
-    private let controller: SettingsSceneController
-    private var cloudflareGatewayObserver: (@MainActor (Bool) -> Void)?
+    private let settingsStore: SettingsStore
 
     /// Whether Pro mode is enabled. Toggling this switches between `.gpt5_4_pro` and `.gpt5_4`.
     public var defaultProModeEnabled: Bool {
@@ -79,30 +62,14 @@ public final class SettingsDefaultsStore {
 
     /// Creates default-setting state from persisted values.
     public init(
-        defaultModel: ModelType,
-        defaultEffort: ReasoningEffort,
-        defaultBackgroundModeEnabled: Bool,
-        defaultServiceTier: ServiceTier,
-        appTheme: AppTheme,
-        hapticEnabled: Bool,
-        cloudflareEnabled: Bool,
-        controller: SettingsSceneController
+        settingsStore: SettingsStore
     ) {
-        self.defaultModel = defaultModel
-        self.defaultEffort = defaultEffort
-        self.defaultBackgroundModeEnabled = defaultBackgroundModeEnabled
-        self.defaultServiceTier = defaultServiceTier
-        self.appTheme = appTheme
-        self.hapticEnabled = hapticEnabled
-        self.cloudflareEnabled = cloudflareEnabled
-        self.controller = controller
-    }
-
-    /// Registers a callback to run whenever the Cloudflare gateway toggle changes.
-    public func observeCloudflareGatewayChanges(
-        _ observer: @escaping @MainActor (Bool) -> Void
-    ) {
-        cloudflareGatewayObserver = observer
+        self.settingsStore = settingsStore
+        defaultModel = settingsStore.defaultModel
+        defaultEffort = settingsStore.defaultEffort
+        defaultServiceTier = settingsStore.defaultServiceTier
+        appTheme = settingsStore.appTheme
+        hapticEnabled = settingsStore.hapticEnabled
     }
 
     private func applyDefaultModel(_ model: ModelType) {

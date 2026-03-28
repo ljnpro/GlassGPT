@@ -14,7 +14,6 @@ EXPORT_OPTIONS="${EXPORT_OPTIONS_PLIST:-$ROOT_DIR/.local/export-options-app-stor
 REMOTE="${GITHUB_REMOTE:-origin}"
 REMOTE_REPO="${GITHUB_REPO_URL:-}"
 XCODEBUILD_APPINTENTS_LINKER_SETTING='OTHER_LDFLAGS=$(inherited) -framework AppIntents'
-RELEASE_SECRETS_XCCONFIG=""
 
 function usage() {
   cat <<'EOF'
@@ -22,7 +21,7 @@ Usage:
   ./scripts/release_testflight.sh <marketing_version> <build_number> [--branch <name>] [--commit-message "<message>"] [--preserve-main-as <name>] [--force-main-with-lease] [--skip-main-promotion] [--skip-ci] [--preflight-only]
 
 Examples:
-  ./scripts/release_testflight.sh 4.12.0 20199 --branch stable-4.12 --skip-main-promotion --skip-ci
+  ./scripts/release_testflight.sh 5.0.0 20206 --branch feature/beta-5.0-cloudflare-all-in --skip-main-promotion --skip-ci
 EOF
 }
 
@@ -157,17 +156,6 @@ function run_logged_release_command() {
   echo "$success_summary"
 }
 
-function prepare_release_secrets_xcconfig() {
-  RELEASE_SECRETS_XCCONFIG="$(mktemp "$BUILD_DIR/release-secrets.XXXXXX.xcconfig")"
-  printf 'CLOUDFLARE_AIG_TOKEN = %s\n' "$CLOUDFLARE_AIG_TOKEN_EFFECTIVE" >"$RELEASE_SECRETS_XCCONFIG"
-}
-
-function cleanup_release_secrets_xcconfig() {
-  if [[ -n "$RELEASE_SECRETS_XCCONFIG" && -f "$RELEASE_SECRETS_XCCONFIG" ]]; then
-    rm -f "$RELEASE_SECRETS_XCCONFIG"
-  fi
-}
-
 function resolve_release_tag() {
   local version="$1"
   local build_number="$2"
@@ -189,33 +177,6 @@ function resolve_release_tag() {
   fi
 
   printf '%s\n' "$build_tag"
-}
-
-function resolve_cloudflare_aig_token() {
-  if [[ -n "${CLOUDFLARE_AIG_TOKEN:-}" ]]; then
-    printf '%s\n' "$CLOUDFLARE_AIG_TOKEN"
-    return 0
-  fi
-
-  if [[ ! -f "$LOCAL_SECRETS_XCCONFIG_PATH" ]]; then
-    return 0
-  fi
-
-  python3 - "$LOCAL_SECRETS_XCCONFIG_PATH" <<'PY'
-import sys
-from pathlib import Path
-
-path = Path(sys.argv[1])
-for raw_line in path.read_text().splitlines():
-    line = raw_line.split("//", 1)[0].strip()
-    if not line or "=" not in line:
-        continue
-    key, value = [segment.strip() for segment in line.split("=", 1)]
-    if key != "CLOUDFLARE_AIG_TOKEN":
-        continue
-    print(value.strip().strip('"').strip("'"))
-    break
-PY
 }
 
 function write_release_versions() {
@@ -261,21 +222,15 @@ fi
 
 source "$ENV_FILE"
 
-CLOUDFLARE_AIG_TOKEN_EFFECTIVE="$(resolve_cloudflare_aig_token)"
-if [[ -z "$CLOUDFLARE_AIG_TOKEN_EFFECTIVE" ]]; then
-  echo "Missing Cloudflare AIG token. Set CLOUDFLARE_AIG_TOKEN or provide $LOCAL_SECRETS_XCCONFIG_PATH." >&2
-  exit 1
-fi
-
 if [[ -z "$TARGET_BRANCH" ]]; then
   TARGET_BRANCH="$(git -C "$ROOT_DIR" rev-parse --abbrev-ref HEAD)"
 fi
 
 case "$TARGET_BRANCH" in
-  main|stable-4.12|codex/stable-4.12|codex/stable-4.1|codex/stable-4.2|codex/stable-4.3|codex/stable-4.4|codex/stable-4.5|codex/stable-4.6|codex/stable-4.7|codex/stable-4.8|codex/stable-4.9|codex/stable-4.10|codex/stable-4.11)
+  main|stable-5.0|codex/stable-5.0|feature/beta-5.0*|codex/feature/beta-5.0*)
     ;;
   *)
-    echo "Release target branch must be a stable branch or main. Got: $TARGET_BRANCH" >&2
+    echo "Release target branch must be the Beta 5.0 release-preparation branch, a 5.0 stable branch, or main. Got: $TARGET_BRANCH" >&2
     exit 1
     ;;
 esac
@@ -315,8 +270,6 @@ fi
 if [[ ! -d "$BUILD_DIR" ]]; then
   mkdir -p "$BUILD_DIR"
 fi
-
-trap cleanup_release_secrets_xcconfig EXIT
 
 REMOTE_MAIN_SHA=""
 if [[ "${PUSH_RELEASE:-1}" == "1" && "$PROMOTE_MAIN" == "1" ]]; then
@@ -371,7 +324,6 @@ IPA_PATH="$EXPORT_PATH/GlassGPT.ipa"
 RELEASE_TAG="$(resolve_release_tag "$VERSION" "$BUILD_NUMBER")"
 
 rm -rf "$ARCHIVE_PATH" "$EXPORT_PATH"
-prepare_release_secrets_xcconfig
 
 KEY_PATH="${ASC_API_KEY_PATH:-}"
 if [[ -z "$KEY_PATH" || ! -f "$KEY_PATH" ]]; then
@@ -391,7 +343,6 @@ run_logged_release_command "Archive" "$ARCHIVE_LOG" "Archive completed successfu
     -configuration Release \
     -destination "generic/platform=iOS" \
     -archivePath "$ARCHIVE_PATH" \
-    -xcconfig "$RELEASE_SECRETS_XCCONFIG" \
     clean archive \
     -allowProvisioningUpdates \
     -authenticationKeyPath "$KEY_PATH" \
@@ -437,8 +388,6 @@ actual_version = info["CFBundleShortVersionString"]
 actual_build = info["CFBundleVersion"]
 if actual_version != expected_version or actual_build != expected_build:
     raise SystemExit(f"IPA metadata mismatch. expected {expected_version} ({expected_build}), found {actual_version} ({actual_build})")
-if not info.get("CloudflareAIGToken"):
-    raise SystemExit("IPA metadata is missing CloudflareAIGToken.")
 print(f"Verified IPA version: {actual_version} ({actual_build})")
 PY
 

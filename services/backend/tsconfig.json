@@ -1,0 +1,10 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2024"],
+    "types": [],
+    "noEmit": true
+  },
+  "include": ["src/**/*.ts", ".wrangler/backend-env.d.ts"],
+  "exclude": ["src/**/*.test.ts", "dist"]
+}

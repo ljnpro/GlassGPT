@@ -17,7 +17,9 @@ public struct SettingsAboutInfo: Equatable, Sendable {
 /// Root owner for the settings scene, coordinating cross-section interactions.
 @MainActor
 public final class SettingsPresenter {
-    /// Credential and Cloudflare gateway state for the settings scene.
+    /// Account and sync state for the settings scene.
+    public let account: SettingsAccountStore
+    /// Backend-owned OpenAI credential state for the settings scene.
     public let credentials: SettingsCredentialsStore
     /// Default model, theme, and toggle state for the settings scene.
     public let defaults: SettingsDefaultsStore
@@ -30,21 +32,19 @@ public final class SettingsPresenter {
 
     /// Creates a settings presenter from independently owned scene sections.
     public init(
+        account: SettingsAccountStore,
         credentials: SettingsCredentialsStore,
         defaults: SettingsDefaultsStore,
         agentDefaults: AgentSettingsDefaultsStore,
         cache: SettingsCacheStore,
         about: SettingsAboutInfo
     ) {
+        self.account = account
         self.credentials = credentials
         self.defaults = defaults
         self.agentDefaults = agentDefaults
         self.cache = cache
         self.about = about
-
-        defaults.observeCloudflareGatewayChanges { [weak credentials] enabled in
-            credentials?.handleCloudflareGatewayChange(enabled)
-        }
     }
 
     /// Shared formatter for converting byte counts to human-readable strings.

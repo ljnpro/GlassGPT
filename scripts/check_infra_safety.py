@@ -10,10 +10,6 @@ PRODUCTION_ROOTS = (
     ROOT / "modules" / "native-chat" / "Sources",
     ROOT / "ios" / "GlassGPT",
 )
-FORBIDDEN_CONTINUATION_ROOTS = (
-    ROOT / "modules" / "native-chat" / "Sources" / "OpenAITransport",
-    ROOT / "modules" / "native-chat" / "Sources" / "GeneratedFilesInfra",
-)
 
 SHARED_SESSION_PATTERNS = (
     (re.compile(r"\bURLSession\.shared\b"), "shared URLSession is forbidden"),
@@ -42,10 +38,6 @@ def production_swift_files() -> list[Path]:
     return files
 
 
-def under_forbidden_continuation_root(path: Path) -> bool:
-    return any(root in path.parents for root in FORBIDDEN_CONTINUATION_ROOTS)
-
-
 def main() -> int:
     files = production_swift_files()
     failures: list[Failure] = []
@@ -59,14 +51,6 @@ def main() -> int:
 
         if DETACHED_TASK_PATTERN.search(text):
             failures.append(Failure(relative(path), "Task.detached is forbidden in production code"))
-
-        if under_forbidden_continuation_root(path) and CONTINUATION_PATTERN.search(text):
-            failures.append(
-                Failure(
-                    relative(path),
-                    "checked continuations are forbidden in transport/download infra; use native async APIs",
-                )
-            )
 
         if NSSTRING_BRIDGE_PATTERN.search(text):
             failures.append(Failure(relative(path), "as NSString bridge is forbidden; use native Swift String APIs"))

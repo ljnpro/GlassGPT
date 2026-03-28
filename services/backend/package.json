@@ -1,0 +1,28 @@
+{
+  "name": "@glassgpt/backend",
+  "version": "5.0.0-beta.1",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=25.2.1 <26"
+  },
+  "scripts": {
+    "prebuild": "corepack pnpm --dir ../.. --filter @glassgpt/backend-contracts run build",
+    "pretest": "corepack pnpm --dir ../.. --filter @glassgpt/backend-contracts run build",
+    "preci": "corepack pnpm --dir ../.. --filter @glassgpt/backend-contracts run ci && corepack pnpm --dir ../.. --filter @glassgpt/backend-infra run build",
+    "generate:types": "mkdir -p .wrangler && wrangler types .wrangler/backend-env.d.ts",
+    "check:types": "mkdir -p .wrangler && wrangler types .wrangler/backend-env.d.ts",
+    "build": "mkdir -p .wrangler && wrangler types .wrangler/backend-env.d.ts && tsc -p tsconfig.json --noEmit",
+    "check": "wrangler deploy --dry-run --outdir .wrangler/dry-run --metafile .wrangler/bundle-meta.json --keep-vars",
+    "lint": "biome check --error-on-warnings src package.json tsconfig.json vitest.config.ts wrangler.jsonc",
+    "test": "vitest run --config vitest.config.ts",
+    "check:deps": "depcruise --config ../../dependency-cruiser.cjs src",
+    "ci": "biome check --error-on-warnings src package.json tsconfig.json vitest.config.ts wrangler.jsonc && mkdir -p .wrangler && wrangler types .wrangler/backend-env.d.ts && tsc -p tsconfig.json --noEmit && vitest run --config vitest.config.ts && wrangler deploy --dry-run --outdir .wrangler/dry-run --metafile .wrangler/bundle-meta.json --keep-vars && depcruise --config ../../dependency-cruiser.cjs src"
+  },
+  "dependencies": {
+    "@glassgpt/backend-contracts": "workspace:*",
+    "hono": "4.12.9",
+    "jose": "6.2.2",
+    "zod": "^4.3.6"
+  }
+}

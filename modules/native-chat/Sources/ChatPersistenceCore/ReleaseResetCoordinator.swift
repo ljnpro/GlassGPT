@@ -7,7 +7,7 @@ import Foundation
 /// is guarded by a version marker in `UserDefaults` so it only runs once.
 public enum ReleaseResetCoordinator {
     /// The release version that triggers the reset.
-    public static let targetVersion = "4.5.0"
+    public static let targetVersion = "5.0.0"
     /// The `UserDefaults` key used to record that the reset has been completed.
     public static let resetMarkerKey = "release_reset_completed_version"
 

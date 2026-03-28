@@ -10,6 +10,8 @@ public protocol SettingsValueStore: AnyObject {
     func bool(forKey defaultName: String) -> Bool
     /// Sets the value for the given key.
     func set(_ value: Any?, forKey defaultName: String)
+    /// Removes the value associated with the given key.
+    func removeObject(forKey defaultName: String)
 }
 
 /// Concrete ``SettingsValueStore`` backed by `UserDefaults`.
@@ -39,5 +41,10 @@ public final class UserDefaultsSettingsValueStore: SettingsValueStore {
     /// Sets the value for the given key in `UserDefaults`.
     public func set(_ value: Any?, forKey defaultName: String) {
         defaults.set(value, forKey: defaultName)
+    }
+
+    /// Removes the value for the given key in `UserDefaults`.
+    public func removeObject(forKey defaultName: String) {
+        defaults.removeObject(forKey: defaultName)
     }
 }

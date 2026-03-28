@@ -2,13 +2,17 @@
 
 ## Purpose
 
-Use this checklist after the local release path is already clean.
-Do not push first and debug later. Local CI, release logs, and TestFlight upload
-must already be complete before starting the GitHub phase.
+Use this checklist only after the local release path is already clean.
+Do not push first and debug later. Local CI, release logs, and the TestFlight
+upload must already be complete before starting the GitHub phase.
 
 ## Preconditions
 
-- current branch is the active stable branch, usually local `stable-4.12` before mirroring to `codex/stable-4.12`
+- current branch is the active release-preparation branch or the mirrored 5.0 release branch:
+  - `feature/beta-5.0-cloudflare-all-in`
+  - `codex/feature/beta-5.0-cloudflare-all-in`
+  - `stable-5.0`
+  - `codex/stable-5.0`
 - worktree is clean
 - `ios/GlassGPT/Config/Versions.xcconfig` matches the intended release
 - `.local/build` logs were reviewed manually
@@ -28,14 +32,14 @@ must already be complete before starting the GitHub phase.
 
 ## Push Order
 
-1. Push `HEAD` to the active stable branch.
+1. Push `HEAD` to the active release branch.
 2. Push the release tag that points to the same commit.
 3. Verify the remote refs with `git ls-remote`.
-4. Watch the GitHub Actions run for the stable branch.
-5. Read every remote log file, not only failing jobs.
+4. Watch the GitHub Actions run for that branch.
+5. Read every remote log, not only failing jobs.
 6. If anything is noisy or incorrect, fix locally, commit, push, and watch again.
-7. Only after the stable branch is clean, promote `main`.
-8. Keep the previous `main` commit preserved on the matching frozen stable branch.
+7. Promote `main` only after the release branch is clean.
+8. Preserve the pre-5.0 rollback line when promoting `main`.
 
 ## Remote CI Standard
 
@@ -51,24 +55,17 @@ Passing status alone is not enough. Successful logs still need manual review.
 
 ## Branch Promotion
 
-When promoting a new stable line to `main`:
+When promoting the first 5.0 line to `main`:
 
-- preserve the previous `main` tip on the frozen branch first
+- preserve the previous rollback line first when needed
 - fast-forward `main` when possible
 - if a force update is required, use `--force-with-lease`
-- verify `main`, the stable branch, and the release tag all point to the intended commit
-
-For the `4.12` rollout:
-
-- previous `main` must remain available as `codex/stable-4.11`
-- the released `4.12.x` commit becomes both `codex/stable-4.12` and `main`
+- verify `main`, the release branch, the preserved rollback branch when used, and the release tag all point to the intended commit
 
 ## Post-Push Verification
 
-After the remote workflow finishes:
-
 1. Inspect every job log in GitHub Actions.
-2. Confirm the stable branch and `main` show the same release commit when expected.
+2. Confirm the release branch and `main` show the same release commit when expected.
 3. Confirm the release tag points to the same commit.
 4. Confirm no extra release commit or tag was created accidentally.
 5. Keep the Delivery UUID and remote run URL in the release notes or handoff notes.

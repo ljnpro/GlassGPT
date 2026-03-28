@@ -7,12 +7,10 @@ from collections import defaultdict
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-CONTROLLERS_ROOT = ROOT / "modules" / "native-chat" / "Sources" / "NativeChatComposition" / "Controllers"
-EXTRA_FILES = [
-    ROOT / "modules" / "native-chat" / "Sources" / "NativeChatComposition" / "NativeChatHistoryCoordinator.swift",
-]
-FULL_CONTROLLER_DEPENDENCY_RE = re.compile(r":\s*ChatController\b")
-CONTROLLER_REACH_THROUGH_RE = re.compile(r"\bcontroller\.[A-Za-z_]\w*")
+CLUSTER_ROOT = ROOT / "modules" / "native-chat" / "Sources" / "NativeChatBackendComposition"
+EXCLUDED_PARTS = {"Resources", "Views"}
+FULL_CONTROLLER_DEPENDENCY_RE = re.compile(r":\s*(?:BackendChatController|BackendAgentController)\b")
+CONTROLLER_REACH_THROUGH_RE = re.compile(r"\b(?:chatController|agentController)\.[A-Za-z_]\w*")
 
 
 def family_name(path: Path) -> str:
@@ -23,9 +21,13 @@ def family_name(path: Path) -> str:
 
 
 def current_tracked_paths() -> list[Path]:
-    files = sorted(CONTROLLERS_ROOT.rglob("*.swift"))
-    files.extend(file for file in EXTRA_FILES if file.exists())
-    return sorted(files)
+    if not CLUSTER_ROOT.exists():
+        return []
+    return sorted(
+        path
+        for path in CLUSTER_ROOT.rglob("*.swift")
+        if not any(part in EXCLUDED_PARTS for part in path.parts)
+    )
 
 
 def ref_tracked_paths(ref: str) -> list[Path]:
@@ -38,8 +40,7 @@ def ref_tracked_paths(ref: str) -> list[Path]:
             "-r",
             "--name-only",
             ref,
-            "modules/native-chat/Sources/NativeChatComposition/Controllers",
-            "modules/native-chat/Sources/NativeChatComposition/NativeChatHistoryCoordinator.swift",
+            "modules/native-chat/Sources/NativeChatBackendComposition",
         ],
         capture_output=True,
         text=True,
@@ -52,7 +53,10 @@ def ref_tracked_paths(ref: str) -> list[Path]:
     for line in completed.stdout.splitlines():
         if not line:
             continue
-        paths.append(ROOT / line)
+        path = ROOT / line
+        if any(part in EXCLUDED_PARTS for part in path.parts):
+            continue
+        paths.append(path)
     return sorted(paths)
 
 
@@ -91,7 +95,7 @@ def anti_pattern_metrics(path: Path, text: str) -> dict[str, int]:
         metrics["full_controller_type_references_in_coordinators"] = len(FULL_CONTROLLER_DEPENDENCY_RE.findall(text))
         metrics["controller_reach_through_sites"] = len(CONTROLLER_REACH_THROUGH_RE.findall(text))
 
-    if path.name == "ChatControllerServices.swift":
+    if path.name == "NativeChatAppStore.swift":
         metrics["broad_service_bag_files"] = 1
 
     return metrics

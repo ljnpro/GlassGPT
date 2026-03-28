@@ -29,7 +29,7 @@ struct UITestEnvironmentResetTests {
             at: temporaryDirectory.appendingPathComponent("file_previews", isDirectory: true),
             withIntermediateDirectories: true
         )
-        userDefaults.setPersistentDomain(["cloudflareGatewayEnabled": true], forName: bundleIdentifier)
+        userDefaults.setPersistentDomain(["hasAcceptedDataSharing": true], forName: bundleIdentifier)
         var resetServices: [String] = []
 
         let didReset = UITestEnvironmentReset.performIfRequested(
@@ -65,7 +65,7 @@ struct UITestEnvironmentResetTests {
 
         try fileManager.createDirectory(at: applicationSupportDirectory, withIntermediateDirectories: true)
         fileManager.createFile(atPath: applicationSupportDirectory.appendingPathComponent("default.store").path, contents: Data())
-        userDefaults.setPersistentDomain(["cloudflareGatewayEnabled": true], forName: bundleIdentifier)
+        userDefaults.setPersistentDomain(["hasAcceptedDataSharing": true], forName: bundleIdentifier)
         var resetServices: [String] = []
 
         let didReset = UITestEnvironmentReset.performIfRequested(
@@ -79,7 +79,7 @@ struct UITestEnvironmentResetTests {
 
         #expect(!didReset)
         #expect(fileManager.fileExists(atPath: applicationSupportDirectory.appendingPathComponent("default.store").path))
-        #expect(userDefaults.bool(forKey: "cloudflareGatewayEnabled"))
+        #expect(userDefaults.bool(forKey: "hasAcceptedDataSharing"))
         #expect(resetServices.isEmpty)
     }
 }

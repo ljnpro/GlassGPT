@@ -1,14 +1,21 @@
 import ChatDomain
 import ChatUIComponents
+import FilePreviewSupport
 import GeneratedFilesCore
-import ImageIO
-import PDFKit
-import Photos
 import SwiftUI
 import UIKit
 
 /// Full-screen preview sheet for generated images and PDFs, with save-to-photos and share actions.
 public struct FilePreviewSheet: View {
+    struct StateSeed {
+        var saveState: GeneratedFilePreviewSaveState = .idle
+        var saveError: String?
+        var imagePreviewState: GeneratedImagePreviewState = .loading
+        var pdfPreviewState: GeneratedPDFPreviewState = .loading
+        var showSaveSuccessHUD = false
+        var isShowingShareSheet = false
+    }
+
     let previewItem: FilePreviewItem
     var isDismissPending = false
     var onBeginDismissInteraction: () -> Void = {}
@@ -18,10 +25,10 @@ public struct FilePreviewSheet: View {
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.hapticsEnabled) var hapticsEnabled
 
-    @State var saveState: SaveState = .idle
+    @State var saveState: GeneratedFilePreviewSaveState = .idle
     @State var saveError: String?
-    @State var imagePreviewState: ImagePreviewState = .loading
-    @State var pdfPreviewState: PDFPreviewState = .loading
+    @State var imagePreviewState: GeneratedImagePreviewState = .loading
+    @State var pdfPreviewState: GeneratedPDFPreviewState = .loading
     @State var showSaveSuccessHUD = false
     @State var saveSuccessHUDToken = UUID()
     @State var isShowingShareSheet = false
@@ -38,7 +45,7 @@ public struct FilePreviewSheet: View {
         imagePreviewPayload != nil
     }
 
-    var imagePreviewPayload: ImagePreviewPayload? {
+    var imagePreviewPayload: GeneratedImagePreviewPayload? {
         if case let .image(payload) = imagePreviewState {
             return payload
         }
@@ -193,9 +200,31 @@ public struct FilePreviewSheet: View {
         onBeginDismissInteraction: @escaping () -> Void = {},
         onRequestDismiss: @escaping () -> Void = {}
     ) {
+        self.init(
+            previewItem: previewItem,
+            isDismissPending: isDismissPending,
+            onBeginDismissInteraction: onBeginDismissInteraction,
+            onRequestDismiss: onRequestDismiss,
+            stateSeed: StateSeed()
+        )
+    }
+
+    init(
+        previewItem: FilePreviewItem,
+        isDismissPending: Bool = false,
+        onBeginDismissInteraction: @escaping () -> Void = {},
+        onRequestDismiss: @escaping () -> Void = {},
+        stateSeed: StateSeed
+    ) {
         self.previewItem = previewItem
         self.isDismissPending = isDismissPending
         self.onBeginDismissInteraction = onBeginDismissInteraction
         self.onRequestDismiss = onRequestDismiss
+        _saveState = State(initialValue: stateSeed.saveState)
+        _saveError = State(initialValue: stateSeed.saveError)
+        _imagePreviewState = State(initialValue: stateSeed.imagePreviewState)
+        _pdfPreviewState = State(initialValue: stateSeed.pdfPreviewState)
+        _showSaveSuccessHUD = State(initialValue: stateSeed.showSaveSuccessHUD)
+        _isShowingShareSheet = State(initialValue: stateSeed.isShowingShareSheet)
     }
 }

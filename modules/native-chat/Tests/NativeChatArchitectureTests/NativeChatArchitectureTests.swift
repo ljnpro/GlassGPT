@@ -1,20 +1,17 @@
-import AITransportContracts
-import ChatApplication
+import BackendAuth
+import BackendContracts
 import ChatDomain
-import ChatPersistenceContracts
 import ChatPersistenceCore
-import ChatPersistenceSwiftData
 import ChatPresentation
-import ChatRuntimeModel
-import ChatRuntimePorts
-import ChatRuntimeWorkflows
-import ChatUIComponents
+import ChatProjectionPersistence
+import FilePreviewSupport
 import GeneratedFilesCore
 import NativeChat
-import NativeChatComposition
 import NativeChatUI
 import SwiftData
 import XCTest
+@testable import NativeChatBackendComposition
+@testable import NativeChatBackendCore
 
 final class NativeChatArchitectureTests: XCTestCase {
     private var packageRoot: URL {
@@ -30,29 +27,31 @@ final class NativeChatArchitectureTests: XCTestCase {
             .deletingLastPathComponent()
     }
 
-    func testPackageManifestDeclaresFoundationTargets() throws {
+    func testPackageManifestDeclaresBetaFiveTargets() throws {
         let manifest = try String(
             contentsOf: packageRoot.appendingPathComponent("Package.swift"),
             encoding: .utf8
         )
         let requiredTargets = [
-            "AITransportContracts",
-            "ChatPersistenceContracts",
+            "AppRouting",
+            "BackendContracts",
+            "BackendAuth",
+            "BackendSessionPersistence",
+            "BackendClient",
+            "SyncProjection",
+            "ConversationSyncApplication",
+            "ChatDomain",
             "ChatPersistenceCore",
-            "ChatPersistenceSwiftData",
+            "ChatProjectionPersistence",
             "GeneratedFilesCore",
-            "GeneratedFilesInfra",
-            "ChatRuntimeModel",
-            "ChatRuntimePorts",
-            "ChatRuntimeWorkflows",
-            "ChatApplication",
+            "GeneratedFilesCache",
+            "FilePreviewSupport",
             "ChatPresentation",
             "ChatUIComponents",
             "NativeChatUI",
-            "NativeChatComposition",
+            "NativeChatBackendComposition",
             "NativeChatUITestSupport",
-            "NativeChat",
-            "NativeChatArchitectureTests"
+            "NativeChat"
         ]
 
         for target in requiredTargets {
@@ -61,29 +60,27 @@ final class NativeChatArchitectureTests: XCTestCase {
                 "Package.swift should declare \(target)"
             )
         }
-
-        XCTAssertFalse(
-            manifest.contains("name: \"NativeChatLegacy\""),
-            "Package.swift should not retain the deprecated NativeChatLegacy target"
-        )
     }
 
-    func testNewSourceTargetsContainProductionSwift() throws {
+    func testSourceTargetsContainProductionSwift() {
         let targets = [
-            "AITransportContracts",
-            "ChatPersistenceContracts",
+            "AppRouting",
+            "BackendContracts",
+            "BackendAuth",
+            "BackendSessionPersistence",
+            "BackendClient",
+            "SyncProjection",
+            "ConversationSyncApplication",
+            "ChatDomain",
             "ChatPersistenceCore",
-            "ChatPersistenceSwiftData",
+            "ChatProjectionPersistence",
             "GeneratedFilesCore",
-            "GeneratedFilesInfra",
-            "ChatRuntimeModel",
-            "ChatRuntimePorts",
-            "ChatRuntimeWorkflows",
-            "ChatApplication",
+            "GeneratedFilesCache",
+            "FilePreviewSupport",
             "ChatPresentation",
             "ChatUIComponents",
             "NativeChatUI",
-            "NativeChatComposition",
+            "NativeChatBackendComposition",
             "NativeChat"
         ]
         let fileManager = FileManager.default
@@ -92,126 +89,76 @@ final class NativeChatArchitectureTests: XCTestCase {
             let targetURL = packageRoot.appendingPathComponent("Sources/\(target)", isDirectory: true)
             XCTAssertTrue(fileManager.fileExists(atPath: targetURL.path), "Missing source target directory \(target)")
 
-            let swiftFiles = try fileManager.contentsOfDirectory(at: targetURL, includingPropertiesForKeys: nil)
-                .filter { $0.pathExtension == "swift" }
-            XCTAssertFalse(
-                swiftFiles.isEmpty,
-                "\(target) should include at least one production Swift file"
-            )
+            let enumerator = fileManager.enumerator(at: targetURL, includingPropertiesForKeys: nil)
+            let swiftFiles = (enumerator?.allObjects as? [URL] ?? []).filter { $0.pathExtension == "swift" }
+            XCTAssertFalse(swiftFiles.isEmpty, "\(target) should include at least one production Swift file")
         }
     }
 
-    func testWorkflowAndLintCoverArchitectureGates() throws {
-        let workflow = try String(
-            contentsOf: workspaceRoot.appendingPathComponent(".github/workflows/ios.yml"),
-            encoding: .utf8
-        )
-        XCTAssertTrue(workflow.contains("matrix:"))
-        XCTAssertTrue(workflow.contains("gate:"))
-        XCTAssertTrue(workflow.contains("architecture-tests"))
-        XCTAssertTrue(workflow.contains("./scripts/ci.sh ${{ matrix.gate }}"))
-        XCTAssertTrue(workflow.contains("./scripts/ci.sh source-share"))
-        XCTAssertTrue(workflow.contains("./scripts/ci.sh infra-safety"))
-        XCTAssertTrue(workflow.contains("./scripts/ci.sh module-boundary"))
-
-        let swiftlint = try String(
-            contentsOf: workspaceRoot.appendingPathComponent(".swiftlint.yml"),
-            encoding: .utf8
-        )
-        XCTAssertTrue(swiftlint.contains("modules/native-chat/Sources"))
-    }
-
-    func testCompositionCoordinatorsDoNotDependOnFullChatController() throws {
-        let compositionRoot = packageRoot.appendingPathComponent("Sources/NativeChatComposition")
-        let controllerFiles = try FileManager.default.contentsOfDirectory(
-            at: compositionRoot.appendingPathComponent("Controllers"),
-            includingPropertiesForKeys: nil
-        )
-        let additionalCoordinator = compositionRoot.appendingPathComponent("NativeChatHistoryCoordinator.swift")
-        let files = controllerFiles
-            .filter { $0.pathExtension == "swift" }
-            .filter { !$0.lastPathComponent.hasPrefix("ChatController") }
-            + [additionalCoordinator]
-
-        for file in files {
-            guard FileManager.default.fileExists(atPath: file.path) else { continue }
-            let text = try String(contentsOf: file, encoding: .utf8)
-            XCTAssertFalse(
-                text.contains("unowned let controller: ChatController"),
-                "\(file.lastPathComponent) must not keep a full ChatController reference"
-            )
-            XCTAssertFalse(
-                text.contains("init(controller: ChatController"),
-                "\(file.lastPathComponent) must not accept ChatController as a direct dependency"
-            )
-        }
-    }
-
-    func testNativeChatUmbrellaNoLongerImportsLegacyImplementationDirectly() throws {
+    func testNativeChatUmbrellaRoutesThroughBackendComposition() throws {
         let umbrella = try String(
             contentsOf: packageRoot.appendingPathComponent("Sources/NativeChat/NativeChatRootView.swift"),
             encoding: .utf8
         )
 
-        XCTAssertFalse(
-            umbrella.contains("import NativeChatLegacy"),
-            "NativeChat umbrella should re-export composition, not import NativeChatLegacy directly"
-        )
         XCTAssertTrue(
+            umbrella.contains("import NativeChatBackendComposition"),
+            "NativeChat umbrella should route through NativeChatBackendComposition"
+        )
+        XCTAssertFalse(
             umbrella.contains("import NativeChatComposition"),
-            "NativeChat umbrella should route through NativeChatComposition"
+            "NativeChat umbrella must not import the legacy composition target"
         )
     }
 
-    func testUITestBootstrapSupportLivesOutsideProductionSources() throws {
-        let productionSupport = packageRoot.appendingPathComponent("Sources/NativeChatComposition/UITestBootstrap", isDirectory: true)
-        XCTAssertFalse(
-            FileManager.default.fileExists(atPath: productionSupport.path),
-            "NativeChatComposition must not keep UITest bootstrap sources in production paths"
-        )
+    func testLegacyCleanPathDuplicatesWereDeletedFromNativeChatComposition() {
+        let deletedPaths = [
+            "Sources/NativeChatComposition/ContentView.swift",
+            "Sources/NativeChatComposition/NativeChatRootView.swift",
+            "Sources/NativeChatComposition/Projection/BackendChatView.swift",
+            "Sources/NativeChatComposition/Projection/BackendAgentView.swift",
+            "Sources/NativeChatComposition/Views/Chat/ChatView.swift",
+            "Sources/NativeChatComposition/Views/Agent/AgentView.swift"
+        ]
 
+        for relativePath in deletedPaths {
+            let path = packageRoot.appendingPathComponent(relativePath)
+            XCTAssertFalse(
+                FileManager.default.fileExists(atPath: path.path),
+                "Legacy duplicate should be deleted: \(relativePath)"
+            )
+        }
+    }
+
+    func testUITestSupportLivesUnderSupportDirectory() {
         let supportRoot = packageRoot.appendingPathComponent("Support/NativeChatUITestSupport", isDirectory: true)
         XCTAssertTrue(
             FileManager.default.fileExists(atPath: supportRoot.path),
             "UITest support should live under Support/NativeChatUITestSupport"
         )
+    }
 
-        let compositionRoot = try String(
-            contentsOf: packageRoot.appendingPathComponent("Sources/NativeChatComposition/NativeChatCompositionRoot.swift"),
+    func testShippingAppMetadataNoLongerEmbedsCloudflareToken() throws {
+        let infoPlist = try String(
+            contentsOf: workspaceRoot.appendingPathComponent("ios/GlassGPT/Info.plist"),
             encoding: .utf8
         )
+
         XCTAssertFalse(
-            compositionRoot.contains("UITestScenarioLoader"),
-            "Production composition root must not reach UITest bootstrap support directly"
+            infoPlist.contains("CloudflareAIGToken"),
+            "Shipping app metadata must not embed CloudflareAIGToken"
         )
     }
 
-    func testLegacyIOSLayerIsDeleted() {
-        let iosRoot = packageRoot.appendingPathComponent("ios", isDirectory: true)
-        XCTAssertFalse(
-            FileManager.default.fileExists(atPath: iosRoot.path),
-            "modules/native-chat/ios must be deleted in the final architecture"
-        )
-    }
-
-    // swiftlint:disable:next function_body_length
-    func testNewArchitectureModulesAreDirectlyCallable() async {
-        let conversation = StoredConversationSnapshot(
-            id: UUID(),
-            title: "  4.4.1 Baseline  ",
-            modelIdentifier: "gpt-5.4",
-            reasoningEffortIdentifier: "high",
-            backgroundModeEnabled: true,
-            serviceTierIdentifier: "default",
-            updatedAt: Date()
-        )
-        XCTAssertEqual(conversation.title, "4.4.1 Baseline")
-        XCTAssertTrue(conversation.hasCustomConfiguration)
-
-        let valueStore = InMemorySettingsValueStore()
-        let settings = SettingsStore(valueStore: valueStore)
-        settings.defaultModel = .gpt5_4_pro
-        XCTAssertEqual(settings.defaultModel, .gpt5_4_pro)
+    @MainActor
+    func testNewArchitectureModulesAreDirectlyCallable() throws {
+        let settingsStore = SettingsStore(valueStore: InMemorySettingsValueStore())
+        settingsStore.defaultModel = .gpt5_4_pro
+        settingsStore.defaultEffort = .xhigh
+        settingsStore.defaultServiceTier = .flex
+        XCTAssertEqual(settingsStore.defaultConversationConfiguration.model, .gpt5_4_pro)
+        XCTAssertEqual(settingsStore.defaultConversationConfiguration.reasoningEffort, .xhigh)
+        XCTAssertEqual(settingsStore.defaultConversationConfiguration.serviceTier, .flex)
 
         let descriptor = GeneratedFileDescriptor(
             fileID: "file_chart",
@@ -221,57 +168,25 @@ final class NativeChatArchitectureTests: XCTestCase {
         )
         XCTAssertEqual(GeneratedFilePolicy.cacheBucket(for: descriptor), .image)
         XCTAssertEqual(GeneratedFilePolicy.openBehavior(for: descriptor), .imagePreview)
-
-        let replyID = AssistantReplyID()
-        let session = ReplySessionActor(
-            initialState: ReplyRuntimeState(
-                assistantReplyID: replyID,
-                messageID: UUID(),
-                conversationID: UUID()
-            )
+        XCTAssertEqual(
+            GeneratedFilePreviewLoader.loadGeneratedImagePreview(from: URL(fileURLWithPath: "/tmp/missing.png")),
+            .unavailable
         )
-        let registry = RuntimeRegistryActor()
-        await registry.register(session, for: replyID)
-        let registryContainsReply = await registry.contains(replyID)
-        XCTAssertTrue(registryContainsReply)
 
-        let runtimeState = await session.apply(
-            .beginRecoveryStatus(
-                responseID: "resp_architecture",
-                lastSequenceNumber: 4,
-                usedBackgroundMode: true,
-                route: .gateway
-            )
+        let sessionStore = BackendSessionStore()
+        XCTAssertFalse(sessionStore.isSignedIn)
+
+        let container = try ModelContainer(
+            for: Schema([Conversation.self, Message.self]),
+            configurations: [ModelConfiguration(isStoredInMemoryOnly: true)]
         )
-        XCTAssertEqual(runtimeState.responseID, "resp_architecture")
-        XCTAssertTrue(runtimeState.isRecovering)
-
-        let streamingText = RichTextAttributedStringBuilder.parseStreamingText("**Ship** release")
-        XCTAssertEqual(String(streamingText.characters), "Ship release")
-
-        await MainActor.run {
-            // swiftlint:disable:next force_try
-            let container = try! ModelContainer(
-                for: Schema([Conversation.self, Message.self]),
-                configurations: [ModelConfiguration(isStoredInMemoryOnly: true)]
-            )
-            let root = NativeChatCompositionRoot(
-                modelContext: ModelContext(container),
-                bootstrapPolicy: .testing
-            )
-            let store = root.makeAppStore()
-            XCTAssertNotNil(store.chatController)
-            XCTAssertNotNil(store.settingsPresenter)
-            XCTAssertNotNil(store.historyPresenter)
-            _ = NativeChatRootTabsView(title: "Architecture")
-        }
-
-        struct TestClock: ClockPort {
-            let now: Date
-        }
-
-        let clock = TestClock(now: Date(timeIntervalSince1970: 0))
-        XCTAssertEqual(clock.now.timeIntervalSince1970, 0)
+        let root = NativeChatCompositionRoot(modelContext: ModelContext(container))
+        let store = root.makeAppStore()
+        XCTAssertNotNil(store.chatController)
+        XCTAssertNotNil(store.agentController)
+        XCTAssertNotNil(store.settingsPresenter)
+        XCTAssertNotNil(store.historyPresenter)
+        _ = NativeChatRootTabsView(title: "Architecture")
     }
 }
 
@@ -292,5 +207,9 @@ private final class InMemorySettingsValueStore: SettingsValueStore {
 
     func set(_ value: Any?, forKey defaultName: String) {
         storage[defaultName] = value
+    }
+
+    func removeObject(forKey defaultName: String) {
+        storage.removeValue(forKey: defaultName)
     }
 }

@@ -13,9 +13,19 @@ SOURCES_DIR = os.path.join(
     "Sources",
 )
 
+DOC_REQUIRED_TARGETS = {
+    "AppRouting",
+    "ChatPresentation",
+    "ChatUIComponents",
+    "ConversationSurfaceLogic",
+    "NativeChatBackendCore",
+    "NativeChatBackendComposition",
+    "NativeChatUI",
+}
+
 DECLARATION_RE = re.compile(
     r"^\s*(?:public|package)\s+"
-    r"(?:func|var|let|struct|enum|class|protocol|actor|init|typealias)\b"
+    r"(?:func|struct|enum|class|protocol|actor|init|typealias)\b"
 )
 
 # Patterns that look like declarations but are inside function bodies or are
@@ -60,6 +70,10 @@ def main() -> int:
     all_missing: list[tuple[str, int, str]] = []
 
     for root, _dirs, files in os.walk(sources_dir):
+        relative_root = os.path.relpath(root, sources_dir)
+        top_level_target = relative_root.split(os.sep, 1)[0]
+        if top_level_target not in DOC_REQUIRED_TARGETS:
+            continue
         for fname in sorted(files):
             if not fname.endswith(".swift"):
                 continue

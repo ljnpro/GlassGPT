@@ -1,5 +1,5 @@
-import ChatApplication
 import Foundation
+import GeneratedFilesCache
 import Observation
 
 /// Observable generated-file cache state for the settings scene.
@@ -19,7 +19,7 @@ public final class SettingsCacheStore {
     /// Human-readable string for the document cache size limit.
     public let generatedDocumentCacheLimitString: String
 
-    private let controller: SettingsSceneController
+    private let cacheManager: GeneratedFileCacheManager
 
     /// Human-readable string for the current image cache size.
     public var generatedImageCacheSizeString: String {
@@ -39,33 +39,34 @@ public final class SettingsCacheStore {
     public init(
         generatedImageCacheLimitString: String,
         generatedDocumentCacheLimitString: String,
-        controller: SettingsSceneController
+        cacheManager: GeneratedFileCacheManager
     ) {
         self.generatedImageCacheLimitString = generatedImageCacheLimitString
         self.generatedDocumentCacheLimitString = generatedDocumentCacheLimitString
-        self.controller = controller
+        self.cacheManager = cacheManager
     }
 
     /// Refreshes both generated-file cache sizes.
     public func refreshAll() async {
-        await apply(controller.refreshGeneratedCacheSnapshot())
+        await applySnapshot()
     }
 
     /// Refreshes the generated image cache size display.
     public func refreshGeneratedImageCacheSize() async {
-        await apply(controller.refreshGeneratedCacheSnapshot())
+        await applySnapshot()
     }
 
     /// Refreshes the generated document cache size display.
     public func refreshGeneratedDocumentCacheSize() async {
-        await apply(controller.refreshGeneratedCacheSnapshot())
+        await applySnapshot()
     }
 
     /// Clears the generated image cache and updates the displayed sizes.
     public func clearGeneratedImageCache() async {
         guard !isClearingImageCache else { return }
         isClearingImageCache = true
-        await apply(controller.clearGeneratedCache(.image))
+        await cacheManager.clearGeneratedImageCache()
+        await applySnapshot()
         isClearingImageCache = false
     }
 
@@ -73,12 +74,13 @@ public final class SettingsCacheStore {
     public func clearGeneratedDocumentCache() async {
         guard !isClearingDocumentCache else { return }
         isClearingDocumentCache = true
-        await apply(controller.clearGeneratedCache(.document))
+        await cacheManager.clearGeneratedDocumentCache()
+        await applySnapshot()
         isClearingDocumentCache = false
     }
 
-    private func apply(_ snapshot: SettingsCacheSnapshot) {
-        generatedImageCacheSizeBytes = snapshot.imageBytes
-        generatedDocumentCacheSizeBytes = snapshot.documentBytes
+    private func applySnapshot() async {
+        generatedImageCacheSizeBytes = await cacheManager.generatedImageCacheSize()
+        generatedDocumentCacheSizeBytes = await cacheManager.generatedDocumentCacheSize()
     }
 }

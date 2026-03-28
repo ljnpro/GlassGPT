@@ -27,6 +27,7 @@
 		<dict>
 			<key>CFBundleURLSchemes</key>
 			<array>
+				<string>glassgpt</string>
 				<string>manus20260308214621</string>
 				<string>space.manus.liquid.glass.chat.t20260308214621</string>
 			</array>
@@ -34,8 +35,8 @@
 	</array>
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
-	<key>CloudflareAIGToken</key>
-	<string>$(CLOUDFLARE_AIG_TOKEN)</string>
+	<key>BackendBaseURL</key>
+	<string>$(BACKEND_BASE_URL)</string>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
 	<key>LSRequiresIPhoneOS</key>

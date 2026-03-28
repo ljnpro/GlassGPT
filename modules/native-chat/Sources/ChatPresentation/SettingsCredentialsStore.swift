@@ -1,112 +1,134 @@
-import ChatApplication
-import ChatDomain
+import BackendAuth
+import BackendClient
+import BackendContracts
 import Foundation
 import Observation
-import os
 
-/// Observable credential state for the settings scene.
-///
-/// Owns API key editing, validation, and Cloudflare health transitions.
+/// Observable OpenAI credential state for the backend-owned settings flow.
 @Observable
 @MainActor
 public final class SettingsCredentialsStore {
-    /// The current API key text entered by the user.
     public var apiKey: String
-    /// Result of the most recent API key validation, or `nil` if not yet validated.
-    public var isAPIKeyValid: Bool?
-    /// Whether an API key validation request is in flight.
-    public var isValidating = false
-    /// Whether a save confirmation should be shown in the UI.
     public var saveConfirmation = false
-    /// Current Cloudflare gateway health status.
-    public var cloudflareHealthStatus: CloudflareHealthStatus
-    /// Whether a Cloudflare health check is in progress.
-    public var isCheckingCloudflareHealth = false
-    /// The currently selected Cloudflare configuration mode.
-    public var cloudflareConfigurationMode: CloudflareGatewayConfigurationMode
-    /// The custom Cloudflare gateway base URL being edited.
-    public var customCloudflareGatewayBaseURL: String
-    /// The custom Cloudflare gateway token being edited.
-    public var customCloudflareAIGToken: String
+    public private(set) var credentialStatus: CredentialStatusDTO?
+    public private(set) var isSaving = false
+    public private(set) var isDeleting = false
+    public private(set) var isRefreshingStatus = false
+    public private(set) var lastErrorMessage: String?
 
-    static let logger = Logger(subsystem: "GlassGPT", category: "settings")
-    let controller: SettingsSceneController
-    let isCloudflareGatewayEnabled: @MainActor () -> Bool
-    let logFailures: Bool
+    private let client: any BackendRequesting
+    private let sessionStore: BackendSessionStore
 
-    /// Creates credential state with the stored API key and current gateway configuration.
+    /// Creates the backend-owned OpenAI credential state store used by Settings.
     public init(
-        apiKey: String,
-        controller: SettingsSceneController,
-        isCloudflareGatewayEnabled: @escaping @MainActor () -> Bool,
-        logFailures: Bool = true
+        client: any BackendRequesting,
+        sessionStore: BackendSessionStore
     ) {
-        self.apiKey = apiKey
-        self.controller = controller
-        self.isCloudflareGatewayEnabled = isCloudflareGatewayEnabled
-        self.logFailures = logFailures
-        let cloudflareConfigurationMode = controller.loadCloudflareConfigurationMode()
-        let customCloudflareGatewayBaseURL = controller.loadCustomCloudflareGatewayBaseURL()
-        let customCloudflareAIGToken = controller.loadCustomCloudflareGatewayToken() ?? ""
-        self.cloudflareConfigurationMode = cloudflareConfigurationMode
-        self.customCloudflareGatewayBaseURL = customCloudflareGatewayBaseURL
-        self.customCloudflareAIGToken = customCloudflareAIGToken
-        let cloudflareConfiguration = SettingsCloudflareConfiguration(
-            mode: cloudflareConfigurationMode,
-            customGatewayBaseURL: customCloudflareGatewayBaseURL,
-            customGatewayToken: customCloudflareAIGToken
-        )
-        cloudflareHealthStatus = controller.resolveCloudflareHealth(
-            typedAPIKey: apiKey,
-            gatewayEnabled: isCloudflareGatewayEnabled(),
-            configuration: cloudflareConfiguration
-        )
+        apiKey = ""
+        self.client = client
+        self.sessionStore = sessionStore
     }
 
-    /// Trims and saves the current API key, updating save confirmation and Cloudflare health.
-    public func saveAPIKey() {
-        do {
-            guard let outcome = try controller.saveAPIKey(
-                apiKey,
-                gatewayEnabled: isCloudflareGatewayEnabled(),
-                cloudflareConfiguration: currentCloudflareConfiguration()
-            ) else {
-                return
-            }
+    public var isSignedIn: Bool {
+        sessionStore.isSignedIn
+    }
 
-            apiKey = outcome.apiKey
-            saveConfirmation = true
-            if let cloudflareHealthStatus = outcome.cloudflareHealthStatus {
-                self.cloudflareHealthStatus = cloudflareHealthStatus
+    public var statusLabel: String {
+        guard let credentialStatus else {
+            return isSignedIn
+                ? String(localized: "Status unknown. Use Check Connection to refresh.")
+                : String(localized: "Sign in to manage your OpenAI API key.")
+        }
+
+        switch credentialStatus.state {
+        case .missing:
+            return String(localized: "No OpenAI API key is stored on the backend.")
+        case .valid:
+            return String(localized: "Your OpenAI API key is stored and valid.")
+        case .invalid:
+            if let lastErrorSummary = credentialStatus.lastErrorSummary, !lastErrorSummary.isEmpty {
+                return lastErrorSummary
             }
-        } catch {
-            if logFailures {
-                Self.logger.error("Failed to save API key: \(error.localizedDescription, privacy: .public)")
-            }
+            return String(localized: "The stored OpenAI API key is invalid.")
         }
     }
 
-    /// Clears the API key and resets validation state.
-    public func clearAPIKey() {
-        apiKey = ""
-        isAPIKeyValid = nil
-        cloudflareHealthStatus = controller.clearAPIKey(
-            gatewayEnabled: isCloudflareGatewayEnabled(),
-            cloudflareConfiguration: currentCloudflareConfiguration()
-        )
-    }
-
-    /// Validates the current API key against the OpenAI API and updates ``isAPIKeyValid``.
-    public func validateAPIKey() async {
-        let trimmedKey = apiKey.trimmingCharacters(in: .whitespacesAndNewlines)
-
-        guard !trimmedKey.isEmpty else {
-            isAPIKeyValid = false
+    /// Refreshes the visible credential state by asking the backend for the latest connection summary.
+    public func refreshStatus() async {
+        guard sessionStore.isSignedIn else {
+            credentialStatus = nil
+            lastErrorMessage = nil
             return
         }
 
-        isValidating = true
-        isAPIKeyValid = await controller.validateAPIKey(trimmedKey)
-        isValidating = false
+        isRefreshingStatus = true
+        defer { isRefreshingStatus = false }
+
+        do {
+            let status = try await client.connectionCheck()
+            credentialStatus = CredentialStatusDTO(
+                provider: "openai",
+                state: Self.mapCredentialState(status.openaiCredential),
+                checkedAt: status.checkedAt,
+                lastErrorSummary: status.errorSummary
+            )
+            lastErrorMessage = nil
+        } catch {
+            lastErrorMessage = error.localizedDescription
+        }
+    }
+
+    /// Uploads the currently entered OpenAI API key for encrypted backend storage.
+    public func saveAPIKey() async {
+        let trimmedKey = apiKey.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedKey.isEmpty, sessionStore.isSignedIn else {
+            return
+        }
+
+        isSaving = true
+        defer { isSaving = false }
+
+        do {
+            credentialStatus = try await client.storeOpenAIKey(trimmedKey)
+            apiKey = ""
+            saveConfirmation = true
+            lastErrorMessage = nil
+        } catch {
+            lastErrorMessage = error.localizedDescription
+        }
+    }
+
+    /// Deletes the stored OpenAI API key for the signed-in account.
+    public func deleteAPIKey() async {
+        guard sessionStore.isSignedIn else {
+            return
+        }
+
+        isDeleting = true
+        defer { isDeleting = false }
+
+        do {
+            try await client.deleteOpenAIKey()
+            credentialStatus = CredentialStatusDTO(
+                provider: "openai",
+                state: .missing,
+                checkedAt: Date(),
+                lastErrorSummary: nil
+            )
+            lastErrorMessage = nil
+        } catch {
+            lastErrorMessage = error.localizedDescription
+        }
+    }
+
+    private static func mapCredentialState(_ state: HealthCheckStateDTO) -> CredentialStatusStateDTO {
+        switch state {
+        case .healthy, .degraded:
+            .valid
+        case .invalid:
+            .invalid
+        case .missing, .unavailable, .unauthorized:
+            .missing
+        }
     }
 }

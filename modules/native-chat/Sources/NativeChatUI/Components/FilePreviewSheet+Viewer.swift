@@ -1,4 +1,5 @@
 import ChatUIComponents
+import FilePreviewSupport
 import PDFKit
 import SwiftUI
 import UIKit

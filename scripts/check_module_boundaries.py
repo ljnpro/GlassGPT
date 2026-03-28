@@ -9,22 +9,25 @@ ROOT = Path(__file__).resolve().parent.parent
 SOURCES_ROOT = ROOT / "modules" / "native-chat" / "Sources"
 IMPORT_PATTERN = re.compile(r"(?m)^\s*import\s+([A-Za-z_][A-Za-z0-9_]*)\s*$")
 ACTIVE_SOURCE_TARGETS = (
+    "AppRouting",
+    "BackendContracts",
+    "BackendAuth",
+    "BackendSessionPersistence",
+    "BackendClient",
+    "SyncProjection",
+    "ConversationSyncApplication",
     "ChatDomain",
-    "AITransportContracts",
-    "ChatPersistenceContracts",
     "ChatPersistenceCore",
     "ChatPersistenceSwiftData",
-    "OpenAITransport",
+    "ChatProjectionPersistence",
     "GeneratedFilesCore",
-    "GeneratedFilesInfra",
-    "ChatRuntimeModel",
-    "ChatRuntimePorts",
-    "ChatRuntimeWorkflows",
-    "ChatApplication",
+    "GeneratedFilesCache",
     "ChatPresentation",
+    "ConversationSurfaceLogic",
     "ChatUIComponents",
     "NativeChatUI",
-    "NativeChatComposition",
+    "NativeChatBackendCore",
+    "NativeChatBackendComposition",
     "NativeChat",
 )
 
@@ -36,12 +39,69 @@ class TargetRule:
 
 
 TARGET_RULES: dict[str, TargetRule] = {
-    "AITransportContracts": TargetRule(
-        allowed_imports=frozenset({"Foundation", "ChatDomain"}),
+    "AppRouting": TargetRule(
+        allowed_imports=frozenset({"Foundation", "Observation", "ChatDomain"}),
         forbidden_patterns=(
-            ("Bundle.main", "AITransportContracts must not reach app bundle state"),
-            ("ProcessInfo.processInfo", "AITransportContracts must not read process environment"),
-            ("URLSession.shared", "AITransportContracts must not perform networking"),
+            ("Bundle.main", "AppRouting must not reach app bundle state"),
+            ("ProcessInfo.processInfo", "AppRouting must not read process environment"),
+            ("URLSession.shared", "AppRouting must not perform networking"),
+        ),
+    ),
+    "BackendContracts": TargetRule(
+        allowed_imports=frozenset({"Foundation"}),
+        forbidden_patterns=(
+            ("Bundle.main", "BackendContracts must not reach app bundle state"),
+            ("ProcessInfo.processInfo", "BackendContracts must not read process environment"),
+            ("URLSession.shared", "BackendContracts must not perform networking"),
+        ),
+    ),
+    "BackendAuth": TargetRule(
+        allowed_imports=frozenset({"Foundation", "Observation", "BackendContracts"}),
+        forbidden_patterns=(
+            ("Bundle.main", "BackendAuth must not reach app bundle state"),
+            ("ProcessInfo.processInfo", "BackendAuth must not read process environment"),
+            ("URLSession.shared", "BackendAuth must not perform networking"),
+        ),
+    ),
+    "BackendSessionPersistence": TargetRule(
+        allowed_imports=frozenset({"Foundation", "BackendAuth", "BackendContracts", "ChatPersistenceCore"}),
+        forbidden_patterns=(
+            ("Bundle.main", "BackendSessionPersistence must not reach app bundle state"),
+            ("ProcessInfo.processInfo", "BackendSessionPersistence must not read process environment"),
+            ("URLSession.shared", "BackendSessionPersistence must not perform networking"),
+        ),
+    ),
+    "BackendClient": TargetRule(
+        allowed_imports=frozenset({"Foundation", "BackendContracts", "BackendAuth"}),
+        forbidden_patterns=(
+            ("Bundle.main", "BackendClient must not reach app bundle state"),
+            ("ProcessInfo.processInfo", "BackendClient must not read process environment"),
+        ),
+    ),
+    "SyncProjection": TargetRule(
+        allowed_imports=frozenset({"Foundation", "BackendContracts"}),
+        forbidden_patterns=(
+            ("Bundle.main", "SyncProjection must not reach app bundle state"),
+            ("ProcessInfo.processInfo", "SyncProjection must not read process environment"),
+            ("URLSession.shared", "SyncProjection must not perform networking"),
+        ),
+    ),
+    "ConversationSyncApplication": TargetRule(
+        allowed_imports=frozenset({
+            "Foundation",
+            "BackendContracts",
+            "BackendAuth",
+            "BackendClient",
+            "SyncProjection",
+            "ChatDomain",
+            "ChatPersistenceCore",
+            "ChatProjectionPersistence",
+        }),
+        forbidden_patterns=(
+            ("Bundle.main", "ConversationSyncApplication must not reach app bundle state"),
+            ("ProcessInfo.processInfo", "ConversationSyncApplication must not read process environment"),
+            ("URLSession.shared", "ConversationSyncApplication must not perform networking"),
+            ("ModelContext", "ConversationSyncApplication must not depend on SwiftData persistence contexts"),
         ),
     ),
     "ChatDomain": TargetRule(
@@ -51,15 +111,6 @@ TARGET_RULES: dict[str, TargetRule] = {
             ("ProcessInfo.processInfo", "ChatDomain must not read process environment"),
             ("URLSession.shared", "ChatDomain must not perform networking"),
             ("ModelContext", "ChatDomain must not depend on SwiftData persistence contexts"),
-        ),
-    ),
-    "ChatPersistenceContracts": TargetRule(
-        allowed_imports=frozenset({"Foundation", "ChatDomain"}),
-        forbidden_patterns=(
-            ("Bundle.main", "ChatPersistenceContracts must not reach app bundle state"),
-            ("ProcessInfo.processInfo", "ChatPersistenceContracts must not read process environment"),
-            ("URLSession.shared", "ChatPersistenceContracts must not perform networking"),
-            ("ModelContext", "ChatPersistenceContracts must not depend on SwiftData persistence contexts"),
         ),
     ),
     "ChatPersistenceCore": TargetRule(
@@ -73,7 +124,7 @@ TARGET_RULES: dict[str, TargetRule] = {
     "ChatPersistenceSwiftData": TargetRule(
         allowed_imports=frozenset({
             "Foundation", "SwiftData", "CryptoKit", "ChatDomain",
-            "ChatPersistenceContracts", "ChatPersistenceCore", "OpenAITransport",
+            "ChatPersistenceCore",
             "os",
         }),
         forbidden_patterns=(
@@ -82,12 +133,12 @@ TARGET_RULES: dict[str, TargetRule] = {
             ("URLSession.shared", "ChatPersistenceSwiftData must not perform networking"),
         ),
     ),
-    "OpenAITransport": TargetRule(
-        allowed_imports=frozenset({"Foundation", "ChatDomain", "AITransportContracts", "Synchronization", "os"}),
+    "ChatProjectionPersistence": TargetRule(
+        allowed_imports=frozenset({"Foundation", "SwiftData", "CryptoKit", "ChatDomain", "ChatPersistenceCore", "os"}),
         forbidden_patterns=(
-            ("Bundle.main", "OpenAITransport must not reach app bundle state directly"),
-            ("ProcessInfo.processInfo", "OpenAITransport configuration must flow through providers"),
-            ("URLSession.shared", "OpenAITransport must not use URLSession.shared directly"),
+            ("Bundle.main", "ChatProjectionPersistence must not reach app bundle state"),
+            ("ProcessInfo.processInfo", "ChatProjectionPersistence must not read process environment"),
+            ("URLSession.shared", "ChatProjectionPersistence must not perform networking"),
         ),
     ),
     "GeneratedFilesCore": TargetRule(
@@ -98,61 +149,36 @@ TARGET_RULES: dict[str, TargetRule] = {
             ("URLSession.shared", "GeneratedFilesCore must not use URLSession.shared directly"),
         ),
     ),
-    "GeneratedFilesInfra": TargetRule(
-        allowed_imports=frozenset({
-            "Foundation", "OSLog", "ImageIO", "PDFKit",
-            "ChatDomain", "GeneratedFilesCore", "OpenAITransport", "os",
-        }),
+    "GeneratedFilesCache": TargetRule(
+        allowed_imports=frozenset({"Foundation", "ImageIO", "OSLog", "PDFKit", "GeneratedFilesCore", "os"}),
         forbidden_patterns=(
-            ("Bundle.main", "GeneratedFilesInfra must not reach app bundle state"),
-            ("ProcessInfo.processInfo", "GeneratedFilesInfra must not read process environment"),
-            ("URLSession.shared", "GeneratedFilesInfra must not use URLSession.shared directly"),
+            ("Bundle.main", "GeneratedFilesCache must not reach app bundle state"),
+            ("ProcessInfo.processInfo", "GeneratedFilesCache must not read process environment"),
+            ("URLSession.shared", "GeneratedFilesCache must not perform networking"),
         ),
     ),
-    "ChatRuntimeModel": TargetRule(
-        allowed_imports=frozenset({"Foundation", "ChatDomain"}),
+    "FilePreviewSupport": TargetRule(
+        allowed_imports=frozenset({"Foundation", "ImageIO", "PDFKit", "UIKit", "GeneratedFilesCore"}),
         forbidden_patterns=(
-            ("Bundle.main", "ChatRuntimeModel must not reach app bundle state"),
-            ("ProcessInfo.processInfo", "ChatRuntimeModel must not read process environment"),
-            ("URLSession.shared", "ChatRuntimeModel must not use URLSession.shared directly"),
-        ),
-    ),
-    "ChatRuntimePorts": TargetRule(
-        allowed_imports=frozenset({"Foundation", "ChatDomain", "ChatPersistenceContracts", "GeneratedFilesCore", "ChatRuntimeModel"}),
-        forbidden_patterns=(
-            ("Bundle.main", "ChatRuntimePorts must not reach app bundle state"),
-            ("ProcessInfo.processInfo", "ChatRuntimePorts must not read process environment"),
-            ("URLSession.shared", "ChatRuntimePorts must not use URLSession.shared directly"),
-        ),
-    ),
-    "ChatRuntimeWorkflows": TargetRule(
-        allowed_imports=frozenset({
-            "Foundation", "ChatDomain", "AITransportContracts",
-            "ChatRuntimeModel", "ChatRuntimePorts", "OpenAITransport", "os",
-        }),
-        forbidden_patterns=(
-            ("Bundle.main", "ChatRuntimeWorkflows must not reach app bundle state"),
-            ("ProcessInfo.processInfo", "ChatRuntimeWorkflows must not read process environment"),
-            ("URLSession.shared", "ChatRuntimeWorkflows must not use URLSession.shared directly"),
-            ("@MainActor", "ChatRuntimeWorkflows must not be annotated @MainActor"),
-        ),
-    ),
-    "ChatApplication": TargetRule(
-        allowed_imports=frozenset({
-            "Foundation", "ChatDomain", "AITransportContracts",
-            "ChatPersistenceContracts", "ChatPersistenceCore",
-            "ChatRuntimeModel", "ChatRuntimePorts", "ChatRuntimeWorkflows",
-            "Observation", "AVFoundation", "Network",
-        }),
-        forbidden_patterns=(
-            ("Bundle.main", "ChatApplication must not reach app bundle state"),
-            ("ProcessInfo.processInfo", "ChatApplication must not read process environment"),
-            ("URLSession.shared", "ChatApplication must not use URLSession.shared directly"),
-            ("ModelContext", "ChatApplication must not depend on SwiftData persistence contexts"),
+            ("Bundle.main", "FilePreviewSupport must not reach app bundle state"),
+            ("ProcessInfo.processInfo", "FilePreviewSupport must not read process environment"),
+            ("URLSession.shared", "FilePreviewSupport must not perform networking"),
+            ("PHPhotoLibrary", "FilePreviewSupport must not perform photo-library writes directly"),
         ),
     ),
     "ChatPresentation": TargetRule(
-        allowed_imports=frozenset({"Foundation", "Observation", "ChatDomain", "GeneratedFilesCore", "ChatApplication", "os"}),
+        allowed_imports=frozenset({
+            "Foundation",
+            "Observation",
+            "ChatDomain",
+            "ChatPersistenceCore",
+            "BackendAuth",
+            "BackendClient",
+            "BackendContracts",
+            "GeneratedFilesCore",
+            "GeneratedFilesCache",
+            "os",
+        }),
         forbidden_patterns=(
             ("Bundle.main", "ChatPresentation must not reach app bundle state"),
             ("ProcessInfo.processInfo", "ChatPresentation must not read process environment"),
@@ -160,8 +186,26 @@ TARGET_RULES: dict[str, TargetRule] = {
             ("ModelContext", "ChatPresentation must not depend on SwiftData persistence contexts"),
         ),
     ),
+    "ConversationSurfaceLogic": TargetRule(
+        allowed_imports=frozenset({"Foundation", "ChatDomain", "CoreGraphics", "UIKit"}),
+        forbidden_patterns=(
+            ("Bundle.main", "ConversationSurfaceLogic must not reach app bundle state"),
+            ("ProcessInfo.processInfo", "ConversationSurfaceLogic must not read process environment"),
+            ("URLSession.shared", "ConversationSurfaceLogic must not perform networking directly"),
+            ("ModelContext", "ConversationSurfaceLogic must not depend on SwiftData persistence contexts"),
+        ),
+    ),
     "ChatUIComponents": TargetRule(
-        allowed_imports=frozenset({"Foundation", "SwiftUI", "UIKit", "PDFKit", "Photos", "QuickLook", "UniformTypeIdentifiers"}),
+        allowed_imports=frozenset({
+            "Foundation",
+            "SwiftUI",
+            "UIKit",
+            "PDFKit",
+            "Photos",
+            "QuickLook",
+            "UniformTypeIdentifiers",
+            "ConversationSurfaceLogic",
+        }),
         forbidden_patterns=(
             ("Bundle.main", "ChatUIComponents should not reach app bundle state"),
             ("ProcessInfo.processInfo", "ChatUIComponents should not read process environment"),
@@ -170,8 +214,10 @@ TARGET_RULES: dict[str, TargetRule] = {
     ),
     "NativeChatUI": TargetRule(
         allowed_imports=frozenset({
-            "Foundation", "SwiftUI", "UIKit", "WebKit", "PDFKit", "Photos",
-            "ImageIO", "ChatDomain", "ChatPresentation", "ChatUIComponents",
+            "Foundation", "SwiftUI", "UIKit", "PDFKit", "Photos",
+            "ImageIO", "BackendContracts", "ChatDomain", "ChatPresentation", "ChatUIComponents",
+            "ConversationSurfaceLogic",
+            "FilePreviewSupport",
             "GeneratedFilesCore",
         }),
         forbidden_patterns=(
@@ -181,28 +227,59 @@ TARGET_RULES: dict[str, TargetRule] = {
             ("ModelContext", "NativeChatUI must not depend on SwiftData persistence contexts"),
         ),
     ),
-    "NativeChatComposition": TargetRule(
+    "NativeChatBackendCore": TargetRule(
+        allowed_imports=frozenset({
+            "Foundation",
+            "AppRouting",
+            "BackendAuth",
+            "BackendClient",
+            "BackendContracts",
+            "BackendSessionPersistence",
+            "ChatDomain",
+            "ChatPersistenceCore",
+            "ChatPresentation",
+            "ChatProjectionPersistence",
+            "ChatUIComponents",
+            "ConversationSyncApplication",
+            "GeneratedFilesCache",
+            "GeneratedFilesCore",
+            "NativeChatUI",
+            "AuthenticationServices",
+            "Observation",
+            "SwiftData",
+            "UIKit",
+            "os",
+        }),
+        forbidden_patterns=(
+            ("ProcessInfo.processInfo", "NativeChatBackendCore must not read process environment"),
+            ("URLSession.shared", "NativeChatBackendCore must not perform networking directly"),
+        ),
+    ),
+    "NativeChatBackendComposition": TargetRule(
         allowed_imports=frozenset({
             "Foundation",
             "SwiftData",
             "SwiftUI",
+            "AppRouting",
             "ChatDomain",
-            "ChatPersistenceContracts",
+            "BackendContracts",
+            "BackendAuth",
+            "BackendSessionPersistence",
+            "BackendClient",
+            "ConversationSyncApplication",
             "ChatPersistenceCore",
-            "ChatPersistenceSwiftData",
-            "OpenAITransport",
+            "ChatProjectionPersistence",
             "GeneratedFilesCore",
-            "GeneratedFilesInfra",
-            "ChatRuntimeModel",
-            "ChatRuntimePorts",
-            "ChatRuntimeWorkflows",
-            "ChatApplication",
+            "GeneratedFilesCache",
             "ChatPresentation",
             "ChatUIComponents",
+            "ConversationSurfaceLogic",
             "NativeChatUI",
-            "UIKit",
+            "NativeChatBackendCore",
+            "AuthenticationServices",
+            "Observation",
             "PhotosUI",
-            "OSLog",
+            "UIKit",
             "os",
         }),
     ),
@@ -211,8 +288,8 @@ TARGET_RULES: dict[str, TargetRule] = {
             "Foundation",
             "SwiftData",
             "SwiftUI",
-            "ChatPersistenceSwiftData",
-            "NativeChatComposition",
+            "ChatProjectionPersistence",
+            "NativeChatBackendComposition",
         }),
     ),
 }

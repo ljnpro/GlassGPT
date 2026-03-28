@@ -53,8 +53,6 @@ package struct SystemKeychainAccess: KeychainAccessing {
 public struct KeychainAPIKeyBackend: Sendable {
     /// The keychain account name used for the API key item.
     public static let apiKeyAccount = "openai_api_key"
-    /// The keychain account name used for the Cloudflare AIG token item.
-    public static let cloudflareAIGTokenAccount = "cloudflare_aig_token"
     /// Fallback keychain service identifier when the bundle identifier is unavailable.
     public static let fallbackServiceIdentifier = "com.liquidglasschat"
     /// Keychain accessibility level applied to newly created items.

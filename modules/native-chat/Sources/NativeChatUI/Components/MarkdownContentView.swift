@@ -1,60 +1,8 @@
 import ChatDomain
+import ConversationSurfaceLogic
 import Foundation
 import SwiftUI
 @preconcurrency import WebKit
-
-/// A segment of inline content, either plain text or an inline LaTeX expression.
-package enum InlineSegment: Equatable {
-    /// A plain text segment.
-    case text(String)
-    /// An inline LaTeX expression.
-    case latexInline(String)
-}
-
-/// A block-level part of parsed Markdown content.
-package enum BlockPart: Identifiable {
-    case richText(id: Int, segments: [InlineSegment])
-    case heading(id: Int, level: Int, text: String)
-    case horizontalRule(id: Int)
-    case latexBlock(id: Int, content: String)
-    case codeBlock(id: Int, language: String?, code: String)
-    case table(id: Int, table: MarkdownTable)
-
-    /// Stable identifier for this block part.
-    package var id: Int {
-        switch self {
-        case let .richText(id, _):
-            id
-        case let .heading(id, _, _):
-            id
-        case let .horizontalRule(id):
-            id
-        case let .latexBlock(id, _):
-            id
-        case let .codeBlock(id, _, _):
-            id
-        case let .table(id, _):
-            id
-        }
-    }
-}
-
-/// Horizontal alignment for one parsed Markdown table column.
-package enum MarkdownTableAlignment: Equatable {
-    case leading
-    case center
-    case trailing
-}
-
-/// A parsed pipe-table extracted from Markdown block content.
-package struct MarkdownTable: Equatable {
-    /// Header cells for the table, parsed as inline segments per column.
-    package let headers: [[InlineSegment]]
-    /// Body rows for the table, parsed as inline segments per cell.
-    package let rows: [[[InlineSegment]]]
-    /// Column alignments derived from the Markdown separator row.
-    package let alignments: [MarkdownTableAlignment]
-}
 
 // MARK: - Markdown Content View
 
@@ -87,7 +35,7 @@ package struct MarkdownContentView: View {
     }
 
     var blockParts: [BlockPart] {
-        parseBlocks(text)
+        MarkdownParser.parseBlocks(text)
     }
 
     /// The rendered Markdown block stack for the supplied text.

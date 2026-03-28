@@ -32,16 +32,6 @@ public extension SettingsStore {
         }
     }
 
-    /// Whether background mode is enabled by default for new Agent conversations.
-    var defaultAgentBackgroundModeEnabled: Bool {
-        get {
-            valueStore.object(forKey: Keys.defaultAgentBackgroundModeEnabled) as? Bool ?? false
-        }
-        set {
-            valueStore.set(newValue, forKey: Keys.defaultAgentBackgroundModeEnabled)
-        }
-    }
-
     /// The user's preferred Agent service tier. Falls back to `.standard` if unset.
     var defaultAgentServiceTier: ServiceTier {
         get {
@@ -62,7 +52,6 @@ public extension SettingsStore {
         AgentConversationConfiguration(
             leaderReasoningEffort: defaultAgentLeaderEffort,
             workerReasoningEffort: defaultAgentWorkerEffort,
-            backgroundModeEnabled: defaultAgentBackgroundModeEnabled,
             serviceTier: defaultAgentServiceTier
         )
     }

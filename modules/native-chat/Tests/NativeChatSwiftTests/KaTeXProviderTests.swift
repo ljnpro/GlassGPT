@@ -66,6 +66,26 @@ struct KaTeXProviderTests {
         #expect(resourceURL == nil)
         #expect(failureMessage == "Failed to locate KaTeX resource katex.min.css in loaded bundles.")
     }
+
+    @Test func `html for latex encodes content token and width constraints`() {
+        let result = KaTeXProvider.htmlForLatex(
+            #"a_b + \"quoted\""#,
+            isDark: true,
+            measurementToken: "token-123",
+            maxWidth: 243.8
+        )
+
+        #expect(result.html.contains("token-123"))
+        #expect(result.html.contains("max-width: min(100%, 243px)"))
+        #expect(result.html.contains("var latexStr = "))
+        #expect(result.html.contains("quoted"))
+        #expect(result.html.contains("#e5e5e5"))
+        if result.baseURL == nil {
+            #expect(result.html.contains("<style>"))
+        } else {
+            #expect(result.baseURL != nil)
+        }
+    }
 }
 
 private final class BundleProbe {}

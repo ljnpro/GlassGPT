@@ -8,21 +8,20 @@
 
 /* Begin PBXBuildFile section */
 		00E357001AD99517003FC87E /* NativeChat in Frameworks */ = {isa = PBXBuildFile; productRef = 081B1C62D4C7E5F6EC724606 /* NativeChat */; };
-		00E357011AD99517003FC87E /* TestSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00E356F71AD99517003FC87E /* TestSupport.swift */; };
-		02FB76D317231FE3C3FE9C26 /* SnapshotTestSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = AEB7DA53CC27898C943EE0C9 /* SnapshotTestSupport.swift */; };
-		02FB76D417231FE3C3FE9C26 /* SnapshotViewTests+Helpers.swift in Sources */ = {isa = PBXBuildFile; fileRef = 02FB76D517231FE3C3FE9C26 /* SnapshotViewTests+Helpers.swift */; };
-		02FB76D617231FE3C3FE9C26 /* SnapshotViewTests+SupportSnapshots.swift in Sources */ = {isa = PBXBuildFile; fileRef = 02FB76D717231FE3C3FE9C26 /* SnapshotViewTests+SupportSnapshots.swift */; };
 		13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB51A68108700A75B9A /* Images.xcassets */; };
 		15FE2F91277A79575837BA7F /* GlassGPTUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CC5500B0A1EE5BC8728B919 /* GlassGPTUITests.swift */; };
+		29D2C590A032AB9E34EB4F95 /* NativeChatUITestSupport in Frameworks */ = {isa = PBXBuildFile; productRef = 5F67A87D4A7E4BE9A0E24F61 /* NativeChatUITestSupport */; };
 		2B8B6D6E7F104E4AA5B5A1C2 /* AccessibilityAuditTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C1F6A2B3D4E5F60718293A4 /* AccessibilityAuditTests.swift */; };
+		C1A2B3C4D5E6F708192A3B4C /* GlassGPTUITests+RichScenarios.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2A2B3C4D5E6F708192A3B4C /* GlassGPTUITests+RichScenarios.swift */; };
+		D1A2B3C4D5E6F708192A3B4C /* GlassGPTUITests+SettingsFlows.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2A2B3C4D5E6F708192A3B4C /* GlassGPTUITests+SettingsFlows.swift */; };
 		3E461D99554A48A4959DE609 /* SplashScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */; };
 		5776C307D8D36530E5D5481C /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 69358B5C464810283E740D47 /* PrivacyInfo.xcprivacy */; };
 		5F67A87C4A7E4BE9A0E24F61 /* NativeChatUITestSupport in Frameworks */ = {isa = PBXBuildFile; productRef = 5F67A87D4A7E4BE9A0E24F61 /* NativeChatUITestSupport */; };
 		A76E6426109752E59235E252 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 29704E88068307A76C6154BB /* Foundation.framework */; };
-		B3846B13491743A06766F455 /* SnapshotViewTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5991E9E08763AFDD43672213 /* SnapshotViewTests.swift */; };
 		DC5C06CA6D6493BE30877ED5 /* NativeChat in Frameworks */ = {isa = PBXBuildFile; productRef = 081B1C62D4C7E5F6EC724606 /* NativeChat */; };
+		E1F0A1B22C33445566778899 /* SettingsAndHistoryPhase6Tests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1F0A1B32C33445566778899 /* SettingsAndHistoryPhase6Tests.swift */; };
 		F11748422D0307B40044C1D9 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = F11748412D0307B40044C1D9 /* AppDelegate.swift */; };
-		F21D3F2C00C92231FCCEAA60 /* SnapshotTesting in Frameworks */ = {isa = PBXBuildFile; productRef = 4FA93214B7AA616DF8666A6D /* SnapshotTesting */; };
+		FD0D2640487FC829829ADEB7 /* UITestScenarioLoaderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 69C9392A14B39A655925B205 /* UITestScenarioLoaderTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -44,17 +43,23 @@
 
 /* Begin PBXFileReference section */
 		00E356EE1AD99517003FC87E /* GlassGPTTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = GlassGPTTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
-		00E356F71AD99517003FC87E /* TestSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TestSupport.swift; sourceTree = "<group>"; };
+		08633D339CAD8FEAD0DD1516 /* SettingsStorePersistenceTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SettingsStorePersistenceTests.swift; sourceTree = "<group>"; };
 		13B07F961A680F5B00A75B9A /* GlassGPT.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = GlassGPT.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		13B07FB51A68108700A75B9A /* Images.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; name = Images.xcassets; path = GlassGPT/Images.xcassets; sourceTree = "<group>"; };
 		13B07FB61A68108700A75B9A /* Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = Info.plist; path = GlassGPT/Info.plist; sourceTree = "<group>"; };
+		1E72DD125013F7356593D6F9 /* RunEventProjectorTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RunEventProjectorTests.swift; sourceTree = "<group>"; };
+		272EFF9AB579B2D6290347CC /* BackendClientTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BackendClientTests.swift; sourceTree = "<group>"; };
 		29704E88068307A76C6154BB /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS18.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
-		02FB76D517231FE3C3FE9C26 /* SnapshotViewTests+Helpers.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = "SnapshotViewTests+Helpers.swift"; sourceTree = "<group>"; };
-		02FB76D717231FE3C3FE9C26 /* SnapshotViewTests+SupportSnapshots.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = "SnapshotViewTests+SupportSnapshots.swift"; sourceTree = "<group>"; };
-		5991E9E08763AFDD43672213 /* SnapshotViewTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SnapshotViewTests.swift; sourceTree = "<group>"; };
 		5CC5500B0A1EE5BC8728B919 /* GlassGPTUITests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = GlassGPTUITests.swift; sourceTree = "<group>"; };
 		69358B5C464810283E740D47 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xml; name = PrivacyInfo.xcprivacy; path = GlassGPT/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		69C9392A14B39A655925B205 /* UITestScenarioLoaderTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = UITestScenarioLoaderTests.swift; sourceTree = "<group>"; };
+		7187C8084BF43056117EADBD /* PromptTemplateTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PromptTemplateTests.swift; sourceTree = "<group>"; };
+		733C8613A42235D03BDDDEE6 /* ThinkingPresentationStateTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ThinkingPresentationStateTests.swift; sourceTree = "<group>"; };
+		80289105627BC8B4A3A7FADC /* KaTeXProviderTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = KaTeXProviderTests.swift; sourceTree = "<group>"; };
+		8A2AEC70E269E730E14C26C9 /* Tags.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = Tags.swift; sourceTree = "<group>"; };
 		9C1F6A2B3D4E5F60718293A4 /* AccessibilityAuditTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AccessibilityAuditTests.swift; sourceTree = "<group>"; };
+		C2A2B3C4D5E6F708192A3B4C /* GlassGPTUITests+RichScenarios.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = "GlassGPTUITests+RichScenarios.swift"; sourceTree = "<group>"; };
+		D2A2B3C4D5E6F708192A3B4C /* GlassGPTUITests+SettingsFlows.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = "GlassGPTUITests+SettingsFlows.swift"; sourceTree = "<group>"; };
 		A1B2C3D50123456789ABCDE0 /* Versions.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Versions.xcconfig; sourceTree = "<group>"; };
 		A1B2C3D60123456789ABCDE0 /* Project-Base.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = "Project-Base.xcconfig"; sourceTree = "<group>"; };
 		A1B2C3D70123456789ABCDE0 /* Project-Debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = "Project-Debug.xcconfig"; sourceTree = "<group>"; };
@@ -66,9 +71,19 @@
 		A1B2C3DD0123456789ABCDE0 /* GlassGPTUITests-Debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = "GlassGPTUITests-Debug.xcconfig"; sourceTree = "<group>"; };
 		A1B2C3DE0123456789ABCDE0 /* GlassGPTUITests-Release.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = "GlassGPTUITests-Release.xcconfig"; sourceTree = "<group>"; };
 		AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = SplashScreen.storyboard; path = GlassGPT/SplashScreen.storyboard; sourceTree = "<group>"; };
-		AEB7DA53CC27898C943EE0C9 /* SnapshotTestSupport.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SnapshotTestSupport.swift; sourceTree = "<group>"; };
+		AAFDDD7EF2E3483919E13C87 /* UITestEnvironmentResetTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = UITestEnvironmentResetTests.swift; sourceTree = "<group>"; };
+		B1E01E081C2783446ED149FE /* FileTestHelpers.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FileTestHelpers.swift; sourceTree = "<group>"; };
+		B6CBFBEEC26AA3A51982D882 /* ReleaseResetCoordinatorTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ReleaseResetCoordinatorTests.swift; sourceTree = "<group>"; };
+		B8972282F3677D9675B7360D /* AppIntentDescriptorTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AppIntentDescriptorTests.swift; sourceTree = "<group>"; };
+		BB5FFDB8C42F998A23AF80AA /* BackendProjectionStoreTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BackendProjectionStoreTests.swift; sourceTree = "<group>"; };
 		C7ACDF5CA685EC3D93FE2FC6 /* GlassGPTUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = GlassGPTUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		CF003B88D3959B4BE36ED2E4 /* BackendContractMirrorTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BackendContractMirrorTests.swift; sourceTree = "<group>"; };
+		D24EA1B514C25B01E85FD1B5 /* NativeChatPersistenceTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = NativeChatPersistenceTests.swift; sourceTree = "<group>"; };
+		DAD14E557806FA5BBC682EF5 /* NativeChatArchitectureTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = NativeChatArchitectureTests.swift; sourceTree = "<group>"; };
+		E1F0A1B32C33445566778899 /* SettingsAndHistoryPhase6Tests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SettingsAndHistoryPhase6Tests.swift; sourceTree = "<group>"; };
 		F11748412D0307B40044C1D9 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppDelegate.swift; path = GlassGPT/AppDelegate.swift; sourceTree = "<group>"; };
+		F3A01D7E5D2C6B72E5A78593 /* ChatUISourceTargetTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ChatUISourceTargetTests.swift; sourceTree = "<group>"; };
+		FAB438B00AEBFFCF0AFE603B /* GeneratedFileCacheEvictionTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = GeneratedFileCacheEvictionTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -77,7 +92,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				00E357001AD99517003FC87E /* NativeChat in Frameworks */,
-				F21D3F2C00C92231FCCEAA60 /* SnapshotTesting in Frameworks */,
+				29D2C590A032AB9E34EB4F95 /* NativeChatUITestSupport in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -101,14 +116,11 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
-		00E356EF1AD99517003FC87E /* ../modules/native-chat/Tests/NativeChatTests */ = {
+		00E356EF1AD99517003FC87E /* NativeChatTests */ = {
 			isa = PBXGroup;
 			children = (
-				00E356F71AD99517003FC87E /* TestSupport.swift */,
-				AEB7DA53CC27898C943EE0C9 /* SnapshotTestSupport.swift */,
-				02FB76D517231FE3C3FE9C26 /* SnapshotViewTests+Helpers.swift */,
-				02FB76D717231FE3C3FE9C26 /* SnapshotViewTests+SupportSnapshots.swift */,
-				5991E9E08763AFDD43672213 /* SnapshotViewTests.swift */,
+				E1F0A1B32C33445566778899 /* SettingsAndHistoryPhase6Tests.swift */,
+				69C9392A14B39A655925B205 /* UITestScenarioLoaderTests.swift */,
 			);
 			path = "../modules/native-chat/Tests/NativeChatTests";
 			sourceTree = SOURCE_ROOT;
@@ -121,7 +133,7 @@
 				13B07FB61A68108700A75B9A /* Info.plist */,
 				AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */,
 				69358B5C464810283E740D47 /* PrivacyInfo.xcprivacy */,
-				A1B2C3D40123456789ABCDE0 /* GlassGPT/Config */,
+				A1B2C3D40123456789ABCDE0 /* Config */,
 			);
 			name = GlassGPT;
 			sourceTree = "<group>";
@@ -145,11 +157,13 @@
 			isa = PBXGroup;
 			children = (
 				13B07FAE1A68108700A75B9A /* GlassGPT */,
-				00E356EF1AD99517003FC87E /* ../modules/native-chat/Tests/NativeChatTests */,
+				00E356EF1AD99517003FC87E /* NativeChatTests */,
 				832341AE1AAA6A7D00B99B32 /* Libraries */,
 				83CBBA001A601CBA00E9B192 /* Products */,
 				2D16E6871FA4F8E400B85C8A /* Frameworks */,
 				BA5D2C92314BC8FFDCDE8238 /* GlassGPTUITests */,
+				FC3E9F6D1213AF0D19681E3F /* NativeChatSwiftTests */,
+				E735B7447FC0F098EDD43D50 /* NativeChatArchitectureTests */,
 			);
 			indentWidth = 2;
 			sourceTree = "<group>";
@@ -166,7 +180,7 @@
 			name = Products;
 			sourceTree = "<group>";
 		};
-		A1B2C3D40123456789ABCDE0 /* GlassGPT/Config */ = {
+		A1B2C3D40123456789ABCDE0 /* Config */ = {
 			isa = PBXGroup;
 			children = (
 				A1B2C3D50123456789ABCDE0 /* Versions.xcconfig */,
@@ -196,8 +210,43 @@
 			children = (
 				9C1F6A2B3D4E5F60718293A4 /* AccessibilityAuditTests.swift */,
 				5CC5500B0A1EE5BC8728B919 /* GlassGPTUITests.swift */,
+				D2A2B3C4D5E6F708192A3B4C /* GlassGPTUITests+SettingsFlows.swift */,
+				C2A2B3C4D5E6F708192A3B4C /* GlassGPTUITests+RichScenarios.swift */,
 			);
 			path = GlassGPTUITests;
+			sourceTree = "<group>";
+		};
+		E735B7447FC0F098EDD43D50 /* NativeChatArchitectureTests */ = {
+			isa = PBXGroup;
+			children = (
+				DAD14E557806FA5BBC682EF5 /* NativeChatArchitectureTests.swift */,
+			);
+			name = NativeChatArchitectureTests;
+			path = "../modules/native-chat/Tests/NativeChatArchitectureTests";
+			sourceTree = "<group>";
+		};
+		FC3E9F6D1213AF0D19681E3F /* NativeChatSwiftTests */ = {
+			isa = PBXGroup;
+			children = (
+				B8972282F3677D9675B7360D /* AppIntentDescriptorTests.swift */,
+				272EFF9AB579B2D6290347CC /* BackendClientTests.swift */,
+				CF003B88D3959B4BE36ED2E4 /* BackendContractMirrorTests.swift */,
+				BB5FFDB8C42F998A23AF80AA /* BackendProjectionStoreTests.swift */,
+				F3A01D7E5D2C6B72E5A78593 /* ChatUISourceTargetTests.swift */,
+				B1E01E081C2783446ED149FE /* FileTestHelpers.swift */,
+				FAB438B00AEBFFCF0AFE603B /* GeneratedFileCacheEvictionTests.swift */,
+				80289105627BC8B4A3A7FADC /* KaTeXProviderTests.swift */,
+				D24EA1B514C25B01E85FD1B5 /* NativeChatPersistenceTests.swift */,
+				7187C8084BF43056117EADBD /* PromptTemplateTests.swift */,
+				B6CBFBEEC26AA3A51982D882 /* ReleaseResetCoordinatorTests.swift */,
+				1E72DD125013F7356593D6F9 /* RunEventProjectorTests.swift */,
+				08633D339CAD8FEAD0DD1516 /* SettingsStorePersistenceTests.swift */,
+				8A2AEC70E269E730E14C26C9 /* Tags.swift */,
+				733C8613A42235D03BDDDEE6 /* ThinkingPresentationStateTests.swift */,
+				AAFDDD7EF2E3483919E13C87 /* UITestEnvironmentResetTests.swift */,
+			);
+			name = NativeChatSwiftTests;
+			path = "../modules/native-chat/Tests/NativeChatSwiftTests";
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -219,7 +268,7 @@
 			name = GlassGPTTests;
 			packageProductDependencies = (
 				081B1C62D4C7E5F6EC724606 /* NativeChat */,
-				4FA93214B7AA616DF8666A6D /* SnapshotTesting */,
+				5F67A87D4A7E4BE9A0E24F61 /* NativeChatUITestSupport */,
 			);
 			productName = GlassGPTTests;
 			productReference = 00E356EE1AD99517003FC87E /* GlassGPTTests.xctest */;
@@ -296,8 +345,7 @@
 			);
 			mainGroup = 83CBB9F61A601CBA00E9B192;
 			packageReferences = (
-				7AC00F0D6B5AC673A4D44A7B /* XCLocalSwiftPackageReference "../modules/native-chat" */,
-				A0CB518C08B10B4C0AD51712 /* XCRemoteSwiftPackageReference "swift-snapshot-testing" */,
+				7AC00F0D6B5AC673A4D44A7B /* XCLocalSwiftPackageReference "native-chat" */,
 			);
 			productRefGroup = 83CBBA001A601CBA00E9B192 /* Products */;
 			projectDirPath = "";
@@ -342,11 +390,8 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				00E357011AD99517003FC87E /* TestSupport.swift in Sources */,
-				02FB76D317231FE3C3FE9C26 /* SnapshotTestSupport.swift in Sources */,
-				02FB76D417231FE3C3FE9C26 /* SnapshotViewTests+Helpers.swift in Sources */,
-				02FB76D617231FE3C3FE9C26 /* SnapshotViewTests+SupportSnapshots.swift in Sources */,
-				B3846B13491743A06766F455 /* SnapshotViewTests.swift in Sources */,
+				E1F0A1B22C33445566778899 /* SettingsAndHistoryPhase6Tests.swift in Sources */,
+				FD0D2640487FC829829ADEB7 /* UITestScenarioLoaderTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -364,6 +409,8 @@
 			files = (
 				2B8B6D6E7F104E4AA5B5A1C2 /* AccessibilityAuditTests.swift in Sources */,
 				15FE2F91277A79575837BA7F /* GlassGPTUITests.swift in Sources */,
+				D1A2B3C4D5E6F708192A3B4C /* GlassGPTUITests+SettingsFlows.swift in Sources */,
+				C1A2B3C4D5E6F708192A3B4C /* GlassGPTUITests+RichScenarios.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -484,37 +531,21 @@
 /* End XCConfigurationList section */
 
 /* Begin XCLocalSwiftPackageReference section */
-		7AC00F0D6B5AC673A4D44A7B /* XCLocalSwiftPackageReference "../modules/native-chat" */ = {
+		7AC00F0D6B5AC673A4D44A7B /* XCLocalSwiftPackageReference "native-chat" */ = {
 			isa = XCLocalSwiftPackageReference;
 			relativePath = "../modules/native-chat";
 		};
 /* End XCLocalSwiftPackageReference section */
 
-/* Begin XCRemoteSwiftPackageReference section */
-		A0CB518C08B10B4C0AD51712 /* XCRemoteSwiftPackageReference "swift-snapshot-testing" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/pointfreeco/swift-snapshot-testing";
-			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 1.17.0;
-			};
-		};
-/* End XCRemoteSwiftPackageReference section */
-
 /* Begin XCSwiftPackageProductDependency section */
 		081B1C62D4C7E5F6EC724606 /* NativeChat */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = 7AC00F0D6B5AC673A4D44A7B /* XCLocalSwiftPackageReference "../modules/native-chat" */;
+			package = 7AC00F0D6B5AC673A4D44A7B /* XCLocalSwiftPackageReference "native-chat" */;
 			productName = NativeChat;
-		};
-		4FA93214B7AA616DF8666A6D /* SnapshotTesting */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = A0CB518C08B10B4C0AD51712 /* XCRemoteSwiftPackageReference "swift-snapshot-testing" */;
-			productName = SnapshotTesting;
 		};
 		5F67A87D4A7E4BE9A0E24F61 /* NativeChatUITestSupport */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = 7AC00F0D6B5AC673A4D44A7B /* XCLocalSwiftPackageReference "../modules/native-chat" */;
+			package = 7AC00F0D6B5AC673A4D44A7B /* XCLocalSwiftPackageReference "native-chat" */;
 			productName = NativeChatUITestSupport;
 		};
 /* End XCSwiftPackageProductDependency section */

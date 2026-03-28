@@ -1,6 +1,4 @@
-import ChatPresentation
 import SwiftUI
-import UIKit
 
 struct SettingsNavigationRowLabel: View {
     let title: String
@@ -9,9 +7,10 @@ struct SettingsNavigationRowLabel: View {
     var body: some View {
         HStack(alignment: .center, spacing: 12) {
             Image(systemName: systemImage)
-                .foregroundStyle(Color.accentColor)
+                .foregroundStyle(Color(red: 0.04, green: 0.26, blue: 0.68))
 
             Text(title)
+                .foregroundStyle(.primary)
                 .multilineTextAlignment(.leading)
                 .lineLimit(nil)
                 .fixedSize(horizontal: false, vertical: true)
@@ -19,22 +18,5 @@ struct SettingsNavigationRowLabel: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.vertical, 2)
-    }
-}
-
-struct SettingsFeedbackSection: View {
-    @Bindable var viewModel: SettingsDefaultsStore
-
-    var body: some View {
-        if UIDevice.current.userInterfaceIdiom == .phone {
-            Section {
-                SettingsAdaptiveToggleRow(
-                    title: String(localized: "Haptic Feedback"),
-                    accessibilityLabel: String(localized: "Haptic feedback"),
-                    accessibilityIdentifier: "settings.haptics",
-                    isOn: $viewModel.hapticEnabled
-                )
-            }
-        }
     }
 }

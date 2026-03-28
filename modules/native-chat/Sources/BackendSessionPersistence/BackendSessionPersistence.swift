@@ -1,0 +1,76 @@
+import BackendAuth
+import BackendContracts
+import ChatPersistenceCore
+import Foundation
+
+/// Keychain-backed persistence for the backend auth session used by the 5.0 server-owned app flow.
+public final class BackendSessionPersistence: BackendSessionPersisting {
+    public static let sessionAccount = "backend_session"
+    public static let defaultBundleIdentifier = "space.manus.liquid.glass.chat.t20260308214621"
+
+    private let store: PersistedAPIKeyStore
+
+    public init(bundleIdentifier: String? = nil) {
+        let serviceIdentifier = KeychainAPIKeyBackend.defaultServiceIdentifier(
+            bundleIdentifier: bundleIdentifier ?? Self.defaultBundleIdentifier
+        ) + ".backend"
+        store = PersistedAPIKeyStore(
+            backend: KeychainAPIKeyBackend(
+                service: serviceIdentifier,
+                account: Self.sessionAccount
+            )
+        )
+    }
+
+    public init(store: PersistedAPIKeyStore) {
+        self.store = store
+    }
+
+    public func loadSession() -> SessionDTO? {
+        guard let payload = store.loadAPIKey(),
+              let data = payload.data(using: .utf8)
+        else {
+            return nil
+        }
+
+        do {
+            let snapshot = try Self.decoder.decode(BackendSessionSnapshot.self, from: data)
+            return snapshot.session
+        } catch {
+            NSLog("%@", "Backend session decode failed: \(error.localizedDescription)")
+            store.deleteAPIKey()
+            return nil
+        }
+    }
+
+    public func saveSession(_ session: SessionDTO) throws {
+        let snapshot = BackendSessionSnapshot(session: session)
+        let data = try Self.encoder.encode(snapshot)
+
+        guard let payload = String(data: data, encoding: .utf8) else {
+            throw BackendSessionPersistenceError.snapshotEncodingFailed
+        }
+
+        try store.saveAPIKey(payload)
+    }
+
+    public func clear() {
+        store.deleteAPIKey()
+    }
+
+    private enum BackendSessionPersistenceError: Error {
+        case snapshotEncodingFailed
+    }
+
+    private static let encoder: JSONEncoder = {
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        return encoder
+    }()
+
+    private static let decoder: JSONDecoder = {
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        return decoder
+    }()
+}

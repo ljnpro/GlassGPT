@@ -70,8 +70,7 @@ public enum RichAssistantReplyFixture {
         userPrompt: String = userPrompt,
         assistantReply: String = assistantReply,
         createdAt: Date = .now,
-        updatedAt: Date = .now,
-        backgroundModeEnabled: Bool = false
+        updatedAt: Date = .now
     ) -> Conversation {
         let conversation = Conversation(
             title: title,
@@ -79,7 +78,6 @@ public enum RichAssistantReplyFixture {
             updatedAt: updatedAt,
             model: ModelType.gpt5_4.rawValue,
             reasoningEffort: ReasoningEffort.high.rawValue,
-            backgroundModeEnabled: backgroundModeEnabled,
             serviceTierRawValue: ServiceTier.standard.rawValue
         )
 

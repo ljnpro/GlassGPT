@@ -6,17 +6,12 @@ public final class SettingsStore {
     public enum Keys {
         public static let defaultModel = "defaultModel"
         public static let defaultEffort = "defaultEffort"
-        public static let defaultBackgroundModeEnabled = "defaultBackgroundModeEnabled"
         public static let defaultServiceTier = "defaultServiceTier"
         public static let defaultAgentLeaderEffort = "defaultAgentLeaderEffort"
         public static let defaultAgentWorkerEffort = "defaultAgentWorkerEffort"
-        public static let defaultAgentBackgroundModeEnabled = "defaultAgentBackgroundModeEnabled"
         public static let defaultAgentServiceTier = "defaultAgentServiceTier"
         public static let appTheme = "appTheme"
         public static let hapticEnabled = "hapticEnabled"
-        public static let cloudflareGatewayEnabled = "cloudflareGatewayEnabled"
-        public static let cloudflareGatewayConfigurationMode = "cloudflareGatewayConfigurationMode"
-        public static let customCloudflareGatewayBaseURL = "customCloudflareGatewayBaseURL"
     }
 
     let valueStore: any SettingsValueStore

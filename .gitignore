@@ -27,6 +27,7 @@ __pycache__/
 # Legacy JS and Expo artifacts
 node_modules/
 .expo/
+.wrangler/
 dist/
 web-build/
 expo-env.d.ts

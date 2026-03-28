@@ -2,10 +2,10 @@ import Foundation
 
 /// The settings section identifiers for deep-link navigation.
 public enum SettingsSection: String, Sendable, Hashable {
+    /// Account and sync section.
+    case account
     /// API key configuration section.
     case apiKey = "apikey"
-    /// Cloudflare gateway configuration section.
-    case cloudflare
     /// Appearance/theme section.
     case appearance
     /// Cache management section.
@@ -22,11 +22,11 @@ public enum AppRoute: Hashable, Sendable {
     /// The main chat tab.
     case chat
     /// A specific conversation within the chat tab.
-    case chatConversation(UUID)
+    case chatConversation(String)
     /// The dedicated Agent tab.
     case agent
     /// A specific conversation within the Agent tab.
-    case agentConversation(UUID)
+    case agentConversation(String)
     /// The conversation history tab.
     case history
     /// The settings tab.

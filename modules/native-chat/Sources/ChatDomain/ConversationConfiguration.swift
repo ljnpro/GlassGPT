@@ -4,8 +4,6 @@ public struct ConversationConfiguration: Equatable, Sendable {
     public var model: ModelType
     /// How much computational effort the model should spend on reasoning.
     public var reasoningEffort: ReasoningEffort
-    /// Whether the conversation should continue processing in the background.
-    public var backgroundModeEnabled: Bool
     /// The service tier controlling quality-of-service for API requests.
     public var serviceTier: ServiceTier
 
@@ -13,17 +11,14 @@ public struct ConversationConfiguration: Equatable, Sendable {
     /// - Parameters:
     ///   - model: The language model to use.
     ///   - reasoningEffort: The reasoning effort level.
-    ///   - backgroundModeEnabled: Whether background processing is enabled.
     ///   - serviceTier: The service tier for API requests.
     public init(
         model: ModelType,
         reasoningEffort: ReasoningEffort,
-        backgroundModeEnabled: Bool,
         serviceTier: ServiceTier
     ) {
         self.model = model
         self.reasoningEffort = reasoningEffort
-        self.backgroundModeEnabled = backgroundModeEnabled
         self.serviceTier = serviceTier
     }
 

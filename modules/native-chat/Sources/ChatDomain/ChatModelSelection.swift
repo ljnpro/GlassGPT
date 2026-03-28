@@ -101,6 +101,8 @@ public enum MessageRole: String, Codable, CaseIterable, Identifiable, Sendable {
     case assistant
     /// A system-level instruction or prompt.
     case system
+    /// A tool-produced message or transcript artifact.
+    case tool
 
     /// Stable identifier derived from the raw value.
     public var id: String {

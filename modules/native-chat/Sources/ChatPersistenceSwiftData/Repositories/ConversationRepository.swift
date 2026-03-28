@@ -32,7 +32,6 @@ public final class ConversationRepository {
         let conversation = Conversation(
             model: configuration.model.rawValue,
             reasoningEffort: configuration.reasoningEffort.rawValue,
-            backgroundModeEnabled: configuration.backgroundModeEnabled,
             serviceTierRawValue: configuration.serviceTier.rawValue
         )
         modelContext.insert(conversation)

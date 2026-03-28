@@ -5,73 +5,67 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![CI](https://img.shields.io/badge/CI-hard--gated-brightgreen.svg)](#testing)
 
-A native iOS and iPadOS OpenAI chat client built with Swift, SwiftUI, and SwiftData. No React Native shell and no web bridge in the product flow -- just a fast, private, actor-isolated runtime talking directly to the OpenAI API, with small platform-native WebKit surfaces only where rendering requires them.
+GlassGPT is a native iOS and iPadOS chat client with a backend-owned Beta 5.0
+architecture. The app is written in Swift, SwiftUI, and SwiftData for the
+device experience, while Cloudflare-hosted backend services own execution,
+continuity, sync, and per-user session state.
+
+Users sign in with Apple, enter their own OpenAI API key in the app, and then
+all model traffic flows through the backend. The client does not ship provider
+tokens, does not execute OpenAI requests directly in the production path, and
+does not rely on local recovery state machines for continuity.
 
 ## Features
 
-- **Streaming chat** with real-time token delivery
-- **Actor-based runtime** -- `ReplySessionActor` owns all mutable state behind a single isolation boundary
-- **16 SwiftPM modules** with clean dependency boundaries and enforced module-boundary CI gates
-- **SwiftData persistence** with migration support
-- **Generated file handling** -- preview and manage code artifacts from chat responses
-- **Adaptive layout** for iPhone and iPad
-- **Keychain-secured API key storage** -- no telemetry, no analytics, fully private
-- **Hard CI gates** covering lint, format, build, architecture, tests, coverage, maintainability, source-share, infra-safety, module-boundary, documentation, localization, and release-readiness
+- backend-owned chat and agent execution
+- Sign in with Apple account flow in Settings
+- per-user OpenAI API key entry in the client with encrypted backend custody
+- same-account cloud sync for conversations, runs, progress, and artifacts
+- native chat, history, settings, preview, and agent surfaces for iPhone and iPad
+- hard CI gates covering iOS, backend, contracts, documentation, maintainability, release-readiness, and zero-skipped-test enforcement
 
 ## Architecture
 
 ```mermaid
 graph TD
-    subgraph Presentation
-        A[NativeChatUI] --> B[ChatPresentation]
-        B --> C[ChatUIComponents]
+    subgraph iOS App
+        A["NativeChatUI"] --> B["ChatPresentation"]
+        B --> C["BackendClient"]
+        B --> D["BackendAuth"]
+        B --> E["SyncProjection"]
+        E --> F["ChatProjectionPersistence"]
+        G["NativeChatBackendComposition"] --> A
+        G --> H["NativeChatBackendCore"]
+        H --> B
+        I["NativeChat"] --> G
     end
 
-    subgraph Application
-        D[ChatApplication] --> E[ChatRuntimeWorkflows]
-        E --> F[ChatRuntimePorts]
-        F --> G[ChatRuntimeModel]
+    subgraph Backend
+        J["Workers + Hono"] --> K["Application Services"]
+        K --> L["D1"]
+        K --> M["R2"]
+        K --> N["Durable Objects"]
+        O["Workflows"] --> K
     end
 
-    subgraph Composition
-        H[NativeChatComposition] --> D
-        H --> A
-    end
-
-    subgraph Domain
-        I[ChatDomain]
-    end
-
-    subgraph Persistence
-        J[ChatPersistenceSwiftData] --> K[ChatPersistenceCore]
-        K --> L[ChatPersistenceContracts]
-    end
-
-    subgraph Infrastructure
-        M[OpenAITransport]
-        N[GeneratedFilesInfra] --> O[GeneratedFilesCore]
-    end
-
-    subgraph Entry
-        P[NativeChat] --> H
-    end
-
-    D --> I
-    D --> L
-    E --> M
-    E --> N
+    C --> J
+    D --> J
+    E --> J
 ```
 
-`NativeChatCompositionRoot` is the sole production composition root. `ChatController` is the observable projection facade, while runtime transition and recovery semantics live in `ReplySessionActor`, `ReplyStreamEventPlanner`, and `ReplyRecoveryPlanner`. Composition coordinators depend on narrow state/service protocols rather than the full controller instance.
+The shipping app route is projection-only. The backend is the single authority
+for runs, events, sessions, sync cursors, and artifacts.
 
 ## Requirements
 
-| Tool    | Version  |
-|---------|----------|
-| Xcode   | 26+      |
-| Swift   | 6.2.4    |
-| iOS     | 26.0     |
-| Python  | 3.14+    |
+| Tool   | Version |
+|--------|---------|
+| Xcode  | 26.4+   |
+| Swift  | 6.2+    |
+| iOS    | 26.0    |
+| Python | 3.14+   |
+| Node   | 25.2.1+ |
+| pnpm   | 10.33.0 |
 
 ## Getting Started
 
@@ -82,7 +76,17 @@ git config core.hooksPath .githooks
 open ios/GlassGPT.xcworkspace
 ```
 
-Build and run the **GlassGPT** scheme on a simulator or device. On first launch, enter your OpenAI API key -- it is stored in the iOS Keychain and never leaves the device.
+To run the backend workspace tooling locally:
+
+```bash
+corepack enable
+corepack pnpm install
+```
+
+Build and run the **GlassGPT** scheme on a simulator or device. On first launch,
+sign in with Apple from Settings, then enter your OpenAI API key in the client.
+The raw key is sent to the backend for encrypted storage and is not retained in
+the app as the long-term authority.
 
 ## Project Structure
 
@@ -95,61 +99,70 @@ GlassGPT/
 ├── modules/native-chat/
 │   ├── Package.swift
 │   ├── Sources/
+│   │   ├── AppRouting/
+│   │   ├── BackendAuth/
+│   │   ├── BackendClient/
+│   │   ├── BackendContracts/
+│   │   ├── BackendSessionPersistence/
 │   │   ├── ChatDomain/
-│   │   ├── ChatPersistenceContracts/
 │   │   ├── ChatPersistenceCore/
 │   │   ├── ChatPersistenceSwiftData/
-│   │   ├── OpenAITransport/
-│   │   ├── GeneratedFilesCore/
-│   │   ├── GeneratedFilesInfra/
-│   │   ├── ChatRuntimeModel/
-│   │   ├── ChatRuntimePorts/
-│   │   ├── ChatRuntimeWorkflows/
-│   │   ├── ChatApplication/
+│   │   ├── ChatProjectionPersistence/
 │   │   ├── ChatPresentation/
 │   │   ├── ChatUIComponents/
+│   │   ├── ConversationSurfaceLogic/
+│   │   ├── ConversationSyncApplication/
+│   │   ├── GeneratedFilesCache/
+│   │   ├── NativeChatBackendComposition/
+│   │   ├── NativeChatBackendCore/
 │   │   ├── NativeChatUI/
-│   │   ├── NativeChatComposition/
+│   │   ├── SyncProjection/
 │   │   └── NativeChat/
 │   └── Tests/
+├── packages/
+│   ├── backend-contracts/
+│   └── backend-infra/
+├── services/
+│   └── backend/
 ├── docs/
 └── scripts/
 ```
 
 ## Testing
 
-Run the full CI suite locally:
+Run the hard lanes locally:
+
+```bash
+./scripts/ci.sh contracts
+./scripts/ci.sh backend
+./scripts/ci.sh ios
+./scripts/ci.sh release-readiness
+```
+
+Run the full orchestrated CI suite:
 
 ```bash
 ./scripts/ci.sh
 ```
 
-Run a specific gate:
+The Beta 5.0 CI contract is strict:
 
-```bash
-./scripts/ci.sh maintainability
-```
-
-Record snapshot baselines after UI changes:
-
-```bash
-./scripts/record_snapshots.sh
-```
-
-The default CI path runs hard gates for CI health, lint, format, build, architecture, tests, coverage, maintainability, source-share, infra-safety, module-boundary, DocC presence, documentation completeness, localization completeness, and release readiness.
+- `0` warnings
+- `0` errors
+- `0` skipped tests
+- `0` avoidable noise
+- `0` `swiftlint:disable` directives
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for prerequisites, branch strategy, PR workflow, code style, and commit conventions.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for prerequisites, branch strategy, PR
+workflow, code style, and commit conventions.
 
 ## Security
 
-See [SECURITY.md](SECURITY.md) for supported versions, vulnerability reporting, and scope.
+See [SECURITY.md](SECURITY.md) for supported versions, vulnerability reporting,
+and scope.
 
 ## License
 
 GlassGPT is released under the [MIT License](LICENSE).
-
-## Acknowledgments
-
-- [Point-Free](https://www.pointfree.co) -- for SwiftUI and composable architecture inspiration

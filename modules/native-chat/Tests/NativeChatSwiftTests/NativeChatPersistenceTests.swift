@@ -1,6 +1,7 @@
 import Foundation
+import SwiftData
 import Testing
-@testable import ChatPersistenceSwiftData
+@testable import ChatProjectionPersistence
 
 struct NativeChatPersistenceTests {
     @MainActor
@@ -84,4 +85,14 @@ private enum NativeChatPersistenceTestError: LocalizedError {
     var errorDescription: String? {
         "bootstrap failed"
     }
+}
+
+@MainActor
+private func makeInMemoryModelContainer() throws -> ModelContainer {
+    let schema = Schema([
+        Conversation.self,
+        Message.self
+    ])
+    let configuration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
+    return try ModelContainer(for: schema, configurations: [configuration])
 }

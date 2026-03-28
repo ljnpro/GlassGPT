@@ -1,7 +1,7 @@
 import Foundation
 import GeneratedFilesCore
 import Testing
-@testable import GeneratedFilesInfra
+@testable import GeneratedFilesCache
 
 struct GeneratedFileCacheEvictionTests {
     private func makeTempCacheStore() -> (GeneratedFileCacheStore, URL) {

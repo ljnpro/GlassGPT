@@ -1,0 +1,33 @@
+{
+  "name": "glassgpt-beta-5",
+  "private": true,
+  "packageManager": "pnpm@10.33.0",
+  "engines": {
+    "node": ">=25.2.1 <26"
+  },
+  "scripts": {
+    "build:contracts": "corepack pnpm --filter @glassgpt/backend-contracts run build",
+    "build:infra": "corepack pnpm --filter @glassgpt/backend-infra run build",
+    "build:backend": "corepack pnpm --filter @glassgpt/backend run build",
+    "check:deps": "depcruise --config dependency-cruiser.cjs services/backend/src packages/backend-contracts/src packages/backend-infra/src",
+    "format:backend": "biome format --write services/backend packages/backend-contracts packages/backend-infra",
+    "lint:backend": "biome check --error-on-warnings services/backend packages/backend-contracts packages/backend-infra && depcruise --config dependency-cruiser.cjs services/backend/src packages/backend-contracts/src packages/backend-infra/src",
+    "test:backend": "corepack pnpm --filter @glassgpt/backend run test",
+    "test:contracts": "corepack pnpm --filter @glassgpt/backend-contracts run test",
+    "generate:contracts": "corepack pnpm --filter @glassgpt/backend-contracts run generate",
+    "ci:backend": "./scripts/ci_backend.sh",
+    "ci:contracts": "./scripts/ci_contracts.sh"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": ["esbuild", "workerd"]
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.4.9",
+    "@types/node": "25.5.0",
+    "dependency-cruiser": "17.3.10",
+    "tsx": "4.21.0",
+    "typescript": "6.0.2",
+    "vitest": "4.1.2",
+    "wrangler": "4.78.0"
+  }
+}

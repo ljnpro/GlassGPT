@@ -1,5 +1,6 @@
 import ChatDomain
 import ChatUIComponents
+import ConversationSurfaceLogic
 import Foundation
 import SwiftUI
 

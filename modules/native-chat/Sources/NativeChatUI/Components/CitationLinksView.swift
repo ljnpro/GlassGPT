@@ -1,5 +1,6 @@
 import ChatDomain
 import ChatUIComponents
+import ConversationSurfaceLogic
 import SwiftUI
 
 /// Displays a horizontal scrollable list of citation link cards from web search results.
@@ -16,18 +17,13 @@ package struct CitationLinksView: View {
     }
 
     /// De-duplicated citations by URL
-    private var uniqueCitations: [URLCitation] {
-        var seen = Set<String>()
-        return citations.filter { citation in
-            if seen.contains(citation.url) { return false }
-            seen.insert(citation.url)
-            return true
-        }
+    var cardModels: [CitationLinkCardModel] {
+        CitationLinkCardModel.makeModels(from: citations)
     }
 
     /// The horizontal citation-card strip rendered below assistant messages.
     package var body: some View {
-        if !uniqueCitations.isEmpty {
+        if !cardModels.isEmpty {
             VStack(alignment: .leading, spacing: cardSpacing) {
                 HStack(spacing: 4) {
                     Image(systemName: "globe")
@@ -44,8 +40,8 @@ package struct CitationLinksView: View {
 
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 8) {
-                        ForEach(Array(uniqueCitations.enumerated()), id: \.element.id) { index, citation in
-                            CitationCard(citation: citation, index: index + 1)
+                        ForEach(cardModels) { model in
+                            CitationCard(model: model)
                         }
                     }
                     .padding(.horizontal, 4)
@@ -58,40 +54,25 @@ package struct CitationLinksView: View {
 
 /// A single citation card with favicon, title, and domain.
 private struct CitationCard: View {
-    let citation: URLCitation
-    let index: Int
-
-    private var domain: String {
-        guard let url = URL(string: citation.url),
-              let host = url.host else { return citation.url }
-        return host.replacingOccurrences(of: "www.", with: "")
-    }
-
-    private var faviconURL: URL? {
-        guard let url = URL(string: citation.url),
-              let scheme = url.scheme,
-              let host = url.host else { return nil }
-        return URL(string: "\(scheme)://\(host)/favicon.ico")
-    }
+    let model: CitationLinkCardModel
 
     var body: some View {
-        let fallback = URL(string: "https://google.com")
-        Link(destination: URL(string: citation.url) ?? fallback ?? URL(fileURLWithPath: "/")) {
+        Link(destination: model.destinationURL) {
             HStack(spacing: 8) {
                 // Index badge
-                Text("\(index)")
+                Text("\(model.index)")
                     .font(.caption2.weight(.bold))
                     .foregroundStyle(.white)
                     .frame(width: 18, height: 18)
                     .background(Circle().fill(.blue))
 
                 VStack(alignment: .leading, spacing: 1) {
-                    Text(citation.title.isEmpty ? domain : citation.title)
+                    Text(model.title)
                         .font(.caption2.weight(.medium))
                         .foregroundStyle(.primary)
                         .lineLimit(1)
 
-                    Text(domain)
+                    Text(model.domain)
                         .font(.caption2)
                         .foregroundStyle(.tertiary)
                         .lineLimit(1)
@@ -108,7 +89,7 @@ private struct CitationCard: View {
             )
         }
         .buttonStyle(.plain)
-        .accessibilityLabel(String(localized: "Source") + " \(index): \(citation.title.isEmpty ? domain : citation.title)")
-        .accessibilityIdentifier("citation.card.\(index)")
+        .accessibilityLabel(model.accessibilityLabel)
+        .accessibilityIdentifier("citation.card.\(model.index)")
     }
 }

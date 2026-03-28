@@ -1,3 +1,4 @@
+import AppIntents
 import ChatPersistenceCore
 import MetricKit
 import NativeChat

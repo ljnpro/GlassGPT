@@ -47,8 +47,6 @@ public struct AgentConversationConfiguration: Codable, Equatable, Sendable {
     public var leaderReasoningEffort: ReasoningEffort
     /// Shared reasoning effort used by all three workers.
     public var workerReasoningEffort: ReasoningEffort
-    /// Whether Agent requests should continue in background mode.
-    public var backgroundModeEnabled: Bool
     /// Service tier used by the Agent council.
     public var serviceTier: ServiceTier
 
@@ -56,12 +54,10 @@ public struct AgentConversationConfiguration: Codable, Equatable, Sendable {
     public init(
         leaderReasoningEffort: ReasoningEffort = .high,
         workerReasoningEffort: ReasoningEffort = .low,
-        backgroundModeEnabled: Bool = false,
         serviceTier: ServiceTier = .standard
     ) {
         self.leaderReasoningEffort = leaderReasoningEffort
         self.workerReasoningEffort = workerReasoningEffort
-        self.backgroundModeEnabled = backgroundModeEnabled
         self.serviceTier = serviceTier
     }
 

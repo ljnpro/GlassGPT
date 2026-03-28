@@ -26,39 +26,4 @@ public extension SettingsStore {
             valueStore.set(newValue, forKey: Keys.hapticEnabled)
         }
     }
-
-    /// Whether the Cloudflare AI gateway is enabled. Defaults to `false` if unset.
-    var cloudflareGatewayEnabled: Bool {
-        get {
-            valueStore.object(forKey: Keys.cloudflareGatewayEnabled) as? Bool ?? false
-        }
-        set {
-            valueStore.set(newValue, forKey: Keys.cloudflareGatewayEnabled)
-        }
-    }
-
-    /// The persisted Cloudflare gateway configuration mode. Defaults to `.default` if unset.
-    var cloudflareGatewayConfigurationMode: CloudflareGatewayConfigurationMode {
-        get {
-            guard let rawValue = valueStore.string(forKey: Keys.cloudflareGatewayConfigurationMode),
-                  let mode = CloudflareGatewayConfigurationMode(rawValue: rawValue)
-            else {
-                return .default
-            }
-            return mode
-        }
-        set {
-            valueStore.set(newValue.rawValue, forKey: Keys.cloudflareGatewayConfigurationMode)
-        }
-    }
-
-    /// The persisted custom Cloudflare gateway base URL. Defaults to an empty string if unset.
-    var customCloudflareGatewayBaseURL: String {
-        get {
-            valueStore.string(forKey: Keys.customCloudflareGatewayBaseURL) ?? ""
-        }
-        set {
-            valueStore.set(newValue, forKey: Keys.customCloudflareGatewayBaseURL)
-        }
-    }
 }

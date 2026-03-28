@@ -38,16 +38,6 @@ public extension SettingsStore {
         }
     }
 
-    /// Whether background mode is enabled by default for new conversations.
-    var defaultBackgroundModeEnabled: Bool {
-        get {
-            valueStore.object(forKey: Keys.defaultBackgroundModeEnabled) as? Bool ?? false
-        }
-        set {
-            valueStore.set(newValue, forKey: Keys.defaultBackgroundModeEnabled)
-        }
-    }
-
     /// The user's preferred OpenAI service tier. Falls back to `.standard` if unset.
     var defaultServiceTier: ServiceTier {
         get {
@@ -70,7 +60,6 @@ public extension SettingsStore {
         return ConversationConfiguration(
             model: model,
             reasoningEffort: resolvedEffort,
-            backgroundModeEnabled: defaultBackgroundModeEnabled,
             serviceTier: defaultServiceTier
         )
     }

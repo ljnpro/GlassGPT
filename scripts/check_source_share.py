@@ -11,21 +11,23 @@ SOURCES_ROOT = ROOT / "modules" / "native-chat" / "Sources"
 IOS_ROOT = ROOT / "modules" / "native-chat" / "ios"
 MIN_SOURCE_SHARE_PERCENT = float(os.environ.get("MIN_SOURCE_SHARE_PERCENT", "17.0"))
 ACTIVE_SOURCE_TARGETS = (
+    "AppRouting",
+    "BackendContracts",
+    "BackendAuth",
+    "BackendSessionPersistence",
+    "BackendClient",
+    "SyncProjection",
+    "ConversationSyncApplication",
     "ChatDomain",
-    "ChatPersistenceContracts",
     "ChatPersistenceCore",
     "ChatPersistenceSwiftData",
-    "OpenAITransport",
+    "ChatProjectionPersistence",
     "GeneratedFilesCore",
-    "GeneratedFilesInfra",
-    "ChatRuntimeModel",
-    "ChatRuntimePorts",
-    "ChatRuntimeWorkflows",
-    "ChatApplication",
+    "GeneratedFilesCache",
     "ChatPresentation",
     "ChatUIComponents",
     "NativeChatUI",
-    "NativeChatComposition",
+    "NativeChatBackendComposition",
     "NativeChat",
 )
 

@@ -1,6 +1,6 @@
 import ChatUIComponents
+import FilePreviewSupport
 import Foundation
-import ImageIO
 import PDFKit
 import Photos
 import SwiftUI
@@ -21,7 +21,7 @@ extension FilePreviewSheet {
         imagePreviewState = .loading
 
         for attempt in 0 ..< 4 {
-            switch FilePreviewLoadingModel.loadGeneratedImagePreview(from: fileURL) {
+            switch GeneratedFilePreviewLoader.loadGeneratedImagePreview(from: fileURL) {
             case let .image(payload):
                 imagePreviewState = .image(payload)
                 return
@@ -47,7 +47,7 @@ extension FilePreviewSheet {
         pdfPreviewState = .loading
 
         for attempt in 0 ..< 4 {
-            switch FilePreviewLoadingModel.loadGeneratedPDFPreview(from: fileURL) {
+            switch GeneratedFilePreviewLoader.loadGeneratedPDFPreview(from: fileURL) {
             case let .document(document):
                 pdfPreviewState = .document(document)
                 return

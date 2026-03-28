@@ -1,4 +1,4 @@
-name: iOS
+name: Beta 5.0 CI
 
 on:
   push:
@@ -8,7 +8,11 @@ on:
       - codex/stable-4.11
       - codex/stable-4.12
       - codex/feature/**
+      - feature/**
   pull_request:
+
+permissions:
+  contents: read
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -24,9 +28,83 @@ defaults:
     shell: bash --noprofile --norc -eo pipefail {0}
 
 jobs:
-  lint:
-    name: Lint & Format
+  contracts:
+    name: Contracts
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.14'
+
+      - name: Print toolchain versions
+        run: |
+          node --version
+          corepack pnpm --version
+          python3 --version
+
+      - name: Contracts Lane
+        run: ./scripts/ci.sh contracts
+
+      - name: Upload contract artifacts
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: contracts-artifacts
+          path: |
+            packages/backend-contracts/generated/openapi.json
+            packages/backend-contracts/generated/fixtures.json
+          retention-days: 14
+
+  backend:
+    name: Backend
+    runs-on: ubuntu-latest
+    needs: contracts
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.14'
+
+      - name: Print toolchain versions
+        run: |
+          node --version
+          corepack pnpm --version
+          python3 --version
+
+      - name: Backend Lane
+        run: ./scripts/ci.sh backend
+
+  ios:
+    name: iOS
     runs-on: macos-26
+    needs: contracts
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -48,16 +126,6 @@ jobs:
             HOMEBREW_NO_AUTO_UPDATE=1 brew install ripgrep
           fi
           echo /opt/homebrew/bin >> "$GITHUB_PATH"
-
-      - name: Install Ruff
-        run: '"$pythonLocation/bin/python3" -m pip install ruff'
-
-      - name: Print toolchain versions
-        run: |
-          bash --version | head -n 1
-          rg --version | head -n 1
-          xcodebuild -version
-          swift --version
 
       - name: Install SwiftLint
         run: |
@@ -71,212 +139,46 @@ jobs:
             HOMEBREW_NO_AUTO_UPDATE=1 brew install swiftformat
           fi
 
-      - name: Install ripgrep
-        run: |
-          if ! command -v rg >/dev/null 2>&1; then
-            HOMEBREW_NO_AUTO_UPDATE=1 brew install ripgrep
-          fi
-
-      - name: CI Health Gate
-        run: ./scripts/ci.sh ci-health
-
-      - name: Lint Gate
-        run: ./scripts/ci.sh lint
-
-      - name: Python Lint Gate
-        run: ./scripts/ci.sh python-lint
-
-      - name: Format Check Gate
-        run: ./scripts/ci.sh format-check
-
-  build:
-    name: Build
-    runs-on: macos-26
-    needs: lint
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-
-      - name: Select Xcode
-        run: sudo xcode-select -s /Applications/Xcode.app
-
-      - name: Set up Python
-        uses: actions/setup-python@v6
-        with:
-          python-version: '3.14'
-
-      - name: Install CI shell tools
-        run: |
-          if ! brew list bash >/dev/null 2>&1; then
-            HOMEBREW_NO_AUTO_UPDATE=1 brew install bash
-          fi
-          if ! command -v rg >/dev/null 2>&1; then
-            HOMEBREW_NO_AUTO_UPDATE=1 brew install ripgrep
-          fi
-          echo /opt/homebrew/bin >> "$GITHUB_PATH"
-
       - name: Print toolchain versions
         run: |
           bash --version | head -n 1
           rg --version | head -n 1
           xcodebuild -version
           swift --version
+          python3 --version
 
       - name: Cache SPM packages
         uses: actions/cache@v5
         with:
           path: .local/build/ci/SourcePackages
-          key: ${{ runner.os }}-spm-${{ hashFiles('modules/native-chat/Package.resolved') }}
+          key: ${{ runner.os }}-spm-${{ hashFiles('modules/native-chat/Package.swift', 'ios/GlassGPT.xcodeproj/project.pbxproj') }}
           restore-keys: |
             ${{ runner.os }}-spm-
 
-      - name: Build Gate
-        run: ./scripts/ci.sh build
+      - name: iOS Lane
+        run: ./scripts/ci.sh ios
 
-  test:
-    name: Tests
-    runs-on: macos-26
-    needs: build
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - gate: architecture-tests
-          - gate: core-tests
-          - gate: performance-tests
-          - gate: ui-tests
-            ui_filter: "shard-1"
-            ui-tests-shard: 1
-          - gate: ui-tests
-            ui_filter: "shard-2"
-            ui-tests-shard: 2
-          - gate: ui-tests
-            ui_filter: "shard-3"
-            ui-tests-shard: 3
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-
-      - name: Select Xcode
-        run: sudo xcode-select -s /Applications/Xcode.app
-
-      - name: Set up Python
-        uses: actions/setup-python@v6
-        with:
-          python-version: '3.14'
-
-      - name: Install CI shell tools
-        run: |
-          if ! brew list bash >/dev/null 2>&1; then
-            HOMEBREW_NO_AUTO_UPDATE=1 brew install bash
-          fi
-          if ! command -v rg >/dev/null 2>&1; then
-            HOMEBREW_NO_AUTO_UPDATE=1 brew install ripgrep
-          fi
-          echo /opt/homebrew/bin >> "$GITHUB_PATH"
-
-      - name: Print toolchain versions
-        run: |
-          bash --version | head -n 1
-          rg --version | head -n 1
-          xcodebuild -version
-          swift --version
-
-      - name: Cache SPM packages
-        uses: actions/cache@v5
-        with:
-          path: .local/build/ci/SourcePackages
-          key: ${{ runner.os }}-spm-${{ hashFiles('modules/native-chat/Package.resolved') }}
-          restore-keys: |
-            ${{ runner.os }}-spm-
-
-      - name: Run ${{ matrix.gate }}
-        run: ./scripts/ci.sh ${{ matrix.gate }}
-        env:
-          UI_TEST_FILTER: ${{ matrix.ui_filter || '' }}
-
-      - name: Upload test results
+      - name: Upload iOS artifacts
         if: always()
         uses: actions/upload-artifact@v6
         with:
-          name: test-results-${{ matrix.gate }}${{ matrix.ui-tests-shard && format('-shard-{0}', matrix.ui-tests-shard) || '' }}
-          path: .local/build/ci/*.xcresult
-          retention-days: 14
-
-  quality:
-    name: Quality Gates
-    runs-on: macos-26
-    needs: build
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-
-      - name: Select Xcode
-        run: sudo xcode-select -s /Applications/Xcode.app
-
-      - name: Set up Python
-        uses: actions/setup-python@v6
-        with:
-          python-version: '3.14'
-
-      - name: Install CI shell tools
-        run: |
-          if ! brew list bash >/dev/null 2>&1; then
-            HOMEBREW_NO_AUTO_UPDATE=1 brew install bash
-          fi
-          if ! command -v rg >/dev/null 2>&1; then
-            HOMEBREW_NO_AUTO_UPDATE=1 brew install ripgrep
-          fi
-          echo /opt/homebrew/bin >> "$GITHUB_PATH"
-
-      - name: Print toolchain versions
-        run: |
-          bash --version | head -n 1
-          rg --version | head -n 1
-          xcodebuild -version
-          swift --version
-
-      - name: Maintainability Gate
-        run: ./scripts/ci.sh maintainability
-
-      - name: Source Share Gate
-        run: ./scripts/ci.sh source-share
-
-      - name: Infra Safety Gate
-        run: ./scripts/ci.sh infra-safety
-
-      - name: Module Boundary Gate
-        run: ./scripts/ci.sh module-boundary
-
-      - name: Doc Build Gate
-        run: ./scripts/ci.sh doc-build
-
-      - name: Doc Completeness Gate
-        run: ./scripts/ci.sh doc-completeness
-
-      - name: Localization Gate
-        run: ./scripts/ci.sh localization-check
-
-      - name: Upload quality reports
-        if: always()
-        uses: actions/upload-artifact@v6
-        with:
-          name: quality-reports
+          name: ios-ci-artifacts
           path: |
-            .local/build/ci/maintainability-report.txt
-            .local/build/ci/source-share-report.txt
-            .local/build/ci/infra-safety-report.txt
-            .local/build/ci/module-boundary-report.txt
-            .local/build/ci/doc-build-report.txt
-            .local/build/ci/doc-completeness-report.txt
-            .local/build/ci/localization-report.txt
+            .local/build/ci/*.xcresult
+            .local/build/ci/*.log
+            .local/build/ci/*.txt
+            .local/build/ci/*.json
           retention-days: 14
 
   release-readiness:
     name: Release Readiness
     runs-on: macos-26
-    needs: [test, quality]
-    if: github.ref == 'refs/heads/codex/stable-4.10' || github.ref == 'refs/heads/codex/stable-4.11' || github.ref == 'refs/heads/codex/stable-4.12' || github.ref == 'refs/heads/main'
+    needs: [contracts, backend, ios]
+    if: |
+      always() &&
+      needs.contracts.result == 'success' &&
+      needs.backend.result == 'success' &&
+      needs.ios.result == 'success'
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -299,20 +201,33 @@ jobs:
           fi
           echo /opt/homebrew/bin >> "$GITHUB_PATH"
 
+      - name: Install SwiftLint
+        run: |
+          if ! command -v swiftlint >/dev/null 2>&1; then
+            HOMEBREW_NO_AUTO_UPDATE=1 brew install swiftlint
+          fi
+
+      - name: Install SwiftFormat
+        run: |
+          if ! command -v swiftformat >/dev/null 2>&1; then
+            HOMEBREW_NO_AUTO_UPDATE=1 brew install swiftformat
+          fi
+
       - name: Print toolchain versions
         run: |
           bash --version | head -n 1
           rg --version | head -n 1
           xcodebuild -version
           swift --version
+          python3 --version
 
       - name: Cache SPM packages
         uses: actions/cache@v5
         with:
           path: .local/build/ci/SourcePackages
-          key: ${{ runner.os }}-spm-${{ hashFiles('modules/native-chat/Package.resolved') }}
+          key: ${{ runner.os }}-spm-${{ hashFiles('modules/native-chat/Package.swift', 'ios/GlassGPT.xcodeproj/project.pbxproj') }}
           restore-keys: |
             ${{ runner.os }}-spm-
 
-      - name: Release Readiness Gate
+      - name: Release Readiness Lane
         run: ./scripts/ci.sh release-readiness

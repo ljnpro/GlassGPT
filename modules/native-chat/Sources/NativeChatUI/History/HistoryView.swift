@@ -4,7 +4,6 @@ import SwiftUI
 
 /// Displays a searchable, deletable list of past conversations.
 public struct HistoryView: View {
-    @State private var showDeleteConfirmation = false
     @State private var viewModel: HistoryPresenter
 
     /// Creates a history view backed by the given presenter.
@@ -30,7 +29,6 @@ public struct HistoryView: View {
                             .accessibilityIdentifier("history.row.\(conversation.title)")
                             .listRowBackground(Color.clear)
                         }
-                        .onDelete(perform: deleteConversations)
                     }
                     .listStyle(.plain)
                 }
@@ -41,38 +39,6 @@ public struct HistoryView: View {
                 placement: .navigationBarDrawer(displayMode: .always),
                 prompt: String(localized: "Search")
             )
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    if !viewModel.conversations.isEmpty {
-                        Button(role: .destructive) {
-                            showDeleteConfirmation = true
-                        } label: {
-                            Label(String(localized: "Delete All"), systemImage: "trash")
-                                .font(.subheadline.weight(.semibold))
-                                .foregroundStyle(.red)
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 6)
-                                .singleFrameGlassCapsuleControl(
-                                    tintOpacity: GlassStyleMetrics.CapsuleControl.tintOpacity,
-                                    borderWidth: GlassStyleMetrics.CapsuleControl.borderWidth,
-                                    darkBorderOpacity: GlassStyleMetrics.CapsuleControl.darkBorderOpacity,
-                                    lightBorderOpacity: GlassStyleMetrics.CapsuleControl.lightBorderOpacity
-                                )
-                        }
-                        .buttonStyle(GlassPressButtonStyle())
-                        .accessibilityLabel(String(localized: "Delete all conversations"))
-                        .accessibilityIdentifier("history.deleteAll")
-                    }
-                }
-            }
-            .alert(String(localized: "Delete All Conversations?"), isPresented: $showDeleteConfirmation) {
-                Button(String(localized: "Delete All"), role: .destructive) {
-                    viewModel.deleteAllConversations()
-                }
-                Button(String(localized: "Cancel"), role: .cancel) {}
-            } message: {
-                Text(String(localized: "This action cannot be undone."))
-            }
         }
         .onAppear {
             viewModel.refresh()
@@ -81,33 +47,39 @@ public struct HistoryView: View {
 
     private var emptyState: some View {
         VStack(spacing: 14) {
-            Image(systemName: "clock.badge.questionmark")
+            Image(systemName: viewModel.isSignedIn ? "clock.badge.questionmark" : "person.crop.circle.badge.exclamationmark")
                 .font(.system(size: 32, weight: .semibold))
                 .foregroundStyle(.secondary)
                 .accessibilityHidden(true)
 
-            Text(String(localized: "No Conversations Yet"))
+            Text(viewModel.isSignedIn ? String(localized: "No Conversations Yet") : String(localized: "Sign In to Sync History"))
                 .font(.title2.weight(.semibold))
                 .foregroundStyle(.primary)
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
 
-            Text(String(localized: "Your chat history will appear here."))
-                .font(.body)
-                .foregroundStyle(.primary.opacity(0.78))
-                .multilineTextAlignment(.center)
-                .fixedSize(horizontal: false, vertical: true)
+            Text(
+                viewModel.isSignedIn
+                    ? String(localized: "Your chat history will appear here.")
+                    : String(localized: "Sign in with Apple in Settings to sync conversations, agent runs, and results across devices.")
+            )
+            .font(.body)
+            .foregroundStyle(.primary.opacity(0.78))
+            .multilineTextAlignment(.center)
+            .fixedSize(horizontal: false, vertical: true)
+
+            if !viewModel.isSignedIn {
+                SettingsCallToActionButton(
+                    title: String(localized: "Open Settings"),
+                    accessibilityIdentifier: "history.openSettings"
+                ) {
+                    viewModel.openSettings()
+                }
+            }
         }
         .padding(.horizontal, 32)
         .frame(maxWidth: 320)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .accessibilityIdentifier("history.emptyState")
-    }
-
-    private func deleteConversations(at offsets: IndexSet) {
-        let toDelete = offsets.map { viewModel.filteredConversations[$0].id }
-        for conversationID in toDelete {
-            viewModel.deleteConversation(id: conversationID)
-        }
     }
 }

@@ -1,6 +1,7 @@
 import ChatDomain
 import ChatPresentation
 import ChatUIComponents
+import ConversationSurfaceLogic
 import SwiftUI
 
 /// Displays the live assistant response bubble during streaming, including tool-call indicators,
@@ -25,6 +26,16 @@ package struct DetachedStreamingBubbleView: View, Equatable {
     /// Maximum width for the assistant bubble.
     let assistantBubbleMaxWidth: CGFloat
     private let renderKey: RenderKey
+
+    private var contentState: DetachedStreamingBubbleContentState {
+        DetachedStreamingBubbleContentState(
+            activeToolCalls: activeToolCalls,
+            currentThinkingText: currentThinkingText,
+            currentStreamingText: currentStreamingText,
+            isThinking: isThinking,
+            liveCitations: liveCitations
+        )
+    }
 
     /// Creates a detached streaming bubble with the given streaming state.
     package init(
@@ -66,39 +77,27 @@ package struct DetachedStreamingBubbleView: View, Equatable {
     /// The detached assistant bubble used while a response is still streaming.
     package var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            let hasActiveWebSearch = activeToolCalls.contains {
-                $0.type == .webSearch && $0.status != .completed
-            }
-            if hasActiveWebSearch {
+            if contentState.hasActiveWebSearch {
                 WebSearchIndicator()
                     .transition(.opacity.combined(with: .scale(scale: 0.95)))
             }
 
-            let hasActiveCodeInterpreter = activeToolCalls.contains {
-                $0.type == .codeInterpreter && $0.status != .completed
-            }
-            if hasActiveCodeInterpreter {
+            if contentState.hasActiveCodeInterpreter {
                 CodeInterpreterIndicator()
                     .transition(.opacity.combined(with: .scale(scale: 0.95)))
             }
 
-            let hasActiveFileSearch = activeToolCalls.contains {
-                $0.type == .fileSearch && $0.status != .completed
-            }
-            if hasActiveFileSearch {
+            if contentState.hasActiveFileSearch {
                 FileSearchIndicator()
                     .transition(.opacity.combined(with: .scale(scale: 0.95)))
             }
 
-            let completedCodeCalls = activeToolCalls.filter {
-                $0.type == .codeInterpreter && $0.status == .completed
-            }
-            ForEach(completedCodeCalls) { toolCall in
+            ForEach(contentState.completedCodeCalls) { toolCall in
                 CodeInterpreterResultView(toolCall: toolCall)
                     .transition(.opacity.combined(with: .move(edge: .top)))
             }
 
-            if isThinking, currentThinkingText.isEmpty, currentStreamingText.isEmpty {
+            if contentState.showsThinkingIndicator {
                 ThinkingIndicator()
                     .transition(.opacity.combined(with: .scale(scale: 0.95)))
             }
@@ -117,12 +116,11 @@ package struct DetachedStreamingBubbleView: View, Equatable {
                     text: currentStreamingText,
                     allowsSelection: false
                 )
-            } else if !isThinking, currentThinkingText.isEmpty,
-                      activeToolCalls.allSatisfy({ $0.status == .completed }) {
+            } else if contentState.showsTypingIndicator {
                 TypingIndicator()
             }
 
-            if !liveCitations.isEmpty {
+            if contentState.showsCitations {
                 CitationLinksView(citations: liveCitations)
             }
         }

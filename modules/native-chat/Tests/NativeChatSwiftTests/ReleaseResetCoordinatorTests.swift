@@ -28,7 +28,7 @@ struct ReleaseResetCoordinatorTests {
                 == ReleaseResetCoordinator.targetVersion
         )
         #expect(result.defaults.object(forKey: "appTheme") == nil)
-        #expect(result.defaults.object(forKey: "cloudflareGatewayEnabled") == nil)
+        #expect(result.defaults.object(forKey: "hasAcceptedDataSharing") == nil)
         #expect(result.resetService == result.suiteName)
         #expect(!FileManager.default.fileExists(
             atPath: directories.appSupport.appendingPathComponent("default.store").path
@@ -152,7 +152,7 @@ private extension ReleaseResetCoordinatorTests {
         let defaultsSuite = "release.reset.tests.\(UUID().uuidString)"
         let defaults = try #require(UserDefaults(suiteName: defaultsSuite))
         defaults.set("dark", forKey: "appTheme")
-        defaults.set(true, forKey: "cloudflareGatewayEnabled")
+        defaults.set(true, forKey: "hasAcceptedDataSharing")
         var resetService: String?
 
         let didReset = ReleaseResetCoordinator.performIfNeeded(

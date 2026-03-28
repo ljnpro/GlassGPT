@@ -1,3 +1,4 @@
+import BackendSessionPersistence
 import ChatPersistenceCore
 import Foundation
 
@@ -28,12 +29,9 @@ public enum UITestEnvironmentReset {
             fileManager: fileManager,
             apiKeyReset: resetCredentials ?? { service in
                 KeychainAPIKeyBackend(service: service).deleteAPIKey()
-                KeychainAPIKeyBackend(
-                    service: service,
-                    account: KeychainAPIKeyBackend.cloudflareAIGTokenAccount
-                ).deleteAPIKey()
             }
         )
+        BackendSessionPersistence(bundleIdentifier: bundleIdentifier).clear()
         userDefaults.removeObject(forKey: ReleaseResetCoordinator.resetMarkerKey)
         return true
     }

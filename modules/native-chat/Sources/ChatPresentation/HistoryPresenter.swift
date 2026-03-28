@@ -1,11 +1,13 @@
-import ChatApplication
+import ChatDomain
 import Foundation
 import Observation
 
 /// View model representing a single row in the conversation history list.
 public struct HistoryConversationRow: Equatable, Identifiable, Sendable {
-    /// The conversation's unique identifier.
-    public let id: UUID
+    /// The conversation's stable server identifier.
+    public let id: String
+    /// The mode associated with the conversation.
+    public let mode: ConversationMode
     /// The conversation's display title.
     public let title: String
     /// A short preview of the most recent message.
@@ -17,13 +19,15 @@ public struct HistoryConversationRow: Equatable, Identifiable, Sendable {
 
     /// Creates a history row.
     public init(
-        id: UUID,
+        id: String,
+        mode: ConversationMode,
         title: String,
         preview: String,
         updatedAt: Date,
         modelDisplayName: String
     ) {
         self.id = id
+        self.mode = mode
         self.title = title
         self.preview = preview
         self.updatedAt = updatedAt
@@ -42,23 +46,27 @@ public final class HistoryPresenter {
     /// All loaded conversation rows, ordered by most recently updated.
     public private(set) var conversations: [HistoryConversationRow]
     private let loadConversationsHandler: () -> [HistoryConversationSummary]
-    private let selectConversationHandler: (UUID) -> Void
-    private let deleteConversationHandler: (UUID) -> Void
-    private let deleteAllConversationsHandler: () -> Void
+    private let selectConversationHandler: (String, ConversationMode) -> Void
+    private let isSignedInHandler: () -> Bool
+    private let openSettingsHandler: () -> Void
 
     /// Creates a history presenter with initial data and handler closures.
     public init(
         conversations: [HistoryConversationSummary] = [],
         loadConversations: @escaping () -> [HistoryConversationSummary],
-        selectConversation: @escaping (UUID) -> Void,
-        deleteConversation: @escaping (UUID) -> Void,
-        deleteAllConversations: @escaping () -> Void
+        selectConversation: @escaping (String, ConversationMode) -> Void,
+        isSignedIn: @escaping () -> Bool = { true },
+        openSettings: @escaping () -> Void = {}
     ) {
         self.conversations = conversations.map(Self.makeRow)
         loadConversationsHandler = loadConversations
         selectConversationHandler = selectConversation
-        deleteConversationHandler = deleteConversation
-        deleteAllConversationsHandler = deleteAllConversations
+        isSignedInHandler = isSignedIn
+        openSettingsHandler = openSettings
+    }
+
+    public var isSignedIn: Bool {
+        isSignedInHandler()
     }
 
     /// Conversations filtered by ``searchText``. Returns all conversations when the search is empty.
@@ -78,25 +86,22 @@ public final class HistoryPresenter {
     }
 
     /// Notifies the handler that the user selected a conversation.
-    public func selectConversation(id: UUID) {
-        selectConversationHandler(id)
+    public func selectConversation(id: String) {
+        guard let conversation = conversations.first(where: { $0.id == id }) else {
+            return
+        }
+        selectConversationHandler(conversation.id, conversation.mode)
     }
 
-    /// Deletes the conversation with the given ID and refreshes the list.
-    public func deleteConversation(id: UUID) {
-        deleteConversationHandler(id)
-        refresh()
-    }
-
-    /// Deletes all conversations and refreshes the list.
-    public func deleteAllConversations() {
-        deleteAllConversationsHandler()
-        refresh()
+    /// Opens the Settings surface so account and sync actions are reachable from signed-out history states.
+    public func openSettings() {
+        openSettingsHandler()
     }
 
     private static func makeRow(from summary: HistoryConversationSummary) -> HistoryConversationRow {
         HistoryConversationRow(
             id: summary.id,
+            mode: summary.mode,
             title: summary.title,
             preview: summary.preview,
             updatedAt: summary.updatedAt,

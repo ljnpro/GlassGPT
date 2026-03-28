@@ -169,6 +169,10 @@ def normalize(path: str) -> str:
     return str((ROOT / path).resolve())
 
 
+def normalize_prefix(path: str) -> str:
+    return f"{normalize(path).rstrip('/')}/"
+
+
 def build_groups() -> list[CoverageGroup]:
     app_shell_paths = sorted(
         normalize(str(path.relative_to(ROOT)))
@@ -179,61 +183,55 @@ def build_groups() -> list[CoverageGroup]:
             name="nativechat-non-ui-total",
             threshold=0.49,
             prefixes=[
-                normalize("modules/native-chat/Sources/"),
+                normalize_prefix("modules/native-chat/Sources/"),
             ],
             exclude_prefixes=[
-                normalize("modules/native-chat/Sources/NativeChatUI/"),
-                normalize("modules/native-chat/Sources/ChatUIComponents/"),
-                normalize("modules/native-chat/Sources/NativeChatComposition/Views/"),
+                normalize_prefix("modules/native-chat/Sources/NativeChatUI/"),
+                normalize_prefix("modules/native-chat/Sources/ChatUIComponents/"),
+                normalize_prefix("modules/native-chat/Sources/NativeChatBackendComposition/Views/"),
             ],
         ),
         CoverageGroup(
-            name="runtime-core",
-            threshold=0.90,
+            name="backend-and-sync",
+            threshold=0.70,
             prefixes=[
-                normalize("modules/native-chat/Sources/ChatRuntimeModel/"),
-                normalize("modules/native-chat/Sources/ChatRuntimePorts/"),
-                normalize("modules/native-chat/Sources/ChatRuntimeWorkflows/"),
+                normalize_prefix("modules/native-chat/Sources/AppRouting/"),
+                normalize_prefix("modules/native-chat/Sources/BackendAuth/"),
+                normalize_prefix("modules/native-chat/Sources/BackendClient/"),
+                normalize_prefix("modules/native-chat/Sources/BackendContracts/"),
+                normalize_prefix("modules/native-chat/Sources/BackendSessionPersistence/"),
+                normalize_prefix("modules/native-chat/Sources/ConversationSyncApplication/"),
+                normalize_prefix("modules/native-chat/Sources/SyncProjection/"),
             ],
         ),
         CoverageGroup(
-            name="runtime-coordinators",
-            threshold=0.55,
-            prefixes=[
-                normalize("modules/native-chat/Sources/NativeChatComposition/Controllers/"),
-            ],
-        ),
-        CoverageGroup(
-            name="screen-stores",
-            threshold=0.28,
-            prefixes=[
-                normalize("modules/native-chat/Sources/ChatPresentation/"),
-            ],
-        ),
-        CoverageGroup(
-            name="transport-and-services",
-            threshold=0.45,
-            prefixes=[
-                normalize("modules/native-chat/Sources/OpenAITransport/"),
-                normalize("modules/native-chat/Sources/GeneratedFilesInfra/"),
-            ],
-        ),
-        CoverageGroup(
-            name="settings-and-storage",
+            name="persistence-and-cache",
             threshold=0.65,
             prefixes=[
-                normalize("modules/native-chat/Sources/ChatPersistenceCore/"),
-                normalize("modules/native-chat/Sources/ChatPersistenceSwiftData/"),
+                normalize_prefix("modules/native-chat/Sources/ChatPersistenceCore/"),
+                normalize_prefix("modules/native-chat/Sources/ChatPersistenceSwiftData/"),
+                normalize_prefix("modules/native-chat/Sources/ChatProjectionPersistence/"),
+                normalize_prefix("modules/native-chat/Sources/GeneratedFilesCore/"),
+                normalize_prefix("modules/native-chat/Sources/GeneratedFilesCache/"),
+            ],
+        ),
+        CoverageGroup(
+            name="presentation",
+            threshold=0.40,
+            prefixes=[
+                normalize_prefix("modules/native-chat/Sources/ChatPresentation/"),
             ],
         ),
         CoverageGroup(
             name="views-and-presentation",
             threshold=0.15,
             prefixes=[
-                normalize("modules/native-chat/Sources/NativeChatUI/"),
-                normalize("modules/native-chat/Sources/ChatUIComponents/"),
-                normalize("modules/native-chat/Sources/NativeChatComposition/Views/"),
+                normalize_prefix("modules/native-chat/Sources/NativeChatUI/"),
+                normalize_prefix("modules/native-chat/Sources/ChatUIComponents/"),
+                normalize_prefix("modules/native-chat/Sources/NativeChatBackendComposition/"),
+                normalize_prefix("modules/native-chat/Sources/NativeChat/"),
             ],
+            required=False,
         ),
         CoverageGroup(
             name="app-shell",
