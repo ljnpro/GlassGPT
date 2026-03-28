@@ -15,7 +15,12 @@ if (( ${#xcresult_bundles[@]} > 0 )); then
   python3 ./scripts/check_zero_skipped_tests.py "${xcresult_bundles[@]}"
 fi
 
-mapfile -t ui_xcresult_bundles < <(find .local/build/ci -maxdepth 1 -name 'glassgpt-ui-*.xcresult' -print | sort)
+mapfile -t ui_xcresult_bundles < <(
+  find .local/build/ci -maxdepth 1 \
+    -name 'glassgpt-ui-*.xcresult' \
+    ! -name 'glassgpt-ui-reinstall-*.xcresult' \
+    -print | sort
+)
 if (( ${#ui_xcresult_bundles[@]} > 0 )); then
   python3 ./scripts/check_required_ui_tests.py "${ui_xcresult_bundles[@]}"
 fi
