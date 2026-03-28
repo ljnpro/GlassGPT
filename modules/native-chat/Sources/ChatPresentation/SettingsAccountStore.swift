@@ -131,7 +131,7 @@ public final class SettingsAccountStore {
         } catch is CancellationError {
             lastErrorMessage = nil
         } catch {
-            lastErrorMessage = error.localizedDescription
+            lastErrorMessage = Self.describeSignInError(error)
         }
     }
 
@@ -165,5 +165,14 @@ public final class SettingsAccountStore {
                 errorSummary: error.localizedDescription
             )
         }
+    }
+
+    private static func describeSignInError(_ error: Error) -> String {
+        let nsError = error as NSError
+        guard nsError.domain != NSCocoaErrorDomain else {
+            return error.localizedDescription
+        }
+
+        return "\(error.localizedDescription) [\(nsError.domain):\(nsError.code)]"
     }
 }
