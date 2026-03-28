@@ -7,9 +7,9 @@
 *.key
 *.mobileprovision
 
-# Local release config
+# Local release config and secrets
 .env*.local
-.local/build/
+.local/
 ios/GlassGPT/Config/Local-Secrets.xcconfig
 
 # Build products

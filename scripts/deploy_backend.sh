@@ -10,6 +10,14 @@ MIGRATIONS_DIR="$BACKEND_DIR/migrations"
 BUILD_DIR="${LOCAL_BUILD_DIR:-$ROOT_DIR/.local/build}"
 DEPLOY_LOG="$BUILD_DIR/backend-deploy.log"
 MIGRATION_LOG="$BUILD_DIR/backend-migrations.log"
+BACKEND_ENV_FILE="$ROOT_DIR/.local/backend.env"
+
+# Source Cloudflare credentials if available (CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID)
+if [[ -f "$BACKEND_ENV_FILE" ]]; then
+  set -a
+  source "$BACKEND_ENV_FILE"
+  set +a
+fi
 
 function usage() {
   cat <<'EOF'
