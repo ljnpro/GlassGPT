@@ -220,19 +220,65 @@ export const createAgentRunSupport = (deps: AgentRunServiceDependencies) => {
       readonly userId: string;
     },
   ): Promise<string | null> => {
-    const activeContext = await loadActiveExecutionContext(env, input.runId, input.userId);
+    let activeContext = await loadActiveExecutionContext(env, input.runId, input.userId);
     if (!activeContext) {
       return null;
     }
 
     const apiKey = await loadApiKey(env, input.userId);
-    const responseText = await deps.createChatCompletion(apiKey, input.prompt);
-    const latestRun = await deps.findRunById(env, input.runId);
-    if (latestRun?.status === 'cancelled') {
-      return null;
+    const chunks: string[] = [];
+    let pendingDelta = '';
+    let chunkCount = 0;
+    const DELTA_FLUSH_THRESHOLD = 5;
+
+    for await (const delta of deps.createStreamingChatCompletion(apiKey, input.prompt)) {
+      // Check for cancellation periodically
+      if (chunkCount % 20 === 0) {
+        const latestRun = await deps.findRunById(env, input.runId);
+        if (latestRun?.status === 'cancelled') {
+          return null;
+        }
+      }
+
+      chunks.push(delta);
+      pendingDelta += delta;
+      chunkCount++;
+
+      // Flush delta events for real-time stage progress
+      if (chunkCount % DELTA_FLUSH_THRESHOLD === 0 && activeContext) {
+        const result = await persistProjectedEvent(deps, env, {
+          conversation: activeContext.conversation,
+          event: createRunEventDraft(deps.now(), activeContext.run, {
+            kind: 'assistant_delta',
+            textDelta: pendingDelta,
+            stage: activeContext.run.stage,
+          }),
+          message: null,
+          run: activeContext.run,
+          syncMessageCursor: false,
+        });
+        activeContext = { conversation: result.conversation, run: result.run };
+        pendingDelta = '';
+      }
     }
 
-    return responseText;
+    // Flush remaining delta
+    if (pendingDelta.length > 0 && activeContext) {
+      const result = await persistProjectedEvent(deps, env, {
+        conversation: activeContext.conversation,
+        event: createRunEventDraft(deps.now(), activeContext.run, {
+          kind: 'assistant_delta',
+          textDelta: pendingDelta,
+          stage: activeContext.run.stage,
+        }),
+        message: null,
+        run: activeContext.run,
+        syncMessageCursor: false,
+      });
+      activeContext = { conversation: result.conversation, run: result.run };
+    }
+
+    return chunks.join('') || null;
   };
 
   return {

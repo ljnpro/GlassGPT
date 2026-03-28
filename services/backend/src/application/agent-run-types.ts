@@ -16,6 +16,10 @@ export interface AgentRunWorkflowParams {
 
 export interface AgentRunServiceDependencies extends RunProjectionDependencies {
   readonly createChatCompletion: (apiKey: string, input: string) => Promise<string>;
+  readonly createStreamingChatCompletion: (
+    apiKey: string,
+    input: string,
+  ) => AsyncGenerator<string, void, undefined>;
   readonly decryptSecret: (
     env: BackendRuntimeContext,
     encrypted: {

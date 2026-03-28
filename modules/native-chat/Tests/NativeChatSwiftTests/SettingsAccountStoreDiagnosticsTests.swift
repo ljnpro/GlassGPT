@@ -102,6 +102,15 @@ private final class SettingsAccountDiagnosticsBackendRequester: BackendRequestin
         throw DiagnosticsTestError.unimplemented
     }
 
+    func streamRun(_ runID: String) -> BackendSSEStream {
+        var components = URLComponents()
+        components.scheme = "https"
+        components.host = "localhost"
+        components.path = "/v1/runs/\(runID)/stream"
+        let url = components.url ?? URL(fileURLWithPath: "/")
+        return BackendSSEStream(url: url, urlSession: .shared, authorizationHeader: nil)
+    }
+
     func syncEvents(after _: String?) async throws -> SyncEnvelopeDTO {
         throw DiagnosticsTestError.unimplemented
     }

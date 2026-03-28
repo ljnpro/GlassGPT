@@ -287,7 +287,6 @@ describe('backend worker scaffold', () => {
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({
       ok: true,
-      environment: 'beta',
     });
   });
 

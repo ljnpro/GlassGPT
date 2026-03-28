@@ -55,6 +55,10 @@ export interface ChatRunWorkflowParams {
 
 export interface ChatRunServiceDependencies extends RunProjectionDependencies {
   readonly createChatCompletion: (apiKey: string, input: string) => Promise<string>;
+  readonly createStreamingChatCompletion: (
+    apiKey: string,
+    input: string,
+  ) => AsyncGenerator<string, void, undefined>;
   readonly decryptSecret: (
     env: BackendRuntimeContext,
     encrypted: {
@@ -267,12 +271,60 @@ export const createChatRunService = (deps: ChatRunServiceDependencies): ChatRunS
           await deps.findProviderCredential(env, input.userId, 'openai'),
         );
         const apiKey = await deps.decryptSecret(env, credential);
-        const assistantText = await deps.createChatCompletion(apiKey, input.content);
-        const latestRun = await deps.findRunById(env, run.id);
-        if (latestRun?.status === 'cancelled') {
-          return;
+
+        // Stream tokens from OpenAI, emitting delta events as they arrive
+        const chunks: string[] = [];
+        let pendingDelta = '';
+        const DELTA_FLUSH_THRESHOLD = 5;
+        let chunkCount = 0;
+
+        for await (const delta of deps.createStreamingChatCompletion(apiKey, input.content)) {
+          // Check for cancellation between chunks
+          const latestRun = chunkCount % 20 === 0 ? await deps.findRunById(env, run.id) : null;
+          if (latestRun?.status === 'cancelled') {
+            return;
+          }
+
+          chunks.push(delta);
+          pendingDelta += delta;
+          chunkCount++;
+
+          // Flush delta events periodically for real-time UI updates
+          if (chunkCount % DELTA_FLUSH_THRESHOLD === 0) {
+            ({ conversation, run } = await persistProjectedEvent(deps, env, {
+              conversation,
+              event: createRunEventDraft(deps.now(), run, {
+                kind: 'assistant_delta',
+                textDelta: pendingDelta,
+              }),
+              message: null,
+              run,
+              syncMessageCursor: false,
+            }));
+            pendingDelta = '';
+          }
         }
 
+        const assistantText = chunks.join('');
+        if (assistantText.length === 0) {
+          throw new Error('openai_response_empty');
+        }
+
+        // Flush any remaining delta
+        if (pendingDelta.length > 0) {
+          ({ conversation, run } = await persistProjectedEvent(deps, env, {
+            conversation,
+            event: createRunEventDraft(deps.now(), run, {
+              kind: 'assistant_delta',
+              textDelta: pendingDelta,
+            }),
+            message: null,
+            run,
+            syncMessageCursor: false,
+          }));
+        }
+
+        // Create the final assistant message with full text
         const assistantMessage: MessageRecord = {
           completedAt: deps.now().toISOString(),
           content: assistantText,
@@ -292,21 +344,10 @@ export const createChatRunService = (deps: ChatRunServiceDependencies): ChatRunS
           message: projectedAssistantMessage,
         } = await persistProjectedEvent(deps, env, {
           conversation,
-          event: createRunEventDraft(deps.now(), run, {
-            kind: 'assistant_delta',
-            textDelta: assistantText,
-          }),
+          event: createRunEventDraft(deps.now(), run, { kind: 'assistant_completed' }),
           message: assistantMessage,
           run,
           syncMessageCursor: true,
-        }));
-
-        ({ conversation, run } = await persistProjectedEvent(deps, env, {
-          conversation,
-          event: createRunEventDraft(deps.now(), run, { kind: 'assistant_completed' }),
-          message: projectedAssistantMessage,
-          run,
-          syncMessageCursor: false,
         }));
 
         const completedRun: RunRecord = {

@@ -26,6 +26,7 @@ public protocol BackendRequesting: AnyObject {
     func retryRun(_ runID: String) async throws -> RunSummaryDTO
     func sendMessage(_ content: String, to conversationID: String) async throws -> RunSummaryDTO
     func startAgentRun(prompt: String?, in conversationID: String) async throws -> RunSummaryDTO
+    func streamRun(_ runID: String) -> BackendSSEStream
     func syncEvents(after cursor: String?) async throws -> SyncEnvelopeDTO
     func logout() async throws
     func storeOpenAIKey(_ apiKey: String) async throws -> CredentialStatusDTO

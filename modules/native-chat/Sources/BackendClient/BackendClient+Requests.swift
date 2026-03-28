@@ -100,6 +100,17 @@ public extension BackendClient {
         )
     }
 
+    func streamRun(_ runID: String) -> BackendSSEStream {
+        var components = URLComponents()
+        components.scheme = environment.baseURL.scheme
+        components.host = environment.baseURL.host
+        components.port = environment.baseURL.port
+        components.path = "/v1/runs/\(runID)/stream"
+        let url = components.url ?? environment.baseURL.appendingPathComponent("/v1/runs/\(runID)/stream")
+        let authHeader = sessionStore.loadSession().map { "Bearer \($0.accessToken)" }
+        return BackendSSEStream(url: url, urlSession: urlSession, authorizationHeader: authHeader)
+    }
+
     func syncEvents(after cursor: String?) async throws -> SyncEnvelopeDTO {
         try await perform(
             path: "/v1/sync/events",

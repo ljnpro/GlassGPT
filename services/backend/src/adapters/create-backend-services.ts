@@ -6,7 +6,7 @@ import { createCredentialService } from '../application/credential-service.js';
 import { createRunService } from '../application/run-service.js';
 import { createSyncService } from '../application/sync-service.js';
 import { validateOpenAiApiKey } from './openai/openai-client.js';
-import { createChatCompletion } from './openai/openai-responses.js';
+import { createChatCompletion, createStreamingChatCompletion } from './openai/openai-responses.js';
 import {
   findConversationByIdForUser,
   insertConversation,
@@ -53,6 +53,7 @@ import { hashRefreshToken, issueRefreshToken } from './security/refresh-token-cr
 export const createBackendServices = () => {
   const chatRunService = createChatRunService({
     createChatCompletion,
+    createStreamingChatCompletion,
     decryptSecret,
     findConversationByIdForUser,
     findProviderCredential,
@@ -72,6 +73,7 @@ export const createBackendServices = () => {
 
   const agentRunService = createAgentRunService({
     createChatCompletion,
+    createStreamingChatCompletion,
     decryptSecret,
     findConversationByIdForUser,
     findProviderCredential,

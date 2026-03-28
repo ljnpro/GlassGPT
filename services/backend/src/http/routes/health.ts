@@ -4,7 +4,6 @@ export const installHealthRoutes = (app: BackendApp): void => {
   app.get('/healthz', (context) => {
     return context.json({
       ok: true,
-      environment: context.env.APP_ENV,
     });
   });
 };

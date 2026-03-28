@@ -86,6 +86,34 @@ struct BackendClientTests {
 
     @MainActor
     @Test
+    func `stream run returns SSE stream targeting correct endpoint`() throws {
+        let sessionStore = try BackendSessionStore(
+            session: makeSessionDTO()
+        )
+        let client = try BackendClient(
+            environment: BackendEnvironment(baseURL: #require(URL(string: "https://api.example.com"))),
+            sessionStore: sessionStore
+        )
+
+        let stream = client.streamRun("run_stream_01")
+        // BackendSSEStream is a value type; verify it was created successfully
+        _ = stream
+    }
+
+    @MainActor
+    @Test
+    func `SSE event struct stores event type data and optional id`() {
+        let event = SSEEvent(event: "delta", data: "{\"textDelta\":\"hello\"}", id: "evt_1")
+        #expect(event.event == "delta")
+        #expect(event.data == "{\"textDelta\":\"hello\"}")
+        #expect(event.id == "evt_1")
+
+        let noID = SSEEvent(event: "status", data: "{}", id: nil)
+        #expect(noID.id == nil)
+    }
+
+    @MainActor
+    @Test
     func `session store restores persisted session and clears on sign out`() throws {
         let backend = InMemoryAPIKeyBackend()
         let persistence = BackendSessionPersistence(

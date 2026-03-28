@@ -117,6 +117,17 @@ const createServiceHarness = (options?: {
           return nextResponse;
         };
       })(),
+    createStreamingChatCompletion:
+      (() => {
+        const responses = ['Leader plan', 'Worker report', 'Leader review', 'Final answer'];
+        return async function* () {
+          const nextResponse = responses.shift();
+          if (!nextResponse) {
+            throw new Error('unexpected_streaming_call');
+          }
+          yield nextResponse;
+        };
+      })(),
     decryptSecret: async () => 'sk-user-key',
     findConversationByIdForUser: async (_env, conversationId, userId) => {
       const conversation = conversations.get(conversationId) ?? null;
@@ -299,41 +310,35 @@ describe('createAgentRunService', () => {
       'run_queued',
       'run_started',
       'run_progress',
+      'assistant_delta',
       'run_progress',
       'stage_changed',
+      'assistant_delta',
       'run_progress',
       'stage_changed',
+      'assistant_delta',
       'run_progress',
       'stage_changed',
+      'assistant_delta',
       'run_progress',
       'assistant_delta',
       'assistant_completed',
       'run_completed',
     ]);
-    expect(harness.events.map((event) => event.cursor)).toEqual([
-      formatCursorSequence(1),
-      formatCursorSequence(2),
-      formatCursorSequence(3),
-      formatCursorSequence(4),
-      formatCursorSequence(5),
-      formatCursorSequence(6),
-      formatCursorSequence(7),
-      formatCursorSequence(8),
-      formatCursorSequence(9),
-      formatCursorSequence(10),
-      formatCursorSequence(11),
-      formatCursorSequence(12),
-      formatCursorSequence(13),
-      formatCursorSequence(14),
+    expect(harness.events.map((event) => event.cursor)).toEqual(
+      Array.from({ length: 18 }, (_, i) => formatCursorSequence(i + 1)),
+    );
+    const stageChangedEvents = harness.events.filter((e) => e.kind === 'stage_changed');
+    expect(stageChangedEvents.map((e) => e.stage)).toEqual([
+      'worker_wave',
+      'leader_review',
+      'final_synthesis',
     ]);
-    expect(harness.events[5]?.stage).toBe('worker_wave');
-    expect(harness.events[7]?.stage).toBe('leader_review');
-    expect(harness.events[9]?.stage).toBe('final_synthesis');
     expect(harness.messages.at(-1)?.role).toBe('assistant');
-    expect(harness.messages.at(-1)?.serverCursor).toBe(formatCursorSequence(12));
+    expect(harness.messages.at(-1)?.serverCursor).toBe(formatCursorSequence(16));
     expect(harness.runs.get(queuedRun.id)?.status).toBe('completed');
     expect(harness.runs.get(queuedRun.id)?.visibleSummary).toBe('Final answer');
-    expect(harness.cursorPublishes).toHaveLength(14);
+    expect(harness.cursorPublishes).toHaveLength(18);
   });
 
   it('reuses the latest user message when an agent run is queued without a new prompt', async () => {

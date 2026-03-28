@@ -101,6 +101,10 @@ const createServiceHarness = (options?: {
       (async () => {
         return 'Assistant reply';
       }),
+    createStreamingChatCompletion:
+      async function* () {
+        yield 'Assistant reply';
+      },
     decryptSecret: async () => 'sk-user-key',
     findConversationByIdForUser: async (_env, conversationId, userId) => {
       const conversation = conversations.get(conversationId) ?? null;
@@ -266,7 +270,7 @@ describe('createChatRunService', () => {
     expect(harness.events[5]?.textDelta).toBeNull();
     expect(harness.events[6]?.run?.status).toBe('completed');
     expect(harness.messages.at(-1)?.role).toBe('assistant');
-    expect(harness.messages.at(-1)?.serverCursor).toBe(formatCursorSequence(5));
+    expect(harness.messages.at(-1)?.serverCursor).toBe(formatCursorSequence(6));
     expect(harness.runs.get(queuedRun.id)?.status).toBe('completed');
     expect(harness.cursorPublishes).toHaveLength(7);
   });

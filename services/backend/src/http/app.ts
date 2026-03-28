@@ -4,6 +4,7 @@ import { ZodError } from 'zod';
 
 import { isApplicationError } from '../application/errors.js';
 import { logError } from '../observability/logger.js';
+import { requestIdMiddleware } from './middleware/request-id.js';
 import { installArtifactRoutes } from './routes/artifacts.js';
 import { installAuthRoutes } from './routes/auth.js';
 import { installConnectionRoutes } from './routes/connection.js';
@@ -11,6 +12,7 @@ import { installConversationRoutes } from './routes/conversations.js';
 import { installCredentialRoutes } from './routes/credentials.js';
 import { installHealthRoutes } from './routes/health.js';
 import { installRunRoutes } from './routes/runs.js';
+import { installRunStreamRoutes } from './routes/run-stream.js';
 import { installSyncRoutes } from './routes/sync.js';
 import type { BackendServices } from './services.js';
 import type { BackendApp } from './types.js';
@@ -37,14 +39,17 @@ const statusCodeForApplicationError = (code: string): ApplicationErrorStatusCode
 export const createApp = (services: BackendServices): BackendApp => {
   const app = new Hono<{ Bindings: Env }>();
 
+  app.use('*', requestIdMiddleware);
+
   installHealthRoutes(app);
   installConnectionRoutes(app, services);
   installAuthRoutes(app, services);
   installCredentialRoutes(app, services);
   installConversationRoutes(app, services);
   installRunRoutes(app, services);
+  installRunStreamRoutes(app, services);
   installSyncRoutes(app, services);
-  installArtifactRoutes(app);
+  installArtifactRoutes(app, services);
 
   app.notFound((context) => {
     return context.json(errorResponseSchema.parse({ error: 'not_found' }), 404);

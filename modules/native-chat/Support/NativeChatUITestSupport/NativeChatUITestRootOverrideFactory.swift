@@ -1,7 +1,7 @@
 import ChatPersistenceSwiftData
 import Foundation
-import NativeChatBackendCore
 import NativeChatBackendComposition
+import NativeChatBackendCore
 import SwiftData
 import SwiftUI
 

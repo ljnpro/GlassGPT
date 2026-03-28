@@ -48,7 +48,9 @@ final class UITestBackendRequester: BackendRequesting {
         )
     }
 
-    func fetchConversations() async throws -> [ConversationDTO] { [] }
+    func fetchConversations() async throws -> [ConversationDTO] {
+        []
+    }
 
     func fetchCurrentUser() async throws -> UserDTO {
         UITestScenarioAppStoreFactory.makeSession().user
@@ -58,11 +60,13 @@ final class UITestBackendRequester: BackendRequesting {
         try makeRun(id: runID, kind: .agent)
     }
 
-    func connectionCheck() async throws -> ConnectionCheckDTO { healthyConnection }
+    func connectionCheck() async throws -> ConnectionCheckDTO {
+        healthyConnection
+    }
 
     func authenticateWithApple(
-        _ payload: AppleSignInPayload,
-        deviceID: String
+        _: AppleSignInPayload,
+        deviceID _: String
     ) async throws -> SessionDTO {
         UITestScenarioAppStoreFactory.makeSession()
     }
@@ -83,13 +87,26 @@ final class UITestBackendRequester: BackendRequesting {
         try makeRun(id: "run_agent_1", kind: .agent, conversationID: conversationID, summary: prompt)
     }
 
+    func streamRun(_ runID: String) -> BackendSSEStream {
+        var components = URLComponents()
+        components.scheme = "https"
+        components.host = "localhost"
+        components.path = "/v1/runs/\(runID)/stream"
+        let url = components.url ?? URL(fileURLWithPath: "/")
+        return BackendSSEStream(
+            url: url,
+            urlSession: .shared,
+            authorizationHeader: nil
+        )
+    }
+
     func syncEvents(after cursor: String?) async throws -> SyncEnvelopeDTO {
         SyncEnvelopeDTO(nextCursor: cursor, events: [])
     }
 
     func logout() async throws {}
 
-    func storeOpenAIKey(_ apiKey: String) async throws -> CredentialStatusDTO {
+    func storeOpenAIKey(_: String) async throws -> CredentialStatusDTO {
         CredentialStatusDTO(provider: "openai", state: .valid, checkedAt: .now, lastErrorSummary: nil)
     }
 

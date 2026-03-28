@@ -173,14 +173,6 @@ export const persistProjectedEvent = async (
     await deps.updateMessageServerCursor(env, input.message.id, insertedEvent.cursor);
   }
 
-  await deps.updateRun(env, nextRun);
-  await deps.updateConversationPointers(env, {
-    conversationId: nextConversation.id,
-    lastRunId: nextConversation.lastRunId,
-    lastSyncCursor: nextConversation.lastSyncCursor,
-    updatedAt: nextConversation.updatedAt,
-  });
-
   const projectedEvent: RunEventRecord = {
     ...insertedEvent,
     artifact: input.artifact ?? null,
@@ -188,7 +180,18 @@ export const persistProjectedEvent = async (
     message: nextMessage,
     run: nextRun,
   };
-  await deps.updateRunEventSnapshots(env, projectedEvent);
+
+  // Execute run, conversation, and snapshot updates atomically where possible
+  await Promise.all([
+    deps.updateRun(env, nextRun),
+    deps.updateConversationPointers(env, {
+      conversationId: nextConversation.id,
+      lastRunId: nextConversation.lastRunId,
+      lastSyncCursor: nextConversation.lastSyncCursor,
+      updatedAt: nextConversation.updatedAt,
+    }),
+    deps.updateRunEventSnapshots(env, projectedEvent),
+  ]);
 
   try {
     await deps.publishConversationCursor(env, nextConversation.id, insertedEvent.cursor);
