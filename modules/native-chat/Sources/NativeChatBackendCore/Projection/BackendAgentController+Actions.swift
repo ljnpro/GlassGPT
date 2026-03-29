@@ -99,6 +99,14 @@ package extension BackendAgentController {
         runPollingTask = nil
         activeRunID = nil
         lastRunSummary = nil
+        currentStreamingText = ""
+        currentThinkingText = ""
+        activeToolCalls = []
+        liveCitations = []
+        liveFilePathAnnotations = []
+        isRunning = false
+        isThinking = false
+        processSnapshot = AgentProcessSnapshot()
         let selectionToken = UUID()
         visibleSelectionToken = selectionToken
 
@@ -116,6 +124,7 @@ package extension BackendAgentController {
                 }
                 hydrateConfigurationFromConversation()
                 syncVisibleState()
+                await restoreActiveRunIfNeeded(selectionToken: selectionToken)
             } catch {
                 errorMessage = error.localizedDescription
             }

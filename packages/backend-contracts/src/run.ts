@@ -55,6 +55,7 @@ export const runSummarySchema = z.object({
   updatedAt: isoDateSchema,
   lastEventCursor: cursorSchema.optional(),
   visibleSummary: optionalTextSchema,
+  processSnapshotJSON: optionalTextSchema,
 });
 
 export const artifactSchema = z.object({

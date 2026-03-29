@@ -4,14 +4,6 @@ import Foundation
 
 @MainActor
 package extension BackendChatController {
-    var liveCitations: [URLCitation] {
-        []
-    }
-
-    var liveFilePathAnnotations: [FilePathAnnotation] {
-        []
-    }
-
     func bootstrap() async {
         guard sessionStore.isSignedIn else {
             messages = []
@@ -28,11 +20,13 @@ package extension BackendChatController {
                 hydrateConfigurationFromConversation()
                 syncMessages()
                 try await refreshVisibleConversation()
+                await restoreActiveRunIfNeeded(selectionToken: visibleSelectionToken)
             } else if let mostRecent = conversations.first {
                 currentConversationRecord = mostRecent
                 hydrateConfigurationFromConversation()
                 syncMessages()
                 try await refreshVisibleConversation()
+                await restoreActiveRunIfNeeded(selectionToken: visibleSelectionToken)
             } else {
                 startNewConversation()
             }
@@ -107,5 +101,42 @@ package extension BackendChatController {
         visibleSelectionToken = UUID()
         currentConversationID = conversation.id
         return true
+    }
+
+    func restoreActiveRunIfNeeded(selectionToken: UUID) async {
+        guard sessionStore.isSignedIn,
+              let conversation = currentConversationRecord,
+              let conversationServerID = conversation.serverID,
+              let runID = conversation.lastRunServerID,
+              visibleSelectionToken == selectionToken
+        else {
+            return
+        }
+
+        do {
+            let run = try await client.fetchRun(runID)
+            guard visibleSelectionToken == selectionToken else {
+                return
+            }
+
+            let previousActiveRunID = activeRunID
+            if run.status == .queued || run.status == .running {
+                activeRunID = run.id
+                isStreaming = true
+                if runPollingTask == nil || previousActiveRunID != run.id {
+                    startRunPolling(
+                        conversationServerID: conversationServerID,
+                        runID: run.id,
+                        selectionToken: selectionToken
+                    )
+                }
+            } else if activeRunID == run.id {
+                activeRunID = nil
+                isStreaming = false
+                isThinking = false
+            }
+        } catch {
+            errorMessage = error.localizedDescription
+        }
     }
 }

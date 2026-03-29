@@ -222,6 +222,7 @@ struct NativeChatUIRenderingCoverageTests {
                 viewModel: agentController,
                 assistantBubbleMaxWidth: 520,
                 liveSummaryExpanded: .constant(true),
+                streamingThinkingExpanded: .constant(nil),
                 expandedTraceMessageIDs: .constant([assistantMessage.id]),
                 openSettings: {}
             )

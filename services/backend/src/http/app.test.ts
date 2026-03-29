@@ -44,14 +44,38 @@ const createArtifactBucketStub = (): R2Bucket => {
   } as R2Bucket;
 };
 
-const createConversationEventHubStub = (): Env['CONVERSATION_EVENT_HUB'] => {
+const createConversationEventHubStub = (
+  fetchImpl?: () => Promise<Response>,
+): Env['CONVERSATION_EVENT_HUB'] => {
   return {
     idFromName: () => ({ toString: () => 'conversation-event-hub-id' }) as DurableObjectId,
     get: () =>
       ({
-        fetch: async () => unexpectedBindingAccess('durable_object'),
+        fetch: async () => {
+          if (fetchImpl) {
+            return fetchImpl();
+          }
+          return unexpectedBindingAccess('durable_object');
+        },
       }) as DurableObjectStub,
   } as Env['CONVERSATION_EVENT_HUB'];
+};
+
+const createSSEStreamResponse = (frames: readonly string[]): Response => {
+  const encoder = new TextEncoder();
+  const stream = new ReadableStream<Uint8Array>({
+    start(controller) {
+      for (const frame of frames) {
+        controller.enqueue(encoder.encode(frame));
+      }
+      controller.close();
+    },
+  });
+
+  return new Response(stream, {
+    headers: { 'Content-Type': 'text/event-stream' },
+    status: 200,
+  });
 };
 
 const sessionFixture = {
@@ -75,7 +99,7 @@ const credentialStatusFixture = {
   state: 'valid',
 } as const;
 
-const testEnv: Env = {
+const createTestEnv = (overrides: Partial<Env> = {}): Env => ({
   APP_ENV: 'beta',
   R2_BUCKET_NAME: 'glassgpt-beta-artifacts',
   CHAT_RUN_WORKFLOW: createWorkflowStub(),
@@ -83,7 +107,10 @@ const testEnv: Env = {
   CONVERSATION_EVENT_HUB: createConversationEventHubStub(),
   GLASSGPT_ARTIFACTS: createArtifactBucketStub(),
   GLASSGPT_DB: createDatabaseStub(),
-};
+  ...overrides,
+});
+
+const testEnv: Env = createTestEnv();
 
 const createAuthServiceStub = (): AuthService => {
   return {
@@ -165,6 +192,20 @@ const agentRunFixture = {
   id: 'run_agent_01',
   kind: 'agent',
   lastEventCursor: 'cur_00000000000000000002',
+  processSnapshotJSON: JSON.stringify({
+    activity: 'delegation',
+    activeTaskIDs: ['task_01'],
+    leaderLiveStatus: 'Workers running',
+    leaderLiveSummary: 'Workers running',
+    recentUpdateItems: [],
+    tasks: [
+      {
+        id: 'task_01',
+        status: 'running',
+        title: 'Inspect evidence',
+      },
+    ],
+  }),
   stage: 'leader_planning',
   status: 'queued',
   updatedAt: '2026-03-27T12:00:00.000Z',
@@ -230,8 +271,8 @@ const createAgentRunServiceStub = (): AgentRunService => {
   };
 };
 
-const createRunServiceStub = (): RunService => {
-  return {
+const createRunServiceStub = (overrides: Partial<RunService> = {}): RunService => {
+  const base: RunService = {
     cancelRun: async (_env, _userId, runId) => {
       return runId.startsWith('run_agent')
         ? { ...agentRunFixture, status: 'cancelled', visibleSummary: 'Agent run cancelled' }
@@ -249,6 +290,11 @@ const createRunServiceStub = (): RunService => {
           };
     },
   };
+
+  return {
+    ...base,
+    ...overrides,
+  };
 };
 
 const createSyncServiceStub = (): SyncService => {
@@ -260,7 +306,7 @@ const createSyncServiceStub = (): SyncService => {
   };
 };
 
-const createTestServices = (): BackendServices => {
+const createTestServices = (overrides: Partial<BackendServices> = {}): BackendServices => {
   return {
     agentRunService: createAgentRunServiceStub(),
     authService: createAuthServiceStub(),
@@ -269,6 +315,7 @@ const createTestServices = (): BackendServices => {
     credentialService: createCredentialServiceStub(),
     runService: createRunServiceStub(),
     syncService: createSyncServiceStub(),
+    ...overrides,
   };
 };
 
@@ -564,6 +611,135 @@ describe('backend worker scaffold', () => {
     expect(response.status).toBe(400);
     await expect(response.json()).resolves.toEqual({
       error: 'invalid_request',
+    });
+  });
+
+  it('requires authentication for run streaming', async () => {
+    const response = await createApp(createTestServices()).fetch(
+      new Request(`https://example.com/v1/runs/${chatRunFixture.id}/stream`),
+      testEnv,
+      testExecutionContext,
+    );
+
+    expect(response.status).toBe(401);
+    await expect(response.json()).resolves.toEqual({
+      error: 'unauthorized',
+    });
+  });
+
+  it('streams immediate done for terminal runs without touching durable objects', async () => {
+    const app = createApp(
+      createTestServices({
+        runService: createRunServiceStub({
+          getRun: async () => ({
+            ...agentRunFixture,
+            id: 'run_agent_terminal_01',
+            stage: 'final_synthesis',
+            status: 'completed',
+            visibleSummary: 'Completed agent run',
+          }),
+        }),
+      }),
+    );
+
+    const env = createTestEnv({
+      CONVERSATION_EVENT_HUB: createConversationEventHubStub(async () => {
+        throw new Error('durable_object_should_not_be_used_for_terminal_run');
+      }),
+    });
+
+    const response = await app.fetch(
+      new Request('https://example.com/v1/runs/run_agent_terminal_01/stream', {
+        headers: { Authorization: 'Bearer access-token' },
+      }),
+      env,
+      testExecutionContext,
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.text()).resolves.toContain('event: done');
+  });
+
+  it('relays initial stage and process payloads and filters unrelated stream frames', async () => {
+    const app = createApp(
+      createTestServices({
+        runService: createRunServiceStub({
+          getRun: async () => ({
+            ...agentRunFixture,
+            id: 'run_agent_stream_01',
+            stage: 'worker_wave',
+            status: 'running',
+            visibleSummary: 'Workers running live',
+          }),
+        }),
+      }),
+    );
+
+    const env = createTestEnv({
+      CONVERSATION_EVENT_HUB: createConversationEventHubStub(async () =>
+        createSSEStreamResponse([
+          ': connected\n\n',
+          'event: delta\ndata: {"runId":"run_other_01","textDelta":"ignore me"}\n\n',
+          'event: delta\ndata: {"runId":"run_agent_stream_01","textDelta":"hello"}\n\n',
+          'event: done\ndata: {"runId":"run_agent_stream_01","status":"completed"}\n\n',
+        ]),
+      ),
+    });
+
+    const response = await app.fetch(
+      new Request('https://example.com/v1/runs/run_agent_stream_01/stream', {
+        headers: { Authorization: 'Bearer access-token' },
+      }),
+      env,
+      testExecutionContext,
+    );
+
+    expect(response.status).toBe(200);
+    const body = await response.text();
+    expect(body).toContain('event: status');
+    expect(body).toContain('event: stage');
+    expect(body).toContain('event: process_update');
+    expect(body).toContain('event: task_update');
+    expect(body).toContain('Workers running live');
+    expect(body).toContain('"textDelta":"hello"');
+    expect(body).not.toContain('ignore me');
+  });
+
+  it('fails closed when realtime relay setup is unavailable', async () => {
+    const app = createApp(
+      createTestServices({
+        runService: createRunServiceStub({
+          getRun: async () => ({
+            ...chatRunFixture,
+            id: 'run_chat_stream_01',
+            status: 'running',
+            visibleSummary: 'Streaming',
+          }),
+        }),
+      }),
+    );
+
+    const env = createTestEnv({
+      CONVERSATION_EVENT_HUB: createConversationEventHubStub(
+        async () =>
+          new Response(JSON.stringify({ error: 'offline' }), {
+            headers: { 'Content-Type': 'application/json' },
+            status: 503,
+          }),
+      ),
+    });
+
+    const response = await app.fetch(
+      new Request('https://example.com/v1/runs/run_chat_stream_01/stream', {
+        headers: { Authorization: 'Bearer access-token' },
+      }),
+      env,
+      testExecutionContext,
+    );
+
+    expect(response.status).toBe(503);
+    await expect(response.json()).resolves.toEqual({
+      error: 'realtime_stream_unavailable',
     });
   });
 });

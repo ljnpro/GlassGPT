@@ -14,50 +14,37 @@ struct SwiftDataProjectionCacheRepositoryTests {
         let context = ModelContext(container)
         let repository = ProjectionCacheRepository(modelContext: context)
 
-        let chat = try repository.upsertConversation(
-            ConversationProjectionRecord(
-                serverID: "conv_chat",
-                accountID: "usr_1",
-                title: "Chat",
-                mode: .chat,
-                createdAt: .init(timeIntervalSince1970: 1),
-                updatedAt: .init(timeIntervalSince1970: 3),
-                lastRunServerID: nil,
-                lastSyncCursor: nil
-            )
-        )
+        let chat = try repository.upsertConversation(makeSwiftDataConversationRecord(
+            serverID: "conv_chat",
+            accountID: "usr_1",
+            title: "Chat",
+            mode: .chat,
+            updatedAt: .init(timeIntervalSince1970: 3)
+        ))
         _ = try repository.upsertConversation(
-            ConversationProjectionRecord(
+            makeSwiftDataConversationRecord(
                 serverID: "conv_chat",
                 accountID: "usr_1",
                 title: "Chat Updated",
                 mode: .agent,
-                createdAt: .init(timeIntervalSince1970: 1),
                 updatedAt: .init(timeIntervalSince1970: 9),
                 lastRunServerID: "run_updated",
                 lastSyncCursor: "cur_updated"
             )
         )
-        let foreign = try repository.upsertConversation(
-            ConversationProjectionRecord(
-                serverID: "conv_foreign",
-                accountID: "usr_2",
-                title: "Foreign",
-                mode: .chat,
-                createdAt: .init(timeIntervalSince1970: 1),
-                updatedAt: .init(timeIntervalSince1970: 5),
-                lastRunServerID: nil,
-                lastSyncCursor: nil
-            )
-        )
+        let foreign = try repository.upsertConversation(makeSwiftDataConversationRecord(
+            serverID: "conv_foreign",
+            accountID: "usr_2",
+            title: "Foreign",
+            mode: .chat,
+            updatedAt: .init(timeIntervalSince1970: 5)
+        ))
 
         _ = repository.upsertMessage(
-            MessageProjectionRecord(
+            makeSwiftDataMessageRecord(
                 serverID: "msg_1",
                 accountID: "usr_1",
-                role: .assistant,
                 content: "keep",
-                createdAt: .init(timeIntervalSince1970: 6),
                 completedAt: .init(timeIntervalSince1970: 7),
                 serverCursor: "cur_1",
                 serverRunID: "run_1"
@@ -65,12 +52,10 @@ struct SwiftDataProjectionCacheRepositoryTests {
             in: chat
         )
         _ = repository.upsertMessage(
-            MessageProjectionRecord(
+            makeSwiftDataMessageRecord(
                 serverID: "msg_1",
                 accountID: "usr_1",
-                role: .assistant,
                 content: "keep updated",
-                createdAt: .init(timeIntervalSince1970: 6),
                 completedAt: nil,
                 serverCursor: "cur_2",
                 serverRunID: "run_2"
@@ -78,7 +63,7 @@ struct SwiftDataProjectionCacheRepositoryTests {
             in: chat
         )
         _ = repository.upsertMessage(
-            MessageProjectionRecord(
+            makeSwiftDataMessageRecord(
                 serverID: "msg_drop",
                 accountID: "usr_1",
                 role: .user,
@@ -122,4 +107,53 @@ private func makeSwiftDataProjectionContainer() throws -> ModelContainer {
     let schema = Schema([Conversation.self, Message.self])
     let configuration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
     return try ModelContainer(for: schema, configurations: [configuration])
+}
+
+private func makeSwiftDataConversationRecord(
+    serverID: String,
+    accountID: String,
+    title: String,
+    mode: ConversationMode,
+    createdAt: Date = .init(timeIntervalSince1970: 1),
+    updatedAt: Date,
+    lastRunServerID: String? = nil,
+    lastSyncCursor: String? = nil
+) -> ConversationProjectionRecord {
+    ConversationProjectionRecord(
+        serverID: serverID,
+        accountID: accountID,
+        title: title,
+        mode: mode,
+        createdAt: createdAt,
+        updatedAt: updatedAt,
+        lastRunServerID: lastRunServerID,
+        lastSyncCursor: lastSyncCursor
+    )
+}
+
+private func makeSwiftDataMessageRecord(
+    serverID: String,
+    accountID: String,
+    role: MessageRole = .assistant,
+    content: String,
+    createdAt: Date = .init(timeIntervalSince1970: 6),
+    completedAt: Date?,
+    serverCursor: String?,
+    serverRunID: String?
+) -> MessageProjectionRecord {
+    MessageProjectionRecord(
+        serverID: serverID,
+        accountID: accountID,
+        role: role,
+        content: content,
+        thinking: nil,
+        createdAt: createdAt,
+        completedAt: completedAt,
+        serverCursor: serverCursor,
+        serverRunID: serverRunID,
+        annotations: [],
+        toolCalls: [],
+        filePathAnnotations: [],
+        agentTrace: nil
+    )
 }

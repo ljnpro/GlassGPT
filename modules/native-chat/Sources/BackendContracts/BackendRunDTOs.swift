@@ -30,6 +30,7 @@ public struct RunSummaryDTO: Codable, Equatable, Sendable, Identifiable {
     public let updatedAt: Date
     public let lastEventCursor: String?
     public let visibleSummary: String?
+    public let processSnapshotJSON: String?
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -41,6 +42,7 @@ public struct RunSummaryDTO: Codable, Equatable, Sendable, Identifiable {
         case updatedAt
         case lastEventCursor
         case visibleSummary
+        case processSnapshotJSON
     }
 
     public init(
@@ -52,7 +54,8 @@ public struct RunSummaryDTO: Codable, Equatable, Sendable, Identifiable {
         createdAt: Date,
         updatedAt: Date,
         lastEventCursor: String?,
-        visibleSummary: String?
+        visibleSummary: String?,
+        processSnapshotJSON: String?
     ) {
         self.id = id
         self.conversationID = conversationID
@@ -63,6 +66,7 @@ public struct RunSummaryDTO: Codable, Equatable, Sendable, Identifiable {
         self.updatedAt = updatedAt
         self.lastEventCursor = lastEventCursor
         self.visibleSummary = visibleSummary
+        self.processSnapshotJSON = processSnapshotJSON
     }
 }
 

@@ -7,6 +7,7 @@ import type { RunRecord } from '../domain/run-model.js';
 import { createAgentRunService } from './agent-run-service.js';
 import type { ProviderCredentialRecord } from './auth-records.js';
 import { formatCursorSequence } from './ids.js';
+import type { StreamingConversationRequest } from './live-stream-model.js';
 import type { WorkflowStarter } from './run-projection.js';
 import type { BackendRuntimeContext } from './runtime-context.js';
 
@@ -54,6 +55,7 @@ const credentialFixture: ProviderCredentialRecord = {
 };
 
 interface ServiceHarness {
+  readonly broadcasts: Array<{ type: string; data: unknown }>;
   readonly conversations: Map<string, ConversationRecord>;
   readonly cursorPublishes: Array<{ conversationId: string; cursor: string }>;
   readonly events: RunEventRecord[];
@@ -71,6 +73,10 @@ interface ServiceHarness {
 
 const createServiceHarness = (options?: {
   readonly createChatCompletion?: (apiKey: string, input: string) => Promise<string>;
+  readonly createStreamingResponse?: (
+    apiKey: string,
+    request: StreamingConversationRequest,
+  ) => AsyncGenerator<import('./live-stream-model.js').LiveStreamEvent, void, undefined>;
   readonly initialMessages?: MessageRecord[];
   readonly publishConversationCursor?: (
     env: BackendRuntimeContext,
@@ -90,6 +96,7 @@ const createServiceHarness = (options?: {
   const conversations = new Map<string, ConversationRecord>([
     [conversationFixture.id, conversationFixture],
   ]);
+  const broadcasts: Array<{ type: string; data: unknown }> = [];
   const messages = [...(options?.initialMessages ?? [])];
   const runs = new Map<string, RunRecord>();
   const events: RunEventRecord[] = [];
@@ -104,7 +111,9 @@ const createServiceHarness = (options?: {
   );
 
   const service = createAgentRunService({
-    broadcastStreamDelta: async () => {},
+    broadcastStreamDelta: async (_env, _conversationId, delta) => {
+      broadcasts.push({ data: delta.data, type: delta.type });
+    },
     createChatCompletion:
       options?.createChatCompletion ??
       (() => {
@@ -118,23 +127,47 @@ const createServiceHarness = (options?: {
           return nextResponse;
         };
       })(),
-    createStreamingChatCompletion:
+    createStreamingResponse:
+      options?.createStreamingResponse ??
       (() => {
         const responses = ['Leader plan', 'Worker report', 'Leader review', 'Final answer'];
         return async function* () {
           const nextResponse = responses.shift();
           if (!nextResponse) {
-            throw new Error('unexpected_streaming_call');
+            throw new Error('unexpected_streaming_response');
           }
-          yield nextResponse;
+          yield { kind: 'text_delta', textDelta: nextResponse } as const;
+          yield {
+            kind: 'completed',
+            citations: [],
+            filePathAnnotations: [],
+            outputText: nextResponse,
+            thinkingText: null,
+            toolCalls: [],
+          } as const;
         };
       })(),
+    createStreamingChatCompletion: (() => {
+      const responses = ['Leader plan', 'Worker report', 'Leader review', 'Final answer'];
+      return async function* () {
+        const nextResponse = responses.shift();
+        if (!nextResponse) {
+          throw new Error('unexpected_streaming_call');
+        }
+        yield nextResponse;
+      };
+    })(),
     decryptSecret: async () => 'sk-user-key',
     findConversationByIdForUser: async (_env, conversationId, userId) => {
       const conversation = conversations.get(conversationId) ?? null;
       return conversation?.userId === userId ? conversation : null;
     },
     findProviderCredential: async () => credentialFixture,
+    findAssistantMessageByRunId: async (_env, runId) => {
+      return (
+        messages.find((message) => message.role === 'assistant' && message.runId === runId) ?? null
+      );
+    },
     findRunById: async (_env, runId) => runs.get(runId) ?? null,
     findRunByIdForUser: async (_env, runId, userId) => {
       const run = runs.get(runId) ?? null;
@@ -192,21 +225,13 @@ const createServiceHarness = (options?: {
         updatedAt: input.updatedAt,
       });
     },
-    updateMessageServerCursor: async (_env, messageId, serverCursor) => {
-      const messageIndex = messages.findIndex((message) => message.id === messageId);
+    updateMessage: async (_env, message) => {
+      const messageIndex = messages.findIndex((candidate) => candidate.id === message.id);
       if (messageIndex < 0) {
         return;
       }
 
-      const existingMessage = messages[messageIndex];
-      if (!existingMessage) {
-        return;
-      }
-
-      messages[messageIndex] = {
-        ...existingMessage,
-        serverCursor,
-      };
+      messages[messageIndex] = message;
     },
     updateRun: async (_env, run) => {
       runs.set(run.id, run);
@@ -222,6 +247,7 @@ const createServiceHarness = (options?: {
   });
 
   return {
+    broadcasts,
     conversations,
     cursorPublishes,
     events,
@@ -320,7 +346,7 @@ describe('createAgentRunService', () => {
       'assistant_delta',
       'run_progress',
       'stage_changed',
-      'assistant_delta',
+      'message_created',
       'run_progress',
       'assistant_delta',
       'assistant_completed',
@@ -335,23 +361,130 @@ describe('createAgentRunService', () => {
       'leader_review',
       'final_synthesis',
     ]);
+    expect(harness.messages.filter((message) => message.role === 'assistant')).toHaveLength(1);
     expect(harness.messages.at(-1)?.role).toBe('assistant');
-    expect(harness.messages.at(-1)?.serverCursor).toBe(formatCursorSequence(16));
+    expect(harness.messages.at(-1)?.serverCursor).toBe(formatCursorSequence(17));
     expect(harness.runs.get(queuedRun.id)?.status).toBe('completed');
     expect(harness.runs.get(queuedRun.id)?.visibleSummary).toBe('Final answer');
     expect(harness.cursorPublishes).toHaveLength(18);
   });
 
+  it('accumulates non-synthesis citations and file annotations in stage streaming broadcasts', async () => {
+    const harness = createServiceHarness({
+      createStreamingResponse: async function* () {
+        yield {
+          kind: 'citation_added',
+          citation: {
+            endIndex: 5,
+            startIndex: 0,
+            title: 'Plan',
+            url: 'https://example.com/plan',
+          },
+        } as const;
+        yield {
+          kind: 'citation_added',
+          citation: {
+            endIndex: 11,
+            startIndex: 6,
+            title: 'Report',
+            url: 'https://example.com/report',
+          },
+        } as const;
+        yield {
+          annotation: {
+            containerId: 'sandbox_1',
+            endIndex: 9,
+            fileId: 'file_1',
+            filename: 'plan.md',
+            sandboxPath: '/tmp/plan.md',
+            startIndex: 0,
+          },
+          kind: 'file_path_annotation_added',
+        } as const;
+        yield {
+          annotation: {
+            containerId: 'sandbox_1',
+            endIndex: 20,
+            fileId: 'file_2',
+            filename: 'report.md',
+            sandboxPath: '/tmp/report.md',
+            startIndex: 10,
+          },
+          kind: 'file_path_annotation_added',
+        } as const;
+        yield {
+          citations: [],
+          filePathAnnotations: [],
+          kind: 'completed',
+          outputText: 'Leader plan',
+          thinkingText: null,
+          toolCalls: [],
+        } as const;
+      },
+    });
+
+    const queuedRun = await harness.service.queueAgentRun(testEnv, harness.workflow, {
+      conversationId: conversationFixture.id,
+      prompt: 'Investigate stage streaming payload accumulation',
+      userId: conversationFixture.userId,
+    });
+
+    await harness.service.startQueuedRun(testEnv, {
+      runId: queuedRun.id,
+      userId: conversationFixture.userId,
+    });
+
+    const leaderPlan = await harness.service.executeLeaderPlanning(testEnv, {
+      prompt: 'Investigate stage streaming payload accumulation',
+      runId: queuedRun.id,
+      userId: conversationFixture.userId,
+    });
+
+    expect(leaderPlan).toBe('Leader plan');
+
+    const citationsPayloads = harness.broadcasts
+      .filter((event) => event.type === 'citations_update')
+      .map((event) => event.data as { citations: Array<{ title: string }> });
+    expect(citationsPayloads).toHaveLength(2);
+    expect(citationsPayloads[0]?.citations.map((citation) => citation.title)).toEqual(['Plan']);
+    expect(citationsPayloads[1]?.citations.map((citation) => citation.title)).toEqual([
+      'Plan',
+      'Report',
+    ]);
+
+    const filePayloads = harness.broadcasts
+      .filter((event) => event.type === 'file_path_annotations_update')
+      .map(
+        (event) =>
+          event.data as {
+            filePathAnnotations: Array<{ filename: string | null }>;
+          },
+      );
+    expect(filePayloads).toHaveLength(2);
+    expect(filePayloads[0]?.filePathAnnotations.map((annotation) => annotation.filename)).toEqual([
+      'plan.md',
+    ]);
+    expect(filePayloads[1]?.filePathAnnotations.map((annotation) => annotation.filename)).toEqual([
+      'plan.md',
+      'report.md',
+    ]);
+  });
+
   it('reuses the latest user message when an agent run is queued without a new prompt', async () => {
     const existingUserMessage: MessageRecord = {
+      agentTraceJSON: null,
+      annotationsJSON: null,
       completedAt: now.toISOString(),
       content: 'Use the previous user message',
       conversationId: conversationFixture.id,
       createdAt: now.toISOString(),
+      filePathAnnotationsJSON: null,
       id: 'msg_existing_01',
       role: 'user',
       runId: null,
       serverCursor: null,
+      thinking: null,
+      toolCallsJSON: null,
     };
     const harness = createServiceHarness({
       initialMessages: [existingUserMessage],

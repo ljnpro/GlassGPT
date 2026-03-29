@@ -8,6 +8,7 @@ import type {
 } from './agent-run-types.js';
 import type { ProviderCredentialRecord } from './auth-records.js';
 import { ApplicationError } from './errors.js';
+import type { LiveCitation, LiveFilePathAnnotation } from './live-stream-model.js';
 import {
   createRunEventDraft,
   persistProjectedEvent,
@@ -58,6 +59,46 @@ const compareMessages = (left: MessageRecord, right: MessageRecord): number => {
   }
 
   return left.id.localeCompare(right.id);
+};
+
+const mergeLiveCitations = (
+  citations: readonly LiveCitation[],
+  nextCitation: LiveCitation,
+): LiveCitation[] => {
+  if (
+    citations.some(
+      (candidate) =>
+        candidate.url === nextCitation.url &&
+        candidate.title === nextCitation.title &&
+        candidate.startIndex === nextCitation.startIndex &&
+        candidate.endIndex === nextCitation.endIndex,
+    )
+  ) {
+    return [...citations];
+  }
+
+  return [...citations, nextCitation];
+};
+
+const mergeLiveFilePathAnnotations = (
+  annotations: readonly LiveFilePathAnnotation[],
+  nextAnnotation: LiveFilePathAnnotation,
+): LiveFilePathAnnotation[] => {
+  if (
+    annotations.some(
+      (candidate) =>
+        candidate.fileId === nextAnnotation.fileId &&
+        candidate.containerId === nextAnnotation.containerId &&
+        candidate.sandboxPath === nextAnnotation.sandboxPath &&
+        candidate.filename === nextAnnotation.filename &&
+        candidate.startIndex === nextAnnotation.startIndex &&
+        candidate.endIndex === nextAnnotation.endIndex,
+    )
+  ) {
+    return [...annotations];
+  }
+
+  return [...annotations, nextAnnotation];
 };
 
 export const createAgentRunSupport = (deps: AgentRunServiceDependencies) => {
@@ -152,6 +193,7 @@ export const createAgentRunSupport = (deps: AgentRunServiceDependencies) => {
     env: BackendRuntimeContext,
     context: AgentExecutionContext,
     input: {
+      readonly processSnapshotJSON?: string | null;
       readonly progressLabel: string;
       readonly stage: RunRecord['stage'];
       readonly visibleSummary: string;
@@ -159,6 +201,7 @@ export const createAgentRunSupport = (deps: AgentRunServiceDependencies) => {
   ): Promise<AgentExecutionContext> => {
     const nextRun: RunRecord = {
       ...context.run,
+      processSnapshotJSON: input.processSnapshotJSON ?? context.run.processSnapshotJSON,
       stage: input.stage,
       status: 'running',
       visibleSummary: input.visibleSummary,
@@ -184,6 +227,7 @@ export const createAgentRunSupport = (deps: AgentRunServiceDependencies) => {
     env: BackendRuntimeContext,
     context: AgentExecutionContext,
     input: {
+      readonly processSnapshotJSON?: string | null;
       readonly progressLabel: string;
       readonly stage: RunRecord['stage'];
       readonly visibleSummary: string;
@@ -191,6 +235,7 @@ export const createAgentRunSupport = (deps: AgentRunServiceDependencies) => {
   ): Promise<AgentExecutionContext> => {
     const nextRun: RunRecord = {
       ...context.run,
+      processSnapshotJSON: input.processSnapshotJSON ?? context.run.processSnapshotJSON,
       stage: input.stage,
       status: 'running',
       visibleSummary: input.visibleSummary,
@@ -226,12 +271,14 @@ export const createAgentRunSupport = (deps: AgentRunServiceDependencies) => {
     }
 
     const apiKey = await loadApiKey(env, input.userId);
-    const chunks: string[] = [];
+    let outputText = '';
     let pendingDelta = '';
     let chunkCount = 0;
+    let liveCitations: LiveCitation[] = [];
+    let liveFilePathAnnotations: LiveFilePathAnnotation[] = [];
     const DELTA_FLUSH_THRESHOLD = 5;
 
-    for await (const delta of deps.createStreamingChatCompletion(apiKey, input.prompt)) {
+    for await (const event of deps.createStreamingResponse(apiKey, { input: input.prompt })) {
       // Check for cancellation periodically
       if (chunkCount % 20 === 0) {
         const latestRun = await deps.findRunById(env, input.runId);
@@ -240,37 +287,142 @@ export const createAgentRunSupport = (deps: AgentRunServiceDependencies) => {
         }
       }
 
-      chunks.push(delta);
-      pendingDelta += delta;
-      chunkCount++;
+      switch (event.kind) {
+        case 'text_delta':
+          outputText += event.textDelta;
+          pendingDelta += event.textDelta;
+          chunkCount += 1;
 
-      // Broadcast every token directly to SSE clients (bypasses D1)
-      if (activeContext) {
-        try {
-          await deps.broadcastStreamDelta(env, activeContext.conversation.id, {
-            type: 'delta',
-            data: { textDelta: delta, runId: input.runId, stage: activeContext.run.stage },
-          });
-        } catch {
-          // Non-fatal
-        }
-      }
+          if (activeContext) {
+            try {
+              await deps.broadcastStreamDelta(env, activeContext.conversation.id, {
+                type: 'delta',
+                data: {
+                  runId: input.runId,
+                  stage: activeContext.run.stage,
+                  textDelta: event.textDelta,
+                },
+              });
+            } catch {
+              // Non-fatal
+            }
+          }
 
-      // Persist to D1 less frequently (for catch-up and history)
-      if (chunkCount % DELTA_FLUSH_THRESHOLD === 0 && activeContext) {
-        const result = await persistProjectedEvent(deps, env, {
-          conversation: activeContext.conversation,
-          event: createRunEventDraft(deps.now(), activeContext.run, {
-            kind: 'assistant_delta',
-            textDelta: pendingDelta,
-            stage: activeContext.run.stage,
-          }),
-          message: null,
-          run: activeContext.run,
-          syncMessageCursor: false,
-        });
-        activeContext = { conversation: result.conversation, run: result.run };
-        pendingDelta = '';
+          if (chunkCount % DELTA_FLUSH_THRESHOLD === 0 && activeContext) {
+            const result = await persistProjectedEvent(deps, env, {
+              conversation: activeContext.conversation,
+              event: createRunEventDraft(deps.now(), activeContext.run, {
+                kind: 'assistant_delta',
+                textDelta: pendingDelta,
+                stage: activeContext.run.stage,
+              }),
+              message: null,
+              run: activeContext.run,
+              syncMessageCursor: false,
+            });
+            activeContext = { conversation: result.conversation, run: result.run };
+            pendingDelta = '';
+          }
+          break;
+
+        case 'thinking_delta':
+          if (activeContext) {
+            try {
+              await deps.broadcastStreamDelta(env, activeContext.conversation.id, {
+                type: 'thinking_delta',
+                data: {
+                  runId: input.runId,
+                  stage: activeContext.run.stage,
+                  thinkingDelta: event.thinkingDelta,
+                },
+              });
+            } catch {
+              // Non-fatal
+            }
+          }
+          break;
+
+        case 'thinking_finished':
+          if (activeContext) {
+            try {
+              await deps.broadcastStreamDelta(env, activeContext.conversation.id, {
+                type: 'thinking_done',
+                data: { runId: input.runId, stage: activeContext.run.stage },
+              });
+            } catch {
+              // Non-fatal
+            }
+          }
+          break;
+
+        case 'tool_call_updated':
+          if (activeContext) {
+            try {
+              await deps.broadcastStreamDelta(env, activeContext.conversation.id, {
+                type: 'tool_call_update',
+                data: {
+                  runId: input.runId,
+                  stage: activeContext.run.stage,
+                  toolCall: event.toolCall,
+                },
+              });
+            } catch {
+              // Non-fatal
+            }
+          }
+          break;
+
+        case 'citation_added':
+          liveCitations = mergeLiveCitations(liveCitations, event.citation);
+          if (activeContext) {
+            try {
+              await deps.broadcastStreamDelta(env, activeContext.conversation.id, {
+                type: 'citations_update',
+                data: {
+                  citations: liveCitations,
+                  runId: input.runId,
+                  stage: activeContext.run.stage,
+                },
+              });
+            } catch {
+              // Non-fatal
+            }
+          }
+          break;
+
+        case 'file_path_annotation_added':
+          liveFilePathAnnotations = mergeLiveFilePathAnnotations(
+            liveFilePathAnnotations,
+            event.annotation,
+          );
+          if (activeContext) {
+            try {
+              await deps.broadcastStreamDelta(env, activeContext.conversation.id, {
+                type: 'file_path_annotations_update',
+                data: {
+                  filePathAnnotations: liveFilePathAnnotations,
+                  runId: input.runId,
+                  stage: activeContext.run.stage,
+                },
+              });
+            } catch {
+              // Non-fatal
+            }
+          }
+          break;
+
+        case 'completed':
+          outputText = event.outputText;
+          break;
+
+        case 'incomplete':
+          throw new Error(event.errorMessage ?? 'openai_response_incomplete');
+
+        case 'failed':
+          throw new Error(event.errorMessage);
+
+        case 'response_created':
+          break;
       }
     }
 
@@ -290,13 +442,14 @@ export const createAgentRunSupport = (deps: AgentRunServiceDependencies) => {
       activeContext = { conversation: result.conversation, run: result.run };
     }
 
-    return chunks.join('') || null;
+    return outputText || null;
   };
 
   return {
     assertCredentialAvailable,
     completeStageText,
     loadActiveExecutionContext,
+    loadApiKey,
     loadExecutionContext,
     recordStageChange,
     recordStageProgress,

@@ -115,6 +115,17 @@ package struct BackendChatView: View {
                 }
                 await viewModel.bootstrap()
             }
+            .onAppear {
+                guard viewModel.presentsSelectorOnLaunch, !showSelector else {
+                    return
+                }
+                DispatchQueue.main.async {
+                    guard viewModel.presentsSelectorOnLaunch else {
+                        return
+                    }
+                    showSelector = true
+                }
+            }
         }
     }
 
@@ -138,6 +149,13 @@ package struct BackendChatView: View {
         hasher.combine(viewModel.isStreaming)
         hasher.combine(viewModel.currentThinkingText)
         hasher.combine(viewModel.currentStreamingText)
+        hasher.combine(viewModel.activeToolCalls.count)
+        hasher.combine(viewModel.liveCitations.count)
+        hasher.combine(viewModel.liveFilePathAnnotations.count)
+        for toolCall in viewModel.activeToolCalls {
+            hasher.combine(toolCall.id)
+            hasher.combine(toolCall.status.rawValue)
+        }
         return hasher.finalize()
     }
 

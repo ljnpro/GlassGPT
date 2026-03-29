@@ -113,10 +113,15 @@ private func makeMessage(
         conversationID: "conv_01",
         role: role,
         content: content,
+        thinking: nil,
         createdAt: Date(timeIntervalSince1970: 1_774_044_800),
         completedAt: Date(timeIntervalSince1970: 1_774_044_800),
         serverCursor: cursor,
-        runID: "run_01"
+        runID: "run_01",
+        annotations: nil,
+        toolCalls: nil,
+        filePathAnnotations: nil,
+        agentTraceJSON: nil
     )
 }
 
@@ -130,7 +135,8 @@ private func makeRun(status: RunStatusDTO, cursor: String) -> RunSummaryDTO {
         createdAt: Date(timeIntervalSince1970: 1_774_044_800),
         updatedAt: Date(timeIntervalSince1970: 1_774_044_800),
         lastEventCursor: cursor,
-        visibleSummary: "Queued chat run"
+        visibleSummary: "Queued chat run",
+        processSnapshotJSON: nil
     )
 }
 

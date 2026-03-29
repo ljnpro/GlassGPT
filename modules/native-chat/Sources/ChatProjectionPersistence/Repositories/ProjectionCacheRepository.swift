@@ -102,12 +102,17 @@ public final class ProjectionCacheRepository {
             syncAccountID: record.accountID,
             role: record.role,
             content: record.content,
+            thinking: record.thinking,
             createdAt: record.createdAt,
             completedAt: record.completedAt,
             conversation: conversation,
             serverRunID: record.serverRunID,
             serverCursor: record.serverCursor,
-            isComplete: record.completedAt != nil
+            isComplete: record.completedAt != nil,
+            annotations: record.annotations,
+            toolCalls: record.toolCalls,
+            filePathAnnotations: record.filePathAnnotations,
+            agentTrace: record.agentTrace
         )
         modelContext.insert(message)
         if !conversation.messages.contains(where: { $0.id == message.id }) {
@@ -185,11 +190,16 @@ public final class ProjectionCacheRepository {
         message.syncAccountID = record.accountID
         message.role = record.role
         message.content = record.content
+        message.thinking = record.thinking
         message.createdAt = record.createdAt
         message.completedAt = record.completedAt
         message.conversation = conversation
         message.serverRunID = record.serverRunID
         message.serverCursor = record.serverCursor
         message.isComplete = record.completedAt != nil
+        message.annotations = record.annotations
+        message.toolCalls = record.toolCalls
+        message.filePathAnnotations = record.filePathAnnotations
+        message.agentTrace = record.agentTrace
     }
 }

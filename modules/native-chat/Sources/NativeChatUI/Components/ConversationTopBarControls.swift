@@ -76,11 +76,9 @@ public struct ConversationSelectorCapsuleButton: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .layoutPriority(1)
         .buttonStyle(GlassPressButtonStyle())
-        .accessibilityElement(children: .ignore)
         .accessibilityLabel(accessibilityLabel)
         .accessibilityValue(accessibilityValue ?? title)
         .accessibilityHint(accessibilityHint ?? "")
-        .accessibilityAddTraits(.isButton)
         .accessibilityIdentifier(accessibilityIdentifier)
     }
 }

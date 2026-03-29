@@ -13,4 +13,5 @@ export interface RunRecord {
   readonly updatedAt: string;
   readonly lastEventCursor: string | null;
   readonly visibleSummary: string | null;
+  readonly processSnapshotJSON: string | null;
 }

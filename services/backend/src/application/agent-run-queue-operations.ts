@@ -1,6 +1,10 @@
 import type { MessageRecord } from '../domain/message-model.js';
 import type { RunRecord } from '../domain/run-model.js';
 import {
+  buildQueuedAgentProcessSnapshot,
+  encodeAgentProcessSnapshot,
+} from './agent-process-payloads.js';
+import {
   createAgentRunSupport,
   requireAgentConversation,
   requireAgentRun,
@@ -67,6 +71,10 @@ export const createAgentRunQueueOperations = (
     requireValidCredential(await deps.findProviderCredential(env, input.userId, 'openai'));
 
     let projectedConversation = conversation;
+    const queuedProcessSnapshot = buildQueuedAgentProcessSnapshot({
+      now: deps.now(),
+      userPrompt: input.prompt,
+    });
     let run = createQueuedRunRecord(deps.now(), {
       conversationId: projectedConversation.id,
       kind: 'agent',
@@ -74,19 +82,28 @@ export const createAgentRunQueueOperations = (
       userId: input.userId,
       visibleSummary: 'Queued agent workflow',
     });
+    run = {
+      ...run,
+      processSnapshotJSON: encodeAgentProcessSnapshot(queuedProcessSnapshot),
+    };
 
     await deps.insertRun(env, run);
 
     if (input.createUserMessage) {
       const userMessage: MessageRecord = {
+        agentTraceJSON: null,
+        annotationsJSON: null,
         completedAt: run.createdAt,
         content: input.prompt,
         conversationId: projectedConversation.id,
         createdAt: run.createdAt,
+        filePathAnnotationsJSON: null,
         id: createMessageId(),
         role: 'user',
         runId: run.id,
         serverCursor: null,
+        thinking: null,
+        toolCallsJSON: null,
       };
       await deps.insertMessage(env, userMessage);
       ({ conversation: projectedConversation, run } = await persistProjectedEvent(deps, env, {

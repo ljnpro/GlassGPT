@@ -33,10 +33,15 @@ struct BackendProjectionStoreTests {
                 accountID: "usr_123",
                 role: .assistant,
                 content: "first",
+                thinking: nil,
                 createdAt: .init(timeIntervalSince1970: 3),
                 completedAt: nil,
                 serverCursor: "cur_2",
-                serverRunID: "run_1"
+                serverRunID: "run_1",
+                annotations: [],
+                toolCalls: [],
+                filePathAnnotations: [],
+                agentTrace: nil
             ),
             in: conversation
         )
@@ -60,10 +65,15 @@ struct BackendProjectionStoreTests {
                 accountID: "usr_123",
                 role: .assistant,
                 content: "final",
+                thinking: nil,
                 createdAt: .init(timeIntervalSince1970: 3),
                 completedAt: .init(timeIntervalSince1970: 5),
                 serverCursor: "cur_3",
-                serverRunID: "run_2"
+                serverRunID: "run_2",
+                annotations: [],
+                toolCalls: [],
+                filePathAnnotations: [],
+                agentTrace: nil
             ),
             in: conversation
         )
@@ -175,10 +185,15 @@ private func makeConversationDetailSnapshot() -> ConversationDetailDTO {
                 conversationID: "conv_abc",
                 role: .user,
                 content: "Hello",
+                thinking: nil,
                 createdAt: .init(timeIntervalSince1970: 11),
                 completedAt: .init(timeIntervalSince1970: 11),
                 serverCursor: "cur_11",
-                runID: nil
+                runID: nil,
+                annotations: nil,
+                toolCalls: nil,
+                filePathAnnotations: nil,
+                agentTraceJSON: nil
             )
         ],
         runs: []
@@ -206,10 +221,15 @@ private func makeSyncEnvelope() -> SyncEnvelopeDTO {
                     conversationID: "conv_abc",
                     role: .assistant,
                     content: "Hi back",
+                    thinking: nil,
                     createdAt: .init(timeIntervalSince1970: 12),
                     completedAt: .init(timeIntervalSince1970: 12),
                     serverCursor: "cur_12",
-                    runID: "run_abc"
+                    runID: "run_abc",
+                    annotations: nil,
+                    toolCalls: nil,
+                    filePathAnnotations: nil,
+                    agentTraceJSON: nil
                 ),
                 run: RunSummaryDTO(
                     id: "run_abc",
@@ -220,7 +240,8 @@ private func makeSyncEnvelope() -> SyncEnvelopeDTO {
                     createdAt: .init(timeIntervalSince1970: 11),
                     updatedAt: .init(timeIntervalSince1970: 12),
                     lastEventCursor: "cur_12",
-                    visibleSummary: nil
+                    visibleSummary: nil,
+                    processSnapshotJSON: nil
                 ),
                 artifact: nil
             )

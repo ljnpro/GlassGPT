@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import { cursorSchema, idSchema, isoDateSchema, optionalTextSchema } from './common.js';
+import { filePathAnnotationSchema, toolCallInfoSchema, urlCitationSchema } from './payloads.js';
 
 export const conversationModeSchema = z.enum(['chat', 'agent']);
 export const messageRoleSchema = z.enum(['system', 'user', 'assistant', 'tool']);
@@ -20,10 +21,15 @@ export const messageSchema = z.object({
   conversationId: idSchema,
   role: messageRoleSchema,
   content: z.string(),
+  thinking: optionalTextSchema,
   createdAt: isoDateSchema,
   completedAt: isoDateSchema.optional(),
   serverCursor: cursorSchema.optional(),
   runId: idSchema.optional(),
+  annotations: z.array(urlCitationSchema).optional(),
+  toolCalls: z.array(toolCallInfoSchema).optional(),
+  filePathAnnotations: z.array(filePathAnnotationSchema).optional(),
+  agentTraceJSON: optionalTextSchema,
 });
 
 export const createConversationRequestSchema = z.object({

@@ -21,7 +21,22 @@ export interface RunProjectionDependencies {
   readonly broadcastStreamDelta: (
     env: BackendRuntimeContext,
     conversationId: string,
-    delta: { type: 'delta' | 'status' | 'stage' | 'done' | 'error'; data: unknown },
+    delta: {
+      type:
+        | 'citations_update'
+        | 'delta'
+        | 'done'
+        | 'error'
+        | 'file_path_annotations_update'
+        | 'process_update'
+        | 'stage'
+        | 'status'
+        | 'task_update'
+        | 'thinking_delta'
+        | 'thinking_done'
+        | 'tool_call_update';
+      data: unknown;
+    },
   ) => Promise<void>;
   readonly insertRunEvent: (
     env: BackendRuntimeContext,
@@ -41,11 +56,7 @@ export interface RunProjectionDependencies {
       readonly updatedAt: string;
     },
   ) => Promise<void>;
-  readonly updateMessageServerCursor: (
-    env: BackendRuntimeContext,
-    messageId: string,
-    serverCursor: string,
-  ) => Promise<void>;
+  readonly updateMessage: (env: BackendRuntimeContext, message: MessageRecord) => Promise<void>;
   readonly updateRun: (env: BackendRuntimeContext, run: RunRecord) => Promise<void>;
   readonly updateRunEventSnapshots: (
     env: BackendRuntimeContext,
@@ -141,6 +152,7 @@ export const createQueuedRunRecord = (
     id: createRunId(),
     kind: input.kind,
     lastEventCursor: null,
+    processSnapshotJSON: null,
     stage: input.stage,
     status: 'queued',
     updatedAt: isoTimestamp,
@@ -174,8 +186,8 @@ export const persistProjectedEvent = async (
         }
       : input.message;
 
-  if (input.message && input.syncMessageCursor) {
-    await deps.updateMessageServerCursor(env, input.message.id, insertedEvent.cursor);
+  if (nextMessage) {
+    await deps.updateMessage(env, nextMessage);
   }
 
   const projectedEvent: RunEventRecord = {
@@ -203,6 +215,69 @@ export const persistProjectedEvent = async (
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'unknown_error';
     logError('conversation_cursor_publish_failed', {
+      conversationId: nextConversation.id,
+      cursor: insertedEvent.cursor,
+      error: errorMessage,
+      runId: nextRun.id,
+    });
+  }
+
+  try {
+    if (
+      input.event.kind === 'run_started' ||
+      input.event.kind === 'run_progress' ||
+      input.event.kind === 'run_completed' ||
+      input.event.kind === 'run_failed' ||
+      input.event.kind === 'run_cancelled'
+    ) {
+      await deps.broadcastStreamDelta(env, nextConversation.id, {
+        type: 'status',
+        data: {
+          runId: nextRun.id,
+          stage: nextRun.stage,
+          status: nextRun.status,
+          visibleSummary: nextRun.visibleSummary,
+        },
+      });
+    }
+
+    if (input.event.kind === 'stage_changed' && nextRun.stage) {
+      await deps.broadcastStreamDelta(env, nextConversation.id, {
+        type: 'stage',
+        data: {
+          runId: nextRun.id,
+          stage: nextRun.stage,
+          visibleSummary: nextRun.visibleSummary,
+        },
+      });
+    }
+
+    if (nextRun.processSnapshotJSON) {
+      const processSnapshot = JSON.parse(nextRun.processSnapshotJSON) as {
+        readonly tasks?: ReadonlyArray<unknown>;
+      };
+      await deps.broadcastStreamDelta(env, nextConversation.id, {
+        type: 'process_update',
+        data: {
+          processSnapshot,
+          runId: nextRun.id,
+          stage: nextRun.stage,
+        },
+      });
+
+      for (const task of processSnapshot.tasks ?? []) {
+        await deps.broadcastStreamDelta(env, nextConversation.id, {
+          type: 'task_update',
+          data: {
+            runId: nextRun.id,
+            task,
+          },
+        });
+      }
+    }
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'unknown_error';
+    logError('conversation_stream_broadcast_failed', {
       conversationId: nextConversation.id,
       cursor: insertedEvent.cursor,
       error: errorMessage,

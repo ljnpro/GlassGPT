@@ -82,6 +82,10 @@ package final class BackendAgentController {
         messages.last(where: { $0.role == .assistant && !$0.isComplete })
     }
 
+    package var liveDraftMessageID: UUID? {
+        draftMessage?.id
+    }
+
     package var isSignedIn: Bool {
         sessionStore.isSignedIn
     }
@@ -124,6 +128,29 @@ package final class BackendAgentController {
             isThinking: isThinking,
             activeToolCalls: activeToolCalls
         )
+    }
+
+    package var shouldShowDetachedStreamingBubble: Bool {
+        guard liveDraftMessageID == nil else {
+            return false
+        }
+        if isRunning || isThinking {
+            return true
+        }
+        if !currentStreamingText.isEmpty || !currentThinkingText.isEmpty {
+            return true
+        }
+        if !activeToolCalls.isEmpty || !liveCitations.isEmpty || !liveFilePathAnnotations.isEmpty {
+            return true
+        }
+        return false
+    }
+
+    package var shouldShowDetachedLiveSummaryCard: Bool {
+        guard liveDraftMessageID == nil else {
+            return false
+        }
+        return isRunning
     }
 
     package var flexModeEnabled: Bool {

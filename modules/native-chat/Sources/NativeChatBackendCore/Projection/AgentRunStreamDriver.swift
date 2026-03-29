@@ -1,14 +1,5 @@
 import BackendClient
-import ChatProjectionPersistence
 import Foundation
-
-private struct DeltaPayload: Decodable {
-    let textDelta: String?
-}
-
-private struct StatusPayload: Decodable {
-    let visibleSummary: String?
-}
 
 @MainActor
 package extension BackendAgentController {
@@ -46,7 +37,6 @@ package extension BackendAgentController {
             isRunning = false
         }
 
-        // Try SSE streaming first, fall back to polling on failure
         do {
             try await streamRun(
                 conversationServerID: conversationServerID,
@@ -57,7 +47,7 @@ package extension BackendAgentController {
         } catch is CancellationError {
             return
         } catch {
-            // SSE failed — fall back to polling
+            // Fall back to polling when SSE setup or transport fails.
         }
 
         await pollRun(
@@ -73,73 +63,27 @@ package extension BackendAgentController {
         selectionToken: UUID
     ) async throws {
         let stream = client.streamRun(runID)
-        isRunning = true
+        beginAgentStream()
 
         for try await event in stream {
             guard visibleSelectionToken == selectionToken, !Task.isCancelled else {
                 break
             }
 
-            switch event.event {
-            case "delta":
-                do {
-                    if let deltaData = event.data.data(using: .utf8) {
-                        let payload = try JSONDecoder().decode(DeltaPayload.self, from: deltaData)
-                        if let textDelta = payload.textDelta {
-                            currentStreamingText += textDelta
-                        }
-                    }
-                } catch {
-                    // Skip malformed delta events
-                }
-
-            case "status":
-                do {
-                    if let statusData = event.data.data(using: .utf8) {
-                        let payload = try JSONDecoder().decode(StatusPayload.self, from: statusData)
-                        if let summary = payload.visibleSummary {
-                            try await loader.applyIncrementalSync()
-                            try await refreshVisibleConversation()
-                            let run = try await client.fetchRun(runID)
-                            lastRunSummary = run
-                            processSnapshot = BackendConversationSupport.processSnapshot(
-                                for: run,
-                                progressLabel: summary
-                            )
-                        }
-                    }
-                } catch {
-                    // Skip malformed status events
-                }
-
-            case "done":
-                try await setCurrentConversation(
-                    loader.refreshConversationDetail(serverID: conversationServerID)
-                )
-                syncVisibleState()
-                currentStreamingText = ""
+            let outcome = try await handleAgentStreamEvent(
+                event,
+                conversationServerID: conversationServerID,
+                runID: runID
+            )
+            if outcome == .finish {
                 return
-
-            case "error":
-                errorMessage = event.data
-                return
-
-            default:
-                try await loader.applyIncrementalSync()
-                try await refreshVisibleConversation()
             }
         }
 
-        // Stream ended; do final refresh
-        do {
-            guard visibleSelectionToken == selectionToken else { return }
-            try await setCurrentConversation(
-                loader.refreshConversationDetail(serverID: conversationServerID)
-            )
-            syncVisibleState()
-        } catch {
-            errorMessage = error.localizedDescription
-        }
+        await finishAgentStreamAfterTermination(
+            conversationServerID: conversationServerID,
+            selectionToken: selectionToken
+        )
     }
 
     private func pollRun(
@@ -190,6 +134,7 @@ package extension BackendAgentController {
                 loader.refreshConversationDetail(serverID: conversationServerID)
             )
             syncVisibleState()
+            clearAgentLiveSurface()
         } catch {
             errorMessage = error.localizedDescription
         }

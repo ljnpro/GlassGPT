@@ -7,7 +7,19 @@ interface ConversationHubSnapshot {
 }
 
 interface StreamDelta {
-  readonly type: 'delta' | 'status' | 'stage' | 'done' | 'error';
+  readonly type:
+    | 'citations_update'
+    | 'delta'
+    | 'done'
+    | 'error'
+    | 'file_path_annotations_update'
+    | 'process_update'
+    | 'stage'
+    | 'status'
+    | 'task_update'
+    | 'thinking_delta'
+    | 'thinking_done'
+    | 'tool_call_update';
   readonly data: unknown;
 }
 
@@ -110,7 +122,22 @@ export const publishConversationCursor = async (
 export const broadcastStreamDelta = async (
   env: BackendEnv,
   conversationId: string,
-  delta: { type: 'delta' | 'status' | 'stage' | 'done' | 'error'; data: unknown },
+  delta: {
+    type:
+      | 'citations_update'
+      | 'delta'
+      | 'done'
+      | 'error'
+      | 'file_path_annotations_update'
+      | 'process_update'
+      | 'stage'
+      | 'status'
+      | 'task_update'
+      | 'thinking_delta'
+      | 'thinking_done'
+      | 'tool_call_update';
+    data: unknown;
+  },
 ): Promise<void> => {
   const durableObjectId = env.CONVERSATION_EVENT_HUB.idFromName(conversationId);
   const stub = env.CONVERSATION_EVENT_HUB.get(durableObjectId);

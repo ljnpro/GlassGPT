@@ -127,7 +127,8 @@ final class UITestBackendRequester: BackendRequesting {
             createdAt: .now,
             updatedAt: .now,
             lastEventCursor: "cursor_1",
-            visibleSummary: summary
+            visibleSummary: summary,
+            processSnapshotJSON: nil
         )
     }
 }

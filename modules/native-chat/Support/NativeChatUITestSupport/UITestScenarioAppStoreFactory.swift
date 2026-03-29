@@ -10,8 +10,12 @@ package enum UITestScenarioAppStoreFactory {
         switch scenario {
         case .richChat:
             makeRichChatStore(modelContext: modelContext)
+        case .richChatSelector:
+            makeRichChatSelectorStore(modelContext: modelContext)
         case .richAgent:
             makeRichAgentStore(modelContext: modelContext)
+        case .richAgentCompleted:
+            makeRichAgentCompletedStore(modelContext: modelContext)
         case .richAgentSelector:
             makeRichAgentSelectorStore(modelContext: modelContext)
         case .signedInSettings:
@@ -29,9 +33,22 @@ package enum UITestScenarioAppStoreFactory {
         return context.store
     }
 
+    private static func makeRichChatSelectorStore(modelContext: ModelContext) -> NativeChatShellState {
+        let context = makeScenarioContext(modelContext: modelContext, selectedTab: 0)
+        seedRichChat(into: context.chatController)
+        context.chatController.presentsSelectorOnLaunch = true
+        return context.store
+    }
+
     private static func makeRichAgentStore(modelContext: ModelContext) -> NativeChatShellState {
         let context = makeScenarioContext(modelContext: modelContext, selectedTab: 1)
         seedRichAgent(into: context.agentController)
+        return context.store
+    }
+
+    private static func makeRichAgentCompletedStore(modelContext: ModelContext) -> NativeChatShellState {
+        let context = makeScenarioContext(modelContext: modelContext, selectedTab: 1)
+        seedRichAgentCompleted(into: context.agentController)
         return context.store
     }
 

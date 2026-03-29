@@ -97,34 +97,45 @@ package enum BackendConversationSupport {
             return AgentProcessSnapshot()
         }
 
+        if let processSnapshotJSON = run.processSnapshotJSON,
+           let data = processSnapshotJSON.data(using: .utf8) {
+            do {
+                let decoder = JSONDecoder()
+                decoder.dateDecodingStrategy = .iso8601
+                return try decoder.decode(AgentProcessSnapshot.self, from: data)
+            } catch {
+                // Fall back to synthesized process state below.
+            }
+        }
+
         let activity: AgentProcessActivity
         let statusText: String
 
-        switch run.stage {
-        case .leaderPlanning:
-            activity = .triage
-            statusText = "Leader planning"
-        case .workerWave:
-            activity = .delegation
-            statusText = "Workers running"
-        case .leaderReview:
-            activity = .reviewing
-            statusText = "Leader reviewing"
-        case .finalSynthesis:
-            activity = .synthesis
-            statusText = "Final synthesis"
-        case nil:
-            switch run.status {
-            case .completed:
-                activity = .completed
-                statusText = "Completed"
-            case .failed:
-                activity = .failed
-                statusText = "Failed"
-            case .cancelled:
-                activity = .failed
-                statusText = "Cancelled"
-            case .queued, .running:
+        switch run.status {
+        case .completed:
+            activity = .completed
+            statusText = "Completed"
+        case .failed:
+            activity = .failed
+            statusText = "Failed"
+        case .cancelled:
+            activity = .failed
+            statusText = "Cancelled"
+        case .queued, .running:
+            switch run.stage {
+            case .leaderPlanning:
+                activity = .triage
+                statusText = "Leader planning"
+            case .workerWave:
+                activity = .delegation
+                statusText = "Workers running"
+            case .leaderReview:
+                activity = .reviewing
+                statusText = "Leader reviewing"
+            case .finalSynthesis:
+                activity = .synthesis
+                statusText = "Final synthesis"
+            case nil:
                 activity = .triage
                 statusText = "Queued"
             }

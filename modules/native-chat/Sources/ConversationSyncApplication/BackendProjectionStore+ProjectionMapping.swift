@@ -57,10 +57,15 @@ extension BackendProjectionStore {
             accountID: accountID,
             role: messageRole(from: message.role),
             content: message.content,
+            thinking: message.thinking,
             createdAt: message.createdAt,
             completedAt: message.completedAt,
             serverCursor: message.serverCursor,
-            serverRunID: message.runID
+            serverRunID: message.runID,
+            annotations: (message.annotations ?? []).map(urlCitation(from:)),
+            toolCalls: (message.toolCalls ?? []).map(toolCall(from:)),
+            filePathAnnotations: (message.filePathAnnotations ?? []).map(filePathAnnotation(from:)),
+            agentTrace: agentTrace(fromJSON: message.agentTraceJSON)
         )
     }
 
@@ -74,6 +79,72 @@ extension BackendProjectionStore {
             .assistant
         case .tool:
             .tool
+        }
+    }
+
+    func toolCall(from toolCall: ToolCallInfoDTO) -> ToolCallInfo {
+        let type: ToolCallType = switch toolCall.type {
+        case .webSearch:
+            .webSearch
+        case .codeInterpreter:
+            .codeInterpreter
+        case .fileSearch:
+            .fileSearch
+        }
+
+        let status: ToolCallStatus = switch toolCall.status {
+        case .inProgress:
+            .inProgress
+        case .searching:
+            .searching
+        case .interpreting:
+            .interpreting
+        case .fileSearching:
+            .fileSearching
+        case .completed:
+            .completed
+        }
+
+        return ToolCallInfo(
+            id: toolCall.id,
+            type: type,
+            status: status,
+            code: toolCall.code,
+            results: toolCall.results,
+            queries: toolCall.queries
+        )
+    }
+
+    func urlCitation(from citation: URLCitationDTO) -> URLCitation {
+        URLCitation(
+            url: citation.url,
+            title: citation.title,
+            startIndex: citation.startIndex,
+            endIndex: citation.endIndex
+        )
+    }
+
+    func filePathAnnotation(from annotation: FilePathAnnotationDTO) -> FilePathAnnotation {
+        FilePathAnnotation(
+            fileId: annotation.fileId,
+            containerId: annotation.containerId,
+            sandboxPath: annotation.sandboxPath,
+            filename: annotation.filename,
+            startIndex: annotation.startIndex,
+            endIndex: annotation.endIndex
+        )
+    }
+
+    func agentTrace(fromJSON json: String?) -> AgentTurnTrace? {
+        guard let json, let data = json.data(using: .utf8) else {
+            return nil
+        }
+        do {
+            let decoder = JSONDecoder()
+            decoder.dateDecodingStrategy = .iso8601
+            return try decoder.decode(AgentTurnTrace.self, from: data)
+        } catch {
+            return nil
         }
     }
 

@@ -1,14 +1,5 @@
 import BackendClient
-import ChatProjectionPersistence
 import Foundation
-
-private struct DeltaPayload: Decodable {
-    let textDelta: String?
-}
-
-private struct StatusPayload: Decodable {
-    let visibleSummary: String?
-}
 
 @MainActor
 package extension BackendChatController {
@@ -46,7 +37,6 @@ package extension BackendChatController {
             isStreaming = false
         }
 
-        // Try SSE streaming first, fall back to polling on failure
         do {
             try await streamRun(
                 conversationServerID: conversationServerID,
@@ -57,7 +47,7 @@ package extension BackendChatController {
         } catch is CancellationError {
             return
         } catch {
-            // SSE failed — fall back to polling
+            // Fall back to polling when SSE setup or transport fails.
         }
 
         await pollRun(
@@ -73,69 +63,26 @@ package extension BackendChatController {
         selectionToken: UUID
     ) async throws {
         let stream = client.streamRun(runID)
-        isStreaming = true
-        currentStreamingText = ""
+        beginChatStream()
 
         for try await event in stream {
             guard visibleSelectionToken == selectionToken, !Task.isCancelled else {
                 break
             }
 
-            switch event.event {
-            case "delta":
-                do {
-                    if let deltaData = event.data.data(using: .utf8) {
-                        let payload = try JSONDecoder().decode(DeltaPayload.self, from: deltaData)
-                        if let textDelta = payload.textDelta {
-                            currentStreamingText += textDelta
-                        }
-                    }
-                } catch {
-                    // Skip malformed delta events
-                }
-
-            case "status":
-                do {
-                    if let statusData = event.data.data(using: .utf8) {
-                        let payload = try JSONDecoder().decode(StatusPayload.self, from: statusData)
-                        if let summary = payload.visibleSummary {
-                            currentThinkingText = summary
-                        }
-                    }
-                } catch {
-                    // Skip malformed status events
-                }
-                try await loader.applyIncrementalSync()
-                try await refreshVisibleConversation()
-
-            case "done":
-                try await setCurrentConversation(
-                    loader.refreshConversationDetail(serverID: conversationServerID)
-                )
-                syncMessages()
-                currentStreamingText = ""
+            let outcome = try await handleChatStreamEvent(
+                event,
+                conversationServerID: conversationServerID
+            )
+            if outcome == .finish {
                 return
-
-            case "error":
-                errorMessage = event.data
-                return
-
-            default:
-                try await loader.applyIncrementalSync()
-                try await refreshVisibleConversation()
             }
         }
 
-        // Stream ended; do final refresh
-        do {
-            guard visibleSelectionToken == selectionToken else { return }
-            try await setCurrentConversation(
-                loader.refreshConversationDetail(serverID: conversationServerID)
-            )
-            syncMessages()
-        } catch {
-            errorMessage = error.localizedDescription
-        }
+        await finishChatStreamAfterTermination(
+            conversationServerID: conversationServerID,
+            selectionToken: selectionToken
+        )
     }
 
     private func pollRun(
@@ -181,6 +128,7 @@ package extension BackendChatController {
                 loader.refreshConversationDetail(serverID: conversationServerID)
             )
             syncMessages()
+            clearChatLiveSurface()
         } catch {
             errorMessage = error.localizedDescription
         }

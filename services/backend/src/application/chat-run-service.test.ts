@@ -102,16 +102,31 @@ const createServiceHarness = (options?: {
         return 'Assistant reply';
       }),
     broadcastStreamDelta: async () => {},
-    createStreamingChatCompletion:
-      async function* () {
-        yield 'Assistant reply';
-      },
+    createStreamingResponse: async function* () {
+      yield { kind: 'text_delta', textDelta: 'Assistant reply' } as const;
+      yield {
+        kind: 'completed',
+        citations: [],
+        filePathAnnotations: [],
+        outputText: 'Assistant reply',
+        thinkingText: null,
+        toolCalls: [],
+      } as const;
+    },
+    createStreamingChatCompletion: async function* () {
+      yield 'Assistant reply';
+    },
     decryptSecret: async () => 'sk-user-key',
     findConversationByIdForUser: async (_env, conversationId, userId) => {
       const conversation = conversations.get(conversationId) ?? null;
       return conversation?.userId === userId ? conversation : null;
     },
     findProviderCredential: async () => credentialFixture,
+    findAssistantMessageByRunId: async (_env, runId) => {
+      return (
+        messages.find((message) => message.runId === runId && message.role === 'assistant') ?? null
+      );
+    },
     findRunById: async (_env, runId) => runs.get(runId) ?? null,
     findRunByIdForUser: async (_env, runId, userId) => {
       const run = runs.get(runId) ?? null;
@@ -166,21 +181,13 @@ const createServiceHarness = (options?: {
         updatedAt: input.updatedAt,
       });
     },
-    updateMessageServerCursor: async (_env, messageId, serverCursor) => {
-      const messageIndex = messages.findIndex((message) => message.id === messageId);
+    updateMessage: async (_env, message) => {
+      const messageIndex = messages.findIndex((candidate) => candidate.id === message.id);
       if (messageIndex < 0) {
         return;
       }
 
-      const existingMessage = messages[messageIndex];
-      if (!existingMessage) {
-        return;
-      }
-
-      messages[messageIndex] = {
-        ...existingMessage,
-        serverCursor,
-      };
+      messages[messageIndex] = message;
     },
     updateRun: async (_env, run) => {
       runs.set(run.id, run);
@@ -254,6 +261,7 @@ describe('createChatRunService', () => {
       'run_queued',
       'run_started',
       'run_progress',
+      'message_created',
       'assistant_delta',
       'assistant_completed',
       'run_completed',
@@ -266,14 +274,17 @@ describe('createChatRunService', () => {
       formatCursorSequence(5),
       formatCursorSequence(6),
       formatCursorSequence(7),
+      formatCursorSequence(8),
     ]);
-    expect(harness.events[4]?.textDelta).toBe('Assistant reply');
-    expect(harness.events[5]?.textDelta).toBeNull();
-    expect(harness.events[6]?.run?.status).toBe('completed');
+    expect(harness.events[4]?.kind).toBe('message_created');
+    expect(harness.events[5]?.textDelta).toBe('Assistant reply');
+    expect(harness.events[6]?.textDelta).toBeNull();
+    expect(harness.events[7]?.run?.status).toBe('completed');
+    expect(harness.messages.filter((message) => message.role === 'assistant')).toHaveLength(1);
     expect(harness.messages.at(-1)?.role).toBe('assistant');
-    expect(harness.messages.at(-1)?.serverCursor).toBe(formatCursorSequence(6));
+    expect(harness.messages.at(-1)?.serverCursor).toBe(formatCursorSequence(7));
     expect(harness.runs.get(queuedRun.id)?.status).toBe('completed');
-    expect(harness.cursorPublishes).toHaveLength(7);
+    expect(harness.cursorPublishes).toHaveLength(8);
   });
 
   it('keeps authoritative state when live cursor fanout fails', async () => {

@@ -11,6 +11,7 @@ const mapRunRow = (row: RunRow): RunRecord => {
     id: row.id,
     kind: row.kind,
     lastEventCursor: row.lastEventCursor,
+    processSnapshotJSON: row.processSnapshotJSON,
     stage: row.stage,
     status: row.status,
     updatedAt: row.updatedAt,
@@ -30,6 +31,7 @@ export const findRunById = async (env: BackendEnv, runId: string): Promise<RunRe
               status,
               stage,
               visible_summary AS visibleSummary,
+              process_snapshot_json AS processSnapshotJSON,
               created_at AS createdAt,
               updated_at AS updatedAt,
               last_event_cursor AS lastEventCursor
@@ -58,6 +60,7 @@ export const findRunByIdForUser = async (
               status,
               stage,
               visible_summary AS visibleSummary,
+              process_snapshot_json AS processSnapshotJSON,
               created_at AS createdAt,
               updated_at AS updatedAt,
               last_event_cursor AS lastEventCursor
@@ -86,6 +89,7 @@ export const listRunsForConversation = async (
               status,
               stage,
               visible_summary AS visibleSummary,
+              process_snapshot_json AS processSnapshotJSON,
               created_at AS createdAt,
               updated_at AS updatedAt,
               last_event_cursor AS lastEventCursor
@@ -104,8 +108,20 @@ export const insertRun = async (env: BackendEnv, run: RunRecord): Promise<void> 
   await database
     .prepare(
       `INSERT INTO runs
-         (id, conversation_id, user_id, kind, status, stage, visible_summary, created_at, updated_at, last_event_cursor)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         (
+           id,
+           conversation_id,
+           user_id,
+           kind,
+           status,
+           stage,
+           visible_summary,
+           process_snapshot_json,
+           created_at,
+           updated_at,
+           last_event_cursor
+         )
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       run.id,
@@ -115,6 +131,7 @@ export const insertRun = async (env: BackendEnv, run: RunRecord): Promise<void> 
       run.status,
       run.stage,
       run.visibleSummary,
+      run.processSnapshotJSON,
       run.createdAt,
       run.updatedAt,
       run.lastEventCursor,
@@ -130,10 +147,19 @@ export const updateRun = async (env: BackendEnv, run: RunRecord): Promise<void> 
           SET status = ?,
               stage = ?,
               visible_summary = ?,
+              process_snapshot_json = ?,
               updated_at = ?,
               last_event_cursor = ?
         WHERE id = ?`,
     )
-    .bind(run.status, run.stage, run.visibleSummary, run.updatedAt, run.lastEventCursor, run.id)
+    .bind(
+      run.status,
+      run.stage,
+      run.visibleSummary,
+      run.processSnapshotJSON,
+      run.updatedAt,
+      run.lastEventCursor,
+      run.id,
+    )
     .run();
 };

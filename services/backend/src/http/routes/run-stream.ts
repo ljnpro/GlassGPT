@@ -4,9 +4,67 @@ import type { BackendServices } from '../services.js';
 import type { BackendApp } from '../types.js';
 
 const SSE_HEARTBEAT_INTERVAL_MS = 15_000;
+const REALTIME_STREAM_UNAVAILABLE = 'realtime_stream_unavailable';
 
 const sseFrame = (event: string, data: unknown): string => {
   return `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
+};
+
+const appendInitialRunFrames = (
+  enqueue: (chunk: string) => void,
+  run: {
+    readonly id: string;
+    readonly stage: string | undefined;
+    readonly status: string;
+    readonly visibleSummary: string | null | undefined;
+    readonly processSnapshotJSON: string | null | undefined;
+  },
+): void => {
+  enqueue(
+    sseFrame('status', {
+      runId: run.id,
+      stage: run.stage ?? null,
+      status: run.status,
+      visibleSummary: run.visibleSummary ?? null,
+    }),
+  );
+
+  if (run.stage) {
+    enqueue(
+      sseFrame('stage', {
+        runId: run.id,
+        stage: run.stage,
+        visibleSummary: run.visibleSummary ?? null,
+      }),
+    );
+  }
+
+  if (!run.processSnapshotJSON) {
+    return;
+  }
+
+  try {
+    const processSnapshot = JSON.parse(run.processSnapshotJSON) as {
+      readonly tasks?: ReadonlyArray<unknown>;
+    };
+    enqueue(
+      sseFrame('process_update', {
+        processSnapshot,
+        runId: run.id,
+      }),
+    );
+
+    for (const task of processSnapshot.tasks ?? []) {
+      enqueue(
+        sseFrame('task_update', {
+          runId: run.id,
+          task,
+        }),
+      );
+    }
+  } catch {
+    // Ignore malformed process snapshots rather than aborting the stream.
+  }
 };
 
 export const installRunStreamRoutes = (app: BackendApp, services: BackendServices): void => {
@@ -17,7 +75,26 @@ export const installRunStreamRoutes = (app: BackendApp, services: BackendService
 
     // Resolve the run and its conversation to connect to the right Durable Object
     const initialRun = await services.runService.getRun(env, session.userId, runId);
-    const conversationId = initialRun.conversationID;
+    const conversationId = initialRun.conversationId;
+
+    let durableObjectResponse: Response | null = null;
+    if (
+      initialRun.status !== 'completed' &&
+      initialRun.status !== 'failed' &&
+      initialRun.status !== 'cancelled'
+    ) {
+      const durableObjectId = context.env.CONVERSATION_EVENT_HUB.idFromName(conversationId);
+      const stub = context.env.CONVERSATION_EVENT_HUB.get(durableObjectId);
+      durableObjectResponse = await stub.fetch('https://conversation-event-hub/stream');
+
+      if (!durableObjectResponse.ok) {
+        return context.json({ error: REALTIME_STREAM_UNAVAILABLE }, 503);
+      }
+
+      if (!durableObjectResponse.body) {
+        return context.json({ error: REALTIME_STREAM_UNAVAILABLE }, 503);
+      }
+    }
 
     const encoder = new TextEncoder();
     const stream = new ReadableStream({
@@ -43,8 +120,13 @@ export const installRunStreamRoutes = (app: BackendApp, services: BackendService
             enqueue(': ping\n\n');
           }, SSE_HEARTBEAT_INTERVAL_MS);
 
-          // Emit initial status
-          enqueue(sseFrame('status', { status: initialRun.status, visibleSummary: initialRun.visibleSummary }));
+          appendInitialRunFrames(enqueue, {
+            id: initialRun.id,
+            processSnapshotJSON: initialRun.processSnapshotJSON,
+            stage: initialRun.stage,
+            status: initialRun.status,
+            visibleSummary: initialRun.visibleSummary,
+          });
 
           // If already terminal, send done immediately
           if (
@@ -58,20 +140,15 @@ export const installRunStreamRoutes = (app: BackendApp, services: BackendService
             return;
           }
 
-          // Connect to the Durable Object's SSE stream for real-time deltas
-          const durableObjectId = context.env.CONVERSATION_EVENT_HUB.idFromName(conversationId);
-          const stub = context.env.CONVERSATION_EVENT_HUB.get(durableObjectId);
-          const doResponse = await stub.fetch('https://conversation-event-hub/stream');
-
-          if (!doResponse.body) {
-            enqueue(sseFrame('error', { message: 'realtime_stream_unavailable' }));
+          if (!durableObjectResponse?.body) {
+            enqueue(sseFrame('error', { message: REALTIME_STREAM_UNAVAILABLE, runId }));
             cleanup();
             controller.close();
             return;
           }
 
           // Relay events from the Durable Object to the client, filtering by runId
-          const reader = doResponse.body.getReader();
+          const reader = durableObjectResponse.body.getReader();
           const decoder = new TextDecoder();
           let buffer = '';
 
@@ -89,11 +166,11 @@ export const installRunStreamRoutes = (app: BackendApp, services: BackendService
 
               // Parse the frame to check runId and detect done events
               const dataMatch = frame.match(/^data: (.+)$/m);
-              if (dataMatch) {
+              if (dataMatch && dataMatch[1] !== undefined) {
                 try {
                   const parsed = JSON.parse(dataMatch[1]) as { runId?: string; status?: string };
                   // Only forward events for this specific run
-                  if (parsed.runId && parsed.runId !== runId) {
+                  if (parsed.runId !== undefined && parsed.runId !== runId) {
                     continue;
                   }
                 } catch {
@@ -121,6 +198,8 @@ export const installRunStreamRoutes = (app: BackendApp, services: BackendService
           // DO stream ended without done — check terminal state and close
           const finalRun = await services.runService.getRun(env, session.userId, runId);
           enqueue(sseFrame('done', { status: finalRun.status }));
+        } catch {
+          enqueue(sseFrame('error', { message: REALTIME_STREAM_UNAVAILABLE, runId }));
         } finally {
           cleanup();
         }

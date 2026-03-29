@@ -157,6 +157,7 @@ struct NativeChatViewBodyEvaluationCoverageTests {
                 viewModel: populatedAgent,
                 assistantBubbleMaxWidth: 520,
                 liveSummaryExpanded: .constant(true),
+                streamingThinkingExpanded: .constant(nil),
                 expandedTraceMessageIDs: .constant([populatedAgent.messages[0].id]),
                 openSettings: {}
             ).body }

@@ -70,6 +70,9 @@ package extension BackendChatController {
         messages = []
         currentStreamingText = ""
         currentThinkingText = ""
+        activeToolCalls = []
+        liveCitations = []
+        liveFilePathAnnotations = []
         isStreaming = false
         isThinking = false
         errorMessage = nil
@@ -81,6 +84,14 @@ package extension BackendChatController {
         submissionTask?.cancel()
         runPollingTask?.cancel()
         runPollingTask = nil
+        activeRunID = nil
+        currentStreamingText = ""
+        currentThinkingText = ""
+        activeToolCalls = []
+        liveCitations = []
+        liveFilePathAnnotations = []
+        isStreaming = false
+        isThinking = false
         let selectionToken = UUID()
         visibleSelectionToken = selectionToken
 
@@ -98,6 +109,7 @@ package extension BackendChatController {
                 }
                 hydrateConfigurationFromConversation()
                 syncMessages()
+                await restoreActiveRunIfNeeded(selectionToken: selectionToken)
             } catch {
                 errorMessage = error.localizedDescription
             }

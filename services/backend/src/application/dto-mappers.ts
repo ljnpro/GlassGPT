@@ -27,14 +27,25 @@ export const buildConversationDTO = (conversation: ConversationRecord): Conversa
 
 export const buildMessageDTO = (message: MessageRecord): MessageDTO => {
   return {
+    agentTraceJSON: message.agentTraceJSON ?? undefined,
+    annotations: message.annotationsJSON
+      ? (JSON.parse(message.annotationsJSON) as MessageDTO['annotations'])
+      : undefined,
     completedAt: message.completedAt ?? undefined,
     content: message.content,
     conversationId: message.conversationId,
     createdAt: message.createdAt,
+    filePathAnnotations: message.filePathAnnotationsJSON
+      ? (JSON.parse(message.filePathAnnotationsJSON) as MessageDTO['filePathAnnotations'])
+      : undefined,
     id: message.id,
     role: message.role,
     runId: message.runId ?? undefined,
     serverCursor: message.serverCursor ?? undefined,
+    thinking: message.thinking ?? undefined,
+    toolCalls: message.toolCallsJSON
+      ? (JSON.parse(message.toolCallsJSON) as MessageDTO['toolCalls'])
+      : undefined,
   };
 };
 
@@ -45,6 +56,7 @@ export const buildRunSummaryDTO = (run: RunRecord): RunSummaryDTO => {
     id: run.id,
     kind: run.kind,
     lastEventCursor: run.lastEventCursor ?? undefined,
+    processSnapshotJSON: run.processSnapshotJSON ?? undefined,
     stage: run.stage ?? undefined,
     status: run.status,
     updatedAt: run.updatedAt,

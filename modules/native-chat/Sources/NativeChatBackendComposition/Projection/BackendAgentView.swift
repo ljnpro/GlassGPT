@@ -19,6 +19,7 @@ package struct BackendAgentView: View {
     @State private var composerResetToken = UUID()
     @State private var scrollRequestID = UUID()
     @State private var liveSummaryExpanded: Bool? = true
+    @State private var streamingThinkingExpanded: Bool? = nil
     @State private var expandedTraceMessageIDs: Set<UUID> = []
 
     /// Creates the agent surface bound to a backend-owned projection controller.
@@ -39,6 +40,7 @@ package struct BackendAgentView: View {
                         viewModel: viewModel,
                         assistantBubbleMaxWidth: assistantBubbleMaxWidth,
                         liveSummaryExpanded: $liveSummaryExpanded,
+                        streamingThinkingExpanded: $streamingThinkingExpanded,
                         expandedTraceMessageIDs: $expandedTraceMessageIDs,
                         openSettings: openSettings
                     )
@@ -88,6 +90,7 @@ package struct BackendAgentView: View {
             }
             .onChange(of: viewModel.currentConversationID) { _, _ in
                 liveSummaryExpanded = true
+                streamingThinkingExpanded = nil
                 composerResetToken = UUID()
                 expandedTraceMessageIDs.removeAll()
             }
@@ -148,11 +151,44 @@ package struct BackendAgentView: View {
     private var liveBottomAnchorKey: Int {
         var hasher = Hasher()
         hasher.combine(viewModel.currentConversationID)
+        hasher.combine(viewModel.liveDraftMessageID)
         hasher.combine(viewModel.processSnapshot.activity.rawValue)
         hasher.combine(viewModel.currentStreamingText)
         hasher.combine(viewModel.currentThinkingText)
         hasher.combine(viewModel.isRunning)
         hasher.combine(viewModel.isThinking)
+        hasher.combine(viewModel.activeToolCalls.count)
+        hasher.combine(viewModel.liveCitations.count)
+        hasher.combine(viewModel.liveFilePathAnnotations.count)
+        hasher.combine(viewModel.processSnapshot.currentFocus)
+        hasher.combine(viewModel.processSnapshot.leaderAcceptedFocus)
+        hasher.combine(viewModel.processSnapshot.leaderLiveStatus)
+        hasher.combine(viewModel.processSnapshot.leaderLiveSummary)
+        hasher.combine(viewModel.processSnapshot.recoveryState.rawValue)
+        hasher.combine(viewModel.processSnapshot.recentUpdateItems.count)
+        hasher.combine(viewModel.processSnapshot.events.count)
+        hasher.combine(viewModel.processSnapshot.tasks.count)
+        hasher.combine(viewModel.processSnapshot.activeTaskIDs.count)
+        hasher.combine(viewModel.processSnapshot.decisions.count)
+        for update in viewModel.processSnapshot.recentUpdateItems {
+            hasher.combine(update.id)
+            hasher.combine(update.kind.rawValue)
+            hasher.combine(update.summary)
+        }
+        for taskID in viewModel.processSnapshot.activeTaskIDs {
+            hasher.combine(taskID)
+        }
+        for task in viewModel.processSnapshot.tasks {
+            hasher.combine(task.id)
+            hasher.combine(task.status.rawValue)
+            hasher.combine(task.liveStatusText ?? "")
+            hasher.combine(task.liveSummary ?? "")
+            hasher.combine(task.resultSummary ?? "")
+        }
+        for toolCall in viewModel.activeToolCalls {
+            hasher.combine(toolCall.id)
+            hasher.combine(toolCall.status.rawValue)
+        }
         return hasher.finalize()
     }
 

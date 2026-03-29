@@ -39,6 +39,7 @@ struct BackendAgentMessageList: View {
     let viewModel: BackendAgentController
     let assistantBubbleMaxWidth: CGFloat
     @Binding var liveSummaryExpanded: Bool?
+    @Binding var streamingThinkingExpanded: Bool?
     @Binding var expandedTraceMessageIDs: Set<UUID>
     let openSettings: @MainActor () -> Void
 
@@ -51,6 +52,18 @@ struct BackendAgentMessageList: View {
                 VStack(spacing: 16) {
                     ForEach(viewModel.messages) { message in
                         VStack(alignment: .leading, spacing: 10) {
+                            if showsLiveSummary(for: message) {
+                                AgentLiveSummaryCard(
+                                    process: viewModel.processSnapshot,
+                                    isExpanded: Binding(
+                                        get: { liveSummaryExpanded },
+                                        set: { liveSummaryExpanded = $0 }
+                                    )
+                                )
+                                .frame(maxWidth: assistantBubbleMaxWidth, alignment: .leading)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                            }
+
                             MessageBubble(
                                 message: message,
                                 liveContent: viewModel.draftMessage?.id == message.id ? viewModel.currentStreamingText : nil,
@@ -65,18 +78,6 @@ struct BackendAgentMessageList: View {
                             )
                             .equatable()
                             .id(message.id)
-
-                            if showsLiveSummary(for: message) {
-                                AgentLiveSummaryCard(
-                                    process: viewModel.processSnapshot,
-                                    isExpanded: Binding(
-                                        get: { liveSummaryExpanded },
-                                        set: { liveSummaryExpanded = $0 }
-                                    )
-                                )
-                                .frame(maxWidth: assistantBubbleMaxWidth, alignment: .leading)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                            }
 
                             if message.role == .assistant, let trace = message.agentTrace {
                                 AgentProcessCard(
@@ -96,6 +97,34 @@ struct BackendAgentMessageList: View {
                                 .frame(maxWidth: .infinity, alignment: .leading)
                             }
                         }
+                    }
+
+                    if viewModel.shouldShowDetachedStreamingBubble {
+                        DetachedStreamingBubbleView(
+                            activeToolCalls: viewModel.activeToolCalls,
+                            currentThinkingText: viewModel.currentThinkingText,
+                            currentStreamingText: viewModel.currentStreamingText,
+                            isThinking: viewModel.isThinking,
+                            isStreaming: viewModel.isRunning,
+                            thinkingPresentationState: viewModel.thinkingPresentationState,
+                            liveCitations: viewModel.liveCitations,
+                            liveFilePathAnnotations: viewModel.liveFilePathAnnotations,
+                            streamingThinkingExpanded: $streamingThinkingExpanded,
+                            assistantBubbleMaxWidth: assistantBubbleMaxWidth
+                        )
+                        .equatable()
+                    }
+
+                    if viewModel.shouldShowDetachedLiveSummaryCard {
+                        AgentLiveSummaryCard(
+                            process: viewModel.processSnapshot,
+                            isExpanded: Binding(
+                                get: { liveSummaryExpanded },
+                                set: { liveSummaryExpanded = $0 }
+                            )
+                        )
+                        .frame(maxWidth: assistantBubbleMaxWidth, alignment: .leading)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                     }
 
                     if let errorMessage = viewModel.errorMessage {

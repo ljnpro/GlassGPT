@@ -13,50 +13,36 @@ struct ProjectionCacheRepositoryCoverageTests {
         let context = ModelContext(container)
         let repository = ProjectionCacheRepository(modelContext: context)
 
-        let chat = try repository.upsertConversation(
-            ConversationProjectionRecord(
-                serverID: "conv_chat",
-                accountID: "usr_1",
-                title: "Chat",
-                mode: .chat,
-                createdAt: .init(timeIntervalSince1970: 1),
-                updatedAt: .init(timeIntervalSince1970: 3),
-                lastRunServerID: nil,
-                lastSyncCursor: nil
-            )
-        )
-        let agent = try repository.upsertConversation(
-            ConversationProjectionRecord(
-                serverID: "conv_agent",
-                accountID: "usr_1",
-                title: "Agent",
-                mode: .agent,
-                createdAt: .init(timeIntervalSince1970: 2),
-                updatedAt: .init(timeIntervalSince1970: 4),
-                lastRunServerID: "run_2",
-                lastSyncCursor: "cur_2"
-            )
-        )
-        let foreign = try repository.upsertConversation(
-            ConversationProjectionRecord(
-                serverID: "conv_foreign",
-                accountID: "usr_2",
-                title: "Foreign",
-                mode: .chat,
-                createdAt: .init(timeIntervalSince1970: 1),
-                updatedAt: .init(timeIntervalSince1970: 5),
-                lastRunServerID: nil,
-                lastSyncCursor: nil
-            )
-        )
+        let chat = try repository.upsertConversation(makeProjectionConversationRecord(
+            serverID: "conv_chat",
+            accountID: "usr_1",
+            title: "Chat",
+            mode: .chat,
+            updatedAt: .init(timeIntervalSince1970: 3)
+        ))
+        let agent = try repository.upsertConversation(makeProjectionConversationRecord(
+            serverID: "conv_agent",
+            accountID: "usr_1",
+            title: "Agent",
+            mode: .agent,
+            createdAt: .init(timeIntervalSince1970: 2),
+            updatedAt: .init(timeIntervalSince1970: 4),
+            lastRunServerID: "run_2",
+            lastSyncCursor: "cur_2"
+        ))
+        let foreign = try repository.upsertConversation(makeProjectionConversationRecord(
+            serverID: "conv_foreign",
+            accountID: "usr_2",
+            title: "Foreign",
+            mode: .chat,
+            updatedAt: .init(timeIntervalSince1970: 5)
+        ))
 
         let retainedMessage = repository.upsertMessage(
-            MessageProjectionRecord(
+            makeProjectionMessageRecord(
                 serverID: "msg_keep",
                 accountID: "usr_1",
-                role: .assistant,
                 content: "keep",
-                createdAt: .init(timeIntervalSince1970: 6),
                 completedAt: .init(timeIntervalSince1970: 7),
                 serverCursor: "cur_6",
                 serverRunID: "run_keep"
@@ -64,12 +50,10 @@ struct ProjectionCacheRepositoryCoverageTests {
             in: chat
         )
         _ = repository.upsertMessage(
-            MessageProjectionRecord(
+            makeProjectionMessageRecord(
                 serverID: "msg_drop",
                 accountID: "usr_1",
-                role: .assistant,
                 content: "drop",
-                createdAt: .init(timeIntervalSince1970: 6),
                 completedAt: nil,
                 serverCursor: "cur_7",
                 serverRunID: "run_drop"
@@ -77,12 +61,10 @@ struct ProjectionCacheRepositoryCoverageTests {
             in: chat
         )
         _ = repository.upsertMessage(
-            MessageProjectionRecord(
+            makeProjectionMessageRecord(
                 serverID: "msg_foreign",
                 accountID: "usr_2",
-                role: .assistant,
                 content: "foreign",
-                createdAt: .init(timeIntervalSince1970: 6),
                 completedAt: .init(timeIntervalSince1970: 7),
                 serverCursor: "cur_8",
                 serverRunID: "run_foreign"
@@ -123,4 +105,53 @@ private func makeProjectionCacheContainer() throws -> ModelContainer {
     let schema = Schema([Conversation.self, Message.self])
     let configuration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
     return try ModelContainer(for: schema, configurations: [configuration])
+}
+
+private func makeProjectionConversationRecord(
+    serverID: String,
+    accountID: String,
+    title: String,
+    mode: ConversationMode,
+    createdAt: Date = .init(timeIntervalSince1970: 1),
+    updatedAt: Date,
+    lastRunServerID: String? = nil,
+    lastSyncCursor: String? = nil
+) -> ConversationProjectionRecord {
+    ConversationProjectionRecord(
+        serverID: serverID,
+        accountID: accountID,
+        title: title,
+        mode: mode,
+        createdAt: createdAt,
+        updatedAt: updatedAt,
+        lastRunServerID: lastRunServerID,
+        lastSyncCursor: lastSyncCursor
+    )
+}
+
+private func makeProjectionMessageRecord(
+    serverID: String,
+    accountID: String,
+    role: MessageRole = .assistant,
+    content: String,
+    createdAt: Date = .init(timeIntervalSince1970: 6),
+    completedAt: Date?,
+    serverCursor: String?,
+    serverRunID: String?
+) -> MessageProjectionRecord {
+    MessageProjectionRecord(
+        serverID: serverID,
+        accountID: accountID,
+        role: role,
+        content: content,
+        thinking: nil,
+        createdAt: createdAt,
+        completedAt: completedAt,
+        serverCursor: serverCursor,
+        serverRunID: serverRunID,
+        annotations: [],
+        toolCalls: [],
+        filePathAnnotations: [],
+        agentTrace: nil
+    )
 }

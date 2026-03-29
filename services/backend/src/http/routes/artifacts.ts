@@ -7,20 +7,17 @@ export const installArtifactRoutes = (app: BackendApp, services: BackendServices
   app.get('/v1/artifacts/:artifactId/url', async (context) => {
     const session = await requireAuthenticatedSession(context, services);
     const artifactId = context.req.param('artifactId');
-    const env = asBackendRuntimeContext(context.env);
+    void asBackendRuntimeContext(context.env);
 
-    const bucket = context.env.ARTIFACT_BUCKET;
-    if (!bucket) {
-      return context.json({ error: 'artifact_storage_unavailable' }, 503);
-    }
-
+    const bucket = context.env.GLASSGPT_ARTIFACTS;
     const objectKey = `${session.userId}/${artifactId}`;
     const object = await bucket.head(objectKey);
     if (!object) {
       return context.json({ error: 'artifact_not_found' }, 404);
     }
 
-    const signedUrl = await bucket.createMultipartUpload(objectKey);
+    const requestURL = new URL(context.req.url);
+    const downloadURL = new URL(`/v1/artifacts/${artifactId}/download`, requestURL.origin);
 
     return context.json({
       artifact: {
@@ -29,7 +26,7 @@ export const installArtifactRoutes = (app: BackendApp, services: BackendServices
         byteCount: object.size,
         createdAt: object.uploaded.toISOString(),
       },
-      url: `${context.env.ARTIFACT_PUBLIC_URL ?? env.baseURL}/${objectKey}`,
+      url: downloadURL.toString(),
     });
   });
 };

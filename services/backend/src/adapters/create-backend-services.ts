@@ -6,7 +6,11 @@ import { createCredentialService } from '../application/credential-service.js';
 import { createRunService } from '../application/run-service.js';
 import { createSyncService } from '../application/sync-service.js';
 import { validateOpenAiApiKey } from './openai/openai-client.js';
-import { createChatCompletion, createStreamingChatCompletion } from './openai/openai-responses.js';
+import {
+  createChatCompletion,
+  createStreamingChatCompletion,
+  createStreamingResponse,
+} from './openai/openai-responses.js';
 import {
   findConversationByIdForUser,
   insertConversation,
@@ -14,10 +18,11 @@ import {
   updateConversationPointers,
 } from './persistence/conversation-repository.js';
 import {
+  findAssistantMessageByRunId,
   findUserMessageByRunId,
   insertMessage,
   listMessagesForConversation,
-  updateMessageServerCursor,
+  updateMessage,
 } from './persistence/message-repository.js';
 import {
   deleteProviderCredential,
@@ -44,7 +49,10 @@ import {
   rotateSessionRefreshToken,
 } from './persistence/session-repository.js';
 import { findUserById, upsertAppleUser } from './persistence/user-repository.js';
-import { broadcastStreamDelta, publishConversationCursor } from './realtime/conversation-event-hub.js';
+import {
+  broadcastStreamDelta,
+  publishConversationCursor,
+} from './realtime/conversation-event-hub.js';
 import { issueAccessToken, verifyAccessToken } from './security/access-token-codec.js';
 import { verifyAppleIdentityToken } from './security/apple-identity-verifier.js';
 import { decryptSecret, encryptSecret } from './security/credential-encryption.js';
@@ -54,9 +62,11 @@ export const createBackendServices = () => {
   const chatRunService = createChatRunService({
     broadcastStreamDelta,
     createChatCompletion,
+    createStreamingResponse,
     createStreamingChatCompletion,
     decryptSecret,
     findConversationByIdForUser,
+    findAssistantMessageByRunId,
     findProviderCredential,
     findRunById,
     findRunByIdForUser,
@@ -66,7 +76,7 @@ export const createBackendServices = () => {
     insertRunEvent,
     now: () => new Date(),
     publishConversationCursor,
-    updateMessageServerCursor,
+    updateMessage,
     updateRunEventSnapshots,
     updateConversationPointers,
     updateRun,
@@ -75,9 +85,11 @@ export const createBackendServices = () => {
   const agentRunService = createAgentRunService({
     broadcastStreamDelta,
     createChatCompletion,
+    createStreamingResponse,
     createStreamingChatCompletion,
     decryptSecret,
     findConversationByIdForUser,
+    findAssistantMessageByRunId,
     findProviderCredential,
     findRunById,
     findRunByIdForUser,
@@ -88,7 +100,7 @@ export const createBackendServices = () => {
     listMessagesForConversation,
     now: () => new Date(),
     publishConversationCursor,
-    updateMessageServerCursor,
+    updateMessage,
     updateRunEventSnapshots,
     updateConversationPointers,
     updateRun,

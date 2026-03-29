@@ -83,7 +83,8 @@ private func enqueueRunResponses(encoder: JSONEncoder) throws {
         createdAt: .init(timeIntervalSince1970: 4),
         updatedAt: .init(timeIntervalSince1970: 5),
         lastEventCursor: "cur_1",
-        visibleSummary: "Done"
+        visibleSummary: "Done",
+        processSnapshotJSON: nil
     )
     for _ in 0 ..< 5 {
         try CoverageBackendURLProtocol.state.enqueueResponse(

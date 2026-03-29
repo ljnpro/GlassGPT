@@ -15,6 +15,9 @@ package final class BackendChatController {
     package var currentConversationID: UUID?
     package var currentStreamingText = ""
     package var currentThinkingText = ""
+    package var activeToolCalls: [ToolCallInfo] = []
+    package var liveCitations: [URLCitation] = []
+    package var liveFilePathAnnotations: [FilePathAnnotation] = []
     package var isStreaming = false
     package var isThinking = false
     package var errorMessage: String?
@@ -45,6 +48,8 @@ package final class BackendChatController {
     package var visibleSelectionToken = UUID()
     @ObservationIgnored
     package var skipAutomaticBootstrap = false
+    @ObservationIgnored
+    package var presentsSelectorOnLaunch = false
 
     /// Creates the backend-owned chat projection controller for one account-scoped shell.
     package init(
@@ -126,7 +131,19 @@ package final class BackendChatController {
     }
 
     package var shouldShowDetachedStreamingBubble: Bool {
-        false
+        guard liveDraftMessageID == nil else {
+            return false
+        }
+        if isStreaming || isThinking {
+            return true
+        }
+        if !currentStreamingText.isEmpty || !currentThinkingText.isEmpty {
+            return true
+        }
+        if !activeToolCalls.isEmpty || !liveCitations.isEmpty || !liveFilePathAnnotations.isEmpty {
+            return true
+        }
+        return false
     }
 
     package var thinkingPresentationState: ThinkingPresentationState? {
@@ -136,9 +153,5 @@ package final class BackendChatController {
             isThinking: isThinking,
             activeToolCalls: activeToolCalls
         )
-    }
-
-    package var activeToolCalls: [ToolCallInfo] {
-        []
     }
 }

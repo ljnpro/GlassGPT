@@ -226,6 +226,7 @@ private func hostBackendAgentSurfaces(
             viewModel: agentController,
             assistantBubbleMaxWidth: 520,
             liveSummaryExpanded: Binding.constant(true),
+            streamingThinkingExpanded: Binding.constant(nil),
             expandedTraceMessageIDs: Binding.constant([agentController.messages[0].id]),
             openSettings: {}
         )

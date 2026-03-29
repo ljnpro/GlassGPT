@@ -7,6 +7,8 @@ import type { ProviderCredentialRecord } from './auth-records.js';
 import { buildRunSummaryDTO } from './dto-mappers.js';
 import { ApplicationError } from './errors.js';
 import { createMessageId } from './ids.js';
+import { applyLiveStateToMessage, parseMessageLiveState } from './live-payload-codec.js';
+import type { StreamingConversationRequest } from './live-stream-model.js';
 import {
   createQueuedRunRecord,
   createRunEventDraft,
@@ -55,6 +57,10 @@ export interface ChatRunWorkflowParams {
 
 export interface ChatRunServiceDependencies extends RunProjectionDependencies {
   readonly createChatCompletion: (apiKey: string, input: string) => Promise<string>;
+  readonly createStreamingResponse: (
+    apiKey: string,
+    request: StreamingConversationRequest,
+  ) => AsyncGenerator<import('./live-stream-model.js').LiveStreamEvent, void, undefined>;
   readonly createStreamingChatCompletion: (
     apiKey: string,
     input: string,
@@ -77,6 +83,10 @@ export interface ChatRunServiceDependencies extends RunProjectionDependencies {
     userId: string,
     provider: 'openai',
   ) => Promise<ProviderCredentialRecord | null>;
+  readonly findAssistantMessageByRunId: (
+    env: BackendRuntimeContext,
+    runId: string,
+  ) => Promise<MessageRecord | null>;
   readonly findRunById: (env: BackendRuntimeContext, runId: string) => Promise<RunRecord | null>;
   readonly findRunByIdForUser: (
     env: BackendRuntimeContext,
@@ -142,14 +152,19 @@ export const createChatRunService = (deps: ChatRunServiceDependencies): ChatRunS
 
     if (input.createUserMessage) {
       const userMessage: MessageRecord = {
+        agentTraceJSON: null,
+        annotationsJSON: null,
         completedAt: run.createdAt,
         content: input.content,
         conversationId: projectedConversation.id,
         createdAt: run.createdAt,
+        filePathAnnotationsJSON: null,
         id: createMessageId(),
         role: 'user',
         runId: run.id,
         serverCursor: null,
+        thinking: null,
+        toolCallsJSON: null,
       };
       await deps.insertMessage(env, userMessage);
       ({ conversation: projectedConversation, run } = await persistProjectedEvent(deps, env, {
@@ -271,114 +286,252 @@ export const createChatRunService = (deps: ChatRunServiceDependencies): ChatRunS
           await deps.findProviderCredential(env, input.userId, 'openai'),
         );
         const apiKey = await deps.decryptSecret(env, credential);
+        const existingAssistantMessage = await deps.findAssistantMessageByRunId(env, run.id);
+        let assistantMessage: MessageRecord = existingAssistantMessage ?? {
+          agentTraceJSON: null,
+          annotationsJSON: null,
+          completedAt: null,
+          content: '',
+          conversationId: conversation.id,
+          createdAt: deps.now().toISOString(),
+          filePathAnnotationsJSON: null,
+          id: createMessageId(),
+          role: 'assistant',
+          runId: run.id,
+          serverCursor: null,
+          thinking: null,
+          toolCallsJSON: null,
+        };
 
-        // Stream tokens from OpenAI, emitting delta events as they arrive
-        const chunks: string[] = [];
-        let pendingDelta = '';
-        const DELTA_FLUSH_THRESHOLD = 5;
-        let chunkCount = 0;
+        if (existingAssistantMessage == null) {
+          await deps.insertMessage(env, assistantMessage);
+          const draftResult = await persistProjectedEvent(deps, env, {
+            conversation,
+            event: createRunEventDraft(deps.now(), run, {
+              kind: 'message_created',
+            }),
+            message: assistantMessage,
+            run,
+            syncMessageCursor: true,
+          });
+          conversation = draftResult.conversation;
+          run = draftResult.run;
+          assistantMessage = draftResult.message ?? assistantMessage;
+        }
 
-        for await (const delta of deps.createStreamingChatCompletion(apiKey, input.content)) {
-          // Check for cancellation between chunks
-          const latestRun = chunkCount % 20 === 0 ? await deps.findRunById(env, run.id) : null;
-          if (latestRun?.status === 'cancelled') {
-            return;
+        let liveState = parseMessageLiveState(assistantMessage);
+        let pendingTextDelta = '';
+        let streamEventCount = 0;
+
+        const persistAssistantSnapshot = async (input: {
+          readonly kind: 'assistant_completed' | 'assistant_delta' | 'run_progress';
+          readonly progressLabel?: string | null;
+          readonly completedAt?: string | null;
+          readonly textDelta?: string | null;
+        }): Promise<void> => {
+          assistantMessage = applyLiveStateToMessage(
+            assistantMessage,
+            liveState,
+            input.completedAt === undefined
+              ? undefined
+              : {
+                  completedAt: input.completedAt,
+                },
+          );
+          const result = await persistProjectedEvent(deps, env, {
+            conversation,
+            event: createRunEventDraft(deps.now(), run, {
+              kind: input.kind,
+              progressLabel: input.progressLabel ?? null,
+              textDelta: input.textDelta ?? null,
+            }),
+            message: assistantMessage,
+            run,
+            syncMessageCursor: true,
+          });
+          conversation = result.conversation;
+          run = result.run;
+          assistantMessage = result.message ?? assistantMessage;
+        };
+
+        for await (const event of deps.createStreamingResponse(apiKey, { input: input.content })) {
+          streamEventCount += 1;
+          if (streamEventCount % 20 === 0) {
+            const latestRun = await deps.findRunById(env, run.id);
+            if (latestRun?.status === 'cancelled') {
+              return;
+            }
           }
 
-          chunks.push(delta);
-          pendingDelta += delta;
-          chunkCount++;
+          switch (event.kind) {
+            case 'text_delta':
+              liveState = {
+                ...liveState,
+                content: liveState.content + event.textDelta,
+              };
+              pendingTextDelta += event.textDelta;
+              try {
+                await deps.broadcastStreamDelta(env, conversation.id, {
+                  type: 'delta',
+                  data: { runId: run.id, textDelta: event.textDelta },
+                });
+              } catch {
+                // Non-fatal.
+              }
+              if (pendingTextDelta.length >= 24) {
+                await persistAssistantSnapshot({
+                  kind: 'assistant_delta',
+                  textDelta: pendingTextDelta,
+                });
+                pendingTextDelta = '';
+              }
+              break;
 
-          // Broadcast every token directly to SSE clients via Durable Object (bypasses D1)
-          try {
-            await deps.broadcastStreamDelta(env, conversation.id, {
-              type: 'delta',
-              data: { textDelta: delta, runId: run.id },
-            });
-          } catch {
-            // Non-fatal: broadcast failure doesn't block execution
-          }
+            case 'thinking_delta':
+              liveState = {
+                ...liveState,
+                thinking: `${liveState.thinking ?? ''}${event.thinkingDelta}`,
+              };
+              try {
+                await deps.broadcastStreamDelta(env, conversation.id, {
+                  type: 'thinking_delta',
+                  data: { runId: run.id, thinkingDelta: event.thinkingDelta },
+                });
+              } catch {
+                // Non-fatal.
+              }
+              await persistAssistantSnapshot({
+                kind: 'run_progress',
+                progressLabel: 'Reasoning',
+              });
+              break;
 
-          // Persist delta events to D1 less frequently (for catch-up and history)
-          if (chunkCount % DELTA_FLUSH_THRESHOLD === 0) {
-            ({ conversation, run } = await persistProjectedEvent(deps, env, {
-              conversation,
-              event: createRunEventDraft(deps.now(), run, {
-                kind: 'assistant_delta',
-                textDelta: pendingDelta,
-              }),
-              message: null,
-              run,
-              syncMessageCursor: false,
-            }));
-            pendingDelta = '';
+            case 'thinking_finished':
+              try {
+                await deps.broadcastStreamDelta(env, conversation.id, {
+                  type: 'thinking_done',
+                  data: { runId: run.id },
+                });
+              } catch {
+                // Non-fatal.
+              }
+              break;
+
+            case 'tool_call_updated':
+              liveState = {
+                ...liveState,
+                toolCalls: [
+                  ...liveState.toolCalls.filter((toolCall) => toolCall.id !== event.toolCall.id),
+                  event.toolCall,
+                ],
+              };
+              try {
+                await deps.broadcastStreamDelta(env, conversation.id, {
+                  type: 'tool_call_update',
+                  data: { runId: run.id, toolCall: event.toolCall },
+                });
+              } catch {
+                // Non-fatal.
+              }
+              await persistAssistantSnapshot({
+                kind: 'run_progress',
+                progressLabel: 'Using tools',
+              });
+              break;
+
+            case 'citation_added':
+              liveState = {
+                ...liveState,
+                citations: [...liveState.citations, event.citation],
+              };
+              try {
+                await deps.broadcastStreamDelta(env, conversation.id, {
+                  type: 'citations_update',
+                  data: { citations: liveState.citations, runId: run.id },
+                });
+              } catch {
+                // Non-fatal.
+              }
+              await persistAssistantSnapshot({
+                kind: 'run_progress',
+                progressLabel: 'Collecting citations',
+              });
+              break;
+
+            case 'file_path_annotation_added':
+              liveState = {
+                ...liveState,
+                filePathAnnotations: [...liveState.filePathAnnotations, event.annotation],
+              };
+              try {
+                await deps.broadcastStreamDelta(env, conversation.id, {
+                  type: 'file_path_annotations_update',
+                  data: { filePathAnnotations: liveState.filePathAnnotations, runId: run.id },
+                });
+              } catch {
+                // Non-fatal.
+              }
+              await persistAssistantSnapshot({
+                kind: 'run_progress',
+                progressLabel: 'Updating file references',
+              });
+              break;
+
+            case 'completed':
+              if (pendingTextDelta.length > 0) {
+                await persistAssistantSnapshot({
+                  kind: 'assistant_delta',
+                  textDelta: pendingTextDelta,
+                });
+                pendingTextDelta = '';
+              }
+              liveState = {
+                ...liveState,
+                citations: event.citations,
+                content: event.outputText,
+                filePathAnnotations: event.filePathAnnotations,
+                thinking: event.thinkingText,
+                toolCalls: event.toolCalls,
+              };
+              await persistAssistantSnapshot({
+                completedAt: deps.now().toISOString(),
+                kind: 'assistant_completed',
+              });
+              break;
+
+            case 'incomplete':
+              throw new Error(event.errorMessage ?? 'openai_response_incomplete');
+
+            case 'failed':
+              throw new Error(event.errorMessage);
+
+            case 'response_created':
+              break;
           }
         }
 
-        const assistantText = chunks.join('');
-        if (assistantText.length === 0) {
+        if (liveState.content.length === 0) {
           throw new Error('openai_response_empty');
         }
 
-        // Flush any remaining delta to D1
-        if (pendingDelta.length > 0) {
-          ({ conversation, run } = await persistProjectedEvent(deps, env, {
-            conversation,
-            event: createRunEventDraft(deps.now(), run, {
-              kind: 'assistant_delta',
-              textDelta: pendingDelta,
-            }),
-            message: null,
-            run,
-            syncMessageCursor: false,
-          }));
-        }
-
-        // Broadcast completion to SSE clients
         try {
           await deps.broadcastStreamDelta(env, conversation.id, {
             type: 'done',
             data: { runId: run.id, status: 'completed' },
           });
         } catch {
-          // Non-fatal
+          // Non-fatal.
         }
-
-        // Create the final assistant message with full text
-        const assistantMessage: MessageRecord = {
-          completedAt: deps.now().toISOString(),
-          content: assistantText,
-          conversationId: conversation.id,
-          createdAt: deps.now().toISOString(),
-          id: createMessageId(),
-          role: 'assistant',
-          runId: run.id,
-          serverCursor: null,
-        };
-        await deps.insertMessage(env, assistantMessage);
-
-        let projectedAssistantMessage: MessageRecord | null = assistantMessage;
-        ({
-          conversation,
-          run,
-          message: projectedAssistantMessage,
-        } = await persistProjectedEvent(deps, env, {
-          conversation,
-          event: createRunEventDraft(deps.now(), run, { kind: 'assistant_completed' }),
-          message: assistantMessage,
-          run,
-          syncMessageCursor: true,
-        }));
 
         const completedRun: RunRecord = {
           ...run,
           status: 'completed',
-          visibleSummary: truncateSummary(assistantText),
+          visibleSummary: truncateSummary(liveState.content),
         };
         ({ run } = await persistProjectedEvent(deps, env, {
           conversation,
           event: createRunEventDraft(deps.now(), completedRun, { kind: 'run_completed' }),
-          message: projectedAssistantMessage,
+          message: assistantMessage,
           run: completedRun,
           syncMessageCursor: false,
         }));

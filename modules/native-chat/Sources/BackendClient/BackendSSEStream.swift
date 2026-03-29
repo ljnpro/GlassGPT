@@ -1,5 +1,10 @@
 import Foundation
 
+public enum BackendSSEStreamError: Error, Equatable, Sendable {
+    case invalidHTTPResponse
+    case unacceptableStatusCode(Int)
+}
+
 /// A single event received from an SSE (Server-Sent Events) stream.
 public struct SSEEvent: Sendable {
     public let event: String
@@ -73,36 +78,55 @@ public enum SSELineParser {
 public struct BackendSSEStream: AsyncSequence, Sendable {
     public typealias Element = SSEEvent
 
-    private let url: URL
-    private let urlSession: URLSession
-    private let authorizationHeader: String?
+    fileprivate enum Source {
+        case network(url: URL, urlSession: URLSession, authorizationHeader: String?)
+        case scripted(events: [SSEEvent], setupError: BackendSSEStreamError?)
+    }
+
+    private let source: Source
 
     public init(url: URL, urlSession: URLSession, authorizationHeader: String?) {
-        self.url = url
-        self.urlSession = urlSession
-        self.authorizationHeader = authorizationHeader
+        source = .network(
+            url: url,
+            urlSession: urlSession,
+            authorizationHeader: authorizationHeader
+        )
+    }
+
+    package init(testEvents: [SSEEvent], setupError: BackendSSEStreamError? = nil) {
+        source = .scripted(events: testEvents, setupError: setupError)
     }
 
     public func makeAsyncIterator() -> AsyncIterator {
-        AsyncIterator(url: url, urlSession: urlSession, authorizationHeader: authorizationHeader)
+        AsyncIterator(source: source)
     }
 
     public struct AsyncIterator: AsyncIteratorProtocol {
-        private let url: URL
-        private let urlSession: URLSession
-        private let authorizationHeader: String?
+        private let source: Source
         private var lines: AsyncLineSequence<URLSession.AsyncBytes>.AsyncIterator?
         private var started = false
+        private var scriptedEvents: [SSEEvent] = []
+        private var scriptedIndex = 0
+        private var scriptedSetupError: BackendSSEStreamError?
 
-        init(url: URL, urlSession: URLSession, authorizationHeader: String?) {
-            self.url = url
-            self.urlSession = urlSession
-            self.authorizationHeader = authorizationHeader
+        fileprivate init(source: Source) {
+            self.source = source
+            if case let .scripted(events, setupError) = source {
+                scriptedEvents = events
+                scriptedSetupError = setupError
+            }
         }
 
         public mutating func next() async throws -> SSEEvent? {
+            if case .scripted = source {
+                return try scriptedNext()
+            }
+
             if !started {
                 started = true
+                guard case let .network(url, urlSession, authorizationHeader) = source else {
+                    return nil
+                }
                 var request = URLRequest(url: url)
                 request.setValue("text/event-stream", forHTTPHeaderField: "Accept")
                 request.setValue("no-cache", forHTTPHeaderField: "Cache-Control")
@@ -111,10 +135,11 @@ public struct BackendSSEStream: AsyncSequence, Sendable {
                 }
 
                 let (bytes, response) = try await urlSession.bytes(for: request)
-                guard let httpResponse = response as? HTTPURLResponse,
-                      (200 ..< 300).contains(httpResponse.statusCode)
-                else {
-                    return nil
+                guard let httpResponse = response as? HTTPURLResponse else {
+                    throw BackendSSEStreamError.invalidHTTPResponse
+                }
+                guard (200 ..< 300).contains(httpResponse.statusCode) else {
+                    throw BackendSSEStreamError.unacceptableStatusCode(httpResponse.statusCode)
                 }
                 lines = bytes.lines.makeAsyncIterator()
             }
@@ -171,6 +196,23 @@ public struct BackendSSEStream: AsyncSequence, Sendable {
             }
 
             return nil
+        }
+
+        private mutating func scriptedNext() throws -> SSEEvent? {
+            if !started {
+                started = true
+                if let scriptedSetupError {
+                    throw scriptedSetupError
+                }
+            }
+
+            guard scriptedIndex < scriptedEvents.count else {
+                return nil
+            }
+
+            let event = scriptedEvents[scriptedIndex]
+            scriptedIndex += 1
+            return event
         }
     }
 }

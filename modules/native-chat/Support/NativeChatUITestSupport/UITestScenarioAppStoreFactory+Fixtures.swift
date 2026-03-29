@@ -18,8 +18,14 @@ extension UITestScenarioAppStoreFactory {
                 isComplete: false
             )
         ]
+        controller.activeToolCalls = makeRichChatToolCalls()
+        controller.liveCitations = makeRichChatCitations()
+        controller.liveFilePathAnnotations = makeRichChatFileAnnotations()
         controller.currentThinkingText = "Reviewing synced project state"
-        controller.currentStreamingText = "Drafting the release summary with current backend state."
+        controller.currentStreamingText = """
+        Drafting the release summary with current backend state and linking \
+        [beta-5-plan.md](sandbox:/tmp/beta-5-plan.md).
+        """
         controller.isStreaming = true
         controller.isThinking = true
     }
@@ -29,15 +35,34 @@ extension UITestScenarioAppStoreFactory {
         controller.leaderReasoningEffort = .xhigh
         controller.workerReasoningEffort = .medium
         controller.serviceTier = .flex
-        controller.messages = makeRichAgentMessages()
+        controller.messages = makeRichAgentLiveMessages()
         controller.currentThinkingText = "Comparing worker findings"
-        controller.currentStreamingText = "Synthesizing the final review and release guidance."
+        controller.currentStreamingText = """
+        Synthesizing the final review and release guidance with \
+        [beta-5-report.md](sandbox:/tmp/beta-5-report.md).
+        """
         controller.activeToolCalls = makeRichAgentToolCalls()
         controller.liveCitations = makeRichAgentCitations()
         controller.liveFilePathAnnotations = makeRichAgentFileAnnotations()
         controller.isRunning = true
         controller.isThinking = true
         controller.processSnapshot = makeRichAgentProcessSnapshot()
+    }
+
+    static func seedRichAgentCompleted(into controller: BackendAgentController) {
+        controller.currentConversationID = UUID()
+        controller.leaderReasoningEffort = .xhigh
+        controller.workerReasoningEffort = .medium
+        controller.serviceTier = .flex
+        controller.messages = makeRichAgentCompletedMessages()
+        controller.currentThinkingText = ""
+        controller.currentStreamingText = ""
+        controller.activeToolCalls = []
+        controller.liveCitations = []
+        controller.liveFilePathAnnotations = []
+        controller.isRunning = false
+        controller.isThinking = false
+        controller.processSnapshot = AgentProcessSnapshot()
     }
 
     static func makeMessageSurface(
@@ -110,14 +135,51 @@ extension UITestScenarioAppStoreFactory {
         )
     }
 
-    private static func makeRichAgentMessages() -> [BackendMessageSurface] {
+    private static func makeRichAgentLiveMessages() -> [BackendMessageSurface] {
         [
             makeMessageSurface(role: .user, content: "Audit Beta 5.0 architecture quality.", isComplete: true),
             makeMessageSurface(
                 role: .assistant,
                 content: "The council is synthesizing the final architecture review.",
                 isComplete: false,
+                includeTrace: false
+            )
+        ]
+    }
+
+    private static func makeRichAgentCompletedMessages() -> [BackendMessageSurface] {
+        [
+            makeMessageSurface(role: .user, content: "Audit Beta 5.0 architecture quality.", isComplete: true),
+            makeMessageSurface(
+                role: .assistant,
+                content: "The council completed the final architecture review.",
+                isComplete: true,
                 includeTrace: true
+            )
+        ]
+    }
+
+    private static func makeRichChatToolCalls() -> [ToolCallInfo] {
+        [
+            ToolCallInfo(id: "tool_web", type: .webSearch, status: .searching, queries: ["beta 5.0 release notes"]),
+            ToolCallInfo(id: "tool_file", type: .fileSearch, status: .fileSearching, queries: ["beta-5-plan.md"]),
+            ToolCallInfo(id: "tool_code", type: .codeInterpreter, status: .interpreting, code: "print('release')")
+        ]
+    }
+
+    private static func makeRichChatCitations() -> [URLCitation] {
+        [URLCitation(url: "https://example.com/release", title: "Release Notes", startIndex: 0, endIndex: 7)]
+    }
+
+    private static func makeRichChatFileAnnotations() -> [FilePathAnnotation] {
+        [
+            FilePathAnnotation(
+                fileId: "file_1",
+                containerId: "container_1",
+                sandboxPath: "/tmp/beta-5-plan.md",
+                filename: "beta-5-plan.md",
+                startIndex: 0,
+                endIndex: 14
             )
         ]
     }
@@ -163,14 +225,12 @@ extension UITestScenarioAppStoreFactory {
                 )
             ],
             events: [
-                AgentEvent(kind: .synthesisStarted, summary: "Leader entered final synthesis"),
-                AgentEvent(kind: .taskCompleted, summary: "Worker A completed the UI audit")
+                AgentEvent(kind: .synthesisStarted, summary: "Leader entered final synthesis")
             ],
             evidence: [
-                "Serial package, architecture, app, and UI validation is green.",
-                "Coverage is now isolated to view-heavy SwiftUI files."
+                "Serial package, architecture, app, and UI validation is green."
             ],
-            activeTaskIDs: [],
+            activeTaskIDs: ["task_ci"],
             recentUpdateItems: makeRichAgentProcessUpdates(),
             stopReason: .sufficientAnswer,
             outcome: "Ready to finalize Beta 5.0 after the render-surface gate closes."
@@ -187,13 +247,6 @@ extension UITestScenarioAppStoreFactory {
                 summary: "Identify remaining quality blockers."
             ),
             AgentPlanStep(
-                id: "plan_workers",
-                owner: .workerA,
-                status: .completed,
-                title: "Validate UI and CI",
-                summary: "Confirm UI polish and strict CI status."
-            ),
-            AgentPlanStep(
                 id: "plan_final",
                 owner: .leader,
                 status: .running,
@@ -206,21 +259,7 @@ extension UITestScenarioAppStoreFactory {
     private static func makeRichAgentTasks() -> [AgentTask] {
         [
             AgentTask(
-                owner: .workerA,
-                title: "Audit UI states",
-                goal: "Verify settings, chat, and agent views",
-                expectedOutput: "UI polish findings",
-                contextSummary: "Focus on accessibility and continuity",
-                toolPolicy: .enabled,
-                status: .completed,
-                resultSummary: "UI states are consistent",
-                result: AgentTaskResult(
-                    summary: "UI states are consistent",
-                    evidence: ["Settings flows are stable", "Agent live summary is visible"],
-                    confidence: .high
-                )
-            ),
-            AgentTask(
+                id: "task_ci",
                 owner: .workerB,
                 title: "Check CI gates",
                 goal: "Confirm zero-warning build discipline",

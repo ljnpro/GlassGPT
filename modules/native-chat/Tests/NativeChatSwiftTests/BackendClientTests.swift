@@ -102,6 +102,39 @@ struct BackendClientTests {
 
     @MainActor
     @Test
+    func `stream run surfaces non-success stream setup as an explicit SSE error`() async throws {
+        RecordingBackendURLProtocol.state.reset()
+        RecordingBackendURLProtocol.state.enqueueResponse(
+            responseStatusCode: 401,
+            responseBody: Data()
+        )
+
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [RecordingBackendURLProtocol.self]
+        let session = URLSession(configuration: configuration)
+        let sessionStore = try BackendSessionStore(
+            session: makeSessionDTO()
+        )
+        let client = try BackendClient(
+            environment: BackendEnvironment(baseURL: #require(URL(string: "https://api.example.com"))),
+            sessionStore: sessionStore,
+            urlSession: session
+        )
+
+        var iterator = client.streamRun("run_stream_401").makeAsyncIterator()
+        do {
+            _ = try await iterator.next()
+            Issue.record("Expected unacceptable status code stream failure")
+        } catch let error as BackendSSEStreamError {
+            #expect(error == .unacceptableStatusCode(401))
+        } catch {
+            Issue.record("Unexpected error: \(error)")
+        }
+        session.invalidateAndCancel()
+    }
+
+    @MainActor
+    @Test
     func `SSE event struct stores event type data and optional id`() {
         let event = SSEEvent(event: "delta", data: "{\"textDelta\":\"hello\"}", id: "evt_1")
         #expect(event.event == "delta")
@@ -204,7 +237,7 @@ private final class RecordingBackendURLProtocol: URLProtocol {
             url: responseURL,
             statusCode: configuredResponse.responseStatusCode,
             httpVersion: nil,
-            headerFields: ["Content-Type": "application/json"]
+            headerFields: configuredResponse.responseHeaders
         )
         guard let response else {
             client?.urlProtocol(self, didFailWithError: URLError(.badServerResponse))
@@ -222,6 +255,7 @@ private final class RecordingBackendURLProtocolState: @unchecked Sendable {
     struct StubbedResponse {
         let responseStatusCode: Int
         let responseBody: Data
+        let responseHeaders: [String: String]
     }
 
     struct RecordedRequest: Equatable {
@@ -245,12 +279,17 @@ private final class RecordingBackendURLProtocolState: @unchecked Sendable {
         lock.unlock()
     }
 
-    func enqueueResponse(responseStatusCode: Int, responseBody: Data) {
+    func enqueueResponse(
+        responseStatusCode: Int,
+        responseBody: Data,
+        responseHeaders: [String: String] = ["Content-Type": "application/json"]
+    ) {
         lock.lock()
         responseQueue.append(
             StubbedResponse(
                 responseStatusCode: responseStatusCode,
-                responseBody: responseBody
+                responseBody: responseBody,
+                responseHeaders: responseHeaders
             )
         )
         lock.unlock()
@@ -270,7 +309,11 @@ private final class RecordingBackendURLProtocolState: @unchecked Sendable {
     func dequeueResponse() -> StubbedResponse {
         lock.lock()
         let response = responseQueue.isEmpty
-            ? StubbedResponse(responseStatusCode: 200, responseBody: Data())
+            ? StubbedResponse(
+                responseStatusCode: 200,
+                responseBody: Data(),
+                responseHeaders: ["Content-Type": "application/json"]
+            )
             : responseQueue.removeFirst()
         lock.unlock()
         return response

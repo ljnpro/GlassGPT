@@ -4,6 +4,7 @@ import type { ConversationRecord } from '../domain/conversation-model.js';
 import type { MessageRecord } from '../domain/message-model.js';
 import type { RunRecord } from '../domain/run-model.js';
 import type { ProviderCredentialRecord } from './auth-records.js';
+import type { LiveStreamEvent, StreamingConversationRequest } from './live-stream-model.js';
 import type { RunProjectionDependencies, WorkflowStarter } from './run-projection.js';
 import type { BackendRuntimeContext } from './runtime-context.js';
 
@@ -16,6 +17,10 @@ export interface AgentRunWorkflowParams {
 
 export interface AgentRunServiceDependencies extends RunProjectionDependencies {
   readonly createChatCompletion: (apiKey: string, input: string) => Promise<string>;
+  readonly createStreamingResponse: (
+    apiKey: string,
+    request: StreamingConversationRequest,
+  ) => AsyncGenerator<LiveStreamEvent, void, undefined>;
   readonly createStreamingChatCompletion: (
     apiKey: string,
     input: string,
@@ -38,6 +43,10 @@ export interface AgentRunServiceDependencies extends RunProjectionDependencies {
     userId: string,
     provider: 'openai',
   ) => Promise<ProviderCredentialRecord | null>;
+  readonly findAssistantMessageByRunId: (
+    env: BackendRuntimeContext,
+    runId: string,
+  ) => Promise<MessageRecord | null>;
   readonly findRunById: (env: BackendRuntimeContext, runId: string) => Promise<RunRecord | null>;
   readonly findRunByIdForUser: (
     env: BackendRuntimeContext,

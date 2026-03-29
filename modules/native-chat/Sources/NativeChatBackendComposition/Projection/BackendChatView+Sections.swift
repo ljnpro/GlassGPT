@@ -73,6 +73,7 @@ struct BackendChatMessageList: View {
                             isStreaming: viewModel.isStreaming,
                             thinkingPresentationState: viewModel.thinkingPresentationState,
                             liveCitations: viewModel.liveCitations,
+                            liveFilePathAnnotations: viewModel.liveFilePathAnnotations,
                             streamingThinkingExpanded: $streamingThinkingExpanded,
                             assistantBubbleMaxWidth: assistantBubbleMaxWidth
                         )

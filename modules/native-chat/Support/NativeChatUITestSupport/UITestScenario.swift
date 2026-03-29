@@ -4,7 +4,9 @@ package enum UITestScenario: String {
     case settings
     case preview
     case richChat
+    case richChatSelector
     case richAgent
+    case richAgentCompleted
     case richAgentSelector
     case signedInSettings
 
@@ -18,9 +20,11 @@ package enum UITestScenario: String {
             3
         case .richAgent:
             1
+        case .richAgentCompleted:
+            1
         case .richAgentSelector:
             1
-        case .empty, .preview, .richChat:
+        case .empty, .preview, .richChat, .richChatSelector:
             0
         }
     }

@@ -21,6 +21,8 @@ package struct DetachedStreamingBubbleView: View, Equatable {
     let thinkingPresentationState: ThinkingPresentationState?
     /// Citations collected during web search tool calls.
     let liveCitations: [URLCitation]
+    /// File-path annotations collected during streaming.
+    let liveFilePathAnnotations: [FilePathAnnotation]
     /// External binding controlling the thinking disclosure expanded state.
     @Binding var streamingThinkingExpanded: Bool?
     /// Maximum width for the assistant bubble.
@@ -46,6 +48,7 @@ package struct DetachedStreamingBubbleView: View, Equatable {
         isStreaming: Bool,
         thinkingPresentationState: ThinkingPresentationState?,
         liveCitations: [URLCitation],
+        liveFilePathAnnotations: [FilePathAnnotation],
         streamingThinkingExpanded: Binding<Bool?>,
         assistantBubbleMaxWidth: CGFloat
     ) {
@@ -56,6 +59,7 @@ package struct DetachedStreamingBubbleView: View, Equatable {
         self.isStreaming = isStreaming
         self.thinkingPresentationState = thinkingPresentationState
         self.liveCitations = liveCitations
+        self.liveFilePathAnnotations = liveFilePathAnnotations
         _streamingThinkingExpanded = streamingThinkingExpanded
         self.assistantBubbleMaxWidth = assistantBubbleMaxWidth
         renderKey = RenderKey(
@@ -66,6 +70,7 @@ package struct DetachedStreamingBubbleView: View, Equatable {
             isStreaming: isStreaming,
             thinkingPresentationState: thinkingPresentationState,
             liveCitations: liveCitations,
+            liveFilePathAnnotations: liveFilePathAnnotations,
             assistantBubbleMaxWidth: assistantBubbleMaxWidth
         )
     }
@@ -112,10 +117,18 @@ package struct DetachedStreamingBubbleView: View, Equatable {
             }
 
             if !currentStreamingText.isEmpty {
-                StreamingTextView(
-                    text: currentStreamingText,
-                    allowsSelection: false
-                )
+                if liveFilePathAnnotations.isEmpty {
+                    StreamingTextView(
+                        text: currentStreamingText,
+                        allowsSelection: false
+                    )
+                } else {
+                    MarkdownContentView(
+                        text: currentStreamingText,
+                        filePathAnnotations: liveFilePathAnnotations,
+                        surfaceStyle: .plain
+                    )
+                }
             } else if contentState.showsTypingIndicator {
                 TypingIndicator()
             }
@@ -150,6 +163,7 @@ private extension DetachedStreamingBubbleView {
         let isStreaming: Bool
         let thinkingPresentationState: ThinkingPresentationState?
         let liveCitations: [URLCitation]
+        let liveFilePathAnnotations: [FilePathAnnotation]
         let assistantBubbleMaxWidth: CGFloat
     }
 }

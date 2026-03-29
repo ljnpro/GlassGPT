@@ -1124,12 +1124,46 @@ Examples:
 EOF
 }
 
+function requested_gate_present() {
+  local requested_gate="$1"
+  local gate
+
+  for gate in "${requested_gates[@]}"; do
+    if [[ "$gate" == "$requested_gate" ]]; then
+      return 0
+    fi
+  done
+
+  return 1
+}
+
 function clean_outputs() {
-  find "$CI_OUTPUT_DIR" -maxdepth 1 -name '*.xcresult' -exec rm -rf {} + >/dev/null 2>&1 || true
-  find "$CI_OUTPUT_DIR" -maxdepth 1 -type f \( -name '*.log' -o -name '*.txt' -o -name '*.json' \) -delete
+  local preserve_prior_ui_results=0
+  local path basename
+
+  if requested_gate_present "coverage-report" && ! requested_gate_present "ui-tests"; then
+    preserve_prior_ui_results=1
+  fi
+
+  shopt -s nullglob
+  for path in "$CI_OUTPUT_DIR"/*.xcresult; do
+    basename="$(basename "$path")"
+    if [[ "$preserve_prior_ui_results" == "1" ]] && [[ "$basename" == glassgpt-ui-*.xcresult ]]; then
+      continue
+    fi
+    force_remove_path "$path"
+  done
+  shopt -u nullglob
+
+  if [[ "$preserve_prior_ui_results" == "1" ]]; then
+    find "$CI_OUTPUT_DIR" -maxdepth 1 -type f \
+      \( -name '*.log' -o -name '*.txt' -o -name '*.json' \) \
+      ! -name 'glassgpt-ui-*.log' \
+      -delete
+  else
+    find "$CI_OUTPUT_DIR" -maxdepth 1 -type f \( -name '*.log' -o -name '*.txt' -o -name '*.json' \) -delete
+  fi
   find "$CI_OUTPUT_DIR" -maxdepth 1 -name '*-serial-probe.log' -delete
-  find "$CI_OUTPUT_DIR" -maxdepth 1 -name 'glassgpt-ui-*.log' -delete
-  find "$CI_OUTPUT_DIR" -maxdepth 1 -name 'test*.xcresult' -exec rm -rf {} + >/dev/null 2>&1 || true
   if [[ "${PRESERVE_CI_DERIVED_DATA:-0}" != "1" ]]; then
     force_remove_path "$CI_DERIVED_DATA_DIR"
   fi
