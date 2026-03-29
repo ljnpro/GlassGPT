@@ -17,6 +17,8 @@ TODO_PATH="${TODO_PATH:-$ROOT_DIR/todo.md}"
 AUDIT_PATH="${AUDIT_PATH:-$ROOT_DIR/docs/audit-5.3.0.md}"
 FINAL_CI_EVIDENCE_PATH="${FINAL_CI_EVIDENCE_PATH:-$ROOT_DIR/.local/build/evidence/rel-001-final-ci.txt}"
 SMOKE_APP_VERSION="${SMOKE_APP_VERSION:-5.3.0}"
+SMOKE_MAX_ATTEMPTS="${SMOKE_MAX_ATTEMPTS:-10}"
+SMOKE_RETRY_DELAY_SECONDS="${SMOKE_RETRY_DELAY_SECONDS:-3}"
 
 # Source Cloudflare credentials if available (CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID)
 if [[ -f "$BACKEND_ENV_FILE" ]]; then
@@ -352,33 +354,55 @@ fi
 
 if (( SKIP_SMOKE == 0 )) && [[ -n "$DEPLOYED_URL" ]]; then
   log "Running post-deploy health check"
-  HEALTH_STATUS="$(
-    curl -sf \
-      -H "X-GlassGPT-App-Version: $SMOKE_APP_VERSION" \
-      "${DEPLOYED_URL}/healthz" 2>/dev/null || echo '{"ok":false}'
-  )"
-  HEALTH_PARSE="$(echo "$HEALTH_STATUS" | python3 -c "import json,sys; data=json.load(sys.stdin); print(f\"{data.get('ok', False)}\\t{data.get('appCompatibility', '')}\")" 2>/dev/null || echo $'False\t')"
-  IFS=$'\t' read -r HEALTH_OK HEALTH_COMPATIBILITY <<<"$HEALTH_PARSE"
+  SMOKE_PASSED=0
+  HEALTH_STATUS='{"ok":false}'
+  CONNECTION_STATUS='{}'
+  STREAM_STATUS='000'
+  HEALTH_OK='False'
+  HEALTH_COMPATIBILITY=''
+  CONNECTION_COMPATIBILITY=''
+  CONNECTION_BACKEND_VERSION=''
+  CONNECTION_MIN_APP_VERSION=''
 
-  CONNECTION_STATUS="$(
-    curl -sf \
-      -H "X-GlassGPT-App-Version: $SMOKE_APP_VERSION" \
-      "${DEPLOYED_URL}/v1/connection/check" 2>/dev/null || echo '{}'
-  )"
-  CONNECTION_PARSE="$(echo "$CONNECTION_STATUS" | python3 -c "import json,sys; data=json.load(sys.stdin); print(f\"{data.get('appCompatibility', '')}\\t{data.get('backendVersion', '')}\\t{data.get('minimumSupportedAppVersion', '')}\")" 2>/dev/null || echo $'\t\t')"
-  IFS=$'\t' read -r CONNECTION_COMPATIBILITY CONNECTION_BACKEND_VERSION CONNECTION_MIN_APP_VERSION <<<"$CONNECTION_PARSE"
-  STREAM_STATUS="$(
-    curl -s -o /dev/null -w '%{http_code}' \
-      -H "X-GlassGPT-App-Version: $SMOKE_APP_VERSION" \
-      "${DEPLOYED_URL}/v1/runs/release-smoke/stream"
-  )"
+  for (( attempt = 1; attempt <= SMOKE_MAX_ATTEMPTS; attempt += 1 )); do
+    HEALTH_STATUS="$(
+      curl -sf \
+        -H "X-GlassGPT-App-Version: $SMOKE_APP_VERSION" \
+        "${DEPLOYED_URL}/healthz" 2>/dev/null || echo '{"ok":false}'
+    )"
+    HEALTH_PARSE="$(echo "$HEALTH_STATUS" | python3 -c "import json,sys; data=json.load(sys.stdin); print(f\"{data.get('ok', False)}\\t{data.get('appCompatibility', '')}\")" 2>/dev/null || echo $'False\t')"
+    IFS=$'\t' read -r HEALTH_OK HEALTH_COMPATIBILITY <<<"$HEALTH_PARSE"
 
-  if [[ "$HEALTH_OK" == "True" ]] &&
-    [[ "$HEALTH_COMPATIBILITY" == "compatible" ]] &&
-    [[ "$CONNECTION_COMPATIBILITY" == "compatible" ]] &&
-    [[ "$STREAM_STATUS" == "401" ]] &&
-    [[ -n "$CONNECTION_BACKEND_VERSION" ]] &&
-    [[ -n "$CONNECTION_MIN_APP_VERSION" ]]; then
+    CONNECTION_STATUS="$(
+      curl -sf \
+        -H "X-GlassGPT-App-Version: $SMOKE_APP_VERSION" \
+        "${DEPLOYED_URL}/v1/connection/check" 2>/dev/null || echo '{}'
+    )"
+    CONNECTION_PARSE="$(echo "$CONNECTION_STATUS" | python3 -c "import json,sys; data=json.load(sys.stdin); print(f\"{data.get('appCompatibility', '')}\\t{data.get('backendVersion', '')}\\t{data.get('minimumSupportedAppVersion', '')}\")" 2>/dev/null || echo $'\t\t')"
+    IFS=$'\t' read -r CONNECTION_COMPATIBILITY CONNECTION_BACKEND_VERSION CONNECTION_MIN_APP_VERSION <<<"$CONNECTION_PARSE"
+    STREAM_STATUS="$(
+      curl -s -o /dev/null -w '%{http_code}' \
+        -H "X-GlassGPT-App-Version: $SMOKE_APP_VERSION" \
+        "${DEPLOYED_URL}/v1/runs/release-smoke/stream"
+    )"
+
+    if [[ "$HEALTH_OK" == "True" ]] &&
+      [[ "$HEALTH_COMPATIBILITY" == "compatible" ]] &&
+      [[ "$CONNECTION_COMPATIBILITY" == "compatible" ]] &&
+      [[ "$STREAM_STATUS" == "401" ]] &&
+      [[ -n "$CONNECTION_BACKEND_VERSION" ]] &&
+      [[ -n "$CONNECTION_MIN_APP_VERSION" ]]; then
+      SMOKE_PASSED=1
+      break
+    fi
+
+    if (( attempt < SMOKE_MAX_ATTEMPTS )); then
+      echo "Smoke check attempt ${attempt}/${SMOKE_MAX_ATTEMPTS} did not converge yet; retrying in ${SMOKE_RETRY_DELAY_SECONDS}s..." >&2
+      sleep "$SMOKE_RETRY_DELAY_SECONDS"
+    fi
+  done
+
+  if (( SMOKE_PASSED == 1 )); then
     echo "Health, compatibility, and stream-route checks passed: $DEPLOYED_URL"
     echo "Backend version: $CONNECTION_BACKEND_VERSION"
     echo "Minimum supported app version: $CONNECTION_MIN_APP_VERSION"
