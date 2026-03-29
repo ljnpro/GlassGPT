@@ -178,7 +178,7 @@ private final class OverrideRootFactory: NativeChatRootOverrideFactory {
 @MainActor
 private func hostBackendChatSurfaces(for chatController: BackendChatController) {
     hostView(
-        BackendChatTopBar(
+        BackendConversationTopBarSection(
             viewModel: chatController,
             onOpenSelector: {},
             onStartNewConversation: {}
@@ -215,7 +215,7 @@ private func hostBackendAgentSurfaces(
     emptyAgentController: BackendAgentController
 ) {
     hostView(
-        BackendAgentTopBar(
+        BackendConversationTopBarSection(
             viewModel: agentController,
             onOpenSelector: {},
             onStartNewConversation: {}

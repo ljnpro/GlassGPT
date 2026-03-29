@@ -105,4 +105,25 @@ struct GeneratedFileCacheEvictionTests {
         // Oldest entries should be gone
         #expect(store.existingCacheEntry(cacheKey: "f0", suggestedFilename: nil, bucket: .image) == nil)
     }
+
+    @Test func `memory pressure trim tightens image and document buckets`() async {
+        let (store, root) = makeTempCacheStore()
+        let manager = GeneratedFileCacheManager(cacheRootOverride: root)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let base = Date.now.addingTimeInterval(-180)
+        seedFile(store: store, cacheKey: "img-old", bucket: .image, sizeBytes: 100, modifiedAt: base)
+        seedFile(store: store, cacheKey: "img-new", bucket: .image, sizeBytes: 100, modifiedAt: base.addingTimeInterval(60))
+        seedFile(store: store, cacheKey: "doc-old", bucket: .document, sizeBytes: 100, modifiedAt: base)
+        seedFile(store: store, cacheKey: "doc-new", bucket: .document, sizeBytes: 100, modifiedAt: base.addingTimeInterval(60))
+
+        await manager.trimCachesForMemoryPressure(imageLimitBytes: 120, documentLimitBytes: 120)
+
+        #expect(store.cacheSize(for: .image) <= 120)
+        #expect(store.cacheSize(for: .document) <= 120)
+        #expect(store.existingCacheEntry(cacheKey: "img-old", suggestedFilename: nil, bucket: .image) == nil)
+        #expect(store.existingCacheEntry(cacheKey: "img-new", suggestedFilename: nil, bucket: .image) != nil)
+        #expect(store.existingCacheEntry(cacheKey: "doc-old", suggestedFilename: nil, bucket: .document) == nil)
+        #expect(store.existingCacheEntry(cacheKey: "doc-new", suggestedFilename: nil, bucket: .document) != nil)
+    }
 }

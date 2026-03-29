@@ -16,66 +16,80 @@ print(time.time())
 PY
 )"
 
-# Recording snapshots intentionally produces mismatches against committed references.
-# Keep going so we can copy the newly recorded images out of the simulator sandbox.
-set +e
-RECORD_SNAPSHOTS=1 ./scripts/ci.sh snapshot-tests,hosted-snapshot-tests
-ci_status=$?
-set -e
+copy_count=0
 
-python3 - "$ROOT_DIR" "$start_epoch" "$ci_status" <<'PY'
+function copy_suite_snapshots() {
+  local suite="$1"
+  local destination="$2"
+  python3 - "$suite" "$destination" "$start_epoch" <<'PY'
 import shutil
 import sys
 from pathlib import Path
 
-root_dir = Path(sys.argv[1])
-start_epoch = float(sys.argv[2])
-ci_status = int(sys.argv[3])
+suite = sys.argv[1]
+destination = Path(sys.argv[2])
+start_epoch = float(sys.argv[3])
 simulator_root = Path.home() / "Library/Developer/CoreSimulator/Devices"
 
-destinations = {
-    "SnapshotViewTests": root_dir / "modules/native-chat/Tests/NativeChatTests/__Snapshots__/SnapshotViewTests",
-    "ViewHostingCoverageTests": root_dir / "modules/native-chat/Tests/NativeChatSwiftTests/__Snapshots__/ViewHostingCoverageTests",
-}
+latest_by_name: dict[str, Path] = {}
+for path in simulator_root.rglob(f"{suite}/*.png"):
+    try:
+        stat = path.stat()
+    except FileNotFoundError:
+        continue
+    if stat.st_mtime < start_epoch:
+        continue
+    existing = latest_by_name.get(path.name)
+    if existing is None or stat.st_mtime > existing.stat().st_mtime:
+        latest_by_name[path.name] = path
 
-latest_by_suite: dict[str, dict[str, Path]] = {suite: {} for suite in destinations}
-direct_recorded_by_suite: dict[str, list[Path]] = {suite: [] for suite in destinations}
-
-for suite in destinations:
-    for path in simulator_root.rglob(f"{suite}/*.png"):
-        try:
-            stat = path.stat()
-        except FileNotFoundError:
-            continue
-        if stat.st_mtime < start_epoch:
-            continue
-        existing = latest_by_suite[suite].get(path.name)
-        if existing is None or stat.st_mtime > existing.stat().st_mtime:
-            latest_by_suite[suite][path.name] = path
-
+destination.mkdir(parents=True, exist_ok=True)
 copied = 0
-for suite, snapshot_dir in destinations.items():
-    snapshot_dir.mkdir(parents=True, exist_ok=True)
+for name, source in sorted(latest_by_name.items()):
+    shutil.copy2(source, destination / name)
+    copied += 1
 
-    for name, source in sorted(latest_by_suite[suite].items()):
-        destination = snapshot_dir / name
-        shutil.copy2(source, destination)
+for path in destination.glob("*.png"):
+    try:
+        stat = path.stat()
+    except FileNotFoundError:
+        continue
+    if stat.st_mtime >= start_epoch and path.name not in latest_by_name:
         copied += 1
 
-    for path in snapshot_dir.glob("*.png"):
-        try:
-            stat = path.stat()
-        except FileNotFoundError:
-            continue
-        if stat.st_mtime >= start_epoch and path.name not in latest_by_suite[suite]:
-            direct_recorded_by_suite[suite].append(path)
-            copied += 1
-
-if copied == 0:
-    if ci_status == 0:
-        print("Snapshots already up to date")
-        raise SystemExit(0)
-    raise SystemExit("No recorded snapshots were found in CoreSimulator temp directories or snapshot reference folders.")
-
-print(f"Recorded {copied} snapshot file(s) into snapshot reference directories")
+print(copied)
 PY
+}
+
+# Recording snapshots intentionally produces mismatches against committed references.
+# Run each snapshot gate independently so a missing-reference failure in the first
+# suite does not prevent the second suite from recording its references.
+set +e
+RECORD_SNAPSHOTS=1 ./scripts/ci.sh snapshot-tests
+snapshot_status=$?
+suite_copy_count="$(copy_suite_snapshots "SnapshotViewTests" "$ROOT_DIR/modules/native-chat/Tests/NativeChatTests/__Snapshots__/SnapshotViewTests")"
+copy_count=$(( copy_count + suite_copy_count ))
+RECORD_SNAPSHOTS=1 ./scripts/ci.sh hosted-snapshot-tests
+hosted_status=$?
+suite_copy_count="$(copy_suite_snapshots "ViewHostingCoverageTests" "$ROOT_DIR/modules/native-chat/Tests/NativeChatSwiftTests/__Snapshots__/ViewHostingCoverageTests")"
+copy_count=$(( copy_count + suite_copy_count ))
+set -e
+
+ci_status=0
+if (( snapshot_status != 0 )); then
+  ci_status=$snapshot_status
+fi
+if (( hosted_status != 0 )); then
+  ci_status=$hosted_status
+fi
+
+if (( copy_count == 0 )); then
+  if (( ci_status == 0 )); then
+    echo "Snapshots already up to date"
+    exit 0
+  fi
+  echo "No recorded snapshots were found in CoreSimulator temp directories or snapshot reference folders." >&2
+  exit 1
+fi
+
+echo "Recorded $copy_count snapshot file(s) into snapshot reference directories"

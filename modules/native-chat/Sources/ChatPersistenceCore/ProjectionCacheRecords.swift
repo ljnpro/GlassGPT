@@ -11,6 +11,10 @@ public struct ConversationProjectionRecord: Equatable, Sendable {
     public let updatedAt: Date
     public let lastRunServerID: String?
     public let lastSyncCursor: String?
+    public let model: String?
+    public let reasoningEffort: String?
+    public let agentWorkerReasoningEffort: String?
+    public let serviceTier: String?
 
     public init(
         serverID: String,
@@ -20,7 +24,11 @@ public struct ConversationProjectionRecord: Equatable, Sendable {
         createdAt: Date,
         updatedAt: Date,
         lastRunServerID: String?,
-        lastSyncCursor: String?
+        lastSyncCursor: String?,
+        model: String?,
+        reasoningEffort: String?,
+        agentWorkerReasoningEffort: String?,
+        serviceTier: String?
     ) {
         self.serverID = serverID
         self.accountID = accountID
@@ -30,6 +38,10 @@ public struct ConversationProjectionRecord: Equatable, Sendable {
         self.updatedAt = updatedAt
         self.lastRunServerID = lastRunServerID
         self.lastSyncCursor = lastSyncCursor
+        self.model = model
+        self.reasoningEffort = reasoningEffort
+        self.agentWorkerReasoningEffort = agentWorkerReasoningEffort
+        self.serviceTier = serviceTier
     }
 }
 

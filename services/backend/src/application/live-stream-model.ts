@@ -37,9 +37,14 @@ export interface StreamingConversationMessage {
   readonly role: 'assistant' | 'system' | 'user';
 }
 
+export type StreamingReasoningEffort = 'none' | 'low' | 'medium' | 'high' | 'xhigh';
+export type StreamingServiceTier = 'default' | 'flex';
+
 export interface StreamingConversationRequest {
   readonly input: string | readonly StreamingConversationMessage[];
   readonly model?: string;
+  readonly reasoningEffort?: StreamingReasoningEffort;
+  readonly serviceTier?: StreamingServiceTier;
 }
 
 export type LiveStreamEvent =

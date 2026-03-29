@@ -20,7 +20,14 @@ final class UITestBackendRequester: BackendRequesting {
         try makeRun(id: runID, kind: .agent)
     }
 
-    func createConversation(title: String, mode: ConversationModeDTO) async throws -> ConversationDTO {
+    func createConversation(
+        title: String,
+        mode: ConversationModeDTO,
+        model: ModelDTO?,
+        reasoningEffort: ReasoningEffortDTO?,
+        agentWorkerReasoningEffort: ReasoningEffortDTO?,
+        serviceTier: ServiceTierDTO?
+    ) async throws -> ConversationDTO {
         ConversationDTO(
             id: "conv_created_1",
             title: title,
@@ -28,7 +35,11 @@ final class UITestBackendRequester: BackendRequesting {
             createdAt: .now,
             updatedAt: .now,
             lastRunID: nil,
-            lastSyncCursor: nil
+            lastSyncCursor: nil,
+            model: model,
+            reasoningEffort: reasoningEffort,
+            agentWorkerReasoningEffort: agentWorkerReasoningEffort,
+            serviceTier: serviceTier
         )
     }
 
@@ -87,7 +98,7 @@ final class UITestBackendRequester: BackendRequesting {
         try makeRun(id: "run_agent_1", kind: .agent, conversationID: conversationID, summary: prompt)
     }
 
-    func streamRun(_ runID: String) -> BackendSSEStream {
+    func streamRun(_ runID: String, lastEventID _: String?) -> BackendSSEStream {
         var components = URLComponents()
         components.scheme = "https"
         components.host = "localhost"
@@ -102,6 +113,28 @@ final class UITestBackendRequester: BackendRequesting {
 
     func syncEvents(after cursor: String?) async throws -> SyncEnvelopeDTO {
         SyncEnvelopeDTO(nextCursor: cursor, events: [])
+    }
+
+    func updateConversationConfiguration(
+        _ conversationID: String,
+        model: ModelDTO?,
+        reasoningEffort: ReasoningEffortDTO?,
+        agentWorkerReasoningEffort: ReasoningEffortDTO?,
+        serviceTier: ServiceTierDTO?
+    ) async throws -> ConversationDTO {
+        ConversationDTO(
+            id: conversationID,
+            title: "UITest Conversation",
+            mode: agentWorkerReasoningEffort == nil ? .chat : .agent,
+            createdAt: .now,
+            updatedAt: .now,
+            lastRunID: nil,
+            lastSyncCursor: nil,
+            model: model,
+            reasoningEffort: reasoningEffort,
+            agentWorkerReasoningEffort: agentWorkerReasoningEffort,
+            serviceTier: serviceTier
+        )
     }
 
     func logout() async throws {}

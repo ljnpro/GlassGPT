@@ -8,11 +8,10 @@ upload must already be complete before starting the GitHub phase.
 
 ## Preconditions
 
-- current branch is the active release-preparation branch or the mirrored 5.0 release branch:
-  - `feature/beta-5.0-cloudflare-all-in`
-  - `codex/feature/beta-5.0-cloudflare-all-in`
-  - `stable-5.0`
-  - `codex/stable-5.0`
+- current branch is the active `5.3` release-preparation branch:
+  - `feature/release-5.3-*`
+  - `codex/feature/release-5.3-*`
+  - `codex/stable-5.3`
 - worktree is clean
 - `ios/GlassGPT/Config/Versions.xcconfig` matches the intended release
 - `.local/build` logs were reviewed manually
@@ -39,7 +38,7 @@ upload must already be complete before starting the GitHub phase.
 5. Read every remote log, not only failing jobs.
 6. If anything is noisy or incorrect, fix locally, commit, push, and watch again.
 7. Promote `main` only after the release branch is clean.
-8. Preserve the pre-5.0 rollback line when promoting `main`.
+8. Preserve the `stable-4.12` rollback line when promoting `main`.
 
 ## Remote CI Standard
 
@@ -55,7 +54,7 @@ Passing status alone is not enough. Successful logs still need manual review.
 
 ## Branch Promotion
 
-When promoting the first 5.0 line to `main`:
+When promoting the `5.3.x` line to `main`:
 
 - preserve the previous rollback line first when needed
 - fast-forward `main` when possible

@@ -8,13 +8,18 @@ package final class StreamEventBatcher<Event: Sendable> {
     private var flushTask: Task<Void, Never>?
     private let flushInterval: Duration
     private let onFlush: @MainActor ([Event]) async throws -> Void
+    private let onFlushError: @MainActor (Error) -> Void
 
     /// Creates a batcher with the given flush interval and callback.
     package init(
         flushInterval: Duration = .milliseconds(66),
+        onFlushError: @escaping @MainActor (Error) -> Void = { error in
+            assertionFailure("StreamEventBatcher onFlush threw: \(error)")
+        },
         onFlush: @escaping @MainActor ([Event]) async throws -> Void
     ) {
         self.flushInterval = flushInterval
+        self.onFlushError = onFlushError
         self.onFlush = onFlush
     }
 
@@ -59,7 +64,7 @@ package final class StreamEventBatcher<Event: Sendable> {
             } catch is CancellationError {
                 return
             } catch {
-                assertionFailure("StreamEventBatcher onFlush threw: \(error)")
+                onFlushError(error)
             }
         }
     }

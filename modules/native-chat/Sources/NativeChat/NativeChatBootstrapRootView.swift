@@ -19,6 +19,11 @@ public struct NativeChatBootstrapRootView: View {
 
     /// The bootstrapped root content or a storage-unavailable fallback.
     public var body: some View {
+        rootContent
+    }
+
+    @ViewBuilder
+    private var rootContent: some View {
         if let modelContainer = bootstrap.container {
             bootstrapContent(modelContainer: modelContainer)
         } else {

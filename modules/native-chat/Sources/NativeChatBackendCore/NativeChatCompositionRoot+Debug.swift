@@ -1,8 +1,6 @@
 import ChatPersistenceCore
+import ChatPresentation
 import Foundation
-#if DEBUG
-import NativeChatUI
-#endif
 import os
 
 #if DEBUG

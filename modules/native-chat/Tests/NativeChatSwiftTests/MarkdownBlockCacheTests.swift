@@ -48,6 +48,15 @@ struct MarkdownBlockCacheTests {
     }
 
     @Test
+    func `memory pressure clears cached markdown blocks`() {
+        let cache = MarkdownBlockCache()
+        _ = cache.parts(for: "# Initial")
+        cache.handleMemoryPressure()
+        let parts = cache.parts(for: "# After Pressure")
+        #expect(!parts.isEmpty)
+    }
+
+    @Test
     func `cache handles code blocks`() {
         let cache = MarkdownBlockCache()
         let parts = cache.parts(for: "```swift\nlet x = 1\n```")

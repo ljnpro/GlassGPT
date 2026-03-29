@@ -5,10 +5,10 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![CI](https://img.shields.io/badge/CI-hard--gated-brightgreen.svg)](#testing)
 
-GlassGPT is a native iOS and iPadOS chat client with a backend-owned Beta 5.0
-architecture. The app is written in Swift, SwiftUI, and SwiftData for the
-device experience, while Cloudflare-hosted backend services own execution,
-continuity, sync, and per-user session state.
+GlassGPT is a native iOS and iPadOS chat client on the `5.3.0` hardening line.
+The app is written in Swift, SwiftUI, and SwiftData for the device experience,
+while Cloudflare-hosted backend services own execution, continuity, sync, and
+per-user session state.
 
 Users sign in with Apple, enter their own OpenAI API key in the app, and then
 all model traffic flows through the backend. The client does not ship provider
@@ -34,6 +34,7 @@ graph TD
         B --> D["BackendAuth"]
         B --> E["SyncProjection"]
         E --> F["ChatProjectionPersistence"]
+        F --> P["ChatPersistenceModels"]
         G["NativeChatBackendComposition"] --> A
         G --> H["NativeChatBackendCore"]
         H --> B
@@ -56,6 +57,19 @@ graph TD
 The shipping app route is projection-only. The backend is the single authority
 for runs, events, sessions, sync cursors, and artifacts.
 
+## Documentation
+
+- API entrypoint:
+  [docs/api.md](/Applications/GlassGPT/docs/api.md)
+- Backend local development:
+  [docs/backend-local-development.md](/Applications/GlassGPT/docs/backend-local-development.md)
+- Testing strategy:
+  [docs/testing.md](/Applications/GlassGPT/docs/testing.md)
+- Release workflow:
+  [docs/release.md](/Applications/GlassGPT/docs/release.md)
+- 5.3.0 audit:
+  [docs/audit-5.3.0.md](/Applications/GlassGPT/docs/audit-5.3.0.md)
+
 ## Requirements
 
 | Tool   | Version |
@@ -64,7 +78,7 @@ for runs, events, sessions, sync cursors, and artifacts.
 | Swift  | 6.2+    |
 | iOS    | 26.0    |
 | Python | 3.14+   |
-| Node   | 25.2.1+ |
+| Node   | 22+     |
 | pnpm   | 10.33.0 |
 
 ## Getting Started
@@ -106,6 +120,7 @@ GlassGPT/
 │   │   ├── BackendSessionPersistence/
 │   │   ├── ChatDomain/
 │   │   ├── ChatPersistenceCore/
+│   │   ├── ChatPersistenceModels/
 │   │   ├── ChatPersistenceSwiftData/
 │   │   ├── ChatProjectionPersistence/
 │   │   ├── ChatPresentation/
@@ -145,13 +160,14 @@ Run the full orchestrated CI suite:
 ./scripts/ci.sh
 ```
 
-The Beta 5.0 CI contract is strict:
+The `5.3.0` CI contract is strict:
 
 - `0` warnings
 - `0` errors
 - `0` skipped tests
 - `0` avoidable noise
 - `0` `swiftlint:disable` directives
+- backend lane coverage thresholds enforced through Vitest V8 coverage
 
 ## Contributing
 

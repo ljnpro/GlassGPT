@@ -1,9 +1,12 @@
 import Foundation
 import ImageIO
+import OSLog
 import PDFKit
 import UIKit
 
 package enum GeneratedFilePreviewLoader {
+    private static let logger = Logger(subsystem: "GlassGPT", category: "files")
+
     package static func loadGeneratedImagePreview(
         from fileURL: URL,
         onFailure: ((String) -> Void)? = nil,
@@ -107,7 +110,7 @@ package enum GeneratedFilePreviewLoader {
         let message = "Failed to load generated \(kind) preview at \(fileURL.path): \(error.localizedDescription)"
         onFailure?(message)
         if logFailure {
-            NSLog("%@", message)
+            logger.error("\(message, privacy: .public)")
         }
     }
 }

@@ -181,7 +181,7 @@ final class NativeChatArchitectureTests: XCTestCase {
             "Project base config should define the backend URL scheme separately"
         )
         XCTAssertTrue(
-            projectBase.contains("BACKEND_BASE_URL_HOST = glassgpt-beta-5-0.glassgpt.workers.dev"),
+            projectBase.contains("BACKEND_BASE_URL_HOST = glassgpt-production.glassgpt.workers.dev"),
             "Project base config should define the backend URL host separately"
         )
         XCTAssertFalse(

@@ -1,10 +1,12 @@
 import BackendContracts
 import Foundation
 import Observation
+import OSLog
 
 @Observable
 @MainActor
 public final class BackendSessionStore {
+    private static let logger = Logger(subsystem: "GlassGPT", category: "recovery")
     private let persistence: (any BackendSessionPersisting)?
 
     public private(set) var currentSession: SessionDTO?
@@ -59,7 +61,7 @@ public final class BackendSessionStore {
         do {
             try persistence.saveSession(currentSession)
         } catch {
-            NSLog("%@", "Backend session persistence failed: \(error.localizedDescription)")
+            Self.logger.error("Backend session persistence failed: \(error.localizedDescription, privacy: .public)")
         }
     }
 }

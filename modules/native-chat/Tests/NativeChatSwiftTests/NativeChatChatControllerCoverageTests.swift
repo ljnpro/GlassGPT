@@ -19,7 +19,7 @@ struct NativeChatChatControllerCoverageTests {
         let controller = signedInHarness.makeChatController()
         controller.selectedImageData = Data([0x01])
         #expect(!controller.sendMessage(text: "Hello"))
-        #expect(controller.errorMessage == "Attachments are not available in Beta 5.0 yet.")
+        #expect(controller.errorMessage == "Attachments are not available in 5.3.0 yet.")
 
         controller.selectedImageData = nil
         controller.pendingAttachments = [FileAttachment(filename: "doc.pdf", fileType: "pdf")]
@@ -205,5 +205,40 @@ struct NativeChatChatControllerCoverageTests {
         #expect(controller.liveCitations.isEmpty)
         #expect(controller.liveFilePathAnnotations.isEmpty)
         #expect(!controller.shouldShowDetachedStreamingBubble)
+    }
+
+    @Test func `chat controller surfaces structured stream error messages instead of raw payload JSON`() async throws {
+        let harness = try makeNativeChatHarness(signedIn: true)
+        let controller = harness.makeChatController()
+        let conversation = makeHarnessConversation(serverID: "conv_chat_stream_error")
+        controller.setCurrentConversation(conversation)
+        controller.syncMessages()
+        harness.client.detail = try makeChatConversationDetailSnapshot(
+            conversationID: "conv_chat_stream_error",
+            runID: "run_chat_stream_error",
+            assistantContent: ""
+        )
+        harness.client.streamEvents = try [
+            SSEEvent(
+                event: "error",
+                data: makeJSONString([
+                    "code": "realtime_stream_unavailable",
+                    "message": "Realtime stream became unavailable. Please retry.",
+                    "phase": "relay"
+                ]),
+                id: nil
+            )
+        ]
+
+        await controller.streamOrPollRun(
+            conversationServerID: "conv_chat_stream_error",
+            runID: "run_chat_stream_error",
+            selectionToken: controller.visibleSelectionToken
+        )
+
+        #expect(harness.client.fetchRunCallCount == 0)
+        #expect(controller.errorMessage == "Realtime stream became unavailable. Please retry.")
+        #expect(controller.currentStreamingText.isEmpty)
+        #expect(controller.currentThinkingText.isEmpty)
     }
 }

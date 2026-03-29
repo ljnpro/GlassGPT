@@ -1,5 +1,6 @@
 import type { MessageRecord } from '../domain/message-model.js';
 import type { RunRecord } from '../domain/run-model.js';
+import { logError, sanitizeLogValue } from '../observability/logger.js';
 import {
   type AgentProcessSnapshotPayload,
   type AgentTaskPayload,
@@ -312,8 +313,28 @@ export const createAgentRunExecutionOperations = (
         userPrompt: input.userPrompt,
         workerReport: input.workerReport,
       });
+      const broadcastNonFatalDelta = async (
+        delta: Parameters<AgentRunServiceDependencies['broadcastStreamDelta']>[2],
+      ): Promise<void> => {
+        try {
+          await deps.broadcastStreamDelta(env, activeContext.conversation.id, delta);
+        } catch (error) {
+          logError('agent_final_synthesis_broadcast_failed', {
+            conversationId: activeContext.conversation.id,
+            errorMessage:
+              error instanceof Error ? sanitizeLogValue(error.message) : 'unknown_error',
+            runId: input.runId,
+            stage: 'final_synthesis',
+            type: delta.type,
+          });
+        }
+      };
 
-      for await (const event of deps.createStreamingResponse(apiKey, { input: prompt })) {
+      for await (const event of deps.createStreamingResponse(apiKey, {
+        input: prompt,
+        reasoningEffort: activeContext.conversation.reasoningEffort ?? 'high',
+        serviceTier: activeContext.conversation.serviceTier ?? 'default',
+      })) {
         streamEventCount += 1;
         if (streamEventCount % 20 === 0) {
           const latestRun = await deps.findRunById(env, input.runId);
@@ -329,18 +350,14 @@ export const createAgentRunExecutionOperations = (
               content: liveState.content + event.textDelta,
             };
             pendingTextDelta += event.textDelta;
-            try {
-              await deps.broadcastStreamDelta(env, activeContext.conversation.id, {
-                type: 'delta',
-                data: {
-                  runId: input.runId,
-                  stage: 'final_synthesis',
-                  textDelta: event.textDelta,
-                },
-              });
-            } catch {
-              // Non-fatal.
-            }
+            await broadcastNonFatalDelta({
+              type: 'delta',
+              data: {
+                runId: input.runId,
+                stage: 'final_synthesis',
+                textDelta: event.textDelta,
+              },
+            });
             if (pendingTextDelta.length >= 24) {
               await persistAssistantSnapshot({
                 kind: 'assistant_delta',
@@ -355,18 +372,14 @@ export const createAgentRunExecutionOperations = (
               ...liveState,
               thinking: `${liveState.thinking ?? ''}${event.thinkingDelta}`,
             };
-            try {
-              await deps.broadcastStreamDelta(env, activeContext.conversation.id, {
-                type: 'thinking_delta',
-                data: {
-                  runId: input.runId,
-                  stage: 'final_synthesis',
-                  thinkingDelta: event.thinkingDelta,
-                },
-              });
-            } catch {
-              // Non-fatal.
-            }
+            await broadcastNonFatalDelta({
+              type: 'thinking_delta',
+              data: {
+                runId: input.runId,
+                stage: 'final_synthesis',
+                thinkingDelta: event.thinkingDelta,
+              },
+            });
             await persistAssistantSnapshot({
               kind: 'run_progress',
               progressLabel: 'Synthesizing final answer',
@@ -374,14 +387,10 @@ export const createAgentRunExecutionOperations = (
             break;
 
           case 'thinking_finished':
-            try {
-              await deps.broadcastStreamDelta(env, activeContext.conversation.id, {
-                type: 'thinking_done',
-                data: { runId: input.runId, stage: 'final_synthesis' },
-              });
-            } catch {
-              // Non-fatal.
-            }
+            await broadcastNonFatalDelta({
+              type: 'thinking_done',
+              data: { runId: input.runId, stage: 'final_synthesis' },
+            });
             break;
 
           case 'tool_call_updated':
@@ -392,18 +401,14 @@ export const createAgentRunExecutionOperations = (
                 event.toolCall,
               ],
             };
-            try {
-              await deps.broadcastStreamDelta(env, activeContext.conversation.id, {
-                type: 'tool_call_update',
-                data: {
-                  runId: input.runId,
-                  stage: 'final_synthesis',
-                  toolCall: event.toolCall,
-                },
-              });
-            } catch {
-              // Non-fatal.
-            }
+            await broadcastNonFatalDelta({
+              type: 'tool_call_update',
+              data: {
+                runId: input.runId,
+                stage: 'final_synthesis',
+                toolCall: event.toolCall,
+              },
+            });
             await persistAssistantSnapshot({
               kind: 'run_progress',
               progressLabel: 'Using tools during synthesis',
@@ -415,18 +420,14 @@ export const createAgentRunExecutionOperations = (
               ...liveState,
               citations: [...liveState.citations, event.citation],
             };
-            try {
-              await deps.broadcastStreamDelta(env, activeContext.conversation.id, {
-                type: 'citations_update',
-                data: {
-                  citations: liveState.citations,
-                  runId: input.runId,
-                  stage: 'final_synthesis',
-                },
-              });
-            } catch {
-              // Non-fatal.
-            }
+            await broadcastNonFatalDelta({
+              type: 'citations_update',
+              data: {
+                citations: liveState.citations,
+                runId: input.runId,
+                stage: 'final_synthesis',
+              },
+            });
             await persistAssistantSnapshot({
               kind: 'run_progress',
               progressLabel: 'Collecting citations during synthesis',
@@ -438,18 +439,14 @@ export const createAgentRunExecutionOperations = (
               ...liveState,
               filePathAnnotations: [...liveState.filePathAnnotations, event.annotation],
             };
-            try {
-              await deps.broadcastStreamDelta(env, activeContext.conversation.id, {
-                type: 'file_path_annotations_update',
-                data: {
-                  filePathAnnotations: liveState.filePathAnnotations,
-                  runId: input.runId,
-                  stage: 'final_synthesis',
-                },
-              });
-            } catch {
-              // Non-fatal.
-            }
+            await broadcastNonFatalDelta({
+              type: 'file_path_annotations_update',
+              data: {
+                filePathAnnotations: liveState.filePathAnnotations,
+                runId: input.runId,
+                stage: 'final_synthesis',
+              },
+            });
             await persistAssistantSnapshot({
               kind: 'run_progress',
               progressLabel: 'Updating file references during synthesis',
@@ -497,21 +494,23 @@ export const createAgentRunExecutionOperations = (
     },
 
     executeLeaderPlanning: async (env, input) => {
-      const leaderPlan = await support.completeStageText(env, {
-        prompt: buildLeaderPlanningPrompt(input.prompt),
-        runId: input.runId,
-        userId: input.userId,
-      });
-      if (!leaderPlan) {
-        return null;
-      }
-
       const activeContext = await support.loadActiveExecutionContext(
         env,
         input.runId,
         input.userId,
       );
       if (!activeContext) {
+        return null;
+      }
+
+      const leaderPlan = await support.completeStageText(env, {
+        prompt: buildLeaderPlanningPrompt(input.prompt),
+        reasoningEffort: activeContext.conversation.reasoningEffort ?? 'high',
+        runId: input.runId,
+        serviceTier: activeContext.conversation.serviceTier ?? 'default',
+        userId: input.userId,
+      });
+      if (!leaderPlan) {
         return null;
       }
 
@@ -603,25 +602,27 @@ export const createAgentRunExecutionOperations = (
     },
 
     executeLeaderReview: async (env, input) => {
-      const leaderReview = await support.completeStageText(env, {
-        prompt: buildLeaderReviewPrompt({
-          leaderPlan: input.leaderPlan,
-          userPrompt: input.userPrompt,
-          workerReport: input.workerReport,
-        }),
-        runId: input.runId,
-        userId: input.userId,
-      });
-      if (!leaderReview) {
-        return null;
-      }
-
       const activeContext = await support.loadActiveExecutionContext(
         env,
         input.runId,
         input.userId,
       );
       if (!activeContext) {
+        return null;
+      }
+
+      const leaderReview = await support.completeStageText(env, {
+        prompt: buildLeaderReviewPrompt({
+          leaderPlan: input.leaderPlan,
+          userPrompt: input.userPrompt,
+          workerReport: input.workerReport,
+        }),
+        reasoningEffort: activeContext.conversation.reasoningEffort ?? 'high',
+        runId: input.runId,
+        serviceTier: activeContext.conversation.serviceTier ?? 'default',
+        userId: input.userId,
+      });
+      if (!leaderReview) {
         return null;
       }
 
@@ -699,24 +700,26 @@ export const createAgentRunExecutionOperations = (
     },
 
     executeWorkerWave: async (env, input) => {
-      const workerReport = await support.completeStageText(env, {
-        prompt: buildWorkerWavePrompt({
-          leaderPlan: input.leaderPlan,
-          userPrompt: input.userPrompt,
-        }),
-        runId: input.runId,
-        userId: input.userId,
-      });
-      if (!workerReport) {
-        return null;
-      }
-
       const activeContext = await support.loadActiveExecutionContext(
         env,
         input.runId,
         input.userId,
       );
       if (!activeContext) {
+        return null;
+      }
+
+      const workerReport = await support.completeStageText(env, {
+        prompt: buildWorkerWavePrompt({
+          leaderPlan: input.leaderPlan,
+          userPrompt: input.userPrompt,
+        }),
+        reasoningEffort: activeContext.conversation.agentWorkerReasoningEffort ?? 'low',
+        runId: input.runId,
+        serviceTier: activeContext.conversation.serviceTier ?? 'default',
+        userId: input.userId,
+      });
+      if (!workerReport) {
         return null;
       }
 

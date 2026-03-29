@@ -6,7 +6,8 @@ import type {
   StreamingConversationMessage,
   StreamingConversationRequest,
 } from '../../application/live-stream-model.js';
-import { openAiCircuitBreaker } from './circuit-breaker.js';
+import { logError, sanitizeLogValue } from '../../observability/logger.js';
+import { openAiCircuitBreakerKey, openAiCircuitBreakers } from './circuit-breaker.js';
 import {
   extractCitations,
   extractErrorMessage,
@@ -104,9 +105,11 @@ const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout
 const fetchWithRetry = async (
   url: string,
   init: RequestInit,
+  breakerKey: string,
   timeoutMs: number,
 ): Promise<Response> => {
-  if (openAiCircuitBreaker.isOpen) {
+  const breaker = openAiCircuitBreakers.breakerFor(breakerKey);
+  if (breaker.isOpen) {
     throw new OpenAiApiError('circuit_breaker_open', 503, null);
   }
 
@@ -121,7 +124,7 @@ const fetchWithRetry = async (
       clearTimeout(timeoutId);
 
       if (response.ok) {
-        openAiCircuitBreaker.recordSuccess();
+        breaker.recordSuccess();
         return response;
       }
 
@@ -135,7 +138,7 @@ const fetchWithRetry = async (
       );
 
       if (!error.isRetryable || attempt === MAX_RETRIES) {
-        openAiCircuitBreaker.recordFailure();
+        breaker.recordFailure();
         throw error;
       }
 
@@ -178,9 +181,10 @@ const buildRequestBody = (request: StreamingConversationRequest) => {
     input: buildInputMessages(request.input),
     model: request.model ?? DEFAULT_CHAT_MODEL,
     reasoning: {
-      effort: DEFAULT_REASONING_EFFORT,
+      effort: request.reasoningEffort ?? DEFAULT_REASONING_EFFORT,
       summary: 'auto',
     },
+    service_tier: request.serviceTier,
     store: true,
     stream: true,
     tools: [
@@ -324,6 +328,11 @@ export const createChatCompletion = async (
   apiKey: string,
   input: string | readonly StreamingConversationMessage[],
 ): Promise<string> => {
+  const breakerKey = openAiCircuitBreakerKey({
+    apiKey,
+    model: DEFAULT_CHAT_MODEL,
+    serviceTier: 'default',
+  });
   const response = await fetchWithRetry(
     'https://api.openai.com/v1/responses',
     {
@@ -337,6 +346,7 @@ export const createChatCompletion = async (
       },
       method: 'POST',
     },
+    breakerKey,
     timeoutForModel(DEFAULT_CHAT_MODEL),
   );
 
@@ -353,6 +363,11 @@ export async function* createStreamingResponse(
   apiKey: string,
   request: StreamingConversationRequest,
 ): AsyncGenerator<LiveStreamEvent, void, undefined> {
+  const breakerKey = openAiCircuitBreakerKey({
+    apiKey,
+    model: request.model ?? DEFAULT_CHAT_MODEL,
+    serviceTier: request.serviceTier ?? 'default',
+  });
   const response = await fetchWithRetry(
     'https://api.openai.com/v1/responses',
     {
@@ -363,6 +378,7 @@ export async function* createStreamingResponse(
       },
       method: 'POST',
     },
+    breakerKey,
     timeoutForModel(request.model ?? DEFAULT_CHAT_MODEL),
   );
 
@@ -555,8 +571,12 @@ export async function* createStreamingResponse(
                 default:
                   break;
               }
-            } catch {
-              // Skip unparseable events.
+            } catch (error) {
+              logError('openai_stream_event_decode_failed', {
+                errorMessage:
+                  error instanceof Error ? sanitizeLogValue(error.message) : 'unknown_error',
+                rawEvent: sanitizeLogValue(eventData),
+              });
             }
 
             eventData = '';

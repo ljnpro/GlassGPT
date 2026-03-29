@@ -3,6 +3,7 @@ import { createAuthService } from '../application/auth-service.js';
 import { createChatRunService } from '../application/chat-run-service.js';
 import { createConversationService } from '../application/conversation-service.js';
 import { createCredentialService } from '../application/credential-service.js';
+import { createRateLimitService } from '../application/rate-limit-service.js';
 import { createRunService } from '../application/run-service.js';
 import { createSyncService } from '../application/sync-service.js';
 import { validateOpenAiApiKey } from './openai/openai-client.js';
@@ -15,6 +16,7 @@ import {
   findConversationByIdForUser,
   insertConversation,
   listConversationsForUser,
+  updateConversationConfiguration,
   updateConversationPointers,
 } from './persistence/conversation-repository.js';
 import {
@@ -29,6 +31,11 @@ import {
   findProviderCredential,
   upsertProviderCredential,
 } from './persistence/provider-credential-repository.js';
+import {
+  loadRateLimitWindow,
+  pruneRateLimitWindows,
+  saveRateLimitWindow,
+} from './persistence/rate-limit-repository.js';
 import {
   insertRunEvent,
   listRunEventsForUser,
@@ -112,6 +119,12 @@ export const createBackendServices = () => {
     findRunByIdForUser,
   });
 
+  const rateLimitService = createRateLimitService({
+    loadRateLimitWindow,
+    pruneRateLimitWindows,
+    saveRateLimitWindow,
+  });
+
   return {
     authService: createAuthService({
       findSessionById,
@@ -143,9 +156,11 @@ export const createBackendServices = () => {
       listMessagesForConversation,
       listRunsForConversation,
       now: () => new Date(),
+      updateConversationConfiguration,
     }),
     agentRunService,
     chatRunService,
+    rateLimitService,
     syncService: createSyncService({
       listRunEventsForUser,
     }),

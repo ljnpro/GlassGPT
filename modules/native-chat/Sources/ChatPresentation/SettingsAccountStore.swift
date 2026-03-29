@@ -69,7 +69,13 @@ public final class SettingsAccountStore {
         guard isSignedIn else {
             return .missing
         }
+        if let connectionStatus, connectionStatus.appCompatibility == .updateRequired {
+            return .invalid
+        }
         guard let connectionStatus else {
+            if lastErrorMessage != nil {
+                return .unavailable
+            }
             return nil
         }
         if connectionStatus.backend == .healthy,
@@ -93,7 +99,13 @@ public final class SettingsAccountStore {
         guard isSignedIn else {
             return String(localized: "Not Available")
         }
+        if let connectionStatus, connectionStatus.appCompatibility == .updateRequired {
+            return String(localized: "App Update Required")
+        }
         guard let connectionStatus else {
+            if lastErrorMessage != nil {
+                return String(localized: "Connection Check Failed")
+            }
             return String(localized: "Ready to Verify")
         }
         if connectionStatus.backend == .healthy,
@@ -111,6 +123,29 @@ public final class SettingsAccountStore {
             return String(localized: "Backend Unavailable")
         }
         return String(localized: "Needs Attention")
+    }
+
+    public var syncStatusDetailText: String? {
+        guard isSignedIn else {
+            return nil
+        }
+        if let connectionStatus, connectionStatus.appCompatibility == .updateRequired {
+            return String(
+                localized: "Install GlassGPT \(connectionStatus.minimumSupportedAppVersion) or newer."
+            )
+        }
+        return lastCheckedText.map { String(localized: "Last checked \($0)") }
+    }
+
+    public var compatibilityMessage: String? {
+        guard let connectionStatus, connectionStatus.appCompatibility == .updateRequired else {
+            return nil
+        }
+        let backendVersion = connectionStatus.backendVersion
+        let minimumSupportedVersion = connectionStatus.minimumSupportedAppVersion
+        return String(
+            localized: "Backend \(backendVersion) requires app version \(minimumSupportedVersion) or newer."
+        )
     }
 
     public var lastCheckedText: String? {
@@ -155,15 +190,7 @@ public final class SettingsAccountStore {
             lastErrorMessage = nil
         } catch {
             lastErrorMessage = error.localizedDescription
-            connectionStatus = ConnectionCheckDTO(
-                backend: .unavailable,
-                auth: sessionStore.isSignedIn ? .unauthorized : .missing,
-                openaiCredential: .missing,
-                sse: .unavailable,
-                checkedAt: Date(),
-                latencyMilliseconds: nil,
-                errorSummary: error.localizedDescription
-            )
+            connectionStatus = nil
         }
     }
 

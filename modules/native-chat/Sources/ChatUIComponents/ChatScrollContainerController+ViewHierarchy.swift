@@ -14,7 +14,16 @@ extension ChatScrollContainerController {
         scrollView.contentInsetAdjustmentBehavior = .never
         view.addSubview(scrollView)
 
-        let tapGesture = UITapGestureRecognizer(target: self, action: #selector(handleBackgroundTap))
+        backgroundTapTarget.handler = { [weak self] in
+            self?.onBackgroundTap?()
+        }
+        let contentSizeRelay = ChatScrollContainerContentSizeRelay { [weak self] in
+            self?.handleObservedContentSizeChange()
+        }
+        let tapGesture = UITapGestureRecognizer(
+            target: backgroundTapTarget,
+            action: #selector(ChatScrollContainerTapTarget.handleTap)
+        )
         tapGesture.cancelsTouchesInView = false
         tapGesture.delegate = self
         scrollView.addGestureRecognizer(tapGesture)
@@ -62,16 +71,10 @@ extension ChatScrollContainerController {
             contentHostingController.view.widthAnchor.constraint(equalTo: scrollView.frameLayoutGuide.widthAnchor)
         ])
 
-        contentSizeObservation = scrollView.observe(\.contentSize, options: [.new]) { [weak self] _, _ in
-            guard let self else { return }
-            DispatchQueue.main.async { [weak self] in
-                self?.handleObservedContentSizeChange()
+        contentSizeObservation = scrollView.observe(\.contentSize, options: [.new]) { [contentSizeRelay] _, _ in
+            Task {
+                await contentSizeRelay.notifyChange()
             }
         }
-    }
-
-    @objc
-    func handleBackgroundTap() {
-        onBackgroundTap?()
     }
 }

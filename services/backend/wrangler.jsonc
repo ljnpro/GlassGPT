@@ -1,6 +1,6 @@
 {
   "$schema": "../../node_modules/wrangler/config-schema.json",
-  "name": "glassgpt-beta-5-0",
+  "name": "glassgpt-development",
   "main": "src/worker.ts",
   "compatibility_date": "2026-03-27",
   "compatibility_flags": ["nodejs_compat"],
@@ -20,20 +20,21 @@
     }
   },
   "vars": {
-    "APP_ENV": "beta",
-    "R2_BUCKET_NAME": "glassgpt-beta-artifacts"
+    "APP_ENV": "development",
+    "R2_BUCKET_NAME": "glassgpt-dev-artifacts",
+    "CORS_ALLOWED_ORIGINS": "https://glassgpt.com,https://beta.glassgpt.com,https://staging.glassgpt.com,http://localhost:3000,http://127.0.0.1:3000,http://localhost:5173,http://127.0.0.1:5173"
   },
   "d1_databases": [
     {
       "binding": "GLASSGPT_DB",
-      "database_name": "glassgpt_beta_5_0",
+      "database_name": "glassgpt_development",
       "database_id": "e51a1e23-f89d-4b55-93a1-f80b1225a3ad"
     }
   ],
   "r2_buckets": [
     {
       "binding": "GLASSGPT_ARTIFACTS",
-      "bucket_name": "glassgpt-beta-artifacts"
+      "bucket_name": "glassgpt-dev-artifacts"
     }
   ],
   "durable_objects": {

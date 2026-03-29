@@ -1,5 +1,6 @@
 import ChatUIComponents
 import SwiftUI
+import UIKit
 
 /// A lightweight text view optimised for streaming.
 ///
@@ -31,6 +32,9 @@ public struct StreamingTextView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .accessibilityLabel(sanitisedText)
             .accessibilityIdentifier("chat.streamingText")
+            .onReceive(NotificationCenter.default.publisher(for: UIApplication.didReceiveMemoryWarningNotification)) { _ in
+                cache.handleMemoryPressure()
+            }
     }
 
     /// Strip LaTeX delimiters and fenced code-block markers so the

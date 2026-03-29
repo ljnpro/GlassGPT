@@ -44,6 +44,7 @@ import {
   sessionSchema,
   startAgentRunRequestSchema,
   syncEnvelopeSchema,
+  updateConversationConfigurationRequestSchema,
   userSchema,
 } from './index.js';
 
@@ -61,6 +62,7 @@ const schemaMap = {
   ConversationListDTO: conversationListSchema,
   CreateConversationRequestDTO: createConversationRequestSchema,
   CreateMessageRequestDTO: createMessageRequestSchema,
+  UpdateConversationConfigurationRequestDTO: updateConversationConfigurationRequestSchema,
   CredentialStatusDTO: credentialStatusSchema,
   ErrorDTO: errorResponseSchema,
   MessageDTO: messageSchema,
@@ -100,7 +102,7 @@ const openApiDocument = {
   openapi: '3.1.0',
   info: {
     title: 'GlassGPT Backend API',
-    version: '5.0.0-beta.1',
+    version: '5.3.0',
   },
   paths: {
     '/v1/auth/apple': {
@@ -157,6 +159,21 @@ const openApiDocument = {
             content: {
               'application/json': {
                 schema: { $ref: '#/components/schemas/RunSummaryDTO' },
+              },
+            },
+          },
+        },
+      },
+    },
+    '/v1/conversations/{conversationId}/configuration': {
+      patch: {
+        operationId: 'updateConversationConfiguration',
+        responses: {
+          '200': {
+            description: 'Updates the authoritative backend configuration for a conversation.',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ConversationDTO' },
               },
             },
           },

@@ -1,4 +1,5 @@
 import {
+  APP_VERSION_HEADER,
   buildConnectionCheck,
   buildUnsignedConnectionCheck,
   healthStateForCredentialStatus,
@@ -11,9 +12,10 @@ import type { BackendApp } from '../types.js';
 
 export const installConnectionRoutes = (app: BackendApp, services: BackendServices): void => {
   app.get('/v1/connection/check', async (context) => {
+    const clientAppVersion = context.req.header(APP_VERSION_HEADER) ?? undefined;
     const accessToken = readBearerToken(context.req.header('Authorization'));
     if (!accessToken) {
-      return context.json(buildUnsignedConnectionCheck());
+      return context.json(buildUnsignedConnectionCheck(clientAppVersion));
     }
 
     try {
@@ -29,6 +31,7 @@ export const installConnectionRoutes = (app: BackendApp, services: BackendServic
       return context.json(
         buildConnectionCheck({
           auth: 'healthy',
+          clientAppVersion,
           latencyMs: 0,
           openaiCredential: healthStateForCredentialStatus(credentialStatus.state),
         }),
@@ -41,6 +44,7 @@ export const installConnectionRoutes = (app: BackendApp, services: BackendServic
       return context.json(
         buildConnectionCheck({
           auth: 'unauthorized',
+          clientAppVersion,
           errorSummary: 'authentication_failed',
           latencyMs: 0,
           openaiCredential: 'missing',

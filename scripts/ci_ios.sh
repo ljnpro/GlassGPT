@@ -14,7 +14,7 @@ REQUESTED_GATES="${1:-$DEFAULT_IOS_GATES}"
 cd "$ROOT_DIR"
 
 python3 ./scripts/check_no_swiftlint_disable.py ios modules/native-chat
-python3 ./scripts/check_legacy_beta5_cutover.py
+python3 ./scripts/check_release_cutover_residue.py
 python3 ./scripts/check_forbidden_legacy_symbols.py modules/native-chat/Sources ios/GlassGPT
 python3 ./scripts/check_test_target_ownership.py
 ./scripts/ci_ios_engine.sh "$REQUESTED_GATES"

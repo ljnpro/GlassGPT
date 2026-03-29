@@ -6,6 +6,8 @@ import { ZodError } from 'zod';
 
 import { isApplicationError } from '../application/errors.js';
 import { logError, sanitizeLogValue } from '../observability/logger.js';
+import { resolveCorsOrigin } from './middleware/cors-policy.js';
+import { createRateLimiterMiddleware } from './middleware/rate-limiter.js';
 import { requestIdMiddleware } from './middleware/request-id.js';
 import { installArtifactRoutes } from './routes/artifacts.js';
 import { installAuthRoutes } from './routes/auth.js';
@@ -17,7 +19,7 @@ import { installRunStreamRoutes } from './routes/run-stream.js';
 import { installRunRoutes } from './routes/runs.js';
 import { installSyncRoutes } from './routes/sync.js';
 import type { BackendServices } from './services.js';
-import type { BackendApp } from './types.js';
+import type { BackendApp, BackendAppContext } from './types.js';
 
 type ApplicationErrorStatusCode = 400 | 401 | 403 | 404 | 409 | 500;
 
@@ -39,20 +41,20 @@ const statusCodeForApplicationError = (code: string): ApplicationErrorStatusCode
 };
 
 export const createApp = (services: BackendServices): BackendApp => {
-  const app = new Hono<{ Bindings: Env }>();
+  const app = new Hono<BackendAppContext>();
 
   app.use(
     '*',
     cors({
       allowHeaders: ['Authorization', 'Content-Type', 'X-Request-ID'],
-      allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+      allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
       maxAge: 86400,
-      origin: (origin) =>
-        origin.endsWith('.glassgpt.com') || origin === 'https://glassgpt.com' ? origin : null,
+      origin: (origin, context) => resolveCorsOrigin(origin, context.env),
     }),
   );
   app.use('*', bodyLimit({ maxSize: 1024 * 1024 }));
   app.use('*', requestIdMiddleware);
+  app.use('/v1/*', createRateLimiterMiddleware(services));
 
   installHealthRoutes(app);
   installConnectionRoutes(app, services);

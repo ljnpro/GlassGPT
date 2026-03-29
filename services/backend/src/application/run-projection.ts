@@ -1,3 +1,5 @@
+import { z } from 'zod';
+
 import type { ArtifactRecord } from '../domain/artifact-model.js';
 import type { ConversationRecord } from '../domain/conversation-model.js';
 import type { MessageRecord } from '../domain/message-model.js';
@@ -11,7 +13,12 @@ import type { AgentStage } from '../domain/run-phase.js';
 import { logError } from '../observability/logger.js';
 import { ApplicationError } from './errors.js';
 import { createRunEventId, createRunId } from './ids.js';
+import { parseOptionalJSONPayload } from './json-payload-codec.js';
 import type { BackendRuntimeContext } from './runtime-context.js';
+
+const processSnapshotTaskEnvelopeSchema = z.object({
+  tasks: z.array(z.unknown()).optional(),
+});
 
 export interface WorkflowStarter<TParams> {
   create(options: { id: string; params: TParams }): Promise<{ id: string }>;
@@ -252,10 +259,11 @@ export const persistProjectedEvent = async (
       });
     }
 
-    if (nextRun.processSnapshotJSON) {
-      const processSnapshot = JSON.parse(nextRun.processSnapshotJSON) as {
-        readonly tasks?: ReadonlyArray<unknown>;
-      };
+    const processSnapshot = parseOptionalJSONPayload(
+      nextRun.processSnapshotJSON,
+      processSnapshotTaskEnvelopeSchema,
+    );
+    if (processSnapshot) {
       await deps.broadcastStreamDelta(env, nextConversation.id, {
         type: 'process_update',
         data: {

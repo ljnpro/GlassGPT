@@ -14,10 +14,14 @@ public enum ChatScrollLayoutMode: Equatable {
 /// Handles bottom-anchored auto-scrolling during streaming, keyboard avoidance,
 /// and layout transitions between centered and bottom-anchored modes.
 @MainActor
-public final class ChatScrollContainerController: UIViewController, UIScrollViewDelegate, UIGestureRecognizerDelegate {
+public final class ChatScrollContainerController<Content: View, Composer: View>:
+    UIViewController,
+    UIScrollViewDelegate,
+    UIGestureRecognizerDelegate {
     let scrollView = UIScrollView()
-    let contentHostingController = UIHostingController(rootView: AnyView(EmptyView()))
-    let composerHostingController = UIHostingController(rootView: AnyView(EmptyView()))
+    let contentHostingController: UIHostingController<Content>
+    let composerHostingController: UIHostingController<Composer>
+    let backgroundTapTarget = ChatScrollContainerTapTarget()
     var contentSizeObservation: NSKeyValueObservation?
 
     var scrollBottomConstraint: NSLayoutConstraint?
@@ -41,7 +45,9 @@ public final class ChatScrollContainerController: UIViewController, UIScrollView
     let pinnedThreshold: CGFloat = 28
 
     /// Creates a new chat scroll container controller.
-    public init() {
+    public init(content: Content, composer: Composer) {
+        contentHostingController = UIHostingController(rootView: content)
+        composerHostingController = UIHostingController(rootView: composer)
         super.init(nibName: nil, bundle: nil)
     }
 
@@ -66,8 +72,8 @@ public final class ChatScrollContainerController: UIViewController, UIScrollView
 
     /// Applies updated state from the SwiftUI representable, reconciling layout and scroll position.
     public func update(
-        content: AnyView,
-        composer: AnyView,
+        content: Content,
+        composer: Composer,
         layoutMode: ChatScrollLayoutMode,
         fixedBottomGap: CGFloat,
         conversationID: UUID?,
@@ -136,5 +142,27 @@ public final class ChatScrollContainerController: UIViewController, UIScrollView
         shouldRecognizeSimultaneouslyWith _: UIGestureRecognizer
     ) -> Bool {
         true
+    }
+}
+
+@MainActor
+final class ChatScrollContainerTapTarget: NSObject {
+    var handler: (() -> Void)?
+
+    @objc
+    func handleTap() {
+        handler?()
+    }
+}
+
+actor ChatScrollContainerContentSizeRelay {
+    private let onChange: @MainActor () -> Void
+
+    init(onChange: @escaping @MainActor () -> Void) {
+        self.onChange = onChange
+    }
+
+    func notifyChange() async {
+        await MainActor.run(body: onChange)
     }
 }

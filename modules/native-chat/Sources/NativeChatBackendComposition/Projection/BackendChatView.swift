@@ -1,25 +1,14 @@
 import ChatDomain
-import ChatPersistenceCore
 import ChatPresentation
 import ChatUIComponents
 import NativeChatBackendCore
 import NativeChatUI
-import PhotosUI
 import SwiftUI
-import UIKit
 
-/// Root chat tab view for the backend-owned Beta 5.0 shipping path.
+/// Root chat tab view for the backend-owned 5.3 shipping path.
 package struct BackendChatView: View {
     @Bindable var viewModel: BackendChatController
     let openSettings: @MainActor () -> Void
-    @AppStorage("appTheme") private var appThemeRawValue: String = AppTheme.system.rawValue
-    @Environment(\.colorScheme) private var systemColorScheme
-    @State private var showPhotoPicker = false
-    @State private var selectedPhotoItem: PhotosPickerItem?
-    @State private var showDocumentPicker = false
-    @State private var showSelector = false
-    @State private var composerResetToken = UUID()
-    @State private var scrollRequestID = UUID()
     @State private var streamingThinkingExpanded: Bool? = true
 
     /// Creates the chat surface bound to a backend-owned projection controller.
@@ -33,145 +22,79 @@ package struct BackendChatView: View {
 
     /// The full chat navigation stack, message list, composer, and selector presentation flow.
     package var body: some View {
-        NavigationStack {
-            ChatScrollContainer(
-                content: AnyView(
-                    BackendChatMessageList(
-                        viewModel: viewModel,
-                        assistantBubbleMaxWidth: assistantBubbleMaxWidth,
-                        streamingThinkingExpanded: $streamingThinkingExpanded,
-                        openSettings: openSettings
-                    )
-                ),
-                composer: AnyView(
-                    BackendChatComposer(
-                        viewModel: viewModel,
-                        composerResetToken: composerResetToken,
-                        onSendAccepted: { scrollRequestID = UUID() },
-                        onPickImage: { showPhotoPicker = true },
-                        onPickDocument: { showDocumentPicker = true }
-                    )
-                ),
-                layoutMode: showsEmptyState ? .centered : .bottomAnchored,
-                fixedBottomGap: 12,
-                conversationID: viewModel.currentConversationID,
-                scrollRequestID: scrollRequestID,
-                liveBottomAnchorKey: liveBottomAnchorKey,
-                onBackgroundTap: dismissKeyboard
-            )
-            .safeAreaInset(edge: .top, spacing: 0) {
-                BackendChatTopBar(
+        BackendConversationRootScaffold(
+            currentConversationID: viewModel.currentConversationID,
+            sessionAccountID: viewModel.sessionAccountID,
+            skipAutomaticBootstrap: viewModel.skipAutomaticBootstrap,
+            presentsSelectorOnLaunch: viewModel.presentsSelectorOnLaunch,
+            showsEmptyState: showsEmptyState,
+            liveBottomAnchorKey: liveBottomAnchorKey,
+            selectedPhotoFailurePrefix: "Failed to load photo",
+            onBootstrap: { await viewModel.bootstrap() },
+            onSelectedImageData: { jpegData in
+                viewModel.selectedImageData = jpegData
+            },
+            onPickedDocuments: { urls in
+                viewModel.handlePickedDocuments(urls)
+            },
+            onStartNewConversation: {
+                viewModel.startNewConversation()
+            },
+            content: { assistantBubbleMaxWidth in
+                BackendChatMessageList(
                     viewModel: viewModel,
-                    onOpenSelector: {
-                        dismissKeyboard()
-                        showSelector = true
-                    },
-                    onStartNewConversation: {
-                        composerResetToken = UUID()
-                        scrollRequestID = UUID()
-                        viewModel.startNewConversation()
-                    }
+                    assistantBubbleMaxWidth: assistantBubbleMaxWidth,
+                    streamingThinkingExpanded: $streamingThinkingExpanded,
+                    openSettings: openSettings
                 )
-            }
-            .toolbar(.hidden, for: .navigationBar)
-            .overFullScreenCover(
-                isPresented: $showSelector,
-                interfaceStyle: resolvedInterfaceStyle,
-                onDismiss: dismissSelector
-            ) {
+            },
+            composer: { composerResetToken, onSendAccepted, onPickImage, onPickDocument in
+                BackendConversationComposerSection(
+                    viewModel: viewModel,
+                    composerResetToken: composerResetToken,
+                    onSendAccepted: onSendAccepted,
+                    onPickImage: onPickImage,
+                    onPickDocument: onPickDocument
+                )
+            },
+            topBar: { onOpenSelector, onStartNewConversation in
+                BackendConversationTopBarSection(
+                    viewModel: viewModel,
+                    onOpenSelector: onOpenSelector,
+                    onStartNewConversation: onStartNewConversation
+                )
+            },
+            selector: { selectedTheme, onDismiss in
                 BackendChatSelectorOverlay(
                     viewModel: viewModel,
                     selectedTheme: selectedTheme,
-                    onDismiss: dismissSelector
+                    onDismiss: onDismiss
                 )
             }
-            .onChange(of: viewModel.currentConversationID) { _, _ in
-                composerResetToken = UUID()
-            }
-            .photosPicker(isPresented: $showPhotoPicker, selection: $selectedPhotoItem, matching: .images)
-            .onChange(of: selectedPhotoItem) { _, newItem in
-                Task {
-                    do {
-                        guard
-                            let rawData = try await newItem?.loadTransferable(type: Data.self),
-                            let image = UIImage(data: rawData),
-                            let jpegData = image.jpegData(compressionQuality: 0.85)
-                        else {
-                            return
-                        }
-                        viewModel.selectedImageData = jpegData
-                    } catch {
-                        Loggers.files.error("Failed to load photo: \(error.localizedDescription)")
-                    }
-                }
-            }
-            .sheet(isPresented: $showDocumentPicker) {
-                DocumentPicker { urls in
-                    viewModel.handlePickedDocuments(urls)
-                }
-            }
-            .task(id: viewModel.sessionAccountID) {
-                guard !viewModel.skipAutomaticBootstrap else {
-                    return
-                }
-                await viewModel.bootstrap()
-            }
-            .onAppear {
-                guard viewModel.presentsSelectorOnLaunch, !showSelector else {
-                    return
-                }
-                DispatchQueue.main.async {
-                    guard viewModel.presentsSelectorOnLaunch else {
-                        return
-                    }
-                    showSelector = true
-                }
-            }
-        }
+        )
     }
 
     private var showsEmptyState: Bool {
-        viewModel.messages.isEmpty && !viewModel.isStreaming
-    }
-
-    private var selectedTheme: AppTheme {
-        AppTheme(rawValue: appThemeRawValue) ?? .system
-    }
-
-    private var resolvedInterfaceStyle: UIUserInterfaceStyle {
-        if let explicit = selectedTheme.colorScheme {
-            return explicit == .dark ? .dark : .light
-        }
-        return systemColorScheme == .dark ? .dark : .light
-    }
-
-    private var assistantBubbleMaxWidth: CGFloat {
-        UIDevice.current.userInterfaceIdiom == .pad ? 680 : 520
+        BackendConversationViewSupport.showsEmptyState(
+            messages: viewModel.messages,
+            isRunActive: viewModel.isStreaming
+        )
     }
 
     private var liveBottomAnchorKey: Int {
         var hasher = Hasher()
-        hasher.combine(viewModel.currentConversationID)
-        hasher.combine(viewModel.liveDraftMessageID)
-        hasher.combine(viewModel.isThinking)
-        hasher.combine(viewModel.isStreaming)
+        BackendConversationViewSupport.hashSharedLiveBottomAnchor(
+            into: &hasher,
+            conversationID: viewModel.currentConversationID,
+            liveDraftMessageID: viewModel.liveDraftMessageID,
+            isThinking: viewModel.isThinking,
+            isRunActive: viewModel.isStreaming,
+            activeToolCalls: viewModel.activeToolCalls,
+            liveCitationsCount: viewModel.liveCitations.count,
+            liveFilePathAnnotationsCount: viewModel.liveFilePathAnnotations.count
+        )
         hasher.combine(viewModel.currentThinkingText.count)
         hasher.combine(viewModel.currentStreamingText.count)
-        hasher.combine(viewModel.activeToolCalls.count)
-        hasher.combine(viewModel.liveCitations.count)
-        hasher.combine(viewModel.liveFilePathAnnotations.count)
-        for toolCall in viewModel.activeToolCalls {
-            hasher.combine(toolCall.id)
-            hasher.combine(toolCall.status.rawValue)
-        }
         return hasher.finalize()
-    }
-
-    private func dismissKeyboard() {
-        KeyboardDismisser.dismiss()
-    }
-
-    private func dismissSelector() {
-        showSelector = false
     }
 }

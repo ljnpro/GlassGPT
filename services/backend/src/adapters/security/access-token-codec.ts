@@ -4,7 +4,7 @@ import { InvalidAccessTokenError } from '../../application/errors.js';
 import type { BackendEnv } from '../persistence/env.js';
 import { decodeHex } from './encoding.js';
 
-const ACCESS_TOKEN_ISSUER = 'glassgpt-beta-5';
+const ACCESS_TOKEN_ISSUER = 'glassgpt-5-3';
 const ACCESS_TOKEN_TTL_SECONDS = 60 * 60;
 
 export interface AccessTokenClaims {

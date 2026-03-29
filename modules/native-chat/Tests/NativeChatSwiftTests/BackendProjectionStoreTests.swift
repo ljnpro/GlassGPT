@@ -23,7 +23,11 @@ struct BackendProjectionStoreTests {
                 createdAt: .init(timeIntervalSince1970: 1),
                 updatedAt: .init(timeIntervalSince1970: 2),
                 lastRunServerID: "run_1",
-                lastSyncCursor: "cur_1"
+                lastSyncCursor: "cur_1",
+                model: ModelDTO.gpt5_4.rawValue,
+                reasoningEffort: ReasoningEffortDTO.medium.rawValue,
+                agentWorkerReasoningEffort: nil,
+                serviceTier: ServiceTierDTO.standard.rawValue
             )
         )
 
@@ -55,7 +59,11 @@ struct BackendProjectionStoreTests {
                 createdAt: .init(timeIntervalSince1970: 1),
                 updatedAt: .init(timeIntervalSince1970: 4),
                 lastRunServerID: "run_2",
-                lastSyncCursor: "cur_3"
+                lastSyncCursor: "cur_3",
+                model: ModelDTO.gpt5_4_pro.rawValue,
+                reasoningEffort: ReasoningEffortDTO.high.rawValue,
+                agentWorkerReasoningEffort: nil,
+                serviceTier: ServiceTierDTO.flex.rawValue
             )
         )
 
@@ -88,6 +96,9 @@ struct BackendProjectionStoreTests {
         #expect(cachedConversation.title == "Renamed chat")
         #expect(cachedConversation.lastRunServerID == "run_2")
         #expect(cachedConversation.lastSyncCursor == "cur_3")
+        #expect(cachedConversation.model == ModelDTO.gpt5_4_pro.rawValue)
+        #expect(cachedConversation.reasoningEffort == ReasoningEffortDTO.high.rawValue)
+        #expect(cachedConversation.serviceTierRawValue == ServiceTierDTO.flex.rawValue)
         #expect(cachedConversation.messages.count == 1)
 
         let cachedMessage = try #require(cachedConversation.messages.first)
@@ -124,7 +135,11 @@ struct BackendProjectionStoreTests {
                     createdAt: .init(timeIntervalSince1970: 10),
                     updatedAt: .init(timeIntervalSince1970: 10),
                     lastRunID: nil,
-                    lastSyncCursor: "cur_10"
+                    lastSyncCursor: "cur_10",
+                    model: .gpt5_4,
+                    reasoningEffort: .medium,
+                    agentWorkerReasoningEffort: nil,
+                    serviceTier: .standard
                 )
             ],
             accountID: "usr_abc"
@@ -149,6 +164,10 @@ struct BackendProjectionStoreTests {
         let cachedConversation = try #require(persistedConversation)
         #expect(cachedConversation.messages.count == 2)
         #expect(cursorStore.loadCursor(for: "usr_abc") == "cur_12")
+        #expect(cachedConversation.model == ModelDTO.gpt5_4_pro.rawValue)
+        #expect(cachedConversation.reasoningEffort == ReasoningEffortDTO.high.rawValue)
+        #expect(cachedConversation.agentWorkerReasoningEffortRawValue == nil)
+        #expect(cachedConversation.serviceTierRawValue == ServiceTierDTO.flex.rawValue)
 
         let assistantMessage = try #require(
             cachedConversation.messages.first(where: { $0.serverID == "msg_assistant" })
@@ -177,7 +196,11 @@ private func makeConversationDetailSnapshot() -> ConversationDetailDTO {
             createdAt: .init(timeIntervalSince1970: 10),
             updatedAt: .init(timeIntervalSince1970: 11),
             lastRunID: "run_abc",
-            lastSyncCursor: "cur_11"
+            lastSyncCursor: "cur_11",
+            model: .gpt5_4_pro,
+            reasoningEffort: .high,
+            agentWorkerReasoningEffort: nil,
+            serviceTier: .flex
         ),
         messages: [
             MessageDTO(

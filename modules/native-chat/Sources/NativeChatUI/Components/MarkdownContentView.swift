@@ -2,6 +2,7 @@ import ChatDomain
 import ConversationSurfaceLogic
 import Foundation
 import SwiftUI
+import UIKit
 @preconcurrency import WebKit
 
 // MARK: - Markdown Content View
@@ -42,6 +43,15 @@ package struct MarkdownContentView: View {
 
     /// The rendered Markdown block stack for the supplied text.
     package var body: some View {
+        contentView.onReceive(
+            NotificationCenter.default.publisher(for: UIApplication.didReceiveMemoryWarningNotification)
+        ) { _ in
+            blockCache.handleMemoryPressure()
+        }
+    }
+
+    @ViewBuilder
+    private var contentView: some View {
         switch surfaceStyle {
         case .plain:
             blockStack(

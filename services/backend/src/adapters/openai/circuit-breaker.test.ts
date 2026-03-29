@@ -1,59 +1,155 @@
 import { describe, expect, it } from 'vitest';
 
-import { CircuitBreaker } from './circuit-breaker.js';
+import {
+  CircuitBreaker,
+  KeyedCircuitBreakerRegistry,
+  openAiCircuitBreakerKey,
+} from './circuit-breaker.js';
 
 describe('CircuitBreaker', () => {
   it('starts in closed state', () => {
-    const cb = new CircuitBreaker();
-    expect(cb.isOpen).toBe(false);
-    expect(cb.currentState).toBe('closed');
+    const breaker = new CircuitBreaker();
+    expect(breaker.isOpen).toBe(false);
+    expect(breaker.currentState).toBe('closed');
   });
 
-  it('stays closed after fewer failures than threshold', () => {
-    const cb = new CircuitBreaker();
-    for (let i = 0; i < 4; i++) {
-      cb.recordFailure();
-    }
-    expect(cb.isOpen).toBe(false);
+  it('opens after enough failures inside the sliding window', () => {
+    let now = 1_000;
+    const breaker = new CircuitBreaker({
+      cooldownMs: 100,
+      failureThreshold: 3,
+      now: () => now,
+      windowMs: 1_000,
+    });
+
+    breaker.recordFailure();
+    now += 100;
+    breaker.recordFailure();
+    now += 100;
+    breaker.recordFailure();
+
+    expect(breaker.isOpen).toBe(true);
+    expect(breaker.currentState).toBe('open');
   });
 
-  it('opens after 5 consecutive failures', () => {
-    const cb = new CircuitBreaker();
-    for (let i = 0; i < 5; i++) {
-      cb.recordFailure();
-    }
-    expect(cb.isOpen).toBe(true);
-    expect(cb.currentState).toBe('open');
+  it('drops old failures that fall outside the sliding window', () => {
+    let now = 1_000;
+    const breaker = new CircuitBreaker({
+      cooldownMs: 100,
+      failureThreshold: 3,
+      now: () => now,
+      windowMs: 500,
+    });
+
+    breaker.recordFailure();
+    now += 600;
+    breaker.recordFailure();
+    now += 100;
+    breaker.recordFailure();
+
+    expect(breaker.isOpen).toBe(false);
+    expect(breaker.currentState).toBe('closed');
   });
 
-  it('resets failure count on success', () => {
-    const cb = new CircuitBreaker();
-    cb.recordFailure();
-    cb.recordFailure();
-    cb.recordFailure();
-    cb.recordSuccess();
-    cb.recordFailure();
-    cb.recordFailure();
-    // Only 2 consecutive failures after success, should not be open
-    expect(cb.isOpen).toBe(false);
+  it('moves to half-open after the cooldown elapses', () => {
+    let now = 1_000;
+    const breaker = new CircuitBreaker({
+      cooldownMs: 200,
+      failureThreshold: 2,
+      now: () => now,
+      windowMs: 1_000,
+    });
+
+    breaker.recordFailure();
+    breaker.recordFailure();
+    expect(breaker.isOpen).toBe(true);
+
+    now += 250;
+    expect(breaker.isOpen).toBe(false);
+    expect(breaker.currentState).toBe('half_open');
   });
 
-  it('success after open transitions to closed', () => {
-    const cb = new CircuitBreaker();
-    for (let i = 0; i < 5; i++) {
-      cb.recordFailure();
-    }
-    expect(cb.isOpen).toBe(true);
-    cb.recordSuccess();
-    expect(cb.isOpen).toBe(false);
-    expect(cb.currentState).toBe('closed');
+  it('closes and clears recent failures after a success', () => {
+    let now = 1_000;
+    const breaker = new CircuitBreaker({
+      cooldownMs: 200,
+      failureThreshold: 2,
+      now: () => now,
+      windowMs: 1_000,
+    });
+
+    breaker.recordFailure();
+    breaker.recordFailure();
+    now += 250;
+    expect(breaker.isOpen).toBe(false);
+
+    breaker.recordSuccess();
+    expect(breaker.currentState).toBe('closed');
+    expect(breaker.isOpen).toBe(false);
+
+    breaker.recordFailure();
+    expect(breaker.isOpen).toBe(false);
+  });
+});
+
+describe('KeyedCircuitBreakerRegistry', () => {
+  it('keeps breaker state isolated per key', () => {
+    const now = 1_000;
+    const registry = new KeyedCircuitBreakerRegistry({
+      breakerOptions: {
+        cooldownMs: 100,
+        failureThreshold: 2,
+        windowMs: 1_000,
+      },
+      now: () => now,
+    });
+
+    const first = registry.breakerFor('user-a');
+    const second = registry.breakerFor('user-b');
+
+    first.recordFailure();
+    first.recordFailure();
+
+    expect(first.isOpen).toBe(true);
+    expect(second.isOpen).toBe(false);
   });
 
-  it('rejects immediately when open', () => {
-    const cb = new CircuitBreaker();
-    for (let i = 0; i < 5; i++) {
-      cb.recordFailure();
-    }
-    expect(cb.isOpen).toBe(true);
+  it('evicts stale breaker entries', () => {
+    let now = 1_000;
+    const registry = new KeyedCircuitBreakerRegistry({
+      entryTtlMs: 50,
+      now: () => now,
+    });
+
+    const breaker = registry.breakerFor('user-a');
+    breaker.recordFailure();
+    expect(registry.size).toBe(1);
+
+    now += 100;
+    registry.breakerFor('user-b');
+    expect(registry.size).toBe(1);
+  });
+});
+
+describe('openAiCircuitBreakerKey', () => {
+  it('separates breaker partitions by api key hash and model metadata', () => {
+    const base = openAiCircuitBreakerKey({
+      apiKey: 'sk-first',
+      model: 'gpt-5.4',
+      serviceTier: 'default',
+    });
+    const differentKey = openAiCircuitBreakerKey({
+      apiKey: 'sk-second',
+      model: 'gpt-5.4',
+      serviceTier: 'default',
+    });
+    const differentModel = openAiCircuitBreakerKey({
+      apiKey: 'sk-first',
+      model: 'gpt-5.4-mini',
+      serviceTier: 'default',
+    });
+
+    expect(base).not.toBe(differentKey);
+    expect(base).not.toBe(differentModel);
   });
 });

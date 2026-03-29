@@ -1,9 +1,9 @@
 import { z } from 'zod';
 
-import { conversationSchema, messageSchema } from './conversation.js';
+import { conversationPageSchema, conversationSchema, messageSchema } from './conversation.js';
 import { artifactSchema, runEventSchema, runSummarySchema } from './run.js';
 
-export const conversationListSchema = z.array(conversationSchema);
+export const conversationListSchema = conversationPageSchema;
 
 export const conversationDetailSchema = z.object({
   conversation: conversationSchema,

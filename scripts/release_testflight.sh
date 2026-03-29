@@ -14,6 +14,9 @@ EXPORT_OPTIONS="${EXPORT_OPTIONS_PLIST:-$ROOT_DIR/.local/export-options-app-stor
 REMOTE="${GITHUB_REMOTE:-origin}"
 REMOTE_REPO="${GITHUB_REPO_URL:-}"
 XCODEBUILD_APPINTENTS_LINKER_SETTING='OTHER_LDFLAGS=$(inherited) -framework AppIntents'
+TODO_PATH="${TODO_PATH:-$ROOT_DIR/todo.md}"
+AUDIT_PATH="${AUDIT_PATH:-$ROOT_DIR/docs/audit-5.3.0.md}"
+FINAL_CI_EVIDENCE_PATH="${FINAL_CI_EVIDENCE_PATH:-$ROOT_DIR/.local/build/evidence/rel-001-final-ci.txt}"
 
 function usage() {
   cat <<'EOF'
@@ -21,9 +24,14 @@ Usage:
   ./scripts/release_testflight.sh <marketing_version> <build_number> [--branch <name>] [--commit-message "<message>"] [--preserve-main-as <name>] [--force-main-with-lease] [--skip-main-promotion] [--skip-ci] [--preflight-only]
 
 Examples:
-  ./scripts/release_testflight.sh 5.0.0 20206 --branch feature/beta-5.0-cloudflare-all-in --skip-main-promotion --skip-ci
+  ./scripts/release_testflight.sh 5.3.0 20300 --branch feature/release-5.3 --skip-main-promotion --skip-ci
 EOF
 }
+
+if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
+  usage
+  exit 0
+fi
 
 if [[ $# -lt 2 ]]; then
   usage
@@ -156,6 +164,24 @@ function run_logged_release_command() {
   echo "$success_summary"
 }
 
+function resolve_transporter_binary() {
+  local transporter_app_binary="/Applications/Transporter.app/Contents/itms/bin/iTMSTransporter"
+  local transporter_pkg_binary="/usr/local/itms/bin/iTMSTransporter"
+
+  if [[ -x "$transporter_app_binary" ]]; then
+    printf '%s\n' "$transporter_app_binary"
+    return 0
+  fi
+
+  if [[ -x "$transporter_pkg_binary" ]]; then
+    printf '%s\n' "$transporter_pkg_binary"
+    return 0
+  fi
+
+  echo "Transporter is required for TestFlight uploads. Install Apple's Transporter app from the Mac App Store or the official iTMSTransporter package so that /Applications/Transporter.app/Contents/itms/bin/iTMSTransporter or /usr/local/itms/bin/iTMSTransporter exists." >&2
+  exit 1
+}
+
 function resolve_release_tag() {
   local version="$1"
   local build_number="$2"
@@ -220,6 +246,16 @@ if [[ ! -f "$ENV_FILE" ]]; then
   exit 1
 fi
 
+if [[ "$VERSION" != 5.3.* ]]; then
+  echo "release_testflight.sh is 5.3-aware and only accepts 5.3.x versions. Got: $VERSION" >&2
+  exit 1
+fi
+
+python3 "$ROOT_DIR/scripts/check_todo_release_gates.py" \
+  --todo "$TODO_PATH" \
+  --require-file "$AUDIT_PATH" \
+  --require-file "$FINAL_CI_EVIDENCE_PATH"
+
 source "$ENV_FILE"
 
 if [[ -z "$TARGET_BRANCH" ]]; then
@@ -227,10 +263,10 @@ if [[ -z "$TARGET_BRANCH" ]]; then
 fi
 
 case "$TARGET_BRANCH" in
-  main|stable-5.0|codex/stable-5.0|feature/beta-5.0*|codex/feature/beta-5.0*)
+  main|stable-5.3|codex/stable-5.3|feature/release-5.3*|codex/feature/release-5.3*|feature/beta-5.3*|codex/feature/beta-5.3*)
     ;;
   *)
-    echo "Release target branch must be the Beta 5.0 release-preparation branch, a 5.0 stable branch, or main. Got: $TARGET_BRANCH" >&2
+    echo "Release target branch must be the 5.3 release-preparation branch, a 5.3 stable branch, or main. Got: $TARGET_BRANCH" >&2
     exit 1
     ;;
 esac
@@ -335,6 +371,12 @@ if [[ -z "$KEY_PATH" || ! -f "$KEY_PATH" ]]; then
   exit 1
 fi
 
+TRANSPORTER_BINARY="$(resolve_transporter_binary)"
+TRANSPORTER_KEYS_DIR="$BUILD_DIR/private_keys"
+TRANSPORTER_KEY_PATH="$TRANSPORTER_KEYS_DIR/AuthKey_${ASC_API_KEY_ID}.p8"
+mkdir -p "$TRANSPORTER_KEYS_DIR"
+cp "$KEY_PATH" "$TRANSPORTER_KEY_PATH"
+
 echo "==> Archiving"
 run_logged_release_command "Archive" "$ARCHIVE_LOG" "Archive completed successfully." \
   xcodebuild \
@@ -405,12 +447,12 @@ PY
 
 echo "==> Uploading to TestFlight"
 run_logged_release_command "Upload" "$UPLOAD_LOG" "Upload completed successfully." \
-  xcrun altool \
-    --upload-app \
-    --type ios \
-    --file "$IPA_PATH" \
-    --apiKey "$ASC_API_KEY_ID" \
-    --apiIssuer "$ASC_ISSUER_ID"
+  env HOME="$BUILD_DIR" "$TRANSPORTER_BINARY" \
+    -m upload \
+    -assetFile "$IPA_PATH" \
+    -apiKey "$ASC_API_KEY_ID" \
+    -apiIssuer "$ASC_ISSUER_ID" \
+    -v informational
 sanitize_successful_upload_log "$UPLOAD_LOG"
 ensure_successful_log_has_content "$UPLOAD_LOG" "Upload completed successfully."
 DELIVERY_UUID="$(awk -F'Delivery UUID: ' '/Delivery UUID:/ {print $2}' "$UPLOAD_LOG" | tail -1)"

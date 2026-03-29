@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "GlassGPT Backend API",
-    "version": "5.0.0-beta.1"
+    "version": "5.3.0"
   },
   "paths": {
     "/v1/auth/apple": {
@@ -66,6 +66,23 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/RunSummaryDTO"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/conversations/{conversationId}/configuration": {
+      "patch": {
+        "operationId": "updateConversationConfiguration",
+        "responses": {
+          "200": {
+            "description": "Updates the authoritative backend configuration for a conversation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConversationDTO"
                 }
               }
             }
@@ -324,6 +341,21 @@
           "errorSummary": {
             "type": "string",
             "minLength": 1
+          },
+          "backendVersion": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minimumSupportedAppVersion": {
+            "type": "string",
+            "minLength": 1
+          },
+          "appCompatibility": {
+            "type": "string",
+            "enum": [
+              "compatible",
+              "update_required"
+            ]
           }
         },
         "required": [
@@ -331,7 +363,10 @@
           "auth",
           "openaiCredential",
           "sse",
-          "checkedAt"
+          "checkedAt",
+          "backendVersion",
+          "minimumSupportedAppVersion",
+          "appCompatibility"
         ],
         "additionalProperties": false
       },
@@ -371,6 +406,40 @@
           "lastSyncCursor": {
             "type": "string",
             "minLength": 1
+          },
+          "model": {
+            "type": "string",
+            "enum": [
+              "gpt-5.4",
+              "gpt-5.4-pro"
+            ]
+          },
+          "reasoningEffort": {
+            "type": "string",
+            "enum": [
+              "none",
+              "low",
+              "medium",
+              "high",
+              "xhigh"
+            ]
+          },
+          "agentWorkerReasoningEffort": {
+            "type": "string",
+            "enum": [
+              "none",
+              "low",
+              "medium",
+              "high",
+              "xhigh"
+            ]
+          },
+          "serviceTier": {
+            "type": "string",
+            "enum": [
+              "default",
+              "flex"
+            ]
           }
         },
         "required": [
@@ -421,6 +490,40 @@
               "lastSyncCursor": {
                 "type": "string",
                 "minLength": 1
+              },
+              "model": {
+                "type": "string",
+                "enum": [
+                  "gpt-5.4",
+                  "gpt-5.4-pro"
+                ]
+              },
+              "reasoningEffort": {
+                "type": "string",
+                "enum": [
+                  "none",
+                  "low",
+                  "medium",
+                  "high",
+                  "xhigh"
+                ]
+              },
+              "agentWorkerReasoningEffort": {
+                "type": "string",
+                "enum": [
+                  "none",
+                  "low",
+                  "medium",
+                  "high",
+                  "xhigh"
+                ]
+              },
+              "serviceTier": {
+                "type": "string",
+                "enum": [
+                  "default",
+                  "flex"
+                ]
               }
             },
             "required": [
@@ -700,53 +803,104 @@
       },
       "ConversationListDTO": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
-        "type": "array",
-        "items": {
-          "type": "object",
-          "properties": {
-            "id": {
-              "type": "string",
-              "minLength": 1
-            },
-            "title": {
-              "type": "string",
-              "minLength": 1
-            },
-            "mode": {
-              "type": "string",
-              "enum": [
-                "chat",
-                "agent"
-              ]
-            },
-            "createdAt": {
-              "type": "string",
-              "format": "date-time",
-              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
-            },
-            "updatedAt": {
-              "type": "string",
-              "format": "date-time",
-              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
-            },
-            "lastRunId": {
-              "type": "string",
-              "minLength": 1
-            },
-            "lastSyncCursor": {
-              "type": "string",
-              "minLength": 1
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "title": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "mode": {
+                  "type": "string",
+                  "enum": [
+                    "chat",
+                    "agent"
+                  ]
+                },
+                "createdAt": {
+                  "type": "string",
+                  "format": "date-time",
+                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                },
+                "updatedAt": {
+                  "type": "string",
+                  "format": "date-time",
+                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                },
+                "lastRunId": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "lastSyncCursor": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "model": {
+                  "type": "string",
+                  "enum": [
+                    "gpt-5.4",
+                    "gpt-5.4-pro"
+                  ]
+                },
+                "reasoningEffort": {
+                  "type": "string",
+                  "enum": [
+                    "none",
+                    "low",
+                    "medium",
+                    "high",
+                    "xhigh"
+                  ]
+                },
+                "agentWorkerReasoningEffort": {
+                  "type": "string",
+                  "enum": [
+                    "none",
+                    "low",
+                    "medium",
+                    "high",
+                    "xhigh"
+                  ]
+                },
+                "serviceTier": {
+                  "type": "string",
+                  "enum": [
+                    "default",
+                    "flex"
+                  ]
+                }
+              },
+              "required": [
+                "id",
+                "title",
+                "mode",
+                "createdAt",
+                "updatedAt"
+              ],
+              "additionalProperties": false
             }
           },
-          "required": [
-            "id",
-            "title",
-            "mode",
-            "createdAt",
-            "updatedAt"
-          ],
-          "additionalProperties": false
-        }
+          "nextCursor": {
+            "type": "string",
+            "minLength": 1
+          },
+          "hasMore": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "items",
+          "hasMore"
+        ],
+        "additionalProperties": false
       },
       "CreateConversationRequestDTO": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -761,6 +915,40 @@
             "enum": [
               "chat",
               "agent"
+            ]
+          },
+          "model": {
+            "type": "string",
+            "enum": [
+              "gpt-5.4",
+              "gpt-5.4-pro"
+            ]
+          },
+          "reasoningEffort": {
+            "type": "string",
+            "enum": [
+              "none",
+              "low",
+              "medium",
+              "high",
+              "xhigh"
+            ]
+          },
+          "agentWorkerReasoningEffort": {
+            "type": "string",
+            "enum": [
+              "none",
+              "low",
+              "medium",
+              "high",
+              "xhigh"
+            ]
+          },
+          "serviceTier": {
+            "type": "string",
+            "enum": [
+              "default",
+              "flex"
             ]
           }
         },
@@ -782,6 +970,47 @@
         "required": [
           "content"
         ],
+        "additionalProperties": false
+      },
+      "UpdateConversationConfigurationRequestDTO": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "model": {
+            "type": "string",
+            "enum": [
+              "gpt-5.4",
+              "gpt-5.4-pro"
+            ]
+          },
+          "reasoningEffort": {
+            "type": "string",
+            "enum": [
+              "none",
+              "low",
+              "medium",
+              "high",
+              "xhigh"
+            ]
+          },
+          "agentWorkerReasoningEffort": {
+            "type": "string",
+            "enum": [
+              "none",
+              "low",
+              "medium",
+              "high",
+              "xhigh"
+            ]
+          },
+          "serviceTier": {
+            "type": "string",
+            "enum": [
+              "default",
+              "flex"
+            ]
+          }
+        },
         "additionalProperties": false
       },
       "CredentialStatusDTO": {
@@ -1140,6 +1369,40 @@
               "lastSyncCursor": {
                 "type": "string",
                 "minLength": 1
+              },
+              "model": {
+                "type": "string",
+                "enum": [
+                  "gpt-5.4",
+                  "gpt-5.4-pro"
+                ]
+              },
+              "reasoningEffort": {
+                "type": "string",
+                "enum": [
+                  "none",
+                  "low",
+                  "medium",
+                  "high",
+                  "xhigh"
+                ]
+              },
+              "agentWorkerReasoningEffort": {
+                "type": "string",
+                "enum": [
+                  "none",
+                  "low",
+                  "medium",
+                  "high",
+                  "xhigh"
+                ]
+              },
+              "serviceTier": {
+                "type": "string",
+                "enum": [
+                  "default",
+                  "flex"
+                ]
               }
             },
             "required": [
@@ -1732,6 +1995,40 @@
                     "lastSyncCursor": {
                       "type": "string",
                       "minLength": 1
+                    },
+                    "model": {
+                      "type": "string",
+                      "enum": [
+                        "gpt-5.4",
+                        "gpt-5.4-pro"
+                      ]
+                    },
+                    "reasoningEffort": {
+                      "type": "string",
+                      "enum": [
+                        "none",
+                        "low",
+                        "medium",
+                        "high",
+                        "xhigh"
+                      ]
+                    },
+                    "agentWorkerReasoningEffort": {
+                      "type": "string",
+                      "enum": [
+                        "none",
+                        "low",
+                        "medium",
+                        "high",
+                        "xhigh"
+                      ]
+                    },
+                    "serviceTier": {
+                      "type": "string",
+                      "enum": [
+                        "default",
+                        "flex"
+                      ]
                     }
                   },
                   "required": [

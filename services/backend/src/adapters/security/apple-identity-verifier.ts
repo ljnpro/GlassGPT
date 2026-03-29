@@ -15,6 +15,10 @@ export const verifyAppleIdentityToken = async (
   env: BackendEnv,
   identityToken: string,
 ): Promise<VerifiedAppleIdentity> => {
+  if (env.APPLE_AUDIENCE !== env.APPLE_BUNDLE_ID) {
+    throw new InvalidAppleIdentityTokenError('apple_bundle_id_mismatch');
+  }
+
   let payload: Awaited<ReturnType<typeof jwtVerify>>['payload'];
   try {
     ({ payload } = await jwtVerify(identityToken, appleJwks, {

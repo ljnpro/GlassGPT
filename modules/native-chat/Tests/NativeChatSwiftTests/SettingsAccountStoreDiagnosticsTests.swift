@@ -54,7 +54,11 @@ private final class SettingsAccountDiagnosticsBackendRequester: BackendRequestin
 
     func createConversation(
         title _: String,
-        mode _: ConversationModeDTO
+        mode _: ConversationModeDTO,
+        model _: ModelDTO?,
+        reasoningEffort _: ReasoningEffortDTO?,
+        agentWorkerReasoningEffort _: ReasoningEffortDTO?,
+        serviceTier _: ServiceTierDTO?
     ) async throws -> ConversationDTO {
         throw DiagnosticsTestError.unimplemented
     }
@@ -102,7 +106,7 @@ private final class SettingsAccountDiagnosticsBackendRequester: BackendRequestin
         throw DiagnosticsTestError.unimplemented
     }
 
-    func streamRun(_ runID: String) -> BackendSSEStream {
+    func streamRun(_ runID: String, lastEventID _: String?) async throws -> BackendSSEStream {
         var components = URLComponents()
         components.scheme = "https"
         components.host = "localhost"
@@ -112,6 +116,16 @@ private final class SettingsAccountDiagnosticsBackendRequester: BackendRequestin
     }
 
     func syncEvents(after _: String?) async throws -> SyncEnvelopeDTO {
+        throw DiagnosticsTestError.unimplemented
+    }
+
+    func updateConversationConfiguration(
+        _: String,
+        model _: ModelDTO?,
+        reasoningEffort _: ReasoningEffortDTO?,
+        agentWorkerReasoningEffort _: ReasoningEffortDTO?,
+        serviceTier _: ServiceTierDTO?
+    ) async throws -> ConversationDTO {
         throw DiagnosticsTestError.unimplemented
     }
 

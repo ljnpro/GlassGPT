@@ -3,19 +3,18 @@ import BackendContracts
 import ChatDomain
 import Foundation
 
-private struct StatusPayload: Decodable {
-    let visibleSummary: String?
-}
-
-private struct StagePayload: Decodable {
-    let stage: AgentStageDTO?
-    let visibleSummary: String?
-}
-
 /// Maps agent stage DTOs to display-level activity and label values, and applies
 /// status/stage stream events. Extracted from AgentStreamEventHandler for CI limits.
 @MainActor
 package extension BackendAgentController {
+    func applyStreamStatusEvent(from event: SSEEvent) {
+        applyAgentStatus(from: event)
+    }
+
+    func applyStreamStageEvent(from event: SSEEvent) {
+        applyAgentStage(from: event)
+    }
+
     func processActivity(for stage: AgentStageDTO) -> AgentProcessActivity {
         switch stage {
         case .leaderPlanning:
@@ -43,16 +42,13 @@ package extension BackendAgentController {
     }
 
     func applyAgentStatus(from event: SSEEvent) {
-        guard let payload = decodeAgentPayload(event, as: StatusPayload.self),
+        guard let payload = decodeStreamPayload(event, as: StreamStatusPayload.self),
               let summary = payload.visibleSummary
         else {
             return
         }
 
-        if currentThinkingText.isEmpty {
-            currentThinkingText = summary
-        }
-        isThinking = true
+        seedThinkingSummaryIfNeeded(summary)
         processSnapshot.leaderLiveSummary = summary
         if processSnapshot.leaderLiveStatus.isEmpty {
             processSnapshot.leaderLiveStatus = summary
@@ -64,7 +60,7 @@ package extension BackendAgentController {
     }
 
     func applyAgentStage(from event: SSEEvent) {
-        guard let payload = decodeAgentPayload(event, as: StagePayload.self) else {
+        guard let payload = decodeStreamPayload(event, as: AgentStreamStagePayload.self) else {
             return
         }
 

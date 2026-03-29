@@ -1,103 +1,88 @@
-# Contributing to GlassGPT
+# Contributing To GlassGPT
 
-Thank you for your interest in contributing to GlassGPT. This guide covers
-everything you need to get started.
+## Toolchain
 
-## Prerequisites
-
-| Tool    | Version       |
-|---------|---------------|
-| Xcode   | 26+           |
-| Swift   | 6.2.4         |
-| iOS target | 26.0       |
-| Python  | 3.14+         |
+| Tool | Version |
+|------|---------|
+| Xcode | 26.4+ |
+| Swift | 6.2.x |
+| iOS deployment target | 26.0 |
+| Node.js | `>=22 <26` |
+| pnpm | via Corepack |
+| Python | 3.14+ |
 
 ## Getting Started
 
 ```bash
 git clone https://github.com/ljnpro/GlassGPT.git
 cd GlassGPT
+git config core.hooksPath .githooks
 open ios/GlassGPT.xcworkspace
 ```
 
-Build and run the `GlassGPT` scheme on a simulator or device.
+For backend-specific setup, see
+[docs/backend-local-development.md](/Applications/GlassGPT/docs/backend-local-development.md).
 
 ## Branch Strategy
 
-| Branch                  | Purpose                        |
-|-------------------------|--------------------------------|
-| `main`                  | Latest release                 |
-| `codex/stable-4.10`     | Active stable release line     |
-| `codex/stable-4.9`      | Frozen prior stable line       |
-| `codex/feature/*`       | Feature branches               |
+| Branch | Purpose |
+|--------|---------|
+| `main` | latest released state |
+| `codex/stable-5.3` | active 5.3 release line |
+| `codex/feature/*` | feature or hardening work |
 
-Create feature branches from `codex/stable-4.10`. Target your pull requests
-back to that branch unless you are shipping a hotfix to `main`.
+Create new work from `codex/stable-5.3` unless you are explicitly preparing a
+different release line.
 
-## Pre-commit Hooks
+## Required Local Checks
 
-Enable the project hooks before your first commit:
+- Full CI:
 
 ```bash
-git config core.hooksPath .githooks
+./scripts/ci.sh
 ```
 
-## Pull Request Requirements
+- Common targeted lanes:
 
-1. **All required CI gates pass.** The tracked path covers lint, format, build,
-   architecture, tests, coverage, maintainability, source-share, infra-safety,
-   module-boundary, documentation, localization, and release-readiness checks.
-2. **Doc comments on every new public API symbol.**
-3. **Snapshot updates** included when UI changes affect rendered output.
-4. **Conventional Commits** message format (see below).
-
-## Commit Convention
-
-This project uses [Conventional Commits](https://www.conventionalcommits.org/):
-
-```
-feat: add model selector haptic feedback
-fix: resolve SwiftData migration crash on iOS 26
-docs: update architecture diagram in README
-refactor: extract streaming logic into ChatStreamingCoordinator
-test: add snapshot tests for MessageBubble dark mode
-ci: add typed-throws gate to CI pipeline
+```bash
+./scripts/ci.sh contracts,backend
+./scripts/ci.sh ios
 ```
 
-## Code Style
+- NativeChat package test path:
 
-- **SwiftLint** with 55+ active rules. Run locally:
-  ```bash
-  ./scripts/lint.sh
-  ```
-- **SwiftFormat** for consistent formatting:
-  ```bash
-  ./scripts/format.sh
-  ```
+```bash
+cd modules/native-chat
+xcodebuild -scheme NativeChat-Package \
+  -destination 'platform=iOS Simulator,id=<simulator-id>' \
+  test
+```
 
-Both tools run automatically through pre-commit hooks and CI.
+## Pull Request Expectations
 
-## Testing
+1. CI must pass for the affected lanes.
+2. New behavior must include meaningful automated coverage.
+3. Architecture and maintainability gates must stay green.
+4. Documentation must stay truthful when behavior or release flow changes.
+5. UI changes that affect presentation should include snapshot or equivalent
+   regression coverage once the 5.3.0 snapshot path is fully in place.
 
-- New code must add meaningful automated coverage for the ownership boundary it changes.
-- Run the full CI suite locally:
-  ```bash
-  ./scripts/ci.sh
-  ```
-- Run a specific gate:
-  ```bash
-  ./scripts/ci.sh maintainability
-  ```
-- Record snapshot baselines after UI changes:
-  ```bash
-  ./scripts/record_snapshots.sh
-  ```
+## Commit Style
 
-## Reporting Issues
+This repo uses Conventional Commits:
 
-Open an issue on GitHub with a clear description, steps to reproduce, and
-the iOS / device version you are running.
+```text
+feat: add staged backend promotion smoke checks
+fix: stop sharing openai circuit breaker state across users
+docs: rewrite architecture for 5.3.0 backend sync flow
+refactor: extract shared backend conversation controller scaffolding
+test: cover SSE replay last-event-id recovery
+ci: gate release on todo audit evidence
+```
 
-## Code of Conduct
+## Notes
 
-All participants are expected to follow the project Code of Conduct.
+- Do not treat `todo.md` or `5.3.0-plan.md` as optional project notes; they are
+  part of the release program for this line.
+- Release publication is script-driven. Do not manually publish backend or
+  TestFlight artifacts outside the release scripts.

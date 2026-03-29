@@ -39,7 +39,14 @@ final class UICoverageBackendRequester: BackendRequesting {
         makeRunSummary(id: id)
     }
 
-    func createConversation(title: String, mode: ConversationModeDTO) async throws -> ConversationDTO {
+    func createConversation(
+        title: String,
+        mode: ConversationModeDTO,
+        model _: ModelDTO?,
+        reasoningEffort _: ReasoningEffortDTO?,
+        agentWorkerReasoningEffort _: ReasoningEffortDTO?,
+        serviceTier _: ServiceTierDTO?
+    ) async throws -> ConversationDTO {
         let dto = ConversationDTO(
             id: "conv_\(mode.rawValue)",
             title: title,
@@ -117,7 +124,7 @@ final class UICoverageBackendRequester: BackendRequesting {
         makeRunSummary(id: "run_agent_\(prompt?.count ?? 0)")
     }
 
-    func streamRun(_: String) -> BackendSSEStream {
+    func streamRun(_: String, lastEventID _: String?) async throws -> BackendSSEStream {
         BackendSSEStream(
             testEvents: streamEvents,
             setupError: streamSetupError
@@ -126,6 +133,30 @@ final class UICoverageBackendRequester: BackendRequesting {
 
     func syncEvents(after _: String?) async throws -> SyncEnvelopeDTO {
         syncEnvelope
+    }
+
+    func updateConversationConfiguration(
+        _ conversationID: String,
+        model: ModelDTO?,
+        reasoningEffort: ReasoningEffortDTO?,
+        agentWorkerReasoningEffort: ReasoningEffortDTO?,
+        serviceTier: ServiceTierDTO?
+    ) async throws -> ConversationDTO {
+        let updated = ConversationDTO(
+            id: conversationID,
+            title: conversations.first?.title ?? "Conversation",
+            mode: conversations.first?.mode ?? .chat,
+            createdAt: conversations.first?.createdAt ?? .now,
+            updatedAt: .now,
+            lastRunID: conversations.first?.lastRunID,
+            lastSyncCursor: conversations.first?.lastSyncCursor,
+            model: model,
+            reasoningEffort: reasoningEffort,
+            agentWorkerReasoningEffort: agentWorkerReasoningEffort,
+            serviceTier: serviceTier
+        )
+        conversations = [updated]
+        return updated
     }
 
     func logout() async throws {

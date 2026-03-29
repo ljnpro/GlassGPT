@@ -2,68 +2,100 @@
 
 ## Principle
 
-`4.9.0` testing exists to verify real ownership boundaries and release
-integrity:
+`5.3.0` testing is release-oriented. The suite must verify the real iOS +
+backend system, not only isolated helper functions.
 
-- runtime transitions belong to runtime owners
-- composition assembles, but does not secretly re-own policy
-- application and presentation layers earn their abstractions
-- documentation, localization, and release-readiness are enforced in CI
+Current emphasis:
 
-## Coverage
+- authoritative backend conversation configuration
+- sync and replay correctness
+- streaming reliability and retry behavior
+- architecture boundaries and maintainability gates
+- release-readiness gates before deployment/TestFlight promotion
 
-- unit and workflow tests
-  - `ReplySessionActor`, `ReplyRecoveryPlanner`, and runtime transition logic
-  - request building, SSE decoding, parser behavior, and transport configuration
-  - SwiftData repositories, adapters, reset flows, and keychain persistence
-  - settings/history/application handlers and presenter/store projection
-- architecture and boundary tests
-  - package/module dependency rules
-  - controller/coordinator ownership checks
-  - source-target and package-surface assertions
-- presentation and UI tests
-  - view-hosting coverage for presentation/views budgets
-  - snapshot coverage for chat, history, settings, model selector, and file preview surfaces
-  - UI flows for launch, history, settings, recovery, streaming, and generated files
-- stress and randomized tests
-  - property tests
-  - fuzz tests
-  - `withTaskGroup` concurrency stress tests for actor-owned systems
+## Current Coverage
 
-## CI Gates
+- Swift package and app tests
+  - backend client request/retry/SSE behavior
+  - sync loaders and projection persistence
+  - markdown/rendering helpers
+  - settings/history/account presentation flows
+  - architecture and dependency-boundary assertions
+- Backend tests
+  - application services
+  - DTO mappers
+  - HTTP routes and middleware
+  - OpenAI adapter helpers
+  - backend TypeScript coverage thresholds enforced inside `@glassgpt/backend ci`
+  - contracts/build integration through the backend CI lane
+- Cross-stack validation
+  - `packages/backend-contracts` fixtures and generated artifacts
+  - Swift mirror tests against backend-facing contract shapes
 
-Default hard CI path:
+## Current Gaps Being Closed In 5.3.0
+
+- migration-failure and corruption-recovery coverage that still needs richer
+  behavior assertions
+- final live staged/prod release execution evidence
+
+## Local Commands
+
+- Full CI:
 
 ```bash
 ./scripts/ci.sh
 ```
 
-This currently runs:
+- Specific lanes:
 
-- `ci-health`
-- `lint`
-- `python-lint`
-- `format-check`
-- `build`
-- `architecture-tests`
-- `core-tests`
-- `ui-tests`
-- `coverage-report`
-- `maintainability`
-- `source-share`
-- `infra-safety`
-- `module-boundary`
-- `doc-build`
-- `doc-completeness`
-- `localization-check`
+```bash
+./scripts/ci.sh contracts
+./scripts/ci.sh backend
+./scripts/ci.sh ios
+./scripts/ci.sh release-readiness
+```
+
+- NativeChat package tests must run through Xcode in this repo:
+
+```bash
+cd modules/native-chat
+xcodebuild -scheme NativeChat-Package \
+  -destination 'platform=iOS Simulator,id=<simulator-id>' \
+  test
+```
+
+- Backend tests:
+
+```bash
+cd services/backend
+corepack pnpm run test
+```
+
+## CI Shape
+
+Top-level CI lanes:
+
+- `contracts`
+- `backend`
+- `ios`
 - `release-readiness`
 
-Tracked release-plan gates:
+The legacy iOS gate list still exists behind `scripts/ci_ios_engine.sh` for
+fine-grained local checks.
 
-- `performance-tests` when deterministic on the active toolchain
+## Release Gate Requirements
 
-## Maintainability
+Before any backend/TestFlight publish step:
 
-- file-level size budgets remain enforced for UI, non-UI, and ScreenStore surfaces
-- type families are checked in aggregate so extension splits cannot hide oversized ownership clusters
-- controller/coordinator cluster size, controller-backed coordinator anti-patterns, and `swiftlint:disable` usage are part of the gate output
+- `todo.md` exit gates must be green
+- the final audit must exist at `docs/audit-5.3.0.md`
+- full CI must pass
+- the final CI evidence log must be archived
+
+## Maintainability Gates
+
+- Swift file-size budgets are enforced for UI and non-UI files.
+- Type-family aggregate size is enforced so extension splits cannot hide large
+  ownership clusters.
+- boundary checks and maintainability checks are part of the expected local and
+  CI workflow, not optional cleanup.

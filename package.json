@@ -3,7 +3,7 @@
   "private": true,
   "packageManager": "pnpm@10.33.0",
   "engines": {
-    "node": ">=25.2.1 <26"
+    "node": ">=22 <26"
   },
   "scripts": {
     "build:contracts": "corepack pnpm --filter @glassgpt/backend-contracts run build",
@@ -19,11 +19,15 @@
     "ci:contracts": "./scripts/ci_contracts.sh"
   },
   "pnpm": {
-    "onlyBuiltDependencies": ["esbuild", "workerd"]
+    "onlyBuiltDependencies": [
+      "esbuild",
+      "workerd"
+    ]
   },
   "devDependencies": {
     "@biomejs/biome": "2.4.9",
     "@types/node": "25.5.0",
+    "@vitest/coverage-v8": "4.1.2",
     "dependency-cruiser": "17.3.10",
     "tsx": "4.21.0",
     "typescript": "6.0.2",

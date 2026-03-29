@@ -192,7 +192,7 @@ struct NativeChatUIRenderingCoverageTests {
             )
         )
         hostView(
-            BackendChatComposer(
+            BackendConversationComposerSection(
                 viewModel: chatController,
                 composerResetToken: UUID(),
                 onSendAccepted: {},
@@ -246,7 +246,7 @@ struct NativeChatUIRenderingCoverageTests {
             )
         )
         hostView(
-            BackendAgentComposer(
+            BackendConversationComposerSection(
                 viewModel: agentController,
                 composerResetToken: UUID(),
                 onSendAccepted: {},

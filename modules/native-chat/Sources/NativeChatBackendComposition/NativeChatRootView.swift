@@ -1,8 +1,10 @@
 import ChatDomain
+import GeneratedFilesCache
 import NativeChatBackendCore
 import NativeChatUI
 import SwiftData
 import SwiftUI
+import UIKit
 
 /// Top-level SwiftUI view that bootstraps the native chat composition root from the environment's model context.
 public struct NativeChatRootView: View {
@@ -24,6 +26,15 @@ public struct NativeChatRootView: View {
 
     /// The bootstrapped root content for the native chat feature.
     public var body: some View {
+        rootContent
+            .onReceive(NotificationCenter.default.publisher(for: UIApplication.didReceiveMemoryWarningNotification)) { _ in
+                Task {
+                    await GeneratedFileCacheManager().trimCachesForMemoryPressure()
+                }
+            }
+    }
+
+    private var rootContent: some View {
         Group {
             if let overrideContent {
                 overrideContent

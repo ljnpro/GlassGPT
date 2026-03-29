@@ -18,7 +18,7 @@ struct NativeChatAgentControllerCoverageTests {
         let controller = signedInHarness.makeAgentController()
         controller.selectedImageData = Data([0x01])
         #expect(!controller.sendMessage(text: "Plan"))
-        #expect(controller.errorMessage == "Attachments are not available in Beta 5.0 yet.")
+        #expect(controller.errorMessage == "Attachments are not available in 5.3.0 yet.")
 
         controller.selectedImageData = nil
         controller.isRunning = true

@@ -11,6 +11,7 @@ export const healthStateSchema = z.enum([
   'invalid',
   'unauthorized',
 ]);
+export const appCompatibilitySchema = z.enum(['compatible', 'update_required']);
 
 export const runKindSchema = z.enum(['chat', 'agent']);
 export const runStatusSchema = z.enum(['queued', 'running', 'completed', 'failed', 'cancelled']);
@@ -43,6 +44,9 @@ export const connectionCheckSchema = z.object({
   checkedAt: isoDateSchema,
   latencyMilliseconds: z.number().int().nonnegative().optional(),
   errorSummary: optionalTextSchema,
+  backendVersion: z.string().min(1),
+  minimumSupportedAppVersion: z.string().min(1),
+  appCompatibility: appCompatibilitySchema,
 });
 
 export const runSummarySchema = z.object({

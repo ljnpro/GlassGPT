@@ -27,17 +27,23 @@ private func enqueueConversationResponses(encoder: JSONEncoder) throws {
     )
     try CoverageBackendURLProtocol.state.enqueueResponse(
         statusCode: 200,
-        body: encoder.encode([
-            ConversationDTO(
-                id: "conv_1",
-                title: "Backend Chat",
-                mode: .chat,
-                createdAt: .init(timeIntervalSince1970: 2),
-                updatedAt: .init(timeIntervalSince1970: 3),
-                lastRunID: nil,
-                lastSyncCursor: nil
+        body: encoder.encode(
+            ConversationPageDTO(
+                items: [
+                    ConversationDTO(
+                        id: "conv_1",
+                        title: "Backend Chat",
+                        mode: .chat,
+                        createdAt: .init(timeIntervalSince1970: 2),
+                        updatedAt: .init(timeIntervalSince1970: 3),
+                        lastRunID: nil,
+                        lastSyncCursor: nil
+                    )
+                ],
+                nextCursor: nil,
+                hasMore: false
             )
-        ])
+        )
     )
     try CoverageBackendURLProtocol.state.enqueueResponse(
         statusCode: 200,

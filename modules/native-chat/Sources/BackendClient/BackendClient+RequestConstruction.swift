@@ -14,6 +14,7 @@ extension BackendClient {
         request.timeoutInterval = environment.timeoutInterval
         request.httpMethod = method
         request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.setValue(environment.appVersion, forHTTPHeaderField: backendAppVersionHeaderField)
 
         switch authorizationMode {
         case .required:

@@ -1,5 +1,6 @@
 import BackendAuth
 import BackendClient
+import BackendContracts
 import ChatDomain
 import ChatPersistenceCore
 import ChatProjectionPersistence
@@ -45,18 +46,64 @@ public final class BackendConversationLoader {
     public func refreshConversationDetail(serverID: String) async throws -> Conversation {
         let accountID = try requireAccountID()
         let detail = try await client.fetchConversationDetail(serverID)
-        return try projectionStore.applyConversationDetailSnapshot(detail, accountID: accountID)
+        let cachedConversation = try projectionStore.applyConversationDetailSnapshot(detail, accountID: accountID)
+        guard backendConfigurationNeedsReconciliation(detail.conversation) else {
+            return cachedConversation
+        }
+
+        return try await updateConversationConfiguration(
+            serverID: serverID,
+            mode: cachedConversation.mode,
+            model: cachedConversation.mode == .chat
+                ? ModelType(rawValue: cachedConversation.model) ?? .gpt5_4
+                : nil,
+            reasoningEffort: ReasoningEffort(rawValue: cachedConversation.reasoningEffort) ?? .high,
+            agentWorkerReasoningEffort: cachedConversation.mode == .agent
+                ? (cachedConversation.agentWorkerReasoningEffort ?? .low)
+                : nil,
+            serviceTier: ServiceTier(rawValue: cachedConversation.serviceTierRawValue) ?? .standard
+        )
     }
 
     @discardableResult
     public func createConversation(
         title: String,
-        mode: ConversationMode
+        mode: ConversationMode,
+        model: ModelType?,
+        reasoningEffort: ReasoningEffort,
+        agentWorkerReasoningEffort: ReasoningEffort?,
+        serviceTier: ServiceTier
     ) async throws -> Conversation {
         let accountID = try requireAccountID()
         let dto = try await client.createConversation(
             title: title,
-            mode: mode == .agent ? .agent : .chat
+            mode: mode == .agent ? .agent : .chat,
+            model: model.map(modelDTO(from:)),
+            reasoningEffort: reasoningEffortDTO(from: reasoningEffort),
+            agentWorkerReasoningEffort: agentWorkerReasoningEffort.map(reasoningEffortDTO(from:)),
+            serviceTier: serviceTierDTO(from: serviceTier)
+        )
+        return try projectionStore.upsertConversation(dto, accountID: accountID)
+    }
+
+    @discardableResult
+    public func updateConversationConfiguration(
+        serverID: String,
+        mode: ConversationMode,
+        model: ModelType?,
+        reasoningEffort: ReasoningEffort,
+        agentWorkerReasoningEffort: ReasoningEffort?,
+        serviceTier: ServiceTier
+    ) async throws -> Conversation {
+        let accountID = try requireAccountID()
+        let dto = try await client.updateConversationConfiguration(
+            serverID,
+            model: mode == .chat ? model.map(modelDTO(from:)) : nil,
+            reasoningEffort: reasoningEffortDTO(from: reasoningEffort),
+            agentWorkerReasoningEffort: mode == .agent
+                ? agentWorkerReasoningEffort.map(reasoningEffortDTO(from:))
+                : nil,
+            serviceTier: serviceTierDTO(from: serviceTier)
         )
         return try projectionStore.upsertConversation(dto, accountID: accountID)
     }
@@ -89,5 +136,49 @@ public final class BackendConversationLoader {
             throw BackendConversationLoaderError.missingSession
         }
         return accountID
+    }
+
+    private func backendConfigurationNeedsReconciliation(_ conversation: ConversationDTO) -> Bool {
+        switch conversation.mode {
+        case .chat:
+            conversation.model == nil || conversation.reasoningEffort == nil || conversation.serviceTier == nil
+        case .agent:
+            conversation.reasoningEffort == nil
+                || conversation.agentWorkerReasoningEffort == nil
+                || conversation.serviceTier == nil
+        }
+    }
+
+    private func modelDTO(from model: ModelType) -> ModelDTO {
+        switch model {
+        case .gpt5_4:
+            .gpt5_4
+        case .gpt5_4_pro:
+            .gpt5_4_pro
+        }
+    }
+
+    private func reasoningEffortDTO(from effort: ReasoningEffort) -> ReasoningEffortDTO {
+        switch effort {
+        case .none:
+            .none
+        case .low:
+            .low
+        case .medium:
+            .medium
+        case .high:
+            .high
+        case .xhigh:
+            .xhigh
+        }
+    }
+
+    private func serviceTierDTO(from tier: ServiceTier) -> ServiceTierDTO {
+        switch tier {
+        case .standard:
+            .standard
+        case .flex:
+            .flex
+        }
     }
 }

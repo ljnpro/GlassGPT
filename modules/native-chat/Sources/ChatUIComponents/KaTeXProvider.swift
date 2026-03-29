@@ -1,8 +1,10 @@
 import Foundation
+import OSLog
 
 /// Provides cached access to bundled KaTeX CSS and JavaScript resources for offline LaTeX rendering.
 @MainActor
 public enum KaTeXProvider {
+    static let logger = Logger(subsystem: "GlassGPT", category: "chat")
     private static var cachedCSS: String?
     private static var cachedJS: String?
     private static var cachedBundleURL: URL?
@@ -69,7 +71,7 @@ public enum KaTeXProvider {
             let message = "Failed to load KaTeX resource at \(url.path): \(error.localizedDescription)"
             onFailure?(message)
             if logFailure {
-                NSLog("%@", message)
+                logger.error("\(message, privacy: .public)")
             }
             return nil
         }

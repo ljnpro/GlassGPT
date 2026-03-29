@@ -3,43 +3,39 @@
 ## Long-Lived Branches
 
 - `main`
-  - promotion target after a Beta 5.0 release candidate is validated
+  - promotion target after a `5.3.x` release is validated
   - should point to the latest shipped product-quality line
 - `stable-4.12`
-  - frozen local backup of the pre-5.0 architecture
+  - frozen local backup of the pre-backend architecture
   - keep as the rollback and parity reference line
 - `codex/stable-4.12`
-  - GitHub mirror of the frozen pre-5.0 line when the branch is pushed remotely
-- `stable-5.0`
-  - optional post-cutover stable line after the first 5.0 release is published
-- `codex/stable-5.0`
-  - remote mirror of the 5.0 stable line once that line exists
+  - GitHub mirror of the frozen pre-backend line when pushed remotely
+- `codex/stable-5.3`
+  - active `5.3` release line
+  - default base for `5.3.x` hardening and release-preparation work
 
-## Active Cutover Branch
+## Active Release Work
 
-- `feature/beta-5.0-cloudflare-all-in`
-  - the active local release-preparation branch for the backend-owned Beta 5.0 cutover
-  - may publish internal and TestFlight release candidates before `main` promotion
-- `codex/feature/beta-5.0-cloudflare-all-in`
-  - remote mirror of the active Beta 5.0 cutover branch when pushed to GitHub
+- `feature/release-5.3-*`
+  - local release-preparation or hardening branches that stack on `codex/stable-5.3`
+- `codex/feature/release-5.3-*`
+  - remote mirrors of `5.3` release-preparation branches when pushed to GitHub
 
 ## Short-Lived Branches
 
 - `feature/<topic>`
-  - branch from the active release-preparation line
+  - branch from the active `5.3` release line unless a different release line is explicitly intended
   - publish as `codex/feature/<topic>` if mirrored remotely
   - merge back only after local CI, release-readiness, and manual log review are clean
   - delete after the change lands
 
 ## Release Alignment
 
-- Beta 5.0 release candidates may be published from `feature/beta-5.0-cloudflare-all-in`.
-- Do not promote `main` until the 5.0 release candidate has:
+- `5.3.x` release candidates should be prepared from `codex/stable-5.3` or a
+  `feature/release-5.3-*` branch cut from it.
+- Do not promote `main` until the `5.3` candidate has:
   - passed `./scripts/ci.sh release-readiness`
-  - passed the required hard lanes that were validated on the same tree
-  - produced a clean TestFlight upload with manually reviewed logs
-- Preserve `stable-4.12` / `codex/stable-4.12` as the frozen rollback line during the 5.0 rollout.
-- After the first 5.0 release is accepted:
-  - optionally establish `stable-5.0` / `codex/stable-5.0`
-  - promote `main` to the same commit
-  - keep the prior stable backup tag and source bundle
+  - passed the required hard lanes on the same tree
+  - produced the required final audit and perfect-log CI evidence
+- Preserve `stable-4.12` / `codex/stable-4.12` as the frozen rollback line
+  during the `5.3` rollout.

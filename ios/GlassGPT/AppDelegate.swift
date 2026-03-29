@@ -1,10 +1,10 @@
 import AppIntents
 import ChatPersistenceCore
+import ChatPresentation
 import MetricKit
 import NativeChat
 import SwiftUI
 #if DEBUG
-import NativeChatUI
 import NativeChatUITestSupport
 #endif
 

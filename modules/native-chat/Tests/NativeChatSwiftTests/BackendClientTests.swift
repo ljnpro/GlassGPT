@@ -1,10 +1,10 @@
 import BackendAuth
-import BackendClient
 import BackendContracts
 import BackendSessionPersistence
 import ChatPersistenceCore
 import Foundation
 import Testing
+@testable import BackendClient
 
 struct BackendClientTests {
     @MainActor
@@ -28,11 +28,17 @@ struct BackendClientTests {
             urlSession: session
         )
 
-        _ = try await client.connectionCheck()
+        let response = try await client.connectionCheck()
 
         #expect(
             RecordingBackendURLProtocol.state.snapshot.lastAuthorizationHeader == "Bearer access-token"
         )
+        #expect(
+            RecordingBackendURLProtocol.state.snapshot.recordedRequests.last?.appVersionHeader == "5.3.0"
+        )
+        #expect(response.backendVersion == "5.3.0")
+        #expect(response.minimumSupportedAppVersion == "5.3.0")
+        #expect(response.appCompatibility == .compatible)
         session.invalidateAndCancel()
     }
 
@@ -74,39 +80,29 @@ struct BackendClientTests {
             urlSession: session
         )
 
-        _ = try await client.connectionCheck()
+        let response = try await client.connectionCheck()
 
         let recorded = RecordingBackendURLProtocol.state.snapshot.recordedRequests
         #expect(recorded.map(\.path) == ["/v1/auth/refresh", "/v1/connection/check"])
         #expect(recorded.last?.authorizationHeader == "Bearer refreshed-access-token")
+        #expect(recorded.last?.appVersionHeader == "5.3.0")
         #expect(sessionStore.loadSession()?.accessToken == "refreshed-access-token")
         #expect(persistence.loadSession()?.accessToken == "refreshed-access-token")
+        #expect(response.backendVersion == "5.3.0")
         session.invalidateAndCancel()
     }
 
     @MainActor
     @Test
-    func `stream run returns SSE stream targeting correct endpoint`() throws {
-        let sessionStore = try BackendSessionStore(
-            session: makeSessionDTO()
-        )
-        let client = try BackendClient(
-            environment: BackendEnvironment(baseURL: #require(URL(string: "https://api.example.com"))),
-            sessionStore: sessionStore
-        )
-
-        let stream = client.streamRun("run_stream_01")
-        // BackendSSEStream is a value type; verify it was created successfully
-        _ = stream
-    }
-
-    @MainActor
-    @Test
-    func `stream run surfaces non-success stream setup as an explicit SSE error`() async throws {
+    func `connection check retries service unavailable and succeeds`() async throws {
         RecordingBackendURLProtocol.state.reset()
         RecordingBackendURLProtocol.state.enqueueResponse(
-            responseStatusCode: 401,
+            responseStatusCode: 503,
             responseBody: Data()
+        )
+        try RecordingBackendURLProtocol.state.enqueueResponse(
+            responseStatusCode: 200,
+            responseBody: makeConnectionCheckResponseData()
         )
 
         let configuration = URLSessionConfiguration.ephemeral
@@ -116,234 +112,131 @@ struct BackendClientTests {
             session: makeSessionDTO()
         )
         let client = try BackendClient(
-            environment: BackendEnvironment(baseURL: #require(URL(string: "https://api.example.com"))),
+            environment: BackendEnvironment(baseURL: #require(URL(string: "https://example.com"))),
             sessionStore: sessionStore,
             urlSession: session
         )
 
-        var iterator = client.streamRun("run_stream_401").makeAsyncIterator()
-        do {
-            _ = try await iterator.next()
-            Issue.record("Expected unacceptable status code stream failure")
-        } catch let error as BackendSSEStreamError {
-            #expect(error == .unacceptableStatusCode(401))
-        } catch {
-            Issue.record("Unexpected error: \(error)")
+        try await withDeterministicRetryPolicy {
+            _ = try await client.connectionCheck()
         }
+
+        #expect(RecordingBackendURLProtocol.state.snapshot.recordedRequests.count == 2)
         session.invalidateAndCancel()
     }
 
     @MainActor
     @Test
-    func `SSE event struct stores event type data and optional id`() {
-        let event = SSEEvent(event: "delta", data: "{\"textDelta\":\"hello\"}", id: "evt_1")
-        #expect(event.event == "delta")
-        #expect(event.data == "{\"textDelta\":\"hello\"}")
-        #expect(event.id == "evt_1")
+    func `connection check retries transient url session failures and succeeds`() async throws {
+        RecordingBackendURLProtocol.state.reset()
+        RecordingBackendURLProtocol.state.enqueueFailure(URLError(.networkConnectionLost))
+        try RecordingBackendURLProtocol.state.enqueueResponse(
+            responseStatusCode: 200,
+            responseBody: makeConnectionCheckResponseData()
+        )
 
-        let noID = SSEEvent(event: "status", data: "{}", id: nil)
-        #expect(noID.id == nil)
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [RecordingBackendURLProtocol.self]
+        let session = URLSession(configuration: configuration)
+        let sessionStore = try BackendSessionStore(
+            session: makeSessionDTO()
+        )
+        let client = try BackendClient(
+            environment: BackendEnvironment(baseURL: #require(URL(string: "https://example.com"))),
+            sessionStore: sessionStore,
+            urlSession: session
+        )
+
+        try await withDeterministicRetryPolicy {
+            _ = try await client.connectionCheck()
+        }
+
+        #expect(RecordingBackendURLProtocol.state.snapshot.recordedRequests.count == 2)
+        session.invalidateAndCancel()
     }
 
     @MainActor
     @Test
-    func `session store restores persisted session and clears on sign out`() throws {
+    func `fetch conversations follows paginated cursors until hasMore is false`() async throws {
+        RecordingBackendURLProtocol.state.reset()
+
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        try RecordingBackendURLProtocol.state.enqueueResponse(
+            responseStatusCode: 200,
+            responseBody: encoder.encode(
+                ConversationPageDTO(
+                    items: [
+                        ConversationDTO(
+                            id: "conv_1",
+                            title: "Conversation 1",
+                            mode: .chat,
+                            createdAt: .init(timeIntervalSince1970: 1),
+                            updatedAt: .init(timeIntervalSince1970: 2),
+                            lastRunID: nil,
+                            lastSyncCursor: nil
+                        )
+                    ],
+                    nextCursor: "cursor-page-2",
+                    hasMore: true
+                )
+            )
+        )
+        try RecordingBackendURLProtocol.state.enqueueResponse(
+            responseStatusCode: 200,
+            responseBody: encoder.encode(
+                ConversationPageDTO(
+                    items: [
+                        ConversationDTO(
+                            id: "conv_2",
+                            title: "Conversation 2",
+                            mode: .agent,
+                            createdAt: .init(timeIntervalSince1970: 3),
+                            updatedAt: .init(timeIntervalSince1970: 4),
+                            lastRunID: nil,
+                            lastSyncCursor: nil
+                        )
+                    ],
+                    nextCursor: nil,
+                    hasMore: false
+                )
+            )
+        )
+
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [RecordingBackendURLProtocol.self]
+        let session = URLSession(configuration: configuration)
+        let sessionStore = try BackendSessionStore(
+            session: makeSessionDTO()
+        )
+        let client = try BackendClient(
+            environment: BackendEnvironment(baseURL: #require(URL(string: "https://example.com"))),
+            sessionStore: sessionStore,
+            urlSession: session
+        )
+
+        let conversations = try await client.fetchConversations()
+
+        #expect(conversations.map(\.id) == ["conv_1", "conv_2"])
+        #expect(
+            RecordingBackendURLProtocol.state.snapshot.recordedRequests.map(\.query) == [
+                nil,
+                "cursor=cursor-page-2"
+            ]
+        )
+        session.invalidateAndCancel()
+    }
+
+    @MainActor
+    @Test
+    func `session persistence clears corrupt stored payloads`() throws {
         let backend = InMemoryAPIKeyBackend()
-        let persistence = BackendSessionPersistence(
-            store: PersistedAPIKeyStore(backend: backend)
-        )
-        let originalSession = try makeSessionDTO(
-            accessToken: "persisted-access-token",
-            refreshToken: "persisted-refresh-token",
-            expiresAt: "2100-01-01T00:16:40Z"
-        )
-        let firstStore = BackendSessionStore(persistence: persistence)
-        firstStore.replace(session: originalSession)
+        let store = PersistedAPIKeyStore(backend: backend)
+        try store.saveAPIKey("{not valid json")
 
-        let restoredStore = BackendSessionStore(persistence: persistence)
-        #expect(restoredStore.loadSession() == originalSession)
+        let persistence = BackendSessionPersistence(store: store)
 
-        restoredStore.clear()
         #expect(persistence.loadSession() == nil)
         #expect(backend.didDelete)
-    }
-}
-
-private func makeConnectionCheckResponseData() throws -> Data {
-    try JSONSerialization.data(withJSONObject: [
-        "backend": "healthy",
-        "auth": "healthy",
-        "openaiCredential": "healthy",
-        "sse": "healthy",
-        "checkedAt": "1970-01-01T00:00:00Z",
-        "latencyMilliseconds": 12
-    ])
-}
-
-private func makeSessionResponseData(
-    accessToken: String,
-    refreshToken: String,
-    expiresAt: String
-) throws -> Data {
-    try JSONSerialization.data(withJSONObject: [
-        "accessToken": accessToken,
-        "refreshToken": refreshToken,
-        "expiresAt": expiresAt,
-        "deviceId": "device_01",
-        "user": [
-            "id": "usr_01",
-            "appleSubject": "apple-subject-01",
-            "email": "glass@example.com",
-            "displayName": "Glass User",
-            "createdAt": "1970-01-01T00:00:00Z"
-        ]
-    ])
-}
-
-private func makeSessionDTO(
-    accessToken: String = "access-token",
-    refreshToken: String = "refresh-token",
-    expiresAt: String = "2100-01-01T00:16:40Z"
-) throws -> SessionDTO {
-    let data = try makeSessionResponseData(
-        accessToken: accessToken,
-        refreshToken: refreshToken,
-        expiresAt: expiresAt
-    )
-    let decoder = JSONDecoder()
-    decoder.dateDecodingStrategy = .iso8601
-    return try decoder.decode(SessionDTO.self, from: data)
-}
-
-private final class RecordingBackendURLProtocol: URLProtocol {
-    static let state = RecordingBackendURLProtocolState()
-
-    override class func canInit(with _: URLRequest) -> Bool {
-        true
-    }
-
-    override class func canonicalRequest(for request: URLRequest) -> URLRequest {
-        request
-    }
-
-    override func startLoading() {
-        Self.state.recordRequest(request)
-        guard let responseURL = request.url ?? URL(string: "https://example.com") else {
-            client?.urlProtocol(self, didFailWithError: URLError(.badURL))
-            return
-        }
-        let configuredResponse = Self.state.dequeueResponse()
-        let response = HTTPURLResponse(
-            url: responseURL,
-            statusCode: configuredResponse.responseStatusCode,
-            httpVersion: nil,
-            headerFields: configuredResponse.responseHeaders
-        )
-        guard let response else {
-            client?.urlProtocol(self, didFailWithError: URLError(.badServerResponse))
-            return
-        }
-        client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
-        client?.urlProtocol(self, didLoad: configuredResponse.responseBody)
-        client?.urlProtocolDidFinishLoading(self)
-    }
-
-    override func stopLoading() {}
-}
-
-private final class RecordingBackendURLProtocolState: @unchecked Sendable {
-    struct StubbedResponse {
-        let responseStatusCode: Int
-        let responseBody: Data
-        let responseHeaders: [String: String]
-    }
-
-    struct RecordedRequest: Equatable {
-        let path: String
-        let authorizationHeader: String?
-    }
-
-    struct Snapshot {
-        let lastAuthorizationHeader: String?
-        let recordedRequests: [RecordedRequest]
-    }
-
-    private let lock = NSLock()
-    private var responseQueue: [StubbedResponse] = []
-    private var recordedRequests: [RecordedRequest] = []
-
-    func reset() {
-        lock.lock()
-        responseQueue.removeAll()
-        recordedRequests.removeAll()
-        lock.unlock()
-    }
-
-    func enqueueResponse(
-        responseStatusCode: Int,
-        responseBody: Data,
-        responseHeaders: [String: String] = ["Content-Type": "application/json"]
-    ) {
-        lock.lock()
-        responseQueue.append(
-            StubbedResponse(
-                responseStatusCode: responseStatusCode,
-                responseBody: responseBody,
-                responseHeaders: responseHeaders
-            )
-        )
-        lock.unlock()
-    }
-
-    func recordRequest(_ request: URLRequest) {
-        lock.lock()
-        recordedRequests.append(
-            RecordedRequest(
-                path: request.url?.path ?? "",
-                authorizationHeader: request.value(forHTTPHeaderField: "Authorization")
-            )
-        )
-        lock.unlock()
-    }
-
-    func dequeueResponse() -> StubbedResponse {
-        lock.lock()
-        let response = responseQueue.isEmpty
-            ? StubbedResponse(
-                responseStatusCode: 200,
-                responseBody: Data(),
-                responseHeaders: ["Content-Type": "application/json"]
-            )
-            : responseQueue.removeFirst()
-        lock.unlock()
-        return response
-    }
-
-    var snapshot: Snapshot {
-        lock.lock()
-        let snapshot = Snapshot(
-            lastAuthorizationHeader: recordedRequests.last?.authorizationHeader,
-            recordedRequests: recordedRequests
-        )
-        lock.unlock()
-        return snapshot
-    }
-}
-
-private final class InMemoryAPIKeyBackend: @unchecked Sendable, APIKeyPersisting {
-    private var storedKey: String?
-    private(set) var didDelete = false
-
-    func saveAPIKey(_ apiKey: String) throws(PersistenceError) {
-        storedKey = apiKey
-    }
-
-    func loadAPIKey() -> String? {
-        storedKey
-    }
-
-    func deleteAPIKey() {
-        didDelete = true
-        storedKey = nil
     }
 }

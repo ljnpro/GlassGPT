@@ -10,7 +10,13 @@ MIGRATIONS_DIR="$BACKEND_DIR/migrations"
 BUILD_DIR="${LOCAL_BUILD_DIR:-$ROOT_DIR/.local/build}"
 DEPLOY_LOG="$BUILD_DIR/backend-deploy.log"
 MIGRATION_LOG="$BUILD_DIR/backend-migrations.log"
+BACKUP_LOG="$BUILD_DIR/backend-d1-backup.log"
+BACKUP_FILE=""
 BACKEND_ENV_FILE="$ROOT_DIR/.local/backend.env"
+TODO_PATH="${TODO_PATH:-$ROOT_DIR/todo.md}"
+AUDIT_PATH="${AUDIT_PATH:-$ROOT_DIR/docs/audit-5.3.0.md}"
+FINAL_CI_EVIDENCE_PATH="${FINAL_CI_EVIDENCE_PATH:-$ROOT_DIR/.local/build/evidence/rel-001-final-ci.txt}"
+SMOKE_APP_VERSION="${SMOKE_APP_VERSION:-5.3.0}"
 
 # Source Cloudflare credentials if available (CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID)
 if [[ -f "$BACKEND_ENV_FILE" ]]; then
@@ -22,21 +28,23 @@ fi
 function usage() {
   cat <<'EOF'
 Usage:
-  ./scripts/deploy_backend.sh [--dry-run] [--skip-migrations] [--skip-tests] [--skip-lint]
+  ./scripts/deploy_backend.sh --env <staging|production> [--dry-run] [--skip-migrations] [--skip-tests] [--skip-lint] [--skip-smoke]
 
 Deploys the backend Cloudflare Worker and runs pending D1 migrations.
 
 Options:
+  --env <name>        Wrangler environment to deploy (`staging` or `production`)
   --dry-run           Bundle and validate without deploying
   --skip-migrations   Skip D1 database migrations
   --skip-tests        Skip backend test suite
   --skip-lint         Skip lint and type checks
+  --skip-smoke        Skip post-deploy smoke checks
   --help, -h          Show this help
 
 Examples:
-  ./scripts/deploy_backend.sh                    # Full deploy with all checks
-  ./scripts/deploy_backend.sh --dry-run          # Validate only
-  ./scripts/deploy_backend.sh --skip-tests       # Deploy without re-running tests
+  ./scripts/deploy_backend.sh --env staging
+  ./scripts/deploy_backend.sh --env production
+  ./scripts/deploy_backend.sh --env staging --dry-run
 EOF
 }
 
@@ -44,9 +52,15 @@ DRY_RUN=0
 SKIP_MIGRATIONS=0
 SKIP_TESTS=0
 SKIP_LINT=0
+SKIP_SMOKE=0
+TARGET_ENV=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
+    --env)
+      TARGET_ENV="${2:-}"
+      shift 2
+      ;;
     --dry-run)
       DRY_RUN=1
       shift
@@ -61,6 +75,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --skip-lint)
       SKIP_LINT=1
+      shift
+      ;;
+    --skip-smoke)
+      SKIP_SMOKE=1
       shift
       ;;
     --help|-h)
@@ -84,8 +102,109 @@ function fail() {
   exit 1
 }
 
-function run_npx() {
-  npx --yes "$@"
+function require_release_gates() {
+  python3 "$ROOT_DIR/scripts/check_todo_release_gates.py" \
+    --todo "$TODO_PATH" \
+    --require-file "$AUDIT_PATH" \
+    --require-file "$FINAL_CI_EVIDENCE_PATH"
+}
+
+function resolve_healthcheck_url() {
+  if [[ -n "${BACKEND_HEALTHCHECK_URL:-}" ]]; then
+    printf '%s\n' "$BACKEND_HEALTHCHECK_URL"
+    return 0
+  fi
+
+  local upper_env="${TARGET_ENV^^}"
+  local env_specific_var="BACKEND_${upper_env}_HEALTHCHECK_URL"
+  local env_specific_value="${!env_specific_var:-}"
+  if [[ -n "$env_specific_value" ]]; then
+    printf '%s\n' "$env_specific_value"
+    return 0
+  fi
+
+  printf '%s\n' ""
+}
+
+function resolve_deploy_config() {
+  if [[ -z "$TARGET_ENV" ]]; then
+    return 0
+  fi
+
+  local resolved_config="$BACKEND_DIR/.wrangler/wrangler.${TARGET_ENV}.json"
+  mkdir -p "$BACKEND_DIR/.wrangler"
+  python3 - "$WRANGLER_CONFIG" "$resolved_config" "$TARGET_ENV" <<'PY'
+import json
+import os
+import pathlib
+import re
+import sys
+
+base_path = pathlib.Path(sys.argv[1])
+resolved_path = pathlib.Path(sys.argv[2])
+target_env = sys.argv[3]
+prefix = f"BACKEND_{target_env.upper()}_"
+
+text = re.sub(r"(?m)^\s*//.*$", "", base_path.read_text())
+config = json.loads(text)
+
+required_suffixes = [
+    "WORKER_NAME",
+    "D1_DATABASE_NAME",
+    "D1_DATABASE_ID",
+    "R2_BUCKET_NAME",
+]
+missing = [prefix + suffix for suffix in required_suffixes if not os.getenv(prefix + suffix)]
+if missing:
+    raise SystemExit(
+        "Missing backend environment overrides for "
+        + target_env
+        + ": "
+        + ", ".join(missing)
+    )
+
+config["name"] = os.environ[prefix + "WORKER_NAME"]
+main = config.get("main")
+if isinstance(main, str) and main and not pathlib.PurePosixPath(main).is_absolute():
+    config["main"] = str(pathlib.PurePosixPath("..") / pathlib.PurePosixPath(main))
+config["workers_dev"] = os.getenv(prefix + "WORKERS_DEV", "true").lower() in {"1", "true", "yes"}
+
+vars_config = config.setdefault("vars", {})
+vars_config["APP_ENV"] = os.getenv(prefix + "APP_ENV", target_env)
+vars_config["R2_BUCKET_NAME"] = os.environ[prefix + "R2_BUCKET_NAME"]
+
+cors_allowed_origins = os.getenv(prefix + "CORS_ALLOWED_ORIGINS")
+if cors_allowed_origins:
+    vars_config["CORS_ALLOWED_ORIGINS"] = cors_allowed_origins
+
+databases = config.get("d1_databases", [])
+if not databases:
+    raise SystemExit("wrangler.jsonc is missing d1_databases")
+databases[0]["database_name"] = os.environ[prefix + "D1_DATABASE_NAME"]
+databases[0]["database_id"] = os.environ[prefix + "D1_DATABASE_ID"]
+
+r2_buckets = config.get("r2_buckets", [])
+if r2_buckets:
+    r2_buckets[0]["bucket_name"] = os.environ[prefix + "R2_BUCKET_NAME"]
+
+resolved_path.write_text(json.dumps(config, indent=2) + "\n")
+PY
+
+  WRANGLER_CONFIG="$resolved_config"
+
+  local resolved_migrations_dir="$BACKEND_DIR/.wrangler/migrations"
+  rm -rf "$resolved_migrations_dir"
+  ln -s ../migrations "$resolved_migrations_dir"
+}
+
+function wrangler() {
+  npx wrangler "$@" --config "$WRANGLER_CONFIG"
+}
+
+function require_target_environment_for_live_deploy() {
+  if (( DRY_RUN == 0 )) && [[ -z "$TARGET_ENV" ]]; then
+    fail "Live deploys require --env staging or --env production."
+  fi
 }
 
 # ---------------------------------------------------------------------------
@@ -94,6 +213,12 @@ function run_npx() {
 
 cd "$ROOT_DIR"
 mkdir -p "$BUILD_DIR"
+require_target_environment_for_live_deploy
+resolve_deploy_config
+
+if (( DRY_RUN == 0 )); then
+  require_release_gates
+fi
 
 if [[ ! -f "$WRANGLER_CONFIG" ]]; then
   fail "Missing wrangler config: $WRANGLER_CONFIG"
@@ -102,7 +227,7 @@ fi
 WORKER_NAME="$(python3 -c "
 import json, re, sys
 text = open('$WRANGLER_CONFIG').read()
-text = re.sub(r'//.*', '', text)
+text = re.sub(r'(?m)^\s*//.*$', '', text)
 print(json.loads(text)['name'])
 ")"
 if [[ -z "$WORKER_NAME" ]]; then
@@ -112,7 +237,7 @@ fi
 D1_DATABASE_NAME="$(python3 -c "
 import json, re, sys
 text = open('$WRANGLER_CONFIG').read()
-text = re.sub(r'//.*', '', text)
+text = re.sub(r'(?m)^\s*//.*$', '', text)
 config = json.loads(text)
 dbs = config.get('d1_databases', [])
 print(dbs[0]['database_name'] if dbs else '')
@@ -120,6 +245,7 @@ print(dbs[0]['database_name'] if dbs else '')
 
 echo "Worker:   $WORKER_NAME"
 echo "Database: ${D1_DATABASE_NAME:-none}"
+echo "Env:      ${TARGET_ENV:-base}"
 echo "Mode:     $([ $DRY_RUN -eq 1 ] && echo 'dry-run' || echo 'live deploy')"
 echo ""
 
@@ -164,7 +290,7 @@ fi
 
 log "Validating Worker bundle"
 mkdir -p .wrangler
-npx wrangler deploy --dry-run --outdir .wrangler/dry-run --metafile .wrangler/bundle-meta.json --keep-vars 2>&1 | tee "$DEPLOY_LOG.preflight"
+wrangler deploy --dry-run --outdir .wrangler/dry-run --metafile .wrangler/bundle-meta.json --keep-vars 2>&1 | tee "$DEPLOY_LOG.preflight"
 
 BUNDLE_SIZE="$(python3 -c "
 import json, pathlib, sys
@@ -193,8 +319,12 @@ fi
 if (( SKIP_MIGRATIONS == 0 )) && [[ -n "$D1_DATABASE_NAME" ]] && [[ -d "$MIGRATIONS_DIR" ]]; then
   MIGRATION_COUNT="$(find "$MIGRATIONS_DIR" -name '*.sql' -type f | wc -l | tr -d ' ')"
   if (( MIGRATION_COUNT > 0 )); then
+    BACKUP_FILE="$BUILD_DIR/d1-${TARGET_ENV:-base}-backup-$(date +%Y%m%dT%H%M%S).sql"
+    log "Exporting D1 backup to $BACKUP_FILE"
+    wrangler d1 export "$D1_DATABASE_NAME" --remote --output "$BACKUP_FILE" 2>&1 | tee "$BACKUP_LOG"
+
     log "Applying D1 migrations ($MIGRATION_COUNT files)"
-    npx wrangler d1 migrations apply "$D1_DATABASE_NAME" --remote 2>&1 | tee "$MIGRATION_LOG"
+    wrangler d1 migrations apply "$D1_DATABASE_NAME" --remote 2>&1 | tee "$MIGRATION_LOG"
     echo "D1 migrations applied."
   else
     log "No pending D1 migrations"
@@ -209,28 +339,65 @@ fi
 
 log "Deploying Worker: $WORKER_NAME"
 rm -f "$DEPLOY_LOG"
-npx wrangler deploy --keep-vars 2>&1 | tee "$DEPLOY_LOG"
+wrangler deploy --keep-vars 2>&1 | tee "$DEPLOY_LOG"
 
-DEPLOYED_URL="$(grep -oE 'https://[a-zA-Z0-9._-]+\.workers\.dev' "$DEPLOY_LOG" | head -1 || true)"
+DEPLOYED_URL="$(resolve_healthcheck_url)"
+if [[ -z "$DEPLOYED_URL" ]]; then
+  DEPLOYED_URL="$(grep -oE 'https://[a-zA-Z0-9._-]+\.workers\.dev' "$DEPLOY_LOG" | head -1 || true)"
+fi
 
 # ---------------------------------------------------------------------------
 # Step 7: Health check
 # ---------------------------------------------------------------------------
 
-if [[ -n "$DEPLOYED_URL" ]]; then
+if (( SKIP_SMOKE == 0 )) && [[ -n "$DEPLOYED_URL" ]]; then
   log "Running post-deploy health check"
-  HEALTH_STATUS="$(curl -sf "${DEPLOYED_URL}/healthz" 2>/dev/null || echo '{"ok":false}')"
-  HEALTH_OK="$(echo "$HEALTH_STATUS" | python3 -c "import json,sys; print(json.load(sys.stdin).get('ok', False))" 2>/dev/null || echo "False")"
+  HEALTH_STATUS="$(
+    curl -sf \
+      -H "X-GlassGPT-App-Version: $SMOKE_APP_VERSION" \
+      "${DEPLOYED_URL}/healthz" 2>/dev/null || echo '{"ok":false}'
+  )"
+  HEALTH_PARSE="$(echo "$HEALTH_STATUS" | python3 -c "import json,sys; data=json.load(sys.stdin); print(f\"{data.get('ok', False)}\\t{data.get('appCompatibility', '')}\")" 2>/dev/null || echo $'False\t')"
+  IFS=$'\t' read -r HEALTH_OK HEALTH_COMPATIBILITY <<<"$HEALTH_PARSE"
 
-  if [[ "$HEALTH_OK" == "True" ]]; then
-    echo "Health check passed: $DEPLOYED_URL"
+  CONNECTION_STATUS="$(
+    curl -sf \
+      -H "X-GlassGPT-App-Version: $SMOKE_APP_VERSION" \
+      "${DEPLOYED_URL}/v1/connection/check" 2>/dev/null || echo '{}'
+  )"
+  CONNECTION_PARSE="$(echo "$CONNECTION_STATUS" | python3 -c "import json,sys; data=json.load(sys.stdin); print(f\"{data.get('appCompatibility', '')}\\t{data.get('backendVersion', '')}\\t{data.get('minimumSupportedAppVersion', '')}\")" 2>/dev/null || echo $'\t\t')"
+  IFS=$'\t' read -r CONNECTION_COMPATIBILITY CONNECTION_BACKEND_VERSION CONNECTION_MIN_APP_VERSION <<<"$CONNECTION_PARSE"
+  STREAM_STATUS="$(
+    curl -s -o /dev/null -w '%{http_code}' \
+      -H "X-GlassGPT-App-Version: $SMOKE_APP_VERSION" \
+      "${DEPLOYED_URL}/v1/runs/release-smoke/stream"
+  )"
+
+  if [[ "$HEALTH_OK" == "True" ]] &&
+    [[ "$HEALTH_COMPATIBILITY" == "compatible" ]] &&
+    [[ "$CONNECTION_COMPATIBILITY" == "compatible" ]] &&
+    [[ "$STREAM_STATUS" == "401" ]] &&
+    [[ -n "$CONNECTION_BACKEND_VERSION" ]] &&
+    [[ -n "$CONNECTION_MIN_APP_VERSION" ]]; then
+    echo "Health, compatibility, and stream-route checks passed: $DEPLOYED_URL"
+    echo "Backend version: $CONNECTION_BACKEND_VERSION"
+    echo "Minimum supported app version: $CONNECTION_MIN_APP_VERSION"
   else
-    echo "WARNING: Health check failed for $DEPLOYED_URL" >&2
-    echo "Response: $HEALTH_STATUS" >&2
-    echo "The deploy completed but the worker may not be healthy. Check Cloudflare dashboard." >&2
+    echo "WARNING: release smoke check failed for $DEPLOYED_URL" >&2
+    echo "Health response: $HEALTH_STATUS" >&2
+    echo "Connection response: $CONNECTION_STATUS" >&2
+    echo "Stream route status: $STREAM_STATUS" >&2
+    if [[ "$TARGET_ENV" == "production" ]]; then
+      echo "Attempting production rollback." >&2
+      wrangler rollback --name "$WORKER_NAME" --message "automatic rollback after failed smoke check" --yes
+      fail "Production smoke check failed and rollback was triggered."
+    fi
+    fail "Staging smoke check failed."
   fi
+elif (( SKIP_SMOKE == 1 )); then
+  log "Skipping smoke checks (--skip-smoke)"
 else
-  echo "Could not extract deployed URL from wrangler output."
+  fail "Could not resolve a deployed URL or healthcheck URL for live smoke checks."
 fi
 
 # ---------------------------------------------------------------------------
@@ -242,4 +409,7 @@ echo "Backend deploy complete."
 echo "Worker:      $WORKER_NAME"
 echo "URL:         ${DEPLOYED_URL:-unknown}"
 echo "Bundle size: $BUNDLE_SIZE"
+if [[ -n "$BACKUP_FILE" ]]; then
+  echo "D1 backup:   $BACKUP_FILE"
+fi
 echo "Log:         $DEPLOY_LOG"

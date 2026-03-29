@@ -1,7 +1,9 @@
 import {
   createConversationRequestSchema,
   createMessageRequestSchema,
+  listConversationsQuerySchema,
   startAgentRunRequestSchema,
+  updateConversationConfigurationRequestSchema,
 } from '@glassgpt/backend-contracts';
 
 import { requireAuthenticatedSession } from '../require-authenticated-session.js';
@@ -12,10 +14,15 @@ import type { BackendApp } from '../types.js';
 export const installConversationRoutes = (app: BackendApp, services: BackendServices): void => {
   app.get('/v1/conversations', async (context) => {
     const session = await requireAuthenticatedSession(context, services);
+    const query = listConversationsQuerySchema.parse({
+      cursor: context.req.query('cursor') ?? undefined,
+      limit: context.req.query('limit') ?? undefined,
+    });
     return context.json(
       await services.conversationService.listConversations(
         asBackendRuntimeContext(context.env),
         session.userId,
+        query,
       ),
     );
   });
@@ -42,6 +49,19 @@ export const installConversationRoutes = (app: BackendApp, services: BackendServ
         body,
       ),
       201,
+    );
+  });
+
+  app.patch('/v1/conversations/:conversationId/configuration', async (context) => {
+    const session = await requireAuthenticatedSession(context, services);
+    const body = updateConversationConfigurationRequestSchema.parse(await context.req.json());
+    return context.json(
+      await services.conversationService.updateConversationConfiguration(
+        asBackendRuntimeContext(context.env),
+        session.userId,
+        context.req.param('conversationId'),
+        body,
+      ),
     );
   });
 

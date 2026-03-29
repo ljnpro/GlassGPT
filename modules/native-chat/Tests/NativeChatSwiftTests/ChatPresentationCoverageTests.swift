@@ -47,8 +47,9 @@ struct ChatPresentationCoverageTests {
 
         client.connectionCheckResult = .failure(PresentationTestError.network)
         await store.checkConnection()
-        #expect(store.connectionStatus?.backend == .unavailable)
-        #expect(store.connectionStatus?.auth == .unauthorized)
+        #expect(store.connectionStatus == nil)
+        #expect(store.syncStatusState == .unavailable)
+        #expect(store.syncStatusText == "Connection Check Failed")
         #expect(store.lastErrorMessage == PresentationTestError.network.localizedDescription)
     }
 
@@ -268,7 +269,7 @@ struct ChatPresentationCoverageTests {
 }
 
 @MainActor
-private final class PresentationBackendRequester: BackendRequesting {
+final class PresentationBackendRequester: BackendRequesting {
     var connectionCheckResult: Result<ConnectionCheckDTO, Error> = .success(
         ConnectionCheckDTO(
             backend: .healthy,
@@ -291,7 +292,14 @@ private final class PresentationBackendRequester: BackendRequesting {
         throw PresentationTestError.unimplemented
     }
 
-    func createConversation(title _: String, mode _: ConversationModeDTO) async throws -> ConversationDTO {
+    func createConversation(
+        title _: String,
+        mode _: ConversationModeDTO,
+        model _: ModelDTO?,
+        reasoningEffort _: ReasoningEffortDTO?,
+        agentWorkerReasoningEffort _: ReasoningEffortDTO?,
+        serviceTier _: ServiceTierDTO?
+    ) async throws -> ConversationDTO {
         throw PresentationTestError.unimplemented
     }
 
@@ -331,7 +339,7 @@ private final class PresentationBackendRequester: BackendRequesting {
         throw PresentationTestError.unimplemented
     }
 
-    func streamRun(_ runID: String) -> BackendSSEStream {
+    func streamRun(_ runID: String, lastEventID _: String?) async throws -> BackendSSEStream {
         var components = URLComponents()
         components.scheme = "https"
         components.host = "localhost"
@@ -341,6 +349,16 @@ private final class PresentationBackendRequester: BackendRequesting {
     }
 
     func syncEvents(after _: String?) async throws -> SyncEnvelopeDTO {
+        throw PresentationTestError.unimplemented
+    }
+
+    func updateConversationConfiguration(
+        _: String,
+        model _: ModelDTO?,
+        reasoningEffort _: ReasoningEffortDTO?,
+        agentWorkerReasoningEffort _: ReasoningEffortDTO?,
+        serviceTier _: ServiceTierDTO?
+    ) async throws -> ConversationDTO {
         throw PresentationTestError.unimplemented
     }
 
@@ -361,7 +379,7 @@ private final class PresentationBackendRequester: BackendRequesting {
     }
 }
 
-private enum PresentationTestError: LocalizedError {
+enum PresentationTestError: LocalizedError {
     case network
     case unimplemented
 
@@ -372,26 +390,5 @@ private enum PresentationTestError: LocalizedError {
         case .unimplemented:
             "unimplemented"
         }
-    }
-}
-
-private enum TestFixtures {
-    static func session(
-        displayName: String? = "Taylor",
-        email: String? = "taylor@example.com"
-    ) -> SessionDTO {
-        SessionDTO(
-            accessToken: "access",
-            refreshToken: "refresh",
-            expiresAt: .init(timeIntervalSince1970: 4000),
-            deviceID: "device-1",
-            user: UserDTO(
-                id: "user-1",
-                appleSubject: "apple-user",
-                displayName: displayName,
-                email: email,
-                createdAt: .init(timeIntervalSince1970: 1)
-            )
-        )
     }
 }

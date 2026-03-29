@@ -38,7 +38,7 @@ package final class BackendAgentController {
     @ObservationIgnored
     package let settingsStore: SettingsStore
     @ObservationIgnored
-    var currentConversationRecord: Conversation?
+    package var currentConversationRecord: Conversation?
     @ObservationIgnored
     package var runPollingTask: Task<Void, Never>?
     @ObservationIgnored
@@ -46,6 +46,8 @@ package final class BackendAgentController {
 
     @ObservationIgnored
     package var activeRunID: String?
+    @ObservationIgnored
+    package var lastStreamEventID: String?
     @ObservationIgnored
     package var lastRunSummary: RunSummaryDTO?
     @ObservationIgnored
@@ -78,22 +80,6 @@ package final class BackendAgentController {
         submissionTask?.cancel()
     }
 
-    package var draftMessage: BackendMessageSurface? {
-        messages.last(where: { $0.role == .assistant && !$0.isComplete })
-    }
-
-    package var liveDraftMessageID: UUID? {
-        draftMessage?.id
-    }
-
-    package var isSignedIn: Bool {
-        sessionStore.isSignedIn
-    }
-
-    package var sessionAccountID: String? {
-        sessionStore.currentUser?.id
-    }
-
     package var emptyStateDescription: String {
         sessionStore.isSignedIn
             ? "Leader planning, worker execution, and synthesis now continue on the backend."
@@ -121,43 +107,10 @@ package final class BackendAgentController {
         flexModeEnabled ? ["leaf.fill"] : []
     }
 
-    package var thinkingPresentationState: ThinkingPresentationState? {
-        BackendConversationSupport.thinkingPresentationState(
-            currentThinkingText: currentThinkingText,
-            currentStreamingText: currentStreamingText,
-            isThinking: isThinking,
-            activeToolCalls: activeToolCalls
-        )
-    }
-
-    package var shouldShowDetachedStreamingBubble: Bool {
-        guard liveDraftMessageID == nil else {
-            return false
-        }
-        if isRunning || isThinking {
-            return true
-        }
-        if !currentStreamingText.isEmpty || !currentThinkingText.isEmpty {
-            return true
-        }
-        if !activeToolCalls.isEmpty || !liveCitations.isEmpty || !liveFilePathAnnotations.isEmpty {
-            return true
-        }
-        return false
-    }
-
     package var shouldShowDetachedLiveSummaryCard: Bool {
         guard liveDraftMessageID == nil else {
             return false
         }
         return isRunning
-    }
-
-    package var flexModeEnabled: Bool {
-        get { serviceTier == .flex }
-        set {
-            serviceTier = newValue ? .flex : .standard
-            persistVisibleConfiguration()
-        }
     }
 }

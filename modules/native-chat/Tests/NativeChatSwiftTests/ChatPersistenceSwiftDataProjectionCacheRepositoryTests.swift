@@ -117,7 +117,11 @@ private func makeSwiftDataConversationRecord(
     createdAt: Date = .init(timeIntervalSince1970: 1),
     updatedAt: Date,
     lastRunServerID: String? = nil,
-    lastSyncCursor: String? = nil
+    lastSyncCursor: String? = nil,
+    model: String? = nil,
+    reasoningEffort: String? = nil,
+    agentWorkerReasoningEffort: String? = nil,
+    serviceTier: String? = nil
 ) -> ConversationProjectionRecord {
     ConversationProjectionRecord(
         serverID: serverID,
@@ -127,7 +131,11 @@ private func makeSwiftDataConversationRecord(
         createdAt: createdAt,
         updatedAt: updatedAt,
         lastRunServerID: lastRunServerID,
-        lastSyncCursor: lastSyncCursor
+        lastSyncCursor: lastSyncCursor,
+        model: model,
+        reasoningEffort: reasoningEffort,
+        agentWorkerReasoningEffort: agentWorkerReasoningEffort,
+        serviceTier: serviceTier
     )
 }
 

@@ -1,6 +1,6 @@
 import { WorkflowEntrypoint, type WorkflowEvent, type WorkflowStep } from 'cloudflare:workers';
 import { createBackendServices } from '../adapters/create-backend-services.js';
-import type { ChatRunWorkflowParams } from '../application/chat-run-service.js';
+import type { ChatRunWorkflowParams } from '../application/chat-run-types.js';
 import type { BackendRuntimeContext } from '../application/runtime-context.js';
 import { logInfo } from '../observability/logger.js';
 

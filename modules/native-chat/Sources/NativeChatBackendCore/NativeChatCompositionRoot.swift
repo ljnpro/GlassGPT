@@ -1,14 +1,12 @@
 import BackendAuth
 import BackendClient
+import BackendSessionPersistence
 import ChatDomain
 import ChatPersistenceCore
 import ChatPresentation
 import ChatProjectionPersistence
 import ConversationSyncApplication
 import Foundation
-#if DEBUG
-import NativeChatUI
-#endif
 import os
 import SwiftData
 

@@ -2,15 +2,6 @@ import ChatDomain
 
 @MainActor
 package extension BackendAgentController {
-    func clearAgentLiveSurface() {
-        currentStreamingText = ""
-        currentThinkingText = ""
-        activeToolCalls = []
-        liveCitations = []
-        liveFilePathAnnotations = []
-        isThinking = false
-    }
-
     func mergeAgentProcessSnapshot(
         existing: AgentProcessSnapshot,
         synthesized: AgentProcessSnapshot

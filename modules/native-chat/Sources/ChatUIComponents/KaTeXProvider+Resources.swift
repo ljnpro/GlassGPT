@@ -32,7 +32,7 @@ extension KaTeXProvider {
         let message = "Failed to locate KaTeX resource directory in loaded bundles."
         onFailure?(message)
         if logFailure {
-            NSLog("%@", message)
+            Self.logger.error("\(message, privacy: .public)")
         }
         return nil
     }
@@ -62,7 +62,7 @@ extension KaTeXProvider {
         let message = "Failed to locate KaTeX resource \(name).\(ext) in loaded bundles."
         onFailure?(message)
         if logFailure {
-            NSLog("%@", message)
+            Self.logger.error("\(message, privacy: .public)")
         }
         return nil
     }

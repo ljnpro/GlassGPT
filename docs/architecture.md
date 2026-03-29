@@ -1,74 +1,124 @@
-# 4.9.0 Architecture
+# 5.3.0 Architecture
 
 ## Goal
 
-`4.9.0` hardens ownership truth, not just file structure. The production system
-must show one coherent story across runtime ownership, composition, presenter
-policy, CI gates, and release governance.
+`5.3.0` is a hardening release. The architecture must describe the real shipped
+system across iOS, backend contracts, backend services, CI, and release
+governance instead of only describing one layer in isolation.
 
 ## Production Topology
 
 - App shell: `ios/GlassGPT`
-  - app entry points, assets, plist, entitlements, and release settings
+  - app entry points, assets, plist, entitlements, and Xcode release settings
 - Product package: `modules/native-chat`
-  - all production logic lives in `Sources/*`
-  - `NativeChat` remains the only library product imported by the app target
+  - `23` production Swift package targets plus `3` test targets
+  - `NativeChat` remains the app-facing library product
+- Shared contracts: `packages/backend-contracts`
+  - TypeScript schemas, fixtures, generated OpenAPI, and mirrored contract
+    artifacts used by iOS and backend
+- Backend infrastructure package: `packages/backend-infra`
+  - backend infra build support
+- Backend service: `services/backend`
+  - Cloudflare Worker HTTP app, application services, adapters, D1/R2/DO
+    integrations, and Workflows orchestration
 
-## Boundaries
+## NativeChat Package Boundaries
 
 - `ChatDomain`
-  - pure product value types
-- `ChatPersistenceContracts`
-  - persistence-facing contracts and snapshots
+  - pure product value types and shared domain models
+- `AppRouting`
+  - route and navigation primitives
+- `BackendContracts`
+  - Swift mirror of backend-facing DTOs and enums
+- `BackendAuth`
+  - signed-in session and auth support
+- `BackendSessionPersistence`
+  - persisted backend session/device identity state
+- `BackendClient`
+  - HTTP request building, retry policy, SSE parsing, and backend request APIs
+- `SyncProjection`
+  - sync envelope projection support
+- `ConversationSyncApplication`
+  - authoritative sync/create/update/detail loading against the backend plus
+    projection-store application
 - `ChatPersistenceCore`
-  - keychain, reset, logging, and persistence support
+  - persistence support, reset coordination, logging, and Keychain helpers
+- `ChatPersistenceModels`
+  - shared SwiftData `Conversation`/`Message` entities and payload-store helpers
+    reused by both persistence targets
 - `ChatPersistenceSwiftData`
-  - SwiftData entities, repositories, and adapters
-- `OpenAITransport`
-  - typed request building, parsing, streaming, and service operations
+  - SwiftData-backed persistence adapters
+- `ChatProjectionPersistence`
+  - cached projection/persistence adapters
 - `GeneratedFilesCore`
-  - generated-file models and policy
-- `GeneratedFilesInfra`
-  - generated-file caching, downloads, inspection, and presentation mapping
-- `ChatRuntimeModel`
-  - reply identity, cursor, lifecycle, buffers, and pure runtime policy
-- `ChatRuntimePorts`
-  - narrow runtime-facing contracts
-- `ChatRuntimeWorkflows`
-  - authoritative runtime transitions, recovery planning, and session registry
-- `ChatApplication`
-  - scene-level settings/history policies and feature bootstrapping
+  - generated file models and policies
+- `GeneratedFilesCache`
+  - generated file cache/store implementations
+- `FilePreviewSupport`
+  - file preview helpers
 - `ChatPresentation`
-  - presenter/store projection for settings, history, and file preview state
+  - app-facing presentation stores and settings/history state
+- `ConversationSurfaceLogic`
+  - markdown/block parsing and conversation-surface logic
 - `ChatUIComponents`
-  - reusable UIKit/SwiftUI primitives
+  - reusable UIKit/SwiftUI UI primitives
 - `NativeChatUI`
-  - feature views only
-- `NativeChatComposition`
-  - the sole production composition root plus orchestration adapters
+  - shared product views
+- `NativeChatBackendCore`
+  - backend-owned controllers, stream drivers, sync coordination, and shell
+    state
+- `NativeChatBackendComposition`
+  - backend-owned composition and root conversation surfaces
 - `NativeChat`
-  - umbrella export
+  - umbrella export used by the app target
+- `NativeChatUITestSupport`
+  - UI-test-only support product
+
+## Backend Architecture
+
+- Domain
+  - persistence-facing records and invariants
+- Application
+  - conversation, run, auth, sync, and connection-check services
+  - chat/agent execution support and workflow orchestration
+- Adapters
+  - OpenAI integration, D1/R2 persistence, realtime event hub, and crypto
+  - runtime-validated DTO mapping
+- HTTP
+  - Hono routes, auth middleware, CORS policy, rate limiting, error mapping,
+    and SSE endpoints
 
 ## Ownership Model
 
-- Runtime
-  - `ReplySessionActor` owns live reply lifecycle, cursor, buffering, and terminal state.
-  - `ReplyStreamEventPlanner` and `ReplyRecoveryPlanner` own stream/recovery transition policy.
-  - `RuntimeRegistryActor` only registers and looks up runtime sessions.
-- Composition
-  - `NativeChatCompositionRoot` is the only production composition root.
-  - `ChatController` is an observable projection facade, not the hidden source of truth.
-  - composition coordinators depend on narrow state/service protocols; no composition coordinator owns the full `ChatController`.
-  - `NativeChatHistoryCoordinator` bridges `HistoryPresenter` to persistence and selection flows without widening controller ownership.
-- Application and presentation
-  - `HistorySceneController`, `SettingsSceneController`, and the settings handlers own scene-level mutations and policy.
-  - `SettingsPresenter`, `HistoryPresenter`, and `FilePreviewStore` project view state and user actions without absorbing infrastructure wiring.
-- Persistence and transport
-  - SwiftData repositories/adapters and the transport layer remain final production boundaries.
-  - no production type self-describes as “legacy”, “relay”, or “mid-cutover”.
+- Conversation configuration is authoritative on the backend and round-trips
+  through contracts, D1 persistence, sync, and iOS projection state.
+- `BackendChatController` and `BackendAgentController` are backend-owned view
+  projections. Shared controller scaffolding now owns the common
+  bootstrap/load/send/stop/selection flow, while chat/agent-specific
+  configuration and process state remain mode-specific.
+- Stream handling is split across request/stream drivers, event handlers, and
+  batching helpers rather than one controller-owned monolith.
+- The backend owns run execution truth; iOS owns only local projection and UI
+  presentation.
 
-## Integrity
+## Guardrails
 
-- the package graph is a real 16-module acyclic graph enforced by `scripts/check_module_boundaries.py`
-- maintainability reporting enforces controller-cluster budgets, `swiftlint:disable` visibility, and controller-backed coordinator bans
-- documentation completeness and UI-surface localization completeness are hard CI gates, not follow-up tasks
+- `scripts/check_module_boundaries.py` enforces the Swift package dependency
+  graph.
+- `scripts/check_maintainability.py` enforces file and type-family size budgets.
+- `./scripts/ci.sh` runs four top-level lanes:
+  - `contracts`
+  - `backend`
+  - `ios`
+  - `release-readiness`
+- Release scripts are gated by `todo.md`, the 5.3.0 audit, and final CI
+  evidence.
+
+## Known 5.3.0 Work Still In Flight
+
+- Final publication still depends on a supported TestFlight upload tool being
+  present on the release machine.
+- The final release run must regenerate fresh perfect-log CI evidence on the
+  exact release tree before backend/TestFlight publish can begin.
+- Backend/TestFlight publication remains script-only and is not considered
+  complete until the release wrapper has archived fresh execution evidence.

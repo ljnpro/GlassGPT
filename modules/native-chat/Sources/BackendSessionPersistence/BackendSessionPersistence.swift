@@ -37,7 +37,7 @@ public final class BackendSessionPersistence: BackendSessionPersisting {
             let snapshot = try Self.decoder.decode(BackendSessionSnapshot.self, from: data)
             return snapshot.session
         } catch {
-            NSLog("%@", "Backend session decode failed: \(error.localizedDescription)")
+            Loggers.recovery.error("Backend session decode failed: \(error.localizedDescription)")
             store.deleteAPIKey()
             return nil
         }

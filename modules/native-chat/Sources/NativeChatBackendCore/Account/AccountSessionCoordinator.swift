@@ -1,5 +1,6 @@
 import BackendAuth
 import BackendClient
+import BackendSessionPersistence
 import ChatPersistenceCore
 import ConversationSyncApplication
 import Foundation

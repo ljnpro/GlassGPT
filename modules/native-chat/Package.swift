@@ -56,10 +56,19 @@ let boundaryTargets: [Target] = [
         path: "Sources/ChatPersistenceCore"
     ),
     .target(
-        name: "ChatPersistenceSwiftData",
+        name: "ChatPersistenceModels",
         dependencies: [
             "ChatDomain",
             "ChatPersistenceCore"
+        ],
+        path: "Sources/ChatPersistenceModels"
+    ),
+    .target(
+        name: "ChatPersistenceSwiftData",
+        dependencies: [
+            "ChatDomain",
+            "ChatPersistenceCore",
+            "ChatPersistenceModels"
         ],
         path: "Sources/ChatPersistenceSwiftData"
     ),
@@ -67,7 +76,8 @@ let boundaryTargets: [Target] = [
         name: "ChatProjectionPersistence",
         dependencies: [
             "ChatDomain",
-            "ChatPersistenceCore"
+            "ChatPersistenceCore",
+            "ChatPersistenceModels"
         ],
         path: "Sources/ChatProjectionPersistence"
     ),
@@ -137,7 +147,6 @@ let boundaryTargets: [Target] = [
             "ChatProjectionPersistence",
             "ChatPresentation",
             "ChatUIComponents",
-            "NativeChatUI",
             "GeneratedFilesCore",
             "GeneratedFilesCache"
         ],
@@ -191,7 +200,12 @@ let package = Package(
             targets: ["NativeChatUITestSupport"]
         )
     ],
-    dependencies: [],
+    dependencies: [
+        .package(
+            url: "https://github.com/pointfreeco/swift-snapshot-testing",
+            from: "1.17.0"
+        )
+    ],
     targets: boundaryTargets + [
         .testTarget(
             name: "NativeChatArchitectureTests",
@@ -234,22 +248,34 @@ let package = Package(
                 "NativeChatUI",
                 "GeneratedFilesCore",
                 "GeneratedFilesCache",
-                "NativeChatUITestSupport"
+                "NativeChatUITestSupport",
+                .product(name: "SnapshotTesting", package: "swift-snapshot-testing")
             ],
-            path: "Tests/NativeChatSwiftTests"
+            path: "Tests/NativeChatSwiftTests",
+            exclude: ["__Snapshots__"]
         ),
         .testTarget(
             name: "NativeChatTests",
             dependencies: [
+                "ChatDomain",
                 "BackendContracts",
                 "BackendAuth",
                 "BackendClient",
+                "ConversationSyncApplication",
+                "ChatPersistenceCore",
+                "ChatProjectionPersistence",
                 "ChatPresentation",
+                "GeneratedFilesCore",
+                "GeneratedFilesCache",
                 "ConversationSurfaceLogic",
                 "NativeChatBackendCore",
-                "NativeChatUITestSupport"
+                "NativeChatBackendComposition",
+                "NativeChatUI",
+                "NativeChatUITestSupport",
+                .product(name: "SnapshotTesting", package: "swift-snapshot-testing")
             ],
-            path: "Tests/NativeChatTests"
+            path: "Tests/NativeChatTests",
+            exclude: ["__Snapshots__"]
         )
     ],
     swiftLanguageModes: [.v6]

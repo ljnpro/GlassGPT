@@ -11,7 +11,10 @@ extension NativeChatCompositionRoot {
             persistence: BackendSessionPersistence(bundleIdentifier: bundleIdentifier)
         )
         let backendClient = BackendClient(
-            environment: BackendEnvironment(baseURL: resolvedBackendBaseURL()),
+            environment: BackendEnvironment(
+                baseURL: resolvedBackendBaseURL(),
+                appVersion: resolvedBackendAppVersion()
+            ),
             sessionStore: backendSessionStore
         )
 
@@ -39,8 +42,14 @@ extension NativeChatCompositionRoot {
 
         var components = URLComponents()
         components.scheme = "https"
-        components.host = "glassgpt-beta-5-0.glassgpt.workers.dev"
+        components.host = "glassgpt-production.glassgpt.workers.dev"
         return components.url ?? URL(fileURLWithPath: "/")
+    }
+
+    private func resolvedBackendAppVersion() -> String {
+        let appVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
+        let trimmed = appVersion?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return trimmed.isEmpty ? "5.3.0" : trimmed
     }
 }
 

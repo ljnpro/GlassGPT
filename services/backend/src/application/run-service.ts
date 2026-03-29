@@ -1,7 +1,7 @@
 import type { RunSummaryDTO } from '@glassgpt/backend-contracts';
 import type { RunRecord } from '../domain/run-model.js';
 import type { AgentRunService, AgentRunWorkflowParams } from './agent-run-service.js';
-import type { ChatRunService, ChatRunWorkflowParams } from './chat-run-service.js';
+import type { ChatRunService, ChatRunWorkflowParams } from './chat-run-types.js';
 import { buildRunSummaryDTO } from './dto-mappers.js';
 import { requireRun, type WorkflowStarter } from './run-projection.js';
 import type { BackendRuntimeContext } from './runtime-context.js';

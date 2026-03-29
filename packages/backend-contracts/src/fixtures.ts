@@ -57,16 +57,22 @@ export const connectionCheckFixture = connectionCheckSchema.parse({
   sse: 'healthy',
   checkedAt: timestamp,
   latencyMilliseconds: 18,
+  backendVersion: '5.3.0',
+  minimumSupportedAppVersion: '5.3.0',
+  appCompatibility: 'compatible',
 });
 
 export const conversationFixture = conversationSchema.parse({
   id: 'conv_01',
-  title: 'Beta 5.0',
+  title: 'GlassGPT 5.3.0',
   mode: 'chat',
   createdAt: timestamp,
   updatedAt: timestamp,
   lastRunId: 'run_01',
   lastSyncCursor: 'cur_00000000000000000001',
+  model: 'gpt-5.4-pro',
+  reasoningEffort: 'xhigh',
+  serviceTier: 'flex',
 });
 
 export const messageFixture = messageSchema.parse({
@@ -128,7 +134,10 @@ export const artifactFixture = artifactSchema.parse({
   downloadUrl: 'https://example.com/artifacts/art_01',
 });
 
-export const conversationListFixture = conversationListSchema.parse([conversationFixture]);
+export const conversationListFixture = conversationListSchema.parse({
+  hasMore: false,
+  items: [conversationFixture],
+});
 
 export const conversationDetailFixture = conversationDetailSchema.parse({
   conversation: conversationFixture,
@@ -163,6 +172,9 @@ export const openAiCredentialRequestFixture = openAiCredentialRequestSchema.pars
 export const createConversationRequestFixture = createConversationRequestSchema.parse({
   title: 'New Conversation',
   mode: 'chat',
+  model: 'gpt-5.4-pro',
+  reasoningEffort: 'xhigh',
+  serviceTier: 'flex',
 });
 
 export const createMessageRequestFixture = createMessageRequestSchema.parse({

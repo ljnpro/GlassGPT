@@ -10,7 +10,7 @@ export interface BackendSecretEnv {
 
 export interface BackendPlatformBindings {
   readonly AGENT_RUN_WORKFLOW: Workflow<unknown>;
-  readonly APP_ENV: 'beta';
+  readonly APP_ENV: 'beta' | 'development' | 'production' | 'staging';
   readonly CHAT_RUN_WORKFLOW: Workflow<unknown>;
   readonly CONVERSATION_EVENT_HUB: DurableObjectNamespace;
   readonly GLASSGPT_ARTIFACTS: R2Bucket;

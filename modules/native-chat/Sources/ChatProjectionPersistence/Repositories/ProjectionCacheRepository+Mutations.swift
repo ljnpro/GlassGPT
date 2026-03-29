@@ -1,0 +1,100 @@
+import ChatDomain
+import ChatPersistenceCore
+
+extension ProjectionCacheRepository {
+    public func removeMessages(
+        in conversation: Conversation,
+        excludingServerIDs retainedServerIDs: Set<String>
+    ) {
+        let staleMessages = conversation.messages.filter { message in
+            guard let serverID = message.serverID else {
+                return true
+            }
+            return !retainedServerIDs.contains(serverID)
+        }
+        for message in staleMessages {
+            modelContext.delete(message)
+        }
+    }
+
+    public func removeConversations(
+        for accountID: String,
+        excludingServerIDs retainedServerIDs: Set<String>
+    ) throws(PersistenceError) {
+        let conversations = try fetchConversations(accountID: accountID)
+        let staleConversations = conversations.filter { conversation in
+            guard let serverID = conversation.serverID else {
+                return true
+            }
+            return !retainedServerIDs.contains(serverID)
+        }
+        for conversation in staleConversations {
+            modelContext.delete(conversation)
+        }
+    }
+
+    public func purgeCache(accountID: String) throws(PersistenceError) {
+        let conversations = try fetchConversations(accountID: accountID)
+        for conversation in conversations {
+            modelContext.delete(conversation)
+        }
+        try save()
+    }
+
+    func message(
+        serverID: String,
+        accountID: String,
+        conversation: Conversation
+    ) -> Message? {
+        conversation.messages.first(where: {
+            $0.serverID == serverID && $0.syncAccountID == accountID
+        })
+    }
+
+    func apply(_ record: ConversationProjectionRecord, to conversation: Conversation) {
+        conversation.serverID = record.serverID
+        conversation.syncAccountID = record.accountID
+        conversation.title = record.title
+        conversation.mode = record.mode
+        conversation.createdAt = record.createdAt
+        conversation.updatedAt = record.updatedAt
+        conversation.lastRunServerID = record.lastRunServerID
+        conversation.lastSyncCursor = record.lastSyncCursor
+        if let model = record.model {
+            conversation.model = model
+        }
+        if let reasoningEffort = record.reasoningEffort {
+            conversation.reasoningEffort = reasoningEffort
+        }
+        if record.mode == .chat {
+            conversation.agentWorkerReasoningEffortRawValue = nil
+        } else if let agentWorkerReasoningEffort = record.agentWorkerReasoningEffort {
+            conversation.agentWorkerReasoningEffortRawValue = agentWorkerReasoningEffort
+        }
+        if let serviceTier = record.serviceTier {
+            conversation.serviceTierRawValue = serviceTier
+        }
+    }
+
+    func apply(
+        _ record: MessageProjectionRecord,
+        to message: Message,
+        conversation: Conversation
+    ) {
+        message.serverID = record.serverID
+        message.syncAccountID = record.accountID
+        message.role = record.role
+        message.content = record.content
+        message.thinking = record.thinking
+        message.createdAt = record.createdAt
+        message.completedAt = record.completedAt
+        message.conversation = conversation
+        message.serverRunID = record.serverRunID
+        message.serverCursor = record.serverCursor
+        message.isComplete = record.completedAt != nil
+        message.annotations = record.annotations
+        message.toolCalls = record.toolCalls
+        message.filePathAnnotations = record.filePathAnnotations
+        message.agentTrace = record.agentTrace
+    }
+}

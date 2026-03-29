@@ -105,7 +105,7 @@ private enum AppleSignInCoordinatorError: LocalizedError {
 }
 
 extension AppleSignInCoordinator: ASAuthorizationControllerDelegate {
-    /// Translates a successful Apple authorization into the backend auth payload used by Beta 5.0.
+    /// Translates a successful Apple authorization into the backend auth payload used by the 5.3 line.
     package func authorizationController(
         controller _: ASAuthorizationController,
         didCompleteWithAuthorization authorization: ASAuthorization

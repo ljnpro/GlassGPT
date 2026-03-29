@@ -35,26 +35,35 @@
     "openaiCredential": "missing",
     "sse": "healthy",
     "checkedAt": "2026-03-27T00:00:00.000Z",
-    "latencyMilliseconds": 18
+    "latencyMilliseconds": 18,
+    "backendVersion": "5.3.0",
+    "minimumSupportedAppVersion": "5.3.0",
+    "appCompatibility": "compatible"
   },
   "ConversationDTO": {
     "id": "conv_01",
-    "title": "Beta 5.0",
+    "title": "GlassGPT 5.3.0",
     "mode": "chat",
     "createdAt": "2026-03-27T00:00:00.000Z",
     "updatedAt": "2026-03-27T00:00:00.000Z",
     "lastRunId": "run_01",
-    "lastSyncCursor": "cur_00000000000000000001"
+    "lastSyncCursor": "cur_00000000000000000001",
+    "model": "gpt-5.4-pro",
+    "reasoningEffort": "xhigh",
+    "serviceTier": "flex"
   },
   "ConversationDetailDTO": {
     "conversation": {
       "id": "conv_01",
-      "title": "Beta 5.0",
+      "title": "GlassGPT 5.3.0",
       "mode": "chat",
       "createdAt": "2026-03-27T00:00:00.000Z",
       "updatedAt": "2026-03-27T00:00:00.000Z",
       "lastRunId": "run_01",
-      "lastSyncCursor": "cur_00000000000000000001"
+      "lastSyncCursor": "cur_00000000000000000001",
+      "model": "gpt-5.4-pro",
+      "reasoningEffort": "xhigh",
+      "serviceTier": "flex"
     },
     "messages": [
       {
@@ -81,20 +90,29 @@
       }
     ]
   },
-  "ConversationListDTO": [
-    {
-      "id": "conv_01",
-      "title": "Beta 5.0",
-      "mode": "chat",
-      "createdAt": "2026-03-27T00:00:00.000Z",
-      "updatedAt": "2026-03-27T00:00:00.000Z",
-      "lastRunId": "run_01",
-      "lastSyncCursor": "cur_00000000000000000001"
-    }
-  ],
+  "ConversationListDTO": {
+    "items": [
+      {
+        "id": "conv_01",
+        "title": "GlassGPT 5.3.0",
+        "mode": "chat",
+        "createdAt": "2026-03-27T00:00:00.000Z",
+        "updatedAt": "2026-03-27T00:00:00.000Z",
+        "lastRunId": "run_01",
+        "lastSyncCursor": "cur_00000000000000000001",
+        "model": "gpt-5.4-pro",
+        "reasoningEffort": "xhigh",
+        "serviceTier": "flex"
+      }
+    ],
+    "hasMore": false
+  },
   "CreateConversationRequestDTO": {
     "title": "New Conversation",
-    "mode": "chat"
+    "mode": "chat",
+    "model": "gpt-5.4-pro",
+    "reasoningEffort": "xhigh",
+    "serviceTier": "flex"
   },
   "CreateMessageRequestDTO": {
     "content": "Tell me something useful."
@@ -129,12 +147,15 @@
     "createdAt": "2026-03-27T00:00:00.000Z",
     "conversation": {
       "id": "conv_01",
-      "title": "Beta 5.0",
+      "title": "GlassGPT 5.3.0",
       "mode": "chat",
       "createdAt": "2026-03-27T00:00:00.000Z",
       "updatedAt": "2026-03-27T00:00:00.000Z",
       "lastRunId": "run_01",
-      "lastSyncCursor": "cur_00000000000000000001"
+      "lastSyncCursor": "cur_00000000000000000001",
+      "model": "gpt-5.4-pro",
+      "reasoningEffort": "xhigh",
+      "serviceTier": "flex"
     },
     "message": {
       "id": "msg_02",
@@ -195,12 +216,15 @@
         "createdAt": "2026-03-27T00:00:00.000Z",
         "conversation": {
           "id": "conv_01",
-          "title": "Beta 5.0",
+          "title": "GlassGPT 5.3.0",
           "mode": "chat",
           "createdAt": "2026-03-27T00:00:00.000Z",
           "updatedAt": "2026-03-27T00:00:00.000Z",
           "lastRunId": "run_01",
-          "lastSyncCursor": "cur_00000000000000000001"
+          "lastSyncCursor": "cur_00000000000000000001",
+          "model": "gpt-5.4-pro",
+          "reasoningEffort": "xhigh",
+          "serviceTier": "flex"
         },
         "message": {
           "id": "msg_02",

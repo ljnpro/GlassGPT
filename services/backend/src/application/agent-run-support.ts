@@ -1,6 +1,7 @@
 import type { ConversationRecord } from '../domain/conversation-model.js';
 import type { MessageRecord } from '../domain/message-model.js';
 import type { RunRecord } from '../domain/run-model.js';
+import { logError, sanitizeLogValue } from '../observability/logger.js';
 import type {
   AgentExecutionContext,
   AgentRunServiceDependencies,
@@ -261,7 +262,9 @@ export const createAgentRunSupport = (deps: AgentRunServiceDependencies) => {
     env: BackendRuntimeContext,
     input: {
       readonly prompt: string;
+      readonly reasoningEffort: 'none' | 'low' | 'medium' | 'high' | 'xhigh';
       readonly runId: string;
+      readonly serviceTier: 'default' | 'flex';
       readonly userId: string;
     },
   ): Promise<string | null> => {
@@ -277,8 +280,31 @@ export const createAgentRunSupport = (deps: AgentRunServiceDependencies) => {
     let liveCitations: LiveCitation[] = [];
     let liveFilePathAnnotations: LiveFilePathAnnotation[] = [];
     const DELTA_FLUSH_THRESHOLD = 5;
+    const broadcastNonFatalDelta = async (
+      delta: Parameters<AgentRunServiceDependencies['broadcastStreamDelta']>[2],
+    ): Promise<void> => {
+      if (!activeContext) {
+        return;
+      }
 
-    for await (const event of deps.createStreamingResponse(apiKey, { input: input.prompt })) {
+      try {
+        await deps.broadcastStreamDelta(env, activeContext.conversation.id, delta);
+      } catch (error) {
+        logError('agent_stream_broadcast_failed', {
+          conversationId: activeContext.conversation.id,
+          errorMessage: error instanceof Error ? sanitizeLogValue(error.message) : 'unknown_error',
+          runId: input.runId,
+          stage: activeContext.run.stage ?? 'unknown',
+          type: delta.type,
+        });
+      }
+    };
+
+    for await (const event of deps.createStreamingResponse(apiKey, {
+      input: input.prompt,
+      reasoningEffort: input.reasoningEffort,
+      serviceTier: input.serviceTier,
+    })) {
       // Check for cancellation periodically
       if (chunkCount % 20 === 0) {
         const latestRun = await deps.findRunById(env, input.runId);
@@ -294,18 +320,14 @@ export const createAgentRunSupport = (deps: AgentRunServiceDependencies) => {
           chunkCount += 1;
 
           if (activeContext) {
-            try {
-              await deps.broadcastStreamDelta(env, activeContext.conversation.id, {
-                type: 'delta',
-                data: {
-                  runId: input.runId,
-                  stage: activeContext.run.stage,
-                  textDelta: event.textDelta,
-                },
-              });
-            } catch {
-              // Non-fatal
-            }
+            await broadcastNonFatalDelta({
+              type: 'delta',
+              data: {
+                runId: input.runId,
+                stage: activeContext.run.stage,
+                textDelta: event.textDelta,
+              },
+            });
           }
 
           if (chunkCount % DELTA_FLUSH_THRESHOLD === 0 && activeContext) {
@@ -327,66 +349,50 @@ export const createAgentRunSupport = (deps: AgentRunServiceDependencies) => {
 
         case 'thinking_delta':
           if (activeContext) {
-            try {
-              await deps.broadcastStreamDelta(env, activeContext.conversation.id, {
-                type: 'thinking_delta',
-                data: {
-                  runId: input.runId,
-                  stage: activeContext.run.stage,
-                  thinkingDelta: event.thinkingDelta,
-                },
-              });
-            } catch {
-              // Non-fatal
-            }
+            await broadcastNonFatalDelta({
+              type: 'thinking_delta',
+              data: {
+                runId: input.runId,
+                stage: activeContext.run.stage,
+                thinkingDelta: event.thinkingDelta,
+              },
+            });
           }
           break;
 
         case 'thinking_finished':
           if (activeContext) {
-            try {
-              await deps.broadcastStreamDelta(env, activeContext.conversation.id, {
-                type: 'thinking_done',
-                data: { runId: input.runId, stage: activeContext.run.stage },
-              });
-            } catch {
-              // Non-fatal
-            }
+            await broadcastNonFatalDelta({
+              type: 'thinking_done',
+              data: { runId: input.runId, stage: activeContext.run.stage },
+            });
           }
           break;
 
         case 'tool_call_updated':
           if (activeContext) {
-            try {
-              await deps.broadcastStreamDelta(env, activeContext.conversation.id, {
-                type: 'tool_call_update',
-                data: {
-                  runId: input.runId,
-                  stage: activeContext.run.stage,
-                  toolCall: event.toolCall,
-                },
-              });
-            } catch {
-              // Non-fatal
-            }
+            await broadcastNonFatalDelta({
+              type: 'tool_call_update',
+              data: {
+                runId: input.runId,
+                stage: activeContext.run.stage,
+                toolCall: event.toolCall,
+              },
+            });
           }
           break;
 
         case 'citation_added':
           liveCitations = mergeLiveCitations(liveCitations, event.citation);
           if (activeContext) {
-            try {
-              await deps.broadcastStreamDelta(env, activeContext.conversation.id, {
-                type: 'citations_update',
-                data: {
-                  citations: liveCitations,
-                  runId: input.runId,
-                  stage: activeContext.run.stage,
-                },
-              });
-            } catch {
-              // Non-fatal
-            }
+            await broadcastNonFatalDelta({
+              type: 'citations_update',
+              data: {
+                citations: liveCitations,
+                runId: input.runId,
+                stage: activeContext.run.stage,
+              },
+            });
           }
           break;
 
@@ -396,18 +402,14 @@ export const createAgentRunSupport = (deps: AgentRunServiceDependencies) => {
             event.annotation,
           );
           if (activeContext) {
-            try {
-              await deps.broadcastStreamDelta(env, activeContext.conversation.id, {
-                type: 'file_path_annotations_update',
-                data: {
-                  filePathAnnotations: liveFilePathAnnotations,
-                  runId: input.runId,
-                  stage: activeContext.run.stage,
-                },
-              });
-            } catch {
-              // Non-fatal
-            }
+            await broadcastNonFatalDelta({
+              type: 'file_path_annotations_update',
+              data: {
+                filePathAnnotations: liveFilePathAnnotations,
+                runId: input.runId,
+                stage: activeContext.run.stage,
+              },
+            });
           }
           break;
 

@@ -6,6 +6,11 @@ interface ConversationHubSnapshot {
   readonly updatedAt: string;
 }
 
+interface ConversationHubBufferedEvent {
+  readonly frame: string;
+  readonly id: string;
+}
+
 interface StreamDelta {
   readonly type:
     | 'citations_update'
@@ -23,6 +28,9 @@ interface StreamDelta {
   readonly data: unknown;
 }
 
+const SNAPSHOT_STORAGE_KEY = 'snapshot';
+const STREAM_HISTORY_LIMIT = 128;
+
 export class ConversationEventHub extends DurableObject<Env> {
   private runClients: Map<string, Set<ReadableStreamDefaultController<Uint8Array>>> = new Map();
   private readonly encoder = new TextEncoder();
@@ -32,11 +40,12 @@ export class ConversationEventHub extends DurableObject<Env> {
 
     const streamMatch = url.pathname.match(/\/stream\/([^/]+)$/);
     if (request.method === 'GET' && streamMatch && streamMatch[1]) {
-      return this.handleSSEConnection(streamMatch[1]);
+      return this.handleSSEConnection(streamMatch[1], request.headers.get('Last-Event-ID'));
     }
 
     if (request.method === 'GET') {
-      const snapshot = (await this.ctx.storage.get<ConversationHubSnapshot>('snapshot')) ?? null;
+      const snapshot =
+        (await this.ctx.storage.get<ConversationHubSnapshot>(SNAPSHOT_STORAGE_KEY)) ?? null;
       return Response.json({ ok: true, snapshot });
     }
 
@@ -51,23 +60,23 @@ export class ConversationEventHub extends DurableObject<Env> {
         lastEventCursor: body.cursor,
         updatedAt: new Date().toISOString(),
       };
-      await this.ctx.storage.put('snapshot', snapshot);
+      await this.ctx.storage.put(SNAPSHOT_STORAGE_KEY, snapshot);
       return Response.json({ ok: true, snapshot }, { status: 202 });
     }
 
     // POST /stream-delta — real-time token broadcast (from workflow, bypasses D1)
     if (request.method === 'POST' && url.pathname.endsWith('/stream-delta')) {
       const delta = (await request.json()) as StreamDelta;
-      this.broadcastDelta(delta);
+      await this.broadcastDelta(delta);
       return Response.json({ ok: true }, { status: 202 });
     }
 
     return Response.json({ error: 'method_not_allowed' }, { status: 405 });
   }
 
-  private handleSSEConnection(runId: string): Response {
+  private handleSSEConnection(runId: string, lastEventID: string | null): Response {
     const stream = new ReadableStream<Uint8Array>({
-      start: (controller) => {
+      start: async (controller) => {
         let clients = this.runClients.get(runId);
         if (!clients) {
           clients = new Set();
@@ -76,6 +85,7 @@ export class ConversationEventHub extends DurableObject<Env> {
         clients.add(controller);
         const ping = this.encoder.encode(': connected\n\n');
         controller.enqueue(ping);
+        await this.replayBufferedEvents(runId, lastEventID, controller);
       },
       cancel: (controller) => {
         const clients = this.runClients.get(runId);
@@ -97,13 +107,72 @@ export class ConversationEventHub extends DurableObject<Env> {
     });
   }
 
-  private broadcastDelta(delta: StreamDelta): void {
-    const frame = this.encoder.encode(
-      `event: ${delta.type}\ndata: ${JSON.stringify(delta.data)}\n\n`,
-    );
+  private async replayBufferedEvents(
+    runId: string,
+    lastEventID: string | null,
+    controller: ReadableStreamDefaultController<Uint8Array>,
+  ): Promise<void> {
+    if (!lastEventID) {
+      return;
+    }
 
+    const history = await this.readBufferedEvents(runId);
+    const replayStartIndex = history.findIndex((entry) => entry.id === lastEventID);
+    if (replayStartIndex < 0) {
+      return;
+    }
+
+    for (const entry of history.slice(replayStartIndex + 1)) {
+      controller.enqueue(this.encoder.encode(entry.frame));
+    }
+  }
+
+  private async readBufferedEvents(runId: string): Promise<ConversationHubBufferedEvent[]> {
+    return (
+      (await this.ctx.storage.get<ConversationHubBufferedEvent[]>(
+        this.streamHistoryStorageKey(runId),
+      )) ?? []
+    );
+  }
+
+  private async nextBufferedEventID(runId: string): Promise<string> {
+    const storageKey = this.streamSequenceStorageKey(runId);
+    const nextSequence = ((await this.ctx.storage.get<number>(storageKey)) ?? 0) + 1;
+    await this.ctx.storage.put(storageKey, nextSequence);
+    return `stream_${runId}_${String(nextSequence).padStart(8, '0')}`;
+  }
+
+  private async appendBufferedEvent(
+    runId: string,
+    event: ConversationHubBufferedEvent,
+  ): Promise<void> {
+    const history = await this.readBufferedEvents(runId);
+    history.push(event);
+    const boundedHistory = history.slice(-STREAM_HISTORY_LIMIT);
+    await this.ctx.storage.put(this.streamHistoryStorageKey(runId), boundedHistory);
+  }
+
+  private streamHistoryStorageKey(runId: string): string {
+    return `stream-history:${runId}`;
+  }
+
+  private streamSequenceStorageKey(runId: string): string {
+    return `stream-sequence:${runId}`;
+  }
+
+  private async broadcastDelta(delta: StreamDelta): Promise<void> {
+    const snapshot =
+      (await this.ctx.storage.get<ConversationHubSnapshot>(SNAPSHOT_STORAGE_KEY)) ?? null;
     const deltaData = delta.data as { runId?: string } | null;
     const targetRunId = deltaData?.runId;
+    const eventID = targetRunId
+      ? await this.nextBufferedEventID(targetRunId)
+      : ((delta.data as { cursor?: string } | null)?.cursor ?? snapshot?.lastEventCursor ?? null);
+    const frameText = `${eventID ? `id: ${eventID}\n` : ''}event: ${delta.type}\ndata: ${JSON.stringify(delta.data)}\n\n`;
+    if (targetRunId && eventID) {
+      await this.appendBufferedEvent(targetRunId, { frame: frameText, id: eventID });
+    }
+    const frame = this.encoder.encode(frameText);
 
     // If the delta has a runId, only broadcast to subscribers of that run
     const clientSets: Set<ReadableStreamDefaultController<Uint8Array>>[] = [];

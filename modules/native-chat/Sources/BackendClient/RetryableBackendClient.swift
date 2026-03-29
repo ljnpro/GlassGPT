@@ -24,9 +24,14 @@ extension BackendClient {
                     queryItems: queryItems,
                     responseType: responseType
                 )
-            } catch let error as BackendAPIError where BackendRetryPolicy.retryableErrors.contains(error) {
+            } catch {
+                guard BackendRetryPolicy.isRetryable(error) else {
+                    throw error
+                }
                 lastError = error
-                try await Task.sleep(for: BackendRetryPolicy.backoffDuration(for: attempt))
+                if attempt + 1 < BackendRetryPolicy.maxAttempts {
+                    try await BackendRetryPolicy.sleep(for: attempt)
+                }
             }
         }
         throw lastError ?? BackendAPIError.serverError
@@ -50,9 +55,14 @@ extension BackendClient {
                     queryItems: queryItems
                 )
                 return
-            } catch let error as BackendAPIError where BackendRetryPolicy.retryableErrors.contains(error) {
+            } catch {
+                guard BackendRetryPolicy.isRetryable(error) else {
+                    throw error
+                }
                 lastError = error
-                try await Task.sleep(for: BackendRetryPolicy.backoffDuration(for: attempt))
+                if attempt + 1 < BackendRetryPolicy.maxAttempts {
+                    try await BackendRetryPolicy.sleep(for: attempt)
+                }
             }
         }
         throw lastError ?? BackendAPIError.serverError

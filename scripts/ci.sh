@@ -23,6 +23,8 @@ readonly LEGACY_IOS_GATES=(
   build
   app-tests
   package-tests
+  snapshot-tests
+  hosted-snapshot-tests
   architecture-tests
   coverage-report
   ui-tests

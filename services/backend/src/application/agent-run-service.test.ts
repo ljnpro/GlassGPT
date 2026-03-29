@@ -72,6 +72,14 @@ interface ServiceHarness {
 }
 
 const createServiceHarness = (options?: {
+  readonly broadcastStreamDelta?: (
+    env: BackendRuntimeContext,
+    conversationId: string,
+    delta: {
+      readonly type: string;
+      readonly data: unknown;
+    },
+  ) => Promise<void>;
   readonly createChatCompletion?: (apiKey: string, input: string) => Promise<string>;
   readonly createStreamingResponse?: (
     apiKey: string,
@@ -111,9 +119,11 @@ const createServiceHarness = (options?: {
   );
 
   const service = createAgentRunService({
-    broadcastStreamDelta: async (_env, _conversationId, delta) => {
-      broadcasts.push({ data: delta.data, type: delta.type });
-    },
+    broadcastStreamDelta:
+      options?.broadcastStreamDelta ??
+      (async (_env, _conversationId, delta) => {
+        broadcasts.push({ data: delta.data, type: delta.type });
+      }),
     createChatCompletion:
       options?.createChatCompletion ??
       (() => {
@@ -367,6 +377,119 @@ describe('createAgentRunService', () => {
     expect(harness.runs.get(queuedRun.id)?.status).toBe('completed');
     expect(harness.runs.get(queuedRun.id)?.visibleSummary).toBe('Final answer');
     expect(harness.cursorPublishes).toHaveLength(18);
+  });
+
+  it('logs non-fatal agent stream broadcast failures and still completes the run', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const harness = createServiceHarness({
+      broadcastStreamDelta: async () => {
+        throw new Error('agent broadcast unavailable');
+      },
+    });
+    const queuedRun = await harness.service.queueAgentRun(testEnv, harness.workflow, {
+      conversationId: conversationFixture.id,
+      prompt: 'Audit the implementation',
+      userId: conversationFixture.userId,
+    });
+
+    await harness.service.startQueuedRun(testEnv, {
+      runId: queuedRun.id,
+      userId: conversationFixture.userId,
+    });
+    const leaderPlan = await harness.service.executeLeaderPlanning(testEnv, {
+      prompt: 'Audit the implementation',
+      runId: queuedRun.id,
+      userId: conversationFixture.userId,
+    });
+    const workerReport = await harness.service.executeWorkerWave(testEnv, {
+      leaderPlan: leaderPlan ?? 'missing',
+      runId: queuedRun.id,
+      userId: conversationFixture.userId,
+      userPrompt: 'Audit the implementation',
+    });
+    const leaderReview = await harness.service.executeLeaderReview(testEnv, {
+      leaderPlan: leaderPlan ?? 'missing',
+      runId: queuedRun.id,
+      userId: conversationFixture.userId,
+      userPrompt: 'Audit the implementation',
+      workerReport: workerReport ?? 'missing',
+    });
+    const finalText = await harness.service.executeFinalSynthesis(testEnv, {
+      leaderPlan: leaderPlan ?? 'missing',
+      leaderReview: leaderReview ?? 'missing',
+      runId: queuedRun.id,
+      userId: conversationFixture.userId,
+      userPrompt: 'Audit the implementation',
+      workerReport: workerReport ?? 'missing',
+    });
+    await harness.service.completeRun(testEnv, {
+      finalText: finalText ?? 'missing',
+      runId: queuedRun.id,
+      userId: conversationFixture.userId,
+    });
+
+    expect(harness.runs.get(queuedRun.id)?.status).toBe('completed');
+    expect(consoleError).toHaveBeenCalledWith(
+      expect.stringMatching(/"message":"agent_(stream|final_synthesis)_broadcast_failed"/),
+    );
+    consoleError.mockRestore();
+  });
+
+  it('uses stored agent leader and worker configuration for stage execution requests', async () => {
+    const capturedRequests: StreamingConversationRequest[] = [];
+    const harness = createServiceHarness({
+      createStreamingResponse: async function* (_apiKey, request) {
+        capturedRequests.push(request);
+        yield { kind: 'text_delta', textDelta: 'Configured stage output' } as const;
+        yield {
+          citations: [],
+          filePathAnnotations: [],
+          kind: 'completed',
+          outputText: 'Configured stage output',
+          thinkingText: null,
+          toolCalls: [],
+        } as const;
+      },
+    });
+    harness.conversations.set(conversationFixture.id, {
+      ...conversationFixture,
+      agentWorkerReasoningEffort: 'medium',
+      reasoningEffort: 'xhigh',
+      serviceTier: 'flex',
+    });
+
+    const queuedRun = await harness.service.queueAgentRun(testEnv, harness.workflow, {
+      conversationId: conversationFixture.id,
+      prompt: 'Use stored agent config',
+      userId: conversationFixture.userId,
+    });
+
+    await harness.service.startQueuedRun(testEnv, {
+      runId: queuedRun.id,
+      userId: conversationFixture.userId,
+    });
+    const leaderPlan = await harness.service.executeLeaderPlanning(testEnv, {
+      prompt: 'Use stored agent config',
+      runId: queuedRun.id,
+      userId: conversationFixture.userId,
+    });
+    const workerReport = await harness.service.executeWorkerWave(testEnv, {
+      leaderPlan: leaderPlan ?? 'Configured stage output',
+      runId: queuedRun.id,
+      userId: conversationFixture.userId,
+      userPrompt: 'Use stored agent config',
+    });
+
+    expect(leaderPlan).toBe('Configured stage output');
+    expect(workerReport).toBe('Configured stage output');
+    expect(capturedRequests[0]).toMatchObject({
+      reasoningEffort: 'xhigh',
+      serviceTier: 'flex',
+    });
+    expect(capturedRequests[1]).toMatchObject({
+      reasoningEffort: 'medium',
+      serviceTier: 'flex',
+    });
   });
 
   it('accumulates non-synthesis citations and file annotations in stage streaming broadcasts', async () => {

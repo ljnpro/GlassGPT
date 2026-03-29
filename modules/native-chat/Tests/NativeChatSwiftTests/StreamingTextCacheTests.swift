@@ -48,6 +48,15 @@ struct StreamingTextCacheTests {
     }
 
     @Test
+    func `memory pressure clears cached streaming text state`() {
+        let cache = StreamingTextCache()
+        _ = cache.attributedString(for: "cached text")
+        cache.handleMemoryPressure()
+        let result = cache.attributedString(for: "after pressure")
+        #expect(String(result.characters).contains("after pressure"))
+    }
+
+    @Test
     func `cache handles empty string`() {
         let cache = StreamingTextCache()
         let result = cache.attributedString(for: "")
@@ -79,5 +88,16 @@ struct StreamingTextCacheTests {
         _ = cache.attributedString(for: "Hello **bold**")
         let result = cache.attributedString(for: "Hello **bold** and more")
         #expect(String(result.characters).contains("more"))
+    }
+
+    @Test
+    func `incremental heuristic keeps dangling triple asterisk as unsafe`() {
+        #expect(StreamingTextCache.requiresFullReparse(forAppendedSuffix: "***"))
+    }
+
+    @Test
+    func `incremental heuristic treats closed thematic break line as safe`() {
+        #expect(!StreamingTextCache.requiresFullReparse(forAppendedSuffix: "***\n"))
+        #expect(!StreamingTextCache.requiresFullReparse(forAppendedSuffix: "\n___\nNext"))
     }
 }

@@ -25,7 +25,11 @@ extension BackendProjectionStore {
             createdAt: event.createdAt,
             updatedAt: event.createdAt,
             lastRunID: event.runID,
-            lastSyncCursor: event.cursor
+            lastSyncCursor: event.cursor,
+            model: nil,
+            reasoningEffort: nil,
+            agentWorkerReasoningEffort: nil,
+            serviceTier: nil
         )
         return try cacheRepository.upsertConversation(
             conversationRecord(from: fallbackConversation, accountID: accountID)
@@ -44,7 +48,11 @@ extension BackendProjectionStore {
             createdAt: conversation.createdAt,
             updatedAt: conversation.updatedAt,
             lastRunServerID: conversation.lastRunID,
-            lastSyncCursor: conversation.lastSyncCursor
+            lastSyncCursor: conversation.lastSyncCursor,
+            model: conversation.model?.rawValue,
+            reasoningEffort: conversation.reasoningEffort?.rawValue,
+            agentWorkerReasoningEffort: conversation.agentWorkerReasoningEffort?.rawValue,
+            serviceTier: conversation.serviceTier?.rawValue
         )
     }
 

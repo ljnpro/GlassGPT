@@ -29,7 +29,7 @@ struct SettingsAccountSection: View {
             SettingsAccountStatusRow(
                 title: String(localized: "Sync"),
                 statusText: viewModel.syncStatusText,
-                detailText: viewModel.lastCheckedText.map { String(localized: "Last checked \($0)") },
+                detailText: viewModel.syncStatusDetailText,
                 state: viewModel.syncStatusState,
                 accessibilityIdentifier: "settings.account.sync"
             )
@@ -62,6 +62,13 @@ struct SettingsAccountSection: View {
                             .font(.caption)
                             .foregroundStyle(.red)
                             .accessibilityIdentifier("settings.account.connection")
+                    }
+
+                    if let compatibilityMessage = viewModel.compatibilityMessage, !compatibilityMessage.isEmpty {
+                        Text(compatibilityMessage)
+                            .font(.caption)
+                            .foregroundStyle(.red)
+                            .accessibilityIdentifier("settings.account.compatibility")
                     }
                 }
                 .padding(.vertical, 4)

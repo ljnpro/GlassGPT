@@ -24,6 +24,19 @@ struct NativeChatBackendTestHarness {
     let settingsPresenter: SettingsPresenter
     let cacheRoot: URL
 
+    func makeShellState(selectedTab: Int = 3) -> NativeChatShellState {
+        NativeChatShellState(
+            chatController: makeChatController(),
+            agentController: makeAgentController(),
+            settingsPresenter: settingsPresenter,
+            historyPresenter: HistoryPresenter(
+                loadConversations: { [] },
+                selectConversation: { _, _ in }
+            ),
+            selectedTab: selectedTab
+        )
+    }
+
     func makeChatController() -> BackendChatController {
         BackendChatController(
             client: client,

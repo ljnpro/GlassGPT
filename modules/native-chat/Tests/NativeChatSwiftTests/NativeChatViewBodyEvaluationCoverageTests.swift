@@ -130,7 +130,15 @@ struct NativeChatViewBodyEvaluationCoverageTests {
         )
         populatedAgent.errorMessage = "Retry pending"
 
-        hostView(BodyEvaluatingView { BackendChatTopBar(viewModel: emptyChat, onOpenSelector: {}, onStartNewConversation: {}).body })
+        hostView(
+            BodyEvaluatingView {
+                BackendConversationTopBarSection(
+                    viewModel: emptyChat,
+                    onOpenSelector: {},
+                    onStartNewConversation: {}
+                ).body
+            }
+        )
         hostView(
             BodyEvaluatingView { BackendChatMessageList(
                 viewModel: populatedChat,
@@ -140,18 +148,28 @@ struct NativeChatViewBodyEvaluationCoverageTests {
             ).body }
         )
         hostView(
-            BodyEvaluatingView { BackendChatComposer(
-                viewModel: populatedChat,
-                composerResetToken: UUID(),
-                onSendAccepted: {},
-                onPickImage: {},
-                onPickDocument: {}
-            ).body }
+            BodyEvaluatingView {
+                BackendConversationComposerSection(
+                    viewModel: populatedChat,
+                    composerResetToken: UUID(),
+                    onSendAccepted: {},
+                    onPickImage: {},
+                    onPickDocument: {}
+                ).body
+            }
         )
         hostView(BodyEvaluatingView { BackendChatEmptyState(viewModel: emptyChat, openSettings: {}).body })
         hostView(BodyEvaluatingView { BackendChatSelectorOverlay(viewModel: populatedChat, selectedTheme: .light, onDismiss: {}).body })
 
-        hostView(BodyEvaluatingView { BackendAgentTopBar(viewModel: populatedAgent, onOpenSelector: {}, onStartNewConversation: {}).body })
+        hostView(
+            BodyEvaluatingView {
+                BackendConversationTopBarSection(
+                    viewModel: populatedAgent,
+                    onOpenSelector: {},
+                    onStartNewConversation: {}
+                ).body
+            }
+        )
         hostView(
             BodyEvaluatingView { BackendAgentMessageList(
                 viewModel: populatedAgent,
@@ -163,13 +181,15 @@ struct NativeChatViewBodyEvaluationCoverageTests {
             ).body }
         )
         hostView(
-            BodyEvaluatingView { BackendAgentComposer(
-                viewModel: populatedAgent,
-                composerResetToken: UUID(),
-                onSendAccepted: {},
-                onPickImage: {},
-                onPickDocument: {}
-            ).body }
+            BodyEvaluatingView {
+                BackendConversationComposerSection(
+                    viewModel: populatedAgent,
+                    composerResetToken: UUID(),
+                    onSendAccepted: {},
+                    onPickImage: {},
+                    onPickDocument: {}
+                ).body
+            }
         )
         hostView(BodyEvaluatingView { BackendAgentEmptyState(viewModel: emptyAgent, openSettings: {}).body })
         hostView(BodyEvaluatingView { BackendAgentSelectorOverlay(viewModel: populatedAgent, selectedTheme: .light, onDismiss: {}).body })

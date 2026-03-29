@@ -1,24 +1,13 @@
 import ChatDomain
-import ChatPersistenceCore
 import ChatUIComponents
 import NativeChatBackendCore
 import NativeChatUI
-import PhotosUI
 import SwiftUI
-import UIKit
 
-/// Root agent tab view for the backend-owned Beta 5.0 shipping path.
+/// Root agent tab view for the backend-owned 5.3 shipping path.
 package struct BackendAgentView: View {
     @Bindable var viewModel: BackendAgentController
     let openSettings: @MainActor () -> Void
-    @AppStorage("appTheme") private var appThemeRawValue: String = AppTheme.system.rawValue
-    @Environment(\.colorScheme) private var systemColorScheme
-    @State private var showPhotoPicker = false
-    @State private var selectedPhotoItem: PhotosPickerItem?
-    @State private var showDocumentPicker = false
-    @State private var showSelector = false
-    @State private var composerResetToken = UUID()
-    @State private var scrollRequestID = UUID()
     @State private var liveSummaryExpanded: Bool? = true
     @State private var streamingThinkingExpanded: Bool? = nil
     @State private var expandedTraceMessageIDs: Set<UUID> = []
@@ -34,140 +23,84 @@ package struct BackendAgentView: View {
 
     /// The full agent navigation stack, composer, selector, and live summary presentation flow.
     package var body: some View {
-        NavigationStack {
-            ChatScrollContainer(
-                content: AnyView(
-                    BackendAgentMessageList(
-                        viewModel: viewModel,
-                        assistantBubbleMaxWidth: assistantBubbleMaxWidth,
-                        liveSummaryExpanded: $liveSummaryExpanded,
-                        streamingThinkingExpanded: $streamingThinkingExpanded,
-                        expandedTraceMessageIDs: $expandedTraceMessageIDs,
-                        openSettings: openSettings
-                    )
-                ),
-                composer: AnyView(
-                    BackendAgentComposer(
-                        viewModel: viewModel,
-                        composerResetToken: composerResetToken,
-                        onSendAccepted: { scrollRequestID = UUID() },
-                        onPickImage: { showPhotoPicker = true },
-                        onPickDocument: { showDocumentPicker = true }
-                    )
-                ),
-                layoutMode: showsEmptyState ? .centered : .bottomAnchored,
-                fixedBottomGap: 12,
-                conversationID: viewModel.currentConversationID,
-                scrollRequestID: scrollRequestID,
-                liveBottomAnchorKey: liveBottomAnchorKey,
-                onBackgroundTap: dismissKeyboard
-            )
-            .safeAreaInset(edge: .top, spacing: 0) {
-                BackendAgentTopBar(
+        BackendConversationRootScaffold(
+            currentConversationID: viewModel.currentConversationID,
+            sessionAccountID: viewModel.sessionAccountID,
+            skipAutomaticBootstrap: viewModel.skipAutomaticBootstrap,
+            presentsSelectorOnLaunch: viewModel.presentsSelectorOnLaunch,
+            showsEmptyState: showsEmptyState,
+            liveBottomAnchorKey: liveBottomAnchorKey,
+            selectedPhotoFailurePrefix: "Failed to load Agent photo",
+            onBootstrap: { await viewModel.bootstrap() },
+            onSelectedImageData: { jpegData in
+                viewModel.selectedImageData = jpegData
+            },
+            onPickedDocuments: { urls in
+                viewModel.handlePickedDocuments(urls)
+            },
+            onConversationChanged: resetViewState,
+            onStartNewConversation: {
+                resetViewState()
+                viewModel.startNewConversation()
+            },
+            content: { assistantBubbleMaxWidth in
+                BackendAgentMessageList(
                     viewModel: viewModel,
-                    onOpenSelector: {
-                        dismissKeyboard()
-                        showSelector = true
-                    },
-                    onStartNewConversation: {
-                        composerResetToken = UUID()
-                        scrollRequestID = UUID()
-                        expandedTraceMessageIDs.removeAll()
-                        viewModel.startNewConversation()
-                    }
+                    assistantBubbleMaxWidth: assistantBubbleMaxWidth,
+                    liveSummaryExpanded: $liveSummaryExpanded,
+                    streamingThinkingExpanded: $streamingThinkingExpanded,
+                    expandedTraceMessageIDs: $expandedTraceMessageIDs,
+                    openSettings: openSettings
                 )
-            }
-            .toolbar(.hidden, for: .navigationBar)
-            .overFullScreenCover(
-                isPresented: $showSelector,
-                interfaceStyle: resolvedInterfaceStyle,
-                onDismiss: dismissSelector
-            ) {
+            },
+            composer: { composerResetToken, onSendAccepted, onPickImage, onPickDocument in
+                BackendConversationComposerSection(
+                    viewModel: viewModel,
+                    composerResetToken: composerResetToken,
+                    onSendAccepted: onSendAccepted,
+                    onPickImage: onPickImage,
+                    onPickDocument: onPickDocument
+                )
+            },
+            topBar: { onOpenSelector, onStartNewConversation in
+                BackendConversationTopBarSection(
+                    viewModel: viewModel,
+                    onOpenSelector: onOpenSelector,
+                    onStartNewConversation: onStartNewConversation
+                )
+            },
+            selector: { selectedTheme, onDismiss in
                 BackendAgentSelectorOverlay(
                     viewModel: viewModel,
                     selectedTheme: selectedTheme,
-                    onDismiss: dismissSelector
+                    onDismiss: onDismiss
                 )
             }
-            .onChange(of: viewModel.currentConversationID) { _, _ in
-                liveSummaryExpanded = true
-                streamingThinkingExpanded = nil
-                composerResetToken = UUID()
-                expandedTraceMessageIDs.removeAll()
-            }
-            .photosPicker(isPresented: $showPhotoPicker, selection: $selectedPhotoItem, matching: .images)
-            .onChange(of: selectedPhotoItem) { _, newItem in
-                Task {
-                    do {
-                        guard
-                            let rawData = try await newItem?.loadTransferable(type: Data.self),
-                            let image = UIImage(data: rawData),
-                            let jpegData = image.jpegData(compressionQuality: 0.85)
-                        else {
-                            return
-                        }
-                        viewModel.selectedImageData = jpegData
-                    } catch {
-                        Loggers.files.error("Failed to load Agent photo: \(error.localizedDescription)")
-                    }
-                }
-            }
-            .sheet(isPresented: $showDocumentPicker) {
-                DocumentPicker { urls in
-                    viewModel.handlePickedDocuments(urls)
-                }
-            }
-            .task(id: viewModel.sessionAccountID) {
-                guard !viewModel.skipAutomaticBootstrap else {
-                    return
-                }
-                await viewModel.bootstrap()
-            }
-            .onAppear {
-                guard viewModel.presentsSelectorOnLaunch, !showSelector else {
-                    return
-                }
-                DispatchQueue.main.async {
-                    guard viewModel.presentsSelectorOnLaunch else {
-                        return
-                    }
-                    showSelector = true
-                }
-            }
-        }
+        )
     }
 
     private var showsEmptyState: Bool {
-        viewModel.messages.isEmpty && !viewModel.isRunning
-    }
-
-    private var selectedTheme: AppTheme {
-        AppTheme(rawValue: appThemeRawValue) ?? .system
-    }
-
-    private var resolvedInterfaceStyle: UIUserInterfaceStyle {
-        if let explicit = selectedTheme.colorScheme {
-            return explicit == .dark ? .dark : .light
-        }
-        return systemColorScheme == .dark ? .dark : .light
-    }
-
-    private var assistantBubbleMaxWidth: CGFloat {
-        UIDevice.current.userInterfaceIdiom == .pad ? 680 : 520
+        BackendConversationViewSupport.showsEmptyState(
+            messages: viewModel.messages,
+            isRunActive: viewModel.isRunning
+        )
     }
 
     private var liveBottomAnchorKey: Int {
         var hasher = Hasher()
-        hasher.combine(viewModel.currentConversationID)
-        hasher.combine(viewModel.liveDraftMessageID)
+        BackendConversationViewSupport.hashSharedLiveBottomAnchor(
+            into: &hasher,
+            conversationID: viewModel.currentConversationID,
+            liveDraftMessageID: viewModel.liveDraftMessageID,
+            isThinking: viewModel.isThinking,
+            isRunActive: viewModel.isRunning,
+            activeToolCalls: viewModel.activeToolCalls,
+            liveCitationsCount: viewModel.liveCitations.count,
+            liveFilePathAnnotationsCount: viewModel.liveFilePathAnnotations.count
+        )
         hasher.combine(viewModel.processSnapshot.activity.rawValue)
         hasher.combine(viewModel.currentStreamingText)
         hasher.combine(viewModel.currentThinkingText)
-        hasher.combine(viewModel.isRunning)
-        hasher.combine(viewModel.isThinking)
-        hasher.combine(viewModel.activeToolCalls.count)
-        hasher.combine(viewModel.liveCitations.count)
-        hasher.combine(viewModel.liveFilePathAnnotations.count)
         hasher.combine(viewModel.processSnapshot.currentFocus)
         hasher.combine(viewModel.processSnapshot.leaderAcceptedFocus)
         hasher.combine(viewModel.processSnapshot.leaderLiveStatus)
@@ -193,18 +126,12 @@ package struct BackendAgentView: View {
             hasher.combine(task.liveSummary ?? "")
             hasher.combine(task.resultSummary ?? "")
         }
-        for toolCall in viewModel.activeToolCalls {
-            hasher.combine(toolCall.id)
-            hasher.combine(toolCall.status.rawValue)
-        }
         return hasher.finalize()
     }
 
-    private func dismissKeyboard() {
-        KeyboardDismisser.dismiss()
-    }
-
-    private func dismissSelector() {
-        showSelector = false
+    private func resetViewState() {
+        liveSummaryExpanded = true
+        streamingThinkingExpanded = nil
+        expandedTraceMessageIDs.removeAll()
     }
 }

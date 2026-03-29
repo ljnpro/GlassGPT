@@ -112,4 +112,65 @@ struct StreamEventBatcherTests {
 
         batcher.cancel()
     }
+
+    @Test
+    func `scheduled flush surfaces non-cancellation errors through onFlushError`() async throws {
+        enum TestFlushError: Error {
+            case failed
+        }
+
+        var receivedError: String?
+        let batcher = StreamEventBatcher<SSEEvent>(
+            flushInterval: .milliseconds(20),
+            onFlushError: { error in
+                receivedError = String(describing: error)
+            },
+            onFlush: { _ in
+                throw TestFlushError.failed
+            }
+        )
+
+        batcher.enqueue(SSEEvent(event: "delta", data: "failing", id: nil))
+        try await Task.sleep(for: .milliseconds(80))
+
+        #expect(receivedError == String(describing: TestFlushError.failed))
+    }
+
+    @Test
+    func `batcher handles high volume enqueue bursts without losing events`() async throws {
+        var flushedEventCount = 0
+        var flushCount = 0
+        let batcher = StreamEventBatcher<SSEEvent>(flushInterval: .milliseconds(20)) { batch in
+            flushCount += 1
+            flushedEventCount += batch.count
+        }
+
+        for index in 0 ..< 100 {
+            batcher.enqueue(SSEEvent(event: "delta", data: "chunk_\(index)", id: nil))
+        }
+
+        try await Task.sleep(for: .milliseconds(100))
+
+        #expect(flushedEventCount == 100)
+        #expect(flushCount >= 1)
+        batcher.cancel()
+    }
+
+    @Test
+    func `batcher supports repeated cancel and restart cycles`() async throws {
+        var flushedPayloads: [String] = []
+        let batcher = StreamEventBatcher<SSEEvent>(flushInterval: .seconds(10)) { batch in
+            flushedPayloads.append(contentsOf: batch.map(\.data))
+        }
+
+        for cycle in 0 ..< 3 {
+            batcher.enqueue(SSEEvent(event: "delta", data: "dropped_\(cycle)", id: nil))
+            batcher.cancel()
+            batcher.enqueue(SSEEvent(event: "delta", data: "kept_\(cycle)", id: nil))
+            try await batcher.flushNow()
+        }
+
+        #expect(flushedPayloads == ["kept_0", "kept_1", "kept_2"])
+        batcher.cancel()
+    }
 }

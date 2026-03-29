@@ -21,7 +21,7 @@ public final class StreamingTextCache {
            text.hasPrefix(cachedText),
            text.count > cachedText.count {
             let suffix = String(text[text.index(text.startIndex, offsetBy: cachedText.count)...])
-            if !hasUnclosedSpans(suffix) {
+            if !Self.requiresFullReparse(forAppendedSuffix: suffix) {
                 let parsed = RichTextAttributedStringBuilder.parseStreamingText(suffix)
                 cachedResult.append(parsed)
                 cachedText = text
@@ -41,9 +41,22 @@ public final class StreamingTextCache {
         cachedResult = .init()
     }
 
+    /// Clears retained parsed state when iOS reports memory pressure.
+    public func handleMemoryPressure() {
+        reset()
+    }
+
+    /// Returns true when the appended suffix still contains markdown span
+    /// delimiters that could require reparsing the cached prefix. Complete
+    /// thematic break lines such as `***` or `___` are ignored because once the
+    /// newline has arrived they can no longer change preceding formatting.
+    package static func requiresFullReparse(forAppendedSuffix text: String) -> Bool {
+        hasUnclosedSpans(filteredHeuristicInput(text))
+    }
+
     /// Checks whether the suffix contains unclosed Markdown spans that would
     /// make incremental parsing incorrect (e.g., an odd number of `**` or `` ` ``).
-    private func hasUnclosedSpans(_ text: String) -> Bool {
+    private static func hasUnclosedSpans(_ text: String) -> Bool {
         let backtickCount = text.count(where: { $0 == "`" })
         if backtickCount % 2 != 0 { return true }
 
@@ -54,5 +67,31 @@ public final class StreamingTextCache {
         if italicUnderscoreCount % 2 != 0 { return true }
 
         return false
+    }
+
+    private static func filteredHeuristicInput(_ text: String) -> String {
+        let lines = text.split(omittingEmptySubsequences: false, whereSeparator: \.isNewline)
+        let hasTrailingNewline = text.last?.isNewline == true
+        var filteredLines: [String] = []
+        filteredLines.reserveCapacity(lines.count)
+
+        for (index, line) in lines.enumerated() {
+            let isCompleteLine = hasTrailingNewline || index < lines.count - 1
+            if isCompleteLine, isThematicBreakLine(line) {
+                continue
+            }
+            filteredLines.append(String(line))
+        }
+
+        return filteredLines.joined(separator: "\n")
+    }
+
+    private static func isThematicBreakLine(_ line: some StringProtocol) -> Bool {
+        let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed.count >= 3 else { return false }
+        guard let marker = trimmed.first, marker == "*" || marker == "_" || marker == "-" else {
+            return false
+        }
+        return trimmed.allSatisfy { $0 == marker }
     }
 }

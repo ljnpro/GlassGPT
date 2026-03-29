@@ -36,8 +36,18 @@ SNAPSHOT_CASES=(
   testModelSelectorPadDarkSnapshot
   testFilePreviewSnapshots
 )
+HOSTED_SNAPSHOT_CASES=(
+  testSettingsGatewaySnapshot
+  testModelSelectorSnapshot
+  testChatCoverageSnapshots
+  testDetachedStreamingSnapshot
+  testAgentSelectorSnapshot
+  testFilePreviewSnapshots
+  testPresentationCoverageSnapshot
+)
 UI_TEST_FILTER="${UI_TEST_FILTER:-}"
 UI_TEST_BUILD_PREPARED=0
+UI_TEST_XCTESTRUN_PATH=""
 
 cd "$ROOT_DIR"
 mkdir -p "$CI_OUTPUT_DIR"
@@ -704,6 +714,58 @@ function gate_package_tests() {
   assert_xcresult_executed_tests "$result_bundle_path"
 }
 
+function gate_snapshot_tests() {
+  log "Running app snapshot regression tests"
+  local result_bundle_path="$CI_OUTPUT_DIR/NativeChatSnapshotTests.xcresult"
+  local -a only_tests=()
+  local snapshot_case
+
+  for snapshot_case in "${SNAPSHOT_CASES[@]}"; do
+    only_tests+=("-only-testing:NativeChatTests/SnapshotViewTests/${snapshot_case}")
+  done
+
+  force_remove_path "$result_bundle_path"
+  run_checked_xcodebuild_in_dir nativechat-snapshot-tests "$ROOT_DIR/modules/native-chat" \
+    xcodebuild \
+    -scheme NativeChat-Package \
+    -clonedSourcePackagesDirPath "$CI_SOURCE_PACKAGES_DIR" \
+    -destination "$SIMULATOR_DEVICE_DESTINATION" \
+    -enableCodeCoverage YES \
+    -parallel-testing-enabled NO \
+    -test-timeouts-enabled YES \
+    -maximum-test-execution-time-allowance "$XCODE_TEST_TIMEOUT_ALLOWANCE" \
+    -resultBundlePath "$result_bundle_path" \
+    "${only_tests[@]}" \
+    test
+  assert_xcresult_executed_tests "$result_bundle_path"
+}
+
+function gate_hosted_snapshot_tests() {
+  log "Running hosted snapshot coverage tests"
+  local result_bundle_path="$CI_OUTPUT_DIR/NativeChatHostedSnapshotTests.xcresult"
+  local -a only_tests=()
+  local snapshot_case
+
+  for snapshot_case in "${HOSTED_SNAPSHOT_CASES[@]}"; do
+    only_tests+=("-only-testing:NativeChatSwiftTests/ViewHostingCoverageTests/${snapshot_case}")
+  done
+
+  force_remove_path "$result_bundle_path"
+  run_checked_xcodebuild_in_dir nativechat-hosted-snapshot-tests "$ROOT_DIR/modules/native-chat" \
+    xcodebuild \
+    -scheme NativeChat-Package \
+    -clonedSourcePackagesDirPath "$CI_SOURCE_PACKAGES_DIR" \
+    -destination "$SIMULATOR_DEVICE_DESTINATION" \
+    -enableCodeCoverage YES \
+    -parallel-testing-enabled NO \
+    -test-timeouts-enabled YES \
+    -maximum-test-execution-time-allowance "$XCODE_TEST_TIMEOUT_ALLOWANCE" \
+    -resultBundlePath "$result_bundle_path" \
+    "${only_tests[@]}" \
+    test
+  assert_xcresult_executed_tests "$result_bundle_path"
+}
+
 function gate_coverage_report() {
   local -a coverage_sources=()
 
@@ -760,40 +822,62 @@ function ensure_ui_test_build_artifacts() {
     -derivedDataPath "$CI_DERIVED_DATA_DIR" \
     build-for-testing
 
+  UI_TEST_XCTESTRUN_PATH="$(
+    find "$CI_DERIVED_DATA_DIR/Build/Products" -maxdepth 1 -name '*.xctestrun' -print | sort | tail -n 1
+  )"
+  if [[ -z "$UI_TEST_XCTESTRUN_PATH" || ! -f "$UI_TEST_XCTESTRUN_PATH" ]]; then
+    echo "Unable to locate .xctestrun output after build-for-testing in $CI_DERIVED_DATA_DIR/Build/Products." >&2
+    exit 1
+  fi
+
   UI_TEST_BUILD_PREPARED=1
 }
 
 function run_ui_test_case() {
   local ui_case="$1"
-  local label_prefix="${2:-glassgpt-ui}"
-  local result_bundle_name
-  result_bundle_name="$(result_bundle_slug "${label_prefix}-${ui_case}")"
+  ui_test_specifier_for_case "$ui_case"
+}
 
-  # Support entries in the form "ClassName/testMethod" for tests outside GlassGPTUITests.
-  local test_specifier
+function ui_test_specifier_for_case() {
+  local ui_case="$1"
+
   if [[ "$ui_case" == */* ]]; then
-    test_specifier="GlassGPTUITests/${ui_case}"
-  else
-    test_specifier="GlassGPTUITests/GlassGPTUITests/${ui_case}"
+    printf 'GlassGPTUITests/%s\n' "$ui_case"
+    return 0
   fi
 
-  log "Running UI test ${ui_case}"
+  printf 'GlassGPTUITests/GlassGPTUITests/%s\n' "$ui_case"
+}
+
+function run_ui_test_batch() {
+  local label="$1"
+  shift
+
+  local result_bundle_name
+  result_bundle_name="$(result_bundle_slug "$label")"
+
+  local -a only_tests=()
+  local ui_case
+  local test_specifier
+  for ui_case in "$@"; do
+    test_specifier="$(ui_test_specifier_for_case "$ui_case")"
+    only_tests+=("-only-testing:${test_specifier}")
+  done
+
+  log "Running ${#only_tests[@]} UI test(s)"
   run_checked_xcodebuild "$result_bundle_name" \
     xcodebuild \
     -quiet \
-    -project "$XCODE_PROJECT" \
-    -scheme "$SCHEME" \
-    -clonedSourcePackagesDirPath "$CI_SOURCE_PACKAGES_DIR" \
+    -xctestrun "$UI_TEST_XCTESTRUN_PATH" \
     -enableCodeCoverage YES \
     -parallel-testing-enabled NO \
     -test-timeouts-enabled YES \
     -maximum-test-execution-time-allowance "$XCODE_TEST_TIMEOUT_ALLOWANCE" \
     -destination "$SIMULATOR_DEVICE_DESTINATION" \
-    -derivedDataPath "$CI_DERIVED_DATA_DIR" \
     -resultBundlePath "$CI_OUTPUT_DIR/${result_bundle_name}.xcresult" \
-    -only-testing:"${test_specifier}" \
-    test
-  assert_xcresult_executed_tests "$CI_OUTPUT_DIR/${result_bundle_name}.xcresult"
+    "${only_tests[@]}" \
+    test-without-building
+  assert_xcresult_executed_tests "$CI_OUTPUT_DIR/${result_bundle_name}.xcresult" "${#only_tests[@]}"
 }
 
 function gate_ui_tests() {
@@ -809,15 +893,8 @@ function gate_ui_tests() {
   fi
 
   ensure_ui_test_build_artifacts
-
-  local ui_case
-  local ui_case_index=0
-  local ui_case_total=${#selected_ui_cases[@]}
-  for ui_case in "${selected_ui_cases[@]}"; do
-    (( ui_case_index += 1 ))
-    progress_bar "$ui_case_index" "$ui_case_total" "UI: $ui_case"
-    run_ui_test_case "$ui_case" "glassgpt-ui"
-  done
+  progress_bar 1 1 "UI: ${#selected_ui_cases[@]} selected case(s)"
+  run_ui_test_batch "glassgpt-ui-tests" "${selected_ui_cases[@]}"
 }
 
 function gate_reinstall_compatibility() {
@@ -829,10 +906,7 @@ function gate_reinstall_compatibility() {
     exit 1
   fi
 
-  local ui_case
-  for ui_case in "${REINSTALL_UI_TEST_CASES[@]}"; do
-    run_ui_test_case "$ui_case" "glassgpt-ui-reinstall"
-  done
+  run_ui_test_batch "glassgpt-ui-reinstall" "${REINSTALL_UI_TEST_CASES[@]}"
 }
 
 function assert_expected_versions_config() {
@@ -908,7 +982,7 @@ function assert_release_readiness() {
   current_branch="${GITHUB_REF_NAME:-$(git rev-parse --abbrev-ref HEAD)}"
 
   case "$current_branch" in
-    main|stable-5.0|codex/stable-5.0|feature/beta-5.0*|codex/feature/beta-5.0*|HEAD)
+    main|stable-5.3|codex/stable-5.3|feature/release-5.3*|codex/feature/release-5.3*|feature/beta-5.3*|codex/feature/beta-5.3*|HEAD)
       ;;
     *)
       echo "Release-readiness gate does not permit branch '$current_branch'." >&2
@@ -916,8 +990,8 @@ function assert_release_readiness() {
       ;;
   esac
 
-  if ! search_quiet "feature/beta-5.0-cloudflare-all-in" "$ROOT_DIR/docs/branch-strategy.md"; then
-    echo "branch-strategy.md must include the active Beta 5.0 release-preparation branch." >&2
+  if ! search_quiet "codex/stable-5.3" "$ROOT_DIR/docs/branch-strategy.md"; then
+    echo "branch-strategy.md must include the active 5.3 release line." >&2
     exit 1
   fi
 
@@ -926,18 +1000,18 @@ function assert_release_readiness() {
     exit 1
   fi
 
-  if ! search_quiet "5\\.0\\.0" "$ROOT_DIR/docs/parity-baseline.md"; then
-    echo "parity-baseline.md must include the active 5.0.0 candidate marker." >&2
+  if ! search_quiet "5\\.3\\.0" "$ROOT_DIR/docs/parity-baseline.md"; then
+    echo "parity-baseline.md must include the active 5.3.0 candidate marker." >&2
     exit 1
   fi
 
-  if ! search_quiet "4\\.12\\.6" "$ROOT_DIR/docs/parity-baseline.md"; then
-    echo "parity-baseline.md must include the frozen 4.12.6 baseline marker." >&2
+  if ! search_quiet "5\\.2\\.0" "$ROOT_DIR/docs/parity-baseline.md"; then
+    echo "parity-baseline.md must include the current 5.2.0 production baseline marker." >&2
     exit 1
   fi
 
-  if ! search_quiet "feature/beta-5.0-cloudflare-all-in" "$ROOT_DIR/docs/release.md"; then
-    echo "release.md must describe the Beta 5.0 release-preparation branch." >&2
+  if ! search_quiet "release_5_3\\.sh" "$ROOT_DIR/docs/release.md"; then
+    echo "release.md must describe the 5.3 orchestrated release entrypoint." >&2
     exit 1
   fi
 
@@ -1090,6 +1164,8 @@ function run_gate() {
     build) gate_build ;;
     app-tests) gate_app_tests ;;
     package-tests) gate_package_tests ;;
+    snapshot-tests) gate_snapshot_tests ;;
+    hosted-snapshot-tests) gate_hosted_snapshot_tests ;;
     architecture-tests) gate_architecture_tests ;;
     coverage-report) gate_coverage_report ;;
     ui-tests) gate_ui_tests ;;
@@ -1105,7 +1181,7 @@ function run_gate() {
     release-readiness) assert_release_readiness ;;
     *)
       echo "Unknown gate: $gate" >&2
-      echo "Valid gates: ci-health, lint, python-lint, format-check, build, app-tests, package-tests, architecture-tests, coverage-report, ui-tests, maintainability, source-share, infra-safety, module-boundary, doc-build, doc-completeness, localization-check, release-readiness" >&2
+      echo "Valid gates: ci-health, lint, python-lint, format-check, build, app-tests, package-tests, snapshot-tests, hosted-snapshot-tests, architecture-tests, coverage-report, ui-tests, maintainability, source-share, infra-safety, module-boundary, doc-build, doc-completeness, localization-check, release-readiness" >&2
       exit 1
       ;;
   esac
@@ -1114,12 +1190,13 @@ function run_gate() {
 function usage() {
   cat <<'EOF'
 Usage:
-  ./scripts/ci.sh [all|ci-health|lint|python-lint|format-check|build|app-tests|package-tests|architecture-tests|coverage-report|ui-tests|maintainability|source-share|infra-safety|module-boundary|doc-build|doc-completeness|localization-check|release-readiness|comma-separated list]
+  ./scripts/ci.sh [all|ci-health|lint|python-lint|format-check|build|app-tests|package-tests|snapshot-tests|hosted-snapshot-tests|architecture-tests|coverage-report|ui-tests|maintainability|source-share|infra-safety|module-boundary|doc-build|doc-completeness|localization-check|release-readiness|comma-separated list]
 
 Examples:
   ./scripts/ci.sh
   ./scripts/ci.sh lint
   ./scripts/ci.sh app-tests,package-tests,coverage-report
+  ./scripts/ci.sh snapshot-tests,hosted-snapshot-tests
   ./scripts/ci.sh build,ui-tests,maintainability,source-share,infra-safety,module-boundary
 EOF
 }
@@ -1185,7 +1262,7 @@ if [[ $# -gt 1 ]]; then
 fi
 
 if [[ $# -eq 0 || "$1" == "all" ]]; then
-  requested_gates=(ci-health lint python-lint format-check build app-tests package-tests architecture-tests ui-tests coverage-report maintainability source-share infra-safety module-boundary doc-build doc-completeness localization-check release-readiness)
+  requested_gates=(ci-health lint python-lint format-check build app-tests package-tests snapshot-tests hosted-snapshot-tests architecture-tests ui-tests coverage-report maintainability source-share infra-safety module-boundary doc-build doc-completeness localization-check release-readiness)
 elif [[ "$1" == "help" || "$1" == "-h" || "$1" == "--help" ]]; then
   usage
   exit 0

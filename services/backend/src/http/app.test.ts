@@ -1,7 +1,10 @@
-import { describe, expect, it } from 'vitest';
-
+import { describe, expect, it, vi } from 'vitest';
 import { ApplicationError } from '../application/errors.js';
 import { createApp } from './app.js';
+import {
+  ANONYMOUS_MAX_REQUESTS_PER_WINDOW,
+  AUTHENTICATED_MAX_REQUESTS_PER_WINDOW,
+} from './middleware/rate-limiter.js';
 import type {
   AgentRunService,
   AuthService,
@@ -9,6 +12,7 @@ import type {
   ChatRunService,
   ConversationService,
   CredentialService,
+  RateLimitService,
   RunService,
   SyncService,
 } from './services.js';
@@ -26,11 +30,58 @@ const createWorkflowStub = (): Env['CHAT_RUN_WORKFLOW'] => {
 };
 
 const createDatabaseStub = (): D1Database => {
+  const rateLimitWindows = new Map<
+    string,
+    {
+      readonly requestCount: number;
+      readonly updatedAtMs: number;
+      readonly windowStartMs: number;
+    }
+  >();
+
   return {
-    prepare: () => ({
-      bind: () => ({
-        first: async () => unexpectedBindingAccess('d1'),
-        run: async () => unexpectedBindingAccess('d1'),
+    prepare: (query: string) => ({
+      bind: (...params: unknown[]) => ({
+        first: async () => {
+          if (query.includes('FROM rate_limit_windows')) {
+            const bucketKey = String(params[0]);
+            const entry = rateLimitWindows.get(bucketKey);
+            if (!entry) {
+              return null;
+            }
+
+            return {
+              bucketKey,
+              requestCount: entry.requestCount,
+              updatedAtMs: entry.updatedAtMs,
+              windowStartMs: entry.windowStartMs,
+            };
+          }
+
+          return unexpectedBindingAccess('d1');
+        },
+        run: async () => {
+          if (query.includes('INSERT INTO rate_limit_windows')) {
+            rateLimitWindows.set(String(params[0]), {
+              requestCount: Number(params[2]),
+              updatedAtMs: Number(params[3]),
+              windowStartMs: Number(params[1]),
+            });
+            return { success: true };
+          }
+
+          if (query.includes('DELETE FROM rate_limit_windows')) {
+            const olderThanMs = Number(params[0]);
+            for (const [bucketKey, entry] of rateLimitWindows.entries()) {
+              if (entry.updatedAtMs < olderThanMs) {
+                rateLimitWindows.delete(bucketKey);
+              }
+            }
+            return { success: true };
+          }
+
+          return unexpectedBindingAccess('d1');
+        },
       }),
     }),
   } as D1Database;
@@ -45,15 +96,15 @@ const createArtifactBucketStub = (): R2Bucket => {
 };
 
 const createConversationEventHubStub = (
-  fetchImpl?: () => Promise<Response>,
+  fetchImpl?: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>,
 ): Env['CONVERSATION_EVENT_HUB'] => {
   return {
     idFromName: () => ({ toString: () => 'conversation-event-hub-id' }) as DurableObjectId,
     get: () =>
       ({
-        fetch: async () => {
+        fetch: async (input: RequestInfo | URL, init?: RequestInit) => {
           if (fetchImpl) {
-            return fetchImpl();
+            return fetchImpl(input, init);
           }
           return unexpectedBindingAccess('durable_object');
         },
@@ -69,6 +120,26 @@ const createSSEStreamResponse = (frames: readonly string[]): Response => {
         controller.enqueue(encoder.encode(frame));
       }
       controller.close();
+    },
+  });
+
+  return new Response(stream, {
+    headers: { 'Content-Type': 'text/event-stream' },
+    status: 200,
+  });
+};
+
+const createFailingSSEStreamResponse = (
+  frames: readonly string[],
+  errorMessage = 'conversation_event_hub_stream_failed',
+): Response => {
+  const encoder = new TextEncoder();
+  const stream = new ReadableStream<Uint8Array>({
+    start(controller) {
+      for (const frame of frames) {
+        controller.enqueue(encoder.encode(frame));
+      }
+      controller.error(new Error(errorMessage));
     },
   });
 
@@ -101,6 +172,8 @@ const credentialStatusFixture = {
 
 const createTestEnv = (overrides: Partial<Env> = {}): Env => ({
   APP_ENV: 'beta',
+  CORS_ALLOWED_ORIGINS:
+    'https://glassgpt.com,https://beta.glassgpt.com,https://staging.glassgpt.com,http://localhost:3000,http://127.0.0.1:3000,http://localhost:5173,http://127.0.0.1:5173',
   R2_BUCKET_NAME: 'glassgpt-beta-artifacts',
   CHAT_RUN_WORKFLOW: createWorkflowStub(),
   AGENT_RUN_WORKFLOW: createWorkflowStub(),
@@ -216,7 +289,11 @@ const createConversationServiceStub = (): ConversationService => {
   return {
     createConversation: async (_env, _userId, input) => ({
       ...(input.mode === 'chat' ? chatConversationFixture : agentConversationFixture),
+      agentWorkerReasoningEffort: input.agentWorkerReasoningEffort,
+      model: input.model,
       mode: input.mode,
+      reasoningEffort: input.reasoningEffort,
+      serviceTier: input.serviceTier,
       title: input.title,
     }),
     getConversationDetail: async (_env, _userId, conversationId) => ({
@@ -227,7 +304,21 @@ const createConversationServiceStub = (): ConversationService => {
       messages: [],
       runs: conversationId === agentConversationFixture.id ? [agentRunFixture] : [chatRunFixture],
     }),
-    listConversations: async () => [chatConversationFixture, agentConversationFixture],
+    listConversations: async () => ({
+      hasMore: false,
+      items: [chatConversationFixture, agentConversationFixture],
+      nextCursor: undefined,
+    }),
+    updateConversationConfiguration: async (_env, _userId, conversationId, input) => ({
+      ...(conversationId === agentConversationFixture.id
+        ? agentConversationFixture
+        : chatConversationFixture),
+      agentWorkerReasoningEffort: input.agentWorkerReasoningEffort,
+      id: conversationId,
+      model: input.model,
+      reasoningEffort: input.reasoningEffort,
+      serviceTier: input.serviceTier,
+    }),
   };
 };
 
@@ -306,6 +397,56 @@ const createSyncServiceStub = (): SyncService => {
   };
 };
 
+const createRateLimitServiceStub = (): RateLimitService => {
+  const windows = new Map<
+    string,
+    {
+      readonly requestCount: number;
+      readonly updatedAtMs: number;
+      readonly windowStartMs: number;
+    }
+  >();
+
+  return {
+    consumeRequest: async (_env, input) => {
+      for (const [bucketKey, entry] of windows.entries()) {
+        if (entry.updatedAtMs < input.nowMs - input.staleWindowRetentionMs) {
+          windows.delete(bucketKey);
+        }
+      }
+
+      const entry = windows.get(input.bucketKey);
+      const windowExpired =
+        entry === undefined || input.nowMs - entry.windowStartMs >= input.windowMs;
+      const windowStartMs = windowExpired ? input.nowMs : entry.windowStartMs;
+      const nextRequestCount = windowExpired ? 1 : entry.requestCount + 1;
+      const resetAtMs = windowStartMs + input.windowMs;
+
+      if (!windowExpired && entry.requestCount >= input.maxRequests) {
+        return {
+          allowed: false,
+          remaining: 0,
+          resetAtMs,
+          retryAfterSeconds: Math.ceil((resetAtMs - input.nowMs) / 1000),
+        };
+      }
+
+      windows.set(input.bucketKey, {
+        requestCount: nextRequestCount,
+        updatedAtMs: input.nowMs,
+        windowStartMs,
+      });
+
+      return {
+        allowed: true,
+        remaining: Math.max(input.maxRequests - nextRequestCount, 0),
+        resetAtMs,
+        retryAfterSeconds: null,
+      };
+    },
+  };
+};
+
 const createTestServices = (overrides: Partial<BackendServices> = {}): BackendServices => {
   return {
     agentRunService: createAgentRunServiceStub(),
@@ -313,6 +454,7 @@ const createTestServices = (overrides: Partial<BackendServices> = {}): BackendSe
     chatRunService: createChatRunServiceStub(),
     conversationService: createConversationServiceStub(),
     credentialService: createCredentialServiceStub(),
+    rateLimitService: createRateLimitServiceStub(),
     runService: createRunServiceStub(),
     syncService: createSyncServiceStub(),
     ...overrides,
@@ -325,19 +467,128 @@ const testExecutionContext = {
 } as ExecutionContext;
 
 describe('backend worker scaffold', () => {
+  it('allows only parsed origins from the configured allowlist', async () => {
+    const app = createApp(createTestServices());
+
+    const allowedResponse = await app.fetch(
+      new Request('https://example.com/healthz', {
+        headers: {
+          Origin: 'https://staging.glassgpt.com',
+        },
+      }),
+      testEnv,
+      testExecutionContext,
+    );
+    expect(allowedResponse.status).toBe(200);
+    expect(allowedResponse.headers.get('Access-Control-Allow-Origin')).toBe(
+      'https://staging.glassgpt.com',
+    );
+
+    const rejectedResponse = await app.fetch(
+      new Request('https://example.com/healthz', {
+        headers: {
+          Origin: 'https://evil-glassgpt.com',
+        },
+      }),
+      testEnv,
+      testExecutionContext,
+    );
+    expect(rejectedResponse.status).toBe(200);
+    expect(rejectedResponse.headers.get('Access-Control-Allow-Origin')).toBeNull();
+  });
+
+  it('accepts preflight requests for the PATCH configuration route', async () => {
+    const response = await createApp(createTestServices()).fetch(
+      new Request('https://example.com/v1/conversations/conv_chat_01/configuration', {
+        method: 'OPTIONS',
+        headers: {
+          'Access-Control-Request-Headers': 'Authorization,Content-Type',
+          'Access-Control-Request-Method': 'PATCH',
+          Origin: 'https://glassgpt.com',
+        },
+      }),
+      testEnv,
+      testExecutionContext,
+    );
+
+    expect(response.status).toBe(204);
+    expect(response.headers.get('Access-Control-Allow-Origin')).toBe('https://glassgpt.com');
+    expect(response.headers.get('Access-Control-Allow-Methods')).toContain('PATCH');
+  });
+
+  it('rate limits anonymous traffic on authenticated-free routes', async () => {
+    const app = createApp(createTestServices());
+    const env = createTestEnv();
+
+    let response: Response | null = null;
+    for (let index = 0; index <= ANONYMOUS_MAX_REQUESTS_PER_WINDOW; index += 1) {
+      response = await app.fetch(
+        new Request('https://example.com/v1/auth/refresh', {
+          method: 'POST',
+          headers: {
+            'CF-Connecting-IP': '203.0.113.10',
+            'content-type': 'application/json',
+          },
+          body: JSON.stringify({ refreshToken: 'refresh-token' }),
+        }),
+        env,
+        testExecutionContext,
+      );
+    }
+
+    expect(response).not.toBeNull();
+    expect(response?.status).toBe(429);
+    await expect(response?.json()).resolves.toEqual({
+      error: 'rate_limited',
+    });
+  });
+
+  it('rate limits authenticated traffic by resolved user identity', async () => {
+    const app = createApp(createTestServices());
+    const env = createTestEnv();
+
+    let response: Response | null = null;
+    for (let index = 0; index <= AUTHENTICATED_MAX_REQUESTS_PER_WINDOW; index += 1) {
+      response = await app.fetch(
+        new Request('https://example.com/v1/conversations', {
+          headers: {
+            Authorization: 'Bearer access-token',
+            'CF-Connecting-IP': '203.0.113.11',
+          },
+        }),
+        env,
+        testExecutionContext,
+      );
+    }
+
+    expect(response).not.toBeNull();
+    expect(response?.status).toBe(429);
+    await expect(response?.json()).resolves.toEqual({
+      error: 'rate_limited',
+    });
+  });
+
   it('serves the health route', async () => {
     const response = await createApp(createTestServices()).fetch(
-      new Request('https://example.com/healthz'),
+      new Request('https://example.com/healthz', {
+        headers: {
+          'X-GlassGPT-App-Version': '5.3.0',
+        },
+      }),
       testEnv,
       testExecutionContext,
     );
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({
+      appEnv: 'beta',
+      backendVersion: '5.3.0',
+      minimumSupportedAppVersion: '5.3.0',
+      appCompatibility: 'compatible',
       ok: true,
     });
   });
 
-  it('serves the unsigned connection check route', async () => {
+  it('marks unsigned connection checks as update_required when app version metadata is missing', async () => {
     const response = await createApp(createTestServices()).fetch(
       new Request('https://example.com/v1/connection/check'),
       testEnv,
@@ -345,10 +596,29 @@ describe('backend worker scaffold', () => {
     );
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toMatchObject({
+      appCompatibility: 'update_required',
       backend: 'healthy',
       auth: 'missing',
       openaiCredential: 'missing',
       sse: 'healthy',
+    });
+  });
+
+  it('marks connection checks compatible when the supported app version header is provided', async () => {
+    const response = await createApp(createTestServices()).fetch(
+      new Request('https://example.com/v1/connection/check', {
+        headers: {
+          'X-GlassGPT-App-Version': '5.3.0',
+        },
+      }),
+      testEnv,
+      testExecutionContext,
+    );
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      appCompatibility: 'compatible',
+      backendVersion: '5.3.0',
+      minimumSupportedAppVersion: '5.3.0',
     });
   });
 
@@ -363,10 +633,10 @@ describe('backend worker scaffold', () => {
       testExecutionContext,
     );
     expect(listResponse.status).toBe(200);
-    await expect(listResponse.json()).resolves.toEqual([
-      chatConversationFixture,
-      agentConversationFixture,
-    ]);
+    await expect(listResponse.json()).resolves.toEqual({
+      hasMore: false,
+      items: [chatConversationFixture, agentConversationFixture],
+    });
 
     const createResponse = await app.fetch(
       new Request('https://example.com/v1/conversations', {
@@ -703,6 +973,158 @@ describe('backend worker scaffold', () => {
     expect(body).toContain('"textDelta":"hello"');
   });
 
+  it('replays the current assistant snapshot with stable ids and forwards last-event-id to realtime relay', async () => {
+    let forwardedLastEventID: string | null = null;
+    const app = createApp(
+      createTestServices({
+        conversationService: {
+          ...createConversationServiceStub(),
+          getConversationDetail: async () => ({
+            conversation: {
+              ...chatConversationFixture,
+              lastSyncCursor: 'cur_00000000000000000007',
+            },
+            messages: [
+              {
+                annotations: [
+                  {
+                    endIndex: 9,
+                    startIndex: 0,
+                    title: 'Plan',
+                    url: 'https://example.com/plan',
+                  },
+                ],
+                completedAt: undefined,
+                content: 'Recovered output',
+                conversationId: chatConversationFixture.id,
+                createdAt: '2026-03-27T12:00:01.000Z',
+                filePathAnnotations: [
+                  {
+                    containerId: 'sandbox_1',
+                    endIndex: 15,
+                    fileId: 'file_1',
+                    filename: 'report.md',
+                    sandboxPath: '/tmp/report.md',
+                    startIndex: 0,
+                  },
+                ],
+                id: 'msg_resume_01',
+                role: 'assistant',
+                runId: 'run_chat_stream_01',
+                serverCursor: 'cur_00000000000000000007',
+                thinking: 'Recovered thinking',
+                toolCalls: [
+                  {
+                    code: null,
+                    id: 'tool_1',
+                    queries: ['GlassGPT 5.3.0'],
+                    results: ['ok'],
+                    status: 'completed',
+                    type: 'web_search',
+                  },
+                ],
+              },
+            ],
+            runs: [
+              {
+                ...chatRunFixture,
+                id: 'run_chat_stream_01',
+                lastEventCursor: 'cur_00000000000000000007',
+                status: 'running',
+                visibleSummary: 'Recovered summary',
+              },
+            ],
+          }),
+        },
+        runService: createRunServiceStub({
+          getRun: async () => ({
+            ...chatRunFixture,
+            id: 'run_chat_stream_01',
+            lastEventCursor: 'cur_00000000000000000007',
+            status: 'running',
+            visibleSummary: 'Recovered summary',
+          }),
+        }),
+      }),
+    );
+
+    const env = createTestEnv({
+      CONVERSATION_EVENT_HUB: createConversationEventHubStub(async (input, init) => {
+        const request = new Request(input, init);
+        forwardedLastEventID = request.headers.get('Last-Event-ID');
+        return createSSEStreamResponse([
+          'id: cur_00000000000000000007\nevent: done\ndata: {"runId":"run_chat_stream_01","status":"completed"}\n\n',
+        ]);
+      }),
+    });
+
+    const response = await app.fetch(
+      new Request('https://example.com/v1/runs/run_chat_stream_01/stream', {
+        headers: {
+          Authorization: 'Bearer access-token',
+          'Last-Event-ID': 'cur_00000000000000000006',
+        },
+      }),
+      env,
+      testExecutionContext,
+    );
+
+    expect(response.status).toBe(200);
+    expect(forwardedLastEventID).toBe('cur_00000000000000000006');
+    const body = await response.text();
+    expect(body).toContain('id: cur_00000000000000000007');
+    expect(body).toContain('event: thinking_delta');
+    expect(body).toContain('event: tool_call_update');
+    expect(body).toContain('event: citations_update');
+    expect(body).toContain('event: file_path_annotations_update');
+    expect(body).toContain('event: delta');
+    expect(body).toContain('Recovered output');
+  });
+
+  it('logs malformed initial process snapshots without aborting the stream', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const app = createApp(
+      createTestServices({
+        runService: createRunServiceStub({
+          getRun: async () => ({
+            ...agentRunFixture,
+            id: 'run_agent_stream_invalid_snapshot',
+            processSnapshotJSON: '{"tasks": ',
+            stage: 'worker_wave',
+            status: 'running',
+            visibleSummary: 'Workers running live',
+          }),
+        }),
+      }),
+    );
+
+    const env = createTestEnv({
+      CONVERSATION_EVENT_HUB: createConversationEventHubStub(async () =>
+        createSSEStreamResponse([
+          'event: done\ndata: {"runId":"run_agent_stream_invalid_snapshot","status":"completed"}\n\n',
+        ]),
+      ),
+    });
+
+    const response = await app.fetch(
+      new Request('https://example.com/v1/runs/run_agent_stream_invalid_snapshot/stream', {
+        headers: { Authorization: 'Bearer access-token' },
+      }),
+      env,
+      testExecutionContext,
+    );
+
+    expect(response.status).toBe(200);
+    const body = await response.text();
+    expect(body).toContain('event: status');
+    expect(body).toContain('event: stage');
+    expect(body).not.toContain('event: process_update');
+    expect(consoleError).toHaveBeenCalledWith(
+      expect.stringContaining('"message":"run_stream_snapshot_decode_failed"'),
+    );
+    consoleError.mockRestore();
+  });
+
   it('fails closed when realtime relay setup is unavailable', async () => {
     const app = createApp(
       createTestServices({
@@ -739,5 +1161,50 @@ describe('backend worker scaffold', () => {
     await expect(response.json()).resolves.toEqual({
       error: 'realtime_stream_unavailable',
     });
+  });
+
+  it('logs relay failures and emits structured stream errors for the client', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const app = createApp(
+      createTestServices({
+        runService: createRunServiceStub({
+          getRun: async () => ({
+            ...chatRunFixture,
+            id: 'run_chat_stream_error',
+            status: 'running',
+            visibleSummary: 'Streaming',
+          }),
+        }),
+      }),
+    );
+
+    const env = createTestEnv({
+      CONVERSATION_EVENT_HUB: createConversationEventHubStub(async () =>
+        createFailingSSEStreamResponse(
+          ['event: delta\ndata: {"runId":"run_chat_stream_error","textDelta":"Alpha"}\n\n'],
+          'durable_object_relay_read_failed',
+        ),
+      ),
+    });
+
+    const response = await app.fetch(
+      new Request('https://example.com/v1/runs/run_chat_stream_error/stream', {
+        headers: { Authorization: 'Bearer access-token' },
+      }),
+      env,
+      testExecutionContext,
+    );
+
+    expect(response.status).toBe(200);
+    const body = await response.text();
+    expect(body).toContain('event: status');
+    expect(body).toContain('event: error');
+    expect(body).toContain('"code":"realtime_stream_unavailable"');
+    expect(body).toContain('"message":"Realtime stream became unavailable. Please retry."');
+    expect(body).toContain('"phase":"relay"');
+    expect(consoleError).toHaveBeenCalledWith(
+      expect.stringContaining('"message":"run_stream_relay_failed"'),
+    );
+    consoleError.mockRestore();
   });
 });

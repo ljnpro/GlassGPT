@@ -26,4 +26,9 @@ package final class MarkdownBlockCache {
         cachedText = ""
         cachedParts = []
     }
+
+    /// Clears retained parsed blocks when iOS reports memory pressure.
+    package func handleMemoryPressure() {
+        reset()
+    }
 }
