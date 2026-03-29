@@ -18,7 +18,7 @@ function require_clean_worktree() {
 function usage() {
   cat <<'EOF'
 Usage:
-  ./scripts/release_5_3.sh <marketing_version> <build_number> [--branch <name>] [--preserve-main-as <name>] [--force-main-with-lease] [--preflight-only]
+  ./scripts/release_5_3.sh <marketing_version> <build_number> [--branch <name>] [--preserve-main-as <name>] [--force-main-with-lease] [--skip-ci] [--preflight-only]
 
 Examples:
   ./scripts/release_5_3.sh 5.3.0 20300 --branch feature/release-5.3
@@ -50,6 +50,7 @@ TARGET_BRANCH=""
 PRESERVE_MAIN_AS=""
 FORCE_MAIN_WITH_LEASE=0
 PREFLIGHT_ONLY=0
+SKIP_CI=0
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -67,6 +68,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --preflight-only)
       PREFLIGHT_ONLY=1
+      shift
+      ;;
+    --skip-ci)
+      SKIP_CI=1
       shift
       ;;
     *)
@@ -96,8 +101,12 @@ if (( PREFLIGHT_ONLY == 1 )); then
   exit 0
 fi
 
-echo "==> Regenerating fresh final CI evidence"
-"$ROOT_DIR/scripts/generate_final_ci_evidence.sh"
+if (( SKIP_CI == 1 )); then
+  echo "==> Reusing archived final CI evidence"
+else
+  echo "==> Regenerating fresh final CI evidence"
+  "$ROOT_DIR/scripts/generate_final_ci_evidence.sh"
+fi
 
 python3 "$ROOT_DIR/scripts/check_todo_release_gates.py" \
   --todo "$TODO_PATH" \
@@ -110,7 +119,10 @@ echo "==> Deploying backend to staging"
 echo "==> Deploying backend to production"
 "$ROOT_DIR/scripts/deploy_backend.sh" --env production 2>&1 | tee "$BACKEND_PRODUCTION_EVIDENCE_PATH"
 
-testflight_args=("$VERSION" "$BUILD_NUMBER" "--skip-ci")
+testflight_args=("$VERSION" "$BUILD_NUMBER")
+if (( SKIP_CI == 1 )); then
+  testflight_args+=("--skip-ci")
+fi
 if [[ -n "$TARGET_BRANCH" ]]; then
   testflight_args+=("--branch" "$TARGET_BRANCH")
 fi
