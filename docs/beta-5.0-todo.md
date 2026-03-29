@@ -2123,7 +2123,19 @@
     - integrity:
       - `Skipped-test check passed.`
       - `Required UI suite integrity passed for 20 test cases.`
+  - post-UI finalization after the first 5.1.3 UI-green baseline:
+    - only non-UI changes remained:
+      - `SwiftFormat` compliance fixes
+      - non-UI stream handler cleanup
+      - version/build bump to `5.1.3 (20214)`
+    - follow-up verification:
+      - `./scripts/ci_ios.sh package-tests`
+      - passed
+      - log:
+        - `.local/build/ci/nativechat-package-tests.log`
+    - release policy decision:
+      - no additional UI rerun required after that point because no visible UI behavior changed after the already-green 20/20 UI baseline
 - Next concrete step:
-  - run backend/contracts/release-readiness validation for the release candidate commit
-  - deploy backend
-  - publish `5.1.3 (20214)` with the release wrapper and manually inspect all release logs
+  - commit the final `5.1.3 (20214)` candidate state
+  - publish `5.1.3 (20214)` with the release wrapper using the already-validated CI/UI baseline
+  - manually inspect archive/export/upload logs after publication

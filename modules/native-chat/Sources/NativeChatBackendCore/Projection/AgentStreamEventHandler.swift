@@ -61,7 +61,7 @@ package extension BackendAgentController {
     func handleAgentStreamEvent(
         _ event: SSEEvent,
         conversationServerID: String,
-        runID: String
+        runID _: String
     ) async throws -> AgentStreamOutcome {
         switch event.event {
         case "delta":
@@ -262,26 +262,26 @@ package extension BackendAgentController {
     private func processActivity(for stage: AgentStageDTO) -> AgentProcessActivity {
         switch stage {
         case .leaderPlanning:
-            return .triage
+            .triage
         case .workerWave:
-            return .delegation
+            .delegation
         case .leaderReview:
-            return .reviewing
+            .reviewing
         case .finalSynthesis:
-            return .synthesis
+            .synthesis
         }
     }
 
     private func stageStatusLabel(for stage: AgentStageDTO) -> String {
         switch stage {
         case .leaderPlanning:
-            return "Leader planning"
+            "Leader planning"
         case .workerWave:
-            return "Workers running"
+            "Workers running"
         case .leaderReview:
-            return "Leader review"
+            "Leader review"
         case .finalSynthesis:
-            return "Final synthesis"
+            "Final synthesis"
         }
     }
 }

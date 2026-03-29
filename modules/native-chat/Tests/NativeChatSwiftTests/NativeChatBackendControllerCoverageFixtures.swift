@@ -49,7 +49,7 @@ func makeChatConversationDetailSnapshot(
     runID: String,
     assistantContent: String
 ) throws -> ConversationDetailDTO {
-    let baseTime = Date(timeIntervalSince1970: 1_000)
+    let baseTime = Date(timeIntervalSince1970: 1000)
     let assistantTime = baseTime.addingTimeInterval(1)
     return ConversationDetailDTO(
         conversation: ConversationDTO(
@@ -121,7 +121,7 @@ func makeAgentConversationDetailSnapshot(
     runID: String,
     assistantContent: String
 ) throws -> ConversationDetailDTO {
-    let baseTime = Date(timeIntervalSince1970: 2_000)
+    let baseTime = Date(timeIntervalSince1970: 2000)
     let assistantTime = baseTime.addingTimeInterval(1)
     return try ConversationDetailDTO(
         conversation: ConversationDTO(
