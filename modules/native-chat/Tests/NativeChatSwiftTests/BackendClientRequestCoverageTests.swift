@@ -192,7 +192,7 @@ struct BackendClientRequestCoverageTests {
         #expect(throws: BackendAPIError.rateLimited) {
             _ = try client.validate(response: response(429), data: Data())
         }
-        #expect(throws: BackendAPIError.serverError) {
+        #expect(throws: BackendAPIError.serviceUnavailable) {
             _ = try client.validate(response: response(503), data: Data())
         }
         #expect(throws: BackendAPIError.networkFailure("gateway down")) {

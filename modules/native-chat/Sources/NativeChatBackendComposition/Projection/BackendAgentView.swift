@@ -12,6 +12,7 @@ package struct BackendAgentView: View {
     @Bindable var viewModel: BackendAgentController
     let openSettings: @MainActor () -> Void
     @AppStorage("appTheme") private var appThemeRawValue: String = AppTheme.system.rawValue
+    @Environment(\.colorScheme) private var systemColorScheme
     @State private var showPhotoPicker = false
     @State private var selectedPhotoItem: PhotosPickerItem?
     @State private var showDocumentPicker = false
@@ -79,7 +80,7 @@ package struct BackendAgentView: View {
             .toolbar(.hidden, for: .navigationBar)
             .overFullScreenCover(
                 isPresented: $showSelector,
-                interfaceStyle: selectedTheme.colorScheme == .dark ? .dark : .light,
+                interfaceStyle: resolvedInterfaceStyle,
                 onDismiss: dismissSelector
             ) {
                 BackendAgentSelectorOverlay(
@@ -142,6 +143,13 @@ package struct BackendAgentView: View {
 
     private var selectedTheme: AppTheme {
         AppTheme(rawValue: appThemeRawValue) ?? .system
+    }
+
+    private var resolvedInterfaceStyle: UIUserInterfaceStyle {
+        if let explicit = selectedTheme.colorScheme {
+            return explicit == .dark ? .dark : .light
+        }
+        return systemColorScheme == .dark ? .dark : .light
     }
 
     private var assistantBubbleMaxWidth: CGFloat {

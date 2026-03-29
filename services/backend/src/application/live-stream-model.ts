@@ -39,6 +39,7 @@ export interface StreamingConversationMessage {
 
 export interface StreamingConversationRequest {
   readonly input: string | readonly StreamingConversationMessage[];
+  readonly model?: string;
 }
 
 export type LiveStreamEvent =

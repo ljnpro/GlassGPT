@@ -1,7 +1,5 @@
 import BackendClient
-import BackendContracts
 import ChatDomain
-import ChatProjectionPersistence
 import Foundation
 
 private struct DeltaPayload: Decodable {
@@ -10,15 +8,6 @@ private struct DeltaPayload: Decodable {
 
 private struct ThinkingDeltaPayload: Decodable {
     let thinkingDelta: String?
-}
-
-private struct StatusPayload: Decodable {
-    let visibleSummary: String?
-}
-
-private struct StagePayload: Decodable {
-    let stage: AgentStageDTO?
-    let visibleSummary: String?
 }
 
 private struct ToolCallPayload: Decodable {
@@ -31,14 +20,6 @@ private struct CitationsPayload: Decodable {
 
 private struct FilePathAnnotationsPayload: Decodable {
     let filePathAnnotations: [FilePathAnnotation]
-}
-
-private struct ProcessUpdatePayload: Decodable {
-    let processSnapshot: AgentProcessSnapshot
-}
-
-private struct TaskUpdatePayload: Decodable {
-    let task: AgentTask
 }
 
 /// Describes whether an agent stream event should continue the active stream loop or terminate it.
@@ -146,72 +127,6 @@ package extension BackendAgentController {
         liveFilePathAnnotations = payload.filePathAnnotations
     }
 
-    func applyAgentProcessUpdate(from event: SSEEvent) {
-        guard let payload = decodeAgentPayload(
-            event,
-            as: ProcessUpdatePayload.self,
-            configure: { $0.dateDecodingStrategy = .iso8601 }
-        ) else {
-            return
-        }
-        processSnapshot = payload.processSnapshot
-    }
-
-    func applyAgentTaskUpdate(from event: SSEEvent) {
-        guard let payload = decodeAgentPayload(
-            event,
-            as: TaskUpdatePayload.self,
-            configure: { $0.dateDecodingStrategy = .iso8601 }
-        ) else {
-            return
-        }
-        var snapshot = processSnapshot
-        snapshot.tasks.removeAll { $0.id == payload.task.id }
-        snapshot.tasks.append(payload.task)
-        processSnapshot = snapshot
-    }
-
-    func applyAgentStatus(from event: SSEEvent) {
-        guard let payload = decodeAgentPayload(event, as: StatusPayload.self),
-              let summary = payload.visibleSummary
-        else {
-            return
-        }
-
-        if currentThinkingText.isEmpty {
-            currentThinkingText = summary
-        }
-        isThinking = true
-        processSnapshot.leaderLiveSummary = summary
-        if processSnapshot.leaderLiveStatus.isEmpty {
-            processSnapshot.leaderLiveStatus = summary
-        }
-        if processSnapshot.currentFocus.isEmpty {
-            processSnapshot.currentFocus = summary
-        }
-        processSnapshot.updatedAt = .now
-    }
-
-    func applyAgentStage(from event: SSEEvent) {
-        guard let payload = decodeAgentPayload(event, as: StagePayload.self) else {
-            return
-        }
-
-        if let stage = payload.stage {
-            processSnapshot.activity = processActivity(for: stage)
-            processSnapshot.leaderLiveStatus = stageStatusLabel(for: stage)
-        }
-
-        if let summary = payload.visibleSummary, !summary.isEmpty {
-            processSnapshot.leaderLiveSummary = summary
-            if processSnapshot.currentFocus.isEmpty {
-                processSnapshot.currentFocus = summary
-            }
-        }
-
-        processSnapshot.updatedAt = .now
-    }
-
     func refreshAgentProjection() async throws {
         try await loader.applyIncrementalSync()
         try await refreshVisibleConversation()
@@ -256,32 +171,6 @@ package extension BackendAgentController {
             return try decoder.decode(Payload.self, from: payloadData)
         } catch {
             return nil
-        }
-    }
-
-    private func processActivity(for stage: AgentStageDTO) -> AgentProcessActivity {
-        switch stage {
-        case .leaderPlanning:
-            .triage
-        case .workerWave:
-            .delegation
-        case .leaderReview:
-            .reviewing
-        case .finalSynthesis:
-            .synthesis
-        }
-    }
-
-    private func stageStatusLabel(for stage: AgentStageDTO) -> String {
-        switch stage {
-        case .leaderPlanning:
-            "Leader planning"
-        case .workerWave:
-            "Workers running"
-        case .leaderReview:
-            "Leader review"
-        case .finalSynthesis:
-            "Final synthesis"
         }
     }
 }

@@ -24,14 +24,15 @@ interface StreamDelta {
 }
 
 export class ConversationEventHub extends DurableObject<Env> {
-  private sseClients: Set<ReadableStreamDefaultController<Uint8Array>> = new Set();
+  private runClients: Map<string, Set<ReadableStreamDefaultController<Uint8Array>>> = new Map();
   private readonly encoder = new TextEncoder();
 
   override async fetch(request: Request): Promise<Response> {
     const url = new URL(request.url);
 
-    if (request.method === 'GET' && url.pathname.endsWith('/stream')) {
-      return this.handleSSEConnection();
+    const streamMatch = url.pathname.match(/\/stream\/([^/]+)$/);
+    if (request.method === 'GET' && streamMatch && streamMatch[1]) {
+      return this.handleSSEConnection(streamMatch[1]);
     }
 
     if (request.method === 'GET') {
@@ -64,15 +65,26 @@ export class ConversationEventHub extends DurableObject<Env> {
     return Response.json({ error: 'method_not_allowed' }, { status: 405 });
   }
 
-  private handleSSEConnection(): Response {
+  private handleSSEConnection(runId: string): Response {
     const stream = new ReadableStream<Uint8Array>({
       start: (controller) => {
-        this.sseClients.add(controller);
+        let clients = this.runClients.get(runId);
+        if (!clients) {
+          clients = new Set();
+          this.runClients.set(runId, clients);
+        }
+        clients.add(controller);
         const ping = this.encoder.encode(': connected\n\n');
         controller.enqueue(ping);
       },
       cancel: (controller) => {
-        this.sseClients.delete(controller as ReadableStreamDefaultController<Uint8Array>);
+        const clients = this.runClients.get(runId);
+        if (clients) {
+          clients.delete(controller as ReadableStreamDefaultController<Uint8Array>);
+          if (clients.size === 0) {
+            this.runClients.delete(runId);
+          }
+        }
       },
     });
 
@@ -89,18 +101,36 @@ export class ConversationEventHub extends DurableObject<Env> {
     const frame = this.encoder.encode(
       `event: ${delta.type}\ndata: ${JSON.stringify(delta.data)}\n\n`,
     );
-    const staleClients: ReadableStreamDefaultController<Uint8Array>[] = [];
 
-    for (const client of this.sseClients) {
-      try {
-        client.enqueue(frame);
-      } catch {
-        staleClients.push(client);
+    const deltaData = delta.data as { runId?: string } | null;
+    const targetRunId = deltaData?.runId;
+
+    // If the delta has a runId, only broadcast to subscribers of that run
+    const clientSets: Set<ReadableStreamDefaultController<Uint8Array>>[] = [];
+    if (targetRunId) {
+      const clients = this.runClients.get(targetRunId);
+      if (clients) {
+        clientSets.push(clients);
+      }
+    } else {
+      // Fallback: broadcast to all runs
+      for (const clients of this.runClients.values()) {
+        clientSets.push(clients);
       }
     }
 
-    for (const client of staleClients) {
-      this.sseClients.delete(client);
+    for (const clients of clientSets) {
+      const staleClients: ReadableStreamDefaultController<Uint8Array>[] = [];
+      for (const client of clients) {
+        try {
+          client.enqueue(frame);
+        } catch {
+          staleClients.push(client);
+        }
+      }
+      for (const client of staleClients) {
+        clients.delete(client);
+      }
     }
   }
 }

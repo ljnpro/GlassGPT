@@ -10,6 +10,7 @@ PRODUCTION_ROOTS = [
 ]
 EXCLUDED_PARTS = {
     ".build",
+    ".claude",
     ".git",
     ".local",
     "build",

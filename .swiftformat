@@ -13,5 +13,5 @@
 --wraparguments before-first
 --wrapparameters before-first
 --wrapcollections before-first
---maxwidth 200
+--maxwidth 140
 --swiftversion 6.2

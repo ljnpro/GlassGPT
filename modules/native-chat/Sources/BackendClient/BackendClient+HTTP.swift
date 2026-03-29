@@ -11,7 +11,7 @@ extension BackendClient {
         queryItems: [URLQueryItem] = [],
         responseType: Response.Type
     ) async throws -> Response {
-        let (data, response) = try await execute(
+        let (data, _) = try await execute(
             path: path,
             method: method,
             body: body,
@@ -19,9 +19,6 @@ extension BackendClient {
             queryItems: queryItems,
             allowRefreshRetry: true
         )
-        guard (200 ..< 300).contains(response.statusCode) else {
-            throw BackendAPIError.invalidResponse
-        }
         return try JSONDecoder.backend.decode(responseType, from: data)
     }
 
@@ -32,7 +29,7 @@ extension BackendClient {
         authorizationMode: AuthorizationMode = .required,
         queryItems: [URLQueryItem] = []
     ) async throws {
-        let (_, response) = try await execute(
+        _ = try await execute(
             path: path,
             method: method,
             body: body,
@@ -40,10 +37,9 @@ extension BackendClient {
             queryItems: queryItems,
             allowRefreshRetry: true
         )
-        guard (200 ..< 300).contains(response.statusCode) || response.statusCode == 204 else {
-            throw BackendAPIError.invalidResponse
-        }
     }
+
+    // MARK: - Core Execute
 
     func execute(
         path: String,
@@ -62,10 +58,17 @@ extension BackendClient {
             authorizationMode: authorizationMode,
             queryItems: queryItems
         )
+        let requestStart = ContinuousClock.now
         let (data, response) = try await urlSession.data(for: request)
         guard let httpResponse = response as? HTTPURLResponse else {
             throw BackendAPIError.invalidResponse
         }
+        BackendNetworkLogger.log(
+            method: method,
+            url: request.url,
+            statusCode: httpResponse.statusCode,
+            startTime: requestStart
+        )
 
         if httpResponse.statusCode == 401,
            allowRefreshRetry,

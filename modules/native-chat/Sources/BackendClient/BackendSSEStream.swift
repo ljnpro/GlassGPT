@@ -10,7 +10,6 @@ public struct SSEEvent: Sendable {
     public let event: String
     public let data: String
     public let id: String?
-
     public init(event: String, data: String, id: String?) {
         self.event = event
         self.data = data
@@ -79,17 +78,18 @@ public struct BackendSSEStream: AsyncSequence, Sendable {
     public typealias Element = SSEEvent
 
     fileprivate enum Source {
-        case network(url: URL, urlSession: URLSession, authorizationHeader: String?)
+        case network(url: URL, urlSession: URLSession, authorizationHeader: String?, lastEventID: String?)
         case scripted(events: [SSEEvent], setupError: BackendSSEStreamError?)
     }
 
     private let source: Source
 
-    public init(url: URL, urlSession: URLSession, authorizationHeader: String?) {
+    public init(url: URL, urlSession: URLSession, authorizationHeader: String?, lastEventID: String? = nil) {
         source = .network(
             url: url,
             urlSession: urlSession,
-            authorizationHeader: authorizationHeader
+            authorizationHeader: authorizationHeader,
+            lastEventID: lastEventID
         )
     }
 
@@ -124,7 +124,7 @@ public struct BackendSSEStream: AsyncSequence, Sendable {
 
             if !started {
                 started = true
-                guard case let .network(url, urlSession, authorizationHeader) = source else {
+                guard case let .network(url, urlSession, authorizationHeader, lastEventID) = source else {
                     return nil
                 }
                 var request = URLRequest(url: url)
@@ -132,6 +132,9 @@ public struct BackendSSEStream: AsyncSequence, Sendable {
                 request.setValue("no-cache", forHTTPHeaderField: "Cache-Control")
                 if let authorizationHeader {
                     request.setValue(authorizationHeader, forHTTPHeaderField: "Authorization")
+                }
+                if let lastEventID {
+                    request.setValue(lastEventID, forHTTPHeaderField: "Last-Event-ID")
                 }
 
                 let (bytes, response) = try await urlSession.bytes(for: request)
@@ -194,7 +197,6 @@ public struct BackendSSEStream: AsyncSequence, Sendable {
             if !data.isEmpty {
                 return SSEEvent(event: eventType, data: data, id: eventID)
             }
-
             return nil
         }
 

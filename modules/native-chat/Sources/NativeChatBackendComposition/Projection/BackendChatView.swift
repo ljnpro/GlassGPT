@@ -13,6 +13,7 @@ package struct BackendChatView: View {
     @Bindable var viewModel: BackendChatController
     let openSettings: @MainActor () -> Void
     @AppStorage("appTheme") private var appThemeRawValue: String = AppTheme.system.rawValue
+    @Environment(\.colorScheme) private var systemColorScheme
     @State private var showPhotoPicker = false
     @State private var selectedPhotoItem: PhotosPickerItem?
     @State private var showDocumentPicker = false
@@ -75,7 +76,7 @@ package struct BackendChatView: View {
             .toolbar(.hidden, for: .navigationBar)
             .overFullScreenCover(
                 isPresented: $showSelector,
-                interfaceStyle: selectedTheme.colorScheme == .dark ? .dark : .light,
+                interfaceStyle: resolvedInterfaceStyle,
                 onDismiss: dismissSelector
             ) {
                 BackendChatSelectorOverlay(
@@ -137,6 +138,13 @@ package struct BackendChatView: View {
         AppTheme(rawValue: appThemeRawValue) ?? .system
     }
 
+    private var resolvedInterfaceStyle: UIUserInterfaceStyle {
+        if let explicit = selectedTheme.colorScheme {
+            return explicit == .dark ? .dark : .light
+        }
+        return systemColorScheme == .dark ? .dark : .light
+    }
+
     private var assistantBubbleMaxWidth: CGFloat {
         UIDevice.current.userInterfaceIdiom == .pad ? 680 : 520
     }
@@ -147,8 +155,8 @@ package struct BackendChatView: View {
         hasher.combine(viewModel.liveDraftMessageID)
         hasher.combine(viewModel.isThinking)
         hasher.combine(viewModel.isStreaming)
-        hasher.combine(viewModel.currentThinkingText)
-        hasher.combine(viewModel.currentStreamingText)
+        hasher.combine(viewModel.currentThinkingText.count)
+        hasher.combine(viewModel.currentStreamingText.count)
         hasher.combine(viewModel.activeToolCalls.count)
         hasher.combine(viewModel.liveCitations.count)
         hasher.combine(viewModel.liveFilePathAnnotations.count)

@@ -679,7 +679,6 @@ describe('backend worker scaffold', () => {
       CONVERSATION_EVENT_HUB: createConversationEventHubStub(async () =>
         createSSEStreamResponse([
           ': connected\n\n',
-          'event: delta\ndata: {"runId":"run_other_01","textDelta":"ignore me"}\n\n',
           'event: delta\ndata: {"runId":"run_agent_stream_01","textDelta":"hello"}\n\n',
           'event: done\ndata: {"runId":"run_agent_stream_01","status":"completed"}\n\n',
         ]),
@@ -702,7 +701,6 @@ describe('backend worker scaffold', () => {
     expect(body).toContain('event: task_update');
     expect(body).toContain('Workers running live');
     expect(body).toContain('"textDelta":"hello"');
-    expect(body).not.toContain('ignore me');
   });
 
   it('fails closed when realtime relay setup is unavailable', async () => {

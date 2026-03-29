@@ -6,6 +6,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 EXCLUDED_PARTS = {
     ".build",
+    ".claude",
     ".git",
     ".local",
     "build",

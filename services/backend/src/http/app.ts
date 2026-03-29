@@ -1,9 +1,11 @@
 import { errorResponseSchema } from '@glassgpt/backend-contracts';
 import { Hono } from 'hono';
+import { bodyLimit } from 'hono/body-limit';
+import { cors } from 'hono/cors';
 import { ZodError } from 'zod';
 
 import { isApplicationError } from '../application/errors.js';
-import { logError } from '../observability/logger.js';
+import { logError, sanitizeLogValue } from '../observability/logger.js';
 import { requestIdMiddleware } from './middleware/request-id.js';
 import { installArtifactRoutes } from './routes/artifacts.js';
 import { installAuthRoutes } from './routes/auth.js';
@@ -39,6 +41,17 @@ const statusCodeForApplicationError = (code: string): ApplicationErrorStatusCode
 export const createApp = (services: BackendServices): BackendApp => {
   const app = new Hono<{ Bindings: Env }>();
 
+  app.use(
+    '*',
+    cors({
+      allowHeaders: ['Authorization', 'Content-Type', 'X-Request-ID'],
+      allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+      maxAge: 86400,
+      origin: (origin) =>
+        origin.endsWith('.glassgpt.com') || origin === 'https://glassgpt.com' ? origin : null,
+    }),
+  );
+  app.use('*', bodyLimit({ maxSize: 1024 * 1024 }));
   app.use('*', requestIdMiddleware);
 
   installHealthRoutes(app);
@@ -68,7 +81,7 @@ export const createApp = (services: BackendServices): BackendApp => {
 
     logError('backend_request_failed', {
       errorName: error.name,
-      errorMessage: error.message,
+      errorMessage: sanitizeLogValue(error.message),
     });
 
     return context.json(errorResponseSchema.parse({ error: 'internal_server_error' }), 500);

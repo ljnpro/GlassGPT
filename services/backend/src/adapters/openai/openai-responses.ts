@@ -6,6 +6,7 @@ import type {
   StreamingConversationMessage,
   StreamingConversationRequest,
 } from '../../application/live-stream-model.js';
+import { openAiCircuitBreaker } from './circuit-breaker.js';
 import {
   extractCitations,
   extractErrorMessage,
@@ -23,6 +24,12 @@ const DEFAULT_CHAT_MODEL = 'gpt-5.4';
 const DEFAULT_REASONING_EFFORT = 'medium';
 const DEFAULT_TIMEOUT_MS = 120_000;
 const MAX_RETRIES = 3;
+
+const timeoutForModel = (model: string): number => {
+  if (model.includes('pro') || model.includes('deep')) return 300_000;
+  if (model.includes('mini') || model.includes('fast')) return 60_000;
+  return DEFAULT_TIMEOUT_MS;
+};
 const RETRYABLE_STATUS_CODES = new Set([429, 500, 502, 503, 504]);
 
 interface StreamEnvelope {
@@ -99,6 +106,10 @@ const fetchWithRetry = async (
   init: RequestInit,
   timeoutMs: number,
 ): Promise<Response> => {
+  if (openAiCircuitBreaker.isOpen) {
+    throw new OpenAiApiError('circuit_breaker_open', 503, null);
+  }
+
   let lastError: Error | null = null;
 
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
@@ -110,6 +121,7 @@ const fetchWithRetry = async (
       clearTimeout(timeoutId);
 
       if (response.ok) {
+        openAiCircuitBreaker.recordSuccess();
         return response;
       }
 
@@ -123,6 +135,7 @@ const fetchWithRetry = async (
       );
 
       if (!error.isRetryable || attempt === MAX_RETRIES) {
+        openAiCircuitBreaker.recordFailure();
         throw error;
       }
 
@@ -163,7 +176,7 @@ const buildInputMessages = (
 const buildRequestBody = (request: StreamingConversationRequest) => {
   return {
     input: buildInputMessages(request.input),
-    model: DEFAULT_CHAT_MODEL,
+    model: request.model ?? DEFAULT_CHAT_MODEL,
     reasoning: {
       effort: DEFAULT_REASONING_EFFORT,
       summary: 'auto',
@@ -324,7 +337,7 @@ export const createChatCompletion = async (
       },
       method: 'POST',
     },
-    DEFAULT_TIMEOUT_MS,
+    timeoutForModel(DEFAULT_CHAT_MODEL),
   );
 
   const responseBody = (await response.json()) as ResponsesApiBody;
@@ -350,7 +363,7 @@ export async function* createStreamingResponse(
       },
       method: 'POST',
     },
-    DEFAULT_TIMEOUT_MS,
+    timeoutForModel(request.model ?? DEFAULT_CHAT_MODEL),
   );
 
   if (!response.body) {

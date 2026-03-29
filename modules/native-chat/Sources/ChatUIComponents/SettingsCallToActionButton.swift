@@ -22,6 +22,7 @@ public struct SettingsCallToActionButton: View {
             Text(title)
                 .font(.headline.weight(.semibold))
                 .multilineTextAlignment(.center)
+                .lineLimit(nil)
                 .fixedSize(horizontal: false, vertical: true)
                 .frame(maxWidth: .infinity, alignment: .center)
                 .padding(.horizontal, 20)

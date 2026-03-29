@@ -217,14 +217,14 @@ def build_groups() -> list[CoverageGroup]:
         ),
         CoverageGroup(
             name="presentation",
-            threshold=0.40,
+            threshold=0.55,
             prefixes=[
                 normalize_prefix("modules/native-chat/Sources/ChatPresentation/"),
             ],
         ),
         CoverageGroup(
             name="views-and-presentation",
-            threshold=0.15,
+            threshold=0.25,
             prefixes=[
                 normalize_prefix("modules/native-chat/Sources/NativeChatUI/"),
                 normalize_prefix("modules/native-chat/Sources/ChatUIComponents/"),

@@ -12,6 +12,7 @@ import SwiftUI
 public struct StreamingTextView: View {
     let text: String
     var allowsSelection = false
+    @State private var cache = StreamingTextCache()
 
     /// Creates a streaming text view for the given incremental response text.
     public init(text: String, allowsSelection: Bool = false) {
@@ -21,7 +22,7 @@ public struct StreamingTextView: View {
 
     /// The lightweight streaming-text rendering used while a reply is still in flight.
     public var body: some View {
-        let attributed = RichTextAttributedStringBuilder.parseStreamingText(sanitisedText)
+        let attributed = cache.attributedString(for: sanitisedText)
         Text(attributed)
             .font(.body)
             .applyingIf(allowsSelection) { view in

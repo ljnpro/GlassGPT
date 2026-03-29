@@ -34,8 +34,10 @@ package struct MarkdownContentView: View {
         self.surfaceStyle = surfaceStyle
     }
 
+    @State private var blockCache = MarkdownBlockCache()
+
     var blockParts: [BlockPart] {
-        MarkdownParser.parseBlocks(text)
+        blockCache.parts(for: text)
     }
 
     /// The rendered Markdown block stack for the supplied text.

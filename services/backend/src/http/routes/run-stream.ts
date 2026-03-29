@@ -3,7 +3,9 @@ import { asBackendRuntimeContext } from '../runtime-context.js';
 import type { BackendServices } from '../services.js';
 import type { BackendApp } from '../types.js';
 
-const SSE_HEARTBEAT_INTERVAL_MS = 15_000;
+const SSE_HEARTBEAT_INTERVAL_MS = 5_000;
+const MICRO_BUFFER_MAX_BYTES = 1024;
+const MICRO_BUFFER_FLUSH_MS = 50;
 const REALTIME_STREAM_UNAVAILABLE = 'realtime_stream_unavailable';
 
 const sseFrame = (event: string, data: unknown): string => {
@@ -85,7 +87,7 @@ export const installRunStreamRoutes = (app: BackendApp, services: BackendService
     ) {
       const durableObjectId = context.env.CONVERSATION_EVENT_HUB.idFromName(conversationId);
       const stub = context.env.CONVERSATION_EVENT_HUB.get(durableObjectId);
-      durableObjectResponse = await stub.fetch('https://conversation-event-hub/stream');
+      durableObjectResponse = await stub.fetch(`https://conversation-event-hub/stream/${runId}`);
 
       if (!durableObjectResponse.ok) {
         return context.json({ error: REALTIME_STREAM_UNAVAILABLE }, 503);
@@ -108,10 +110,15 @@ export const installRunStreamRoutes = (app: BackendApp, services: BackendService
         };
 
         let heartbeatTimer: ReturnType<typeof setInterval> | null = null;
+        let pendingMicroFlush: ReturnType<typeof setTimeout> | null = null;
         const cleanup = (): void => {
           if (heartbeatTimer !== null) {
             clearInterval(heartbeatTimer);
             heartbeatTimer = null;
+          }
+          if (pendingMicroFlush !== null) {
+            clearTimeout(pendingMicroFlush);
+            pendingMicroFlush = null;
           }
         };
 
@@ -147,53 +154,65 @@ export const installRunStreamRoutes = (app: BackendApp, services: BackendService
             return;
           }
 
-          // Relay events from the Durable Object to the client, filtering by runId
+          // Relay events from the Durable Object to the client (pre-filtered by runId at DO level)
           const reader = durableObjectResponse.body.getReader();
           const decoder = new TextDecoder();
-          let buffer = '';
+          let parseBuffer = '';
+          let microBuffer = '';
+          let microFlushTimer: ReturnType<typeof setTimeout> | null = null;
+
+          const flushMicroBuffer = (): void => {
+            if (microBuffer.length > 0) {
+              enqueue(microBuffer);
+              microBuffer = '';
+            }
+            if (microFlushTimer !== null) {
+              clearTimeout(microFlushTimer);
+              microFlushTimer = null;
+            }
+          };
+
+          const enqueueMicroBuffered = (frame: string): void => {
+            microBuffer += frame;
+            if (microBuffer.length >= MICRO_BUFFER_MAX_BYTES) {
+              flushMicroBuffer();
+            } else if (microFlushTimer === null) {
+              microFlushTimer = setTimeout(flushMicroBuffer, MICRO_BUFFER_FLUSH_MS);
+            }
+          };
 
           while (true) {
             const { done, value } = await reader.read();
             if (done) break;
 
-            buffer += decoder.decode(value, { stream: true });
+            parseBuffer += decoder.decode(value, { stream: true });
 
             // Forward complete SSE frames (ending with \n\n)
-            while (buffer.includes('\n\n')) {
-              const frameEnd = buffer.indexOf('\n\n');
-              const frame = buffer.slice(0, frameEnd + 2);
-              buffer = buffer.slice(frameEnd + 2);
-
-              // Parse the frame to check runId and detect done events
-              const dataMatch = frame.match(/^data: (.+)$/m);
-              if (dataMatch && dataMatch[1] !== undefined) {
-                try {
-                  const parsed = JSON.parse(dataMatch[1]) as { runId?: string; status?: string };
-                  // Only forward events for this specific run
-                  if (parsed.runId !== undefined && parsed.runId !== runId) {
-                    continue;
-                  }
-                } catch {
-                  // Forward unparseable frames as-is
-                }
-              }
+            while (parseBuffer.includes('\n\n')) {
+              const frameEnd = parseBuffer.indexOf('\n\n');
+              const frame = parseBuffer.slice(0, frameEnd + 2);
+              parseBuffer = parseBuffer.slice(frameEnd + 2);
 
               // Skip comment lines (heartbeats from DO)
               if (frame.startsWith(':')) {
                 continue;
               }
 
-              enqueue(frame);
-
-              // Check for done event
+              // Check for done event — flush immediately and close
               if (frame.includes('event: done')) {
+                flushMicroBuffer();
+                enqueue(frame);
                 cleanup();
                 reader.releaseLock();
                 controller.close();
                 return;
               }
+
+              enqueueMicroBuffered(frame);
             }
           }
+
+          flushMicroBuffer();
 
           // DO stream ended without done — check terminal state and close
           const finalRun = await services.runService.getRun(env, session.userId, runId);

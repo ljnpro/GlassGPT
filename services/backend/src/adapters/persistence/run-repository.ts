@@ -75,6 +75,40 @@ export const findRunByIdForUser = async (
   return row ? mapRunRow(row) : null;
 };
 
+export interface RunStreamProjection {
+  readonly conversationId: string;
+  readonly id: string;
+  readonly processSnapshotJSON: string | null;
+  readonly stage: string | null;
+  readonly status: string;
+  readonly visibleSummary: string | null;
+}
+
+export const findRunStreamProjection = async (
+  env: BackendEnv,
+  runId: string,
+  userId: string,
+): Promise<RunStreamProjection | null> => {
+  const database = createBackendDatabase(env).raw;
+  const row = await database
+    .prepare(
+      `SELECT id,
+              conversation_id AS conversationId,
+              status,
+              stage,
+              visible_summary AS visibleSummary,
+              process_snapshot_json AS processSnapshotJSON
+         FROM runs
+        WHERE id = ?
+          AND user_id = ?
+        LIMIT 1`,
+    )
+    .bind(runId, userId)
+    .first<RunStreamProjection>();
+
+  return row ?? null;
+};
+
 export const listRunsForConversation = async (
   env: BackendEnv,
   conversationId: string,

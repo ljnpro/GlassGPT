@@ -77,12 +77,13 @@ package struct DataSharingConsentView: View {
         HStack(alignment: .top, spacing: 12) {
             Image(systemName: icon)
                 .font(.body)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Color.primary.opacity(0.65))
                 .frame(width: 24, alignment: .center)
                 .accessibilityHidden(true)
             Text(text)
                 .font(.subheadline)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Color.primary.opacity(0.65))
+                .lineLimit(nil)
                 .fixedSize(horizontal: false, vertical: true)
         }
     }

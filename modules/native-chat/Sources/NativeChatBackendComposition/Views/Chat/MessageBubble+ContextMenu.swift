@@ -42,9 +42,9 @@ extension MessageBubble {
         let payloadRenderDigest: String
         let liveContent: String?
         let liveThinking: String?
-        let activeToolCalls: [ToolCallInfo]
-        let liveCitations: [URLCitation]
-        let liveFilePathAnnotations: [FilePathAnnotation]
+        let toolCallDigest: String
+        let citationCount: Int
+        let annotationCount: Int
         let showsRecoveryIndicator: Bool
         let isLiveThinking: Bool
         let liveThinkingPresentationState: ThinkingPresentationState?

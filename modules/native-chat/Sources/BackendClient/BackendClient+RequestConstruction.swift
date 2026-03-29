@@ -73,7 +73,13 @@ extension BackendClient {
             throw BackendAPIError.conflict
         case 429:
             throw BackendAPIError.rateLimited
-        case 500 ... 599:
+        case 500, 502:
+            throw BackendAPIError.serverError
+        case 503:
+            throw BackendAPIError.serviceUnavailable
+        case 504:
+            throw BackendAPIError.timeout
+        case 501, 505 ... 599:
             throw BackendAPIError.serverError
         default:
             if !data.isEmpty, let errorSummary = String(data: data, encoding: .utf8) {

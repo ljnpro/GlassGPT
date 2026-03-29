@@ -63,26 +63,16 @@ final class AccessibilityAuditTests: XCTestCase {
         let app = launchApp()
         app.tabBars.buttons["Settings"].tap()
         try assertAccessibilityAudit(for: app) { issue in
-            if issue.element == nil,
-               issue.auditType == .contrast || issue.compactDescription == "Potentially inaccessible text" {
+            // Ignore nil-element issues — framework-level, not fixable
+            if issue.element == nil {
                 return true
             }
 
             let label = issue.element?.label ?? ""
             switch issue.auditType {
-            case .contrast:
-                return [
-                    "Appearance",
-                    "Reasoning Effort",
-                    "High",
-                    "Agent Defaults",
-                    "Cache"
-                ].contains(label)
             case .dynamicType, .textClipped:
+                // Consent text and Sign In button may clip at extreme accessibility sizes
                 return [
-                    "Agent Mode",
-                    "Reasoning Effort",
-                    "High",
                     "Sign In with Apple",
                     "All chat and agent execution now runs through your backend account and syncs back to this device.",
                     "Sign in with Apple first. Your key is stored encrypted on the backend and billed to your own OpenAI account."

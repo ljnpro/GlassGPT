@@ -27,6 +27,8 @@ package extension BackendChatController {
         }
     }
 
+    private static let maxStreamRetries = 3
+
     func streamOrPollRun(conversationServerID: String, runID: String, selectionToken: UUID) async {
         defer {
             if activeRunID == runID {
@@ -37,17 +39,28 @@ package extension BackendChatController {
             isStreaming = false
         }
 
-        do {
-            try await streamRun(
-                conversationServerID: conversationServerID,
-                runID: runID,
-                selectionToken: selectionToken
-            )
-            return
-        } catch is CancellationError {
-            return
-        } catch {
-            // Fall back to polling when SSE setup or transport fails.
+        for attempt in 0 ..< Self.maxStreamRetries {
+            do {
+                try await streamRun(
+                    conversationServerID: conversationServerID,
+                    runID: runID,
+                    selectionToken: selectionToken
+                )
+                return
+            } catch is CancellationError {
+                return
+            } catch {
+                if attempt < Self.maxStreamRetries - 1 {
+                    let backoff = pow(2.0, Double(attempt)) + Double.random(in: 0 ... 0.5)
+                    do {
+                        try await Task.sleep(for: .seconds(backoff))
+                    } catch {
+                        return
+                    }
+                    continue
+                }
+                // All stream retries exhausted — fall back to polling.
+            }
         }
 
         await pollRun(
@@ -65,20 +78,32 @@ package extension BackendChatController {
         let stream = client.streamRun(runID)
         beginChatStream()
 
+        let batcher = StreamEventBatcher<SSEEvent> { [weak self] batch in
+            try await self?.flushChatStreamBatch(batch, conversationServerID: conversationServerID)
+        }
+
         for try await event in stream {
             guard visibleSelectionToken == selectionToken, !Task.isCancelled else {
+                batcher.cancel()
                 break
             }
 
-            let outcome = try await handleChatStreamEvent(
-                event,
-                conversationServerID: conversationServerID
-            )
-            if outcome == .finish {
-                return
+            if event.event == "done" || event.event == "error" {
+                try await batcher.flushNow()
+                let outcome = try await handleChatStreamEvent(
+                    event,
+                    conversationServerID: conversationServerID
+                )
+                if outcome == .finish {
+                    batcher.cancel()
+                    return
+                }
+            } else {
+                batcher.enqueue(event)
             }
         }
 
+        batcher.cancel()
         await finishChatStreamAfterTermination(
             conversationServerID: conversationServerID,
             selectionToken: selectionToken

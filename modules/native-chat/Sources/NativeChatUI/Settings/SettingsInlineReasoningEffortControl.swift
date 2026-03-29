@@ -66,7 +66,9 @@ struct SettingsInlineReasoningEffortControl: View {
             Text(visibleEffortLabel(selectedEffort))
                 .font(.headline.weight(.semibold))
                 .foregroundStyle(.primary)
-                .minimumScaleFactor(0.85)
+                .lineLimit(2)
+                .minimumScaleFactor(0.75)
+                .fixedSize(horizontal: false, vertical: true)
 
             Image(systemName: "chevron.up.chevron.down")
                 .font(.caption.weight(.semibold))
