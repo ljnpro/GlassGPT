@@ -139,6 +139,7 @@ struct NativeChatAgentControllerCoverageTests {
             selectionToken: controller.visibleSelectionToken
         )
 
+        #expect(harness.client.fetchRunCallCount == 0)
         #expect(controller.messages.count == 2)
         #expect(controller.messages.last?.content == "Final synthesis body")
         #expect(controller.messages.last?.agentTrace != nil)

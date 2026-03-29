@@ -60,6 +60,16 @@ extension MessageBubble {
         )
     }
 
+    var shouldUseLightweightLiveContentRenderer: Bool {
+        guard message.role == .assistant, isDisplayingLiveAssistantState else {
+            return false
+        }
+        guard liveFilePathAnnotations.isEmpty else {
+            return false
+        }
+        return liveContent?.isEmpty == false
+    }
+
     private var bubbleMaxWidth: CGFloat {
         switch UIDevice.current.userInterfaceIdiom {
         case .pad:
@@ -199,12 +209,21 @@ extension MessageBubble {
     }
 
     private var assistantBubble: some View {
-        MarkdownContentView(
-            text: displayedContent,
-            filePathAnnotations: displayedFilePathAnnotations,
-            onSandboxLinkTap: onSandboxLinkTap,
-            surfaceStyle: .assistant(isLive: isDisplayingLiveAssistantState)
-        )
+        Group {
+            if shouldUseLightweightLiveContentRenderer {
+                StreamingTextView(
+                    text: displayedContent,
+                    allowsSelection: false
+                )
+            } else {
+                MarkdownContentView(
+                    text: displayedContent,
+                    filePathAnnotations: displayedFilePathAnnotations,
+                    onSandboxLinkTap: onSandboxLinkTap,
+                    surfaceStyle: .assistant(isLive: isDisplayingLiveAssistantState)
+                )
+            }
+        }
         .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("chat.assistant.surface")

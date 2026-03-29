@@ -14,6 +14,10 @@ private struct StatusPayload: Decodable {
     let visibleSummary: String?
 }
 
+private struct StagePayload: Decodable {
+    let visibleSummary: String?
+}
+
 private struct ToolCallPayload: Decodable {
     let toolCall: ToolCallInfo
 }
@@ -68,7 +72,9 @@ package extension BackendChatController {
             return .continueLoop
         case "status":
             applyChatStatus(from: event)
-            try await refreshVisibleProjection()
+            return .continueLoop
+        case "stage":
+            applyChatStage(from: event)
             return .continueLoop
         case "done":
             try await finalizeChatStream(conversationServerID: conversationServerID)
@@ -77,7 +83,6 @@ package extension BackendChatController {
             errorMessage = event.data
             return .finish
         default:
-            try await refreshVisibleProjection()
             return .continueLoop
         }
     }
@@ -132,6 +137,18 @@ package extension BackendChatController {
         if currentThinkingText.isEmpty {
             currentThinkingText = summary
         }
+        isThinking = true
+    }
+
+    func applyChatStage(from event: SSEEvent) {
+        guard let payload = decodeChatPayload(event, as: StagePayload.self),
+              let summary = payload.visibleSummary,
+              !summary.isEmpty
+        else {
+            return
+        }
+
+        currentThinkingText = summary
         isThinking = true
     }
 

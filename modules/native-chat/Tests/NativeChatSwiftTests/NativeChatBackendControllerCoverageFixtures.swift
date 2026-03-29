@@ -49,13 +49,15 @@ func makeChatConversationDetailSnapshot(
     runID: String,
     assistantContent: String
 ) throws -> ConversationDetailDTO {
-    ConversationDetailDTO(
+    let baseTime = Date(timeIntervalSince1970: 1_000)
+    let assistantTime = baseTime.addingTimeInterval(1)
+    return ConversationDetailDTO(
         conversation: ConversationDTO(
             id: conversationID,
             title: "Chat Thread",
             mode: .chat,
-            createdAt: .now,
-            updatedAt: .now,
+            createdAt: baseTime,
+            updatedAt: assistantTime,
             lastRunID: runID,
             lastSyncCursor: "cur_final"
         ),
@@ -66,8 +68,8 @@ func makeChatConversationDetailSnapshot(
                 role: .user,
                 content: "Question",
                 thinking: nil,
-                createdAt: .now,
-                completedAt: .now,
+                createdAt: baseTime,
+                completedAt: baseTime,
                 serverCursor: "cur_user",
                 runID: nil,
                 annotations: nil,
@@ -81,8 +83,8 @@ func makeChatConversationDetailSnapshot(
                 role: .assistant,
                 content: assistantContent,
                 thinking: nil,
-                createdAt: .now,
-                completedAt: .now,
+                createdAt: assistantTime,
+                completedAt: assistantTime,
                 serverCursor: "cur_assistant",
                 runID: runID,
                 annotations: [URLCitationDTO(
@@ -119,13 +121,15 @@ func makeAgentConversationDetailSnapshot(
     runID: String,
     assistantContent: String
 ) throws -> ConversationDetailDTO {
-    try ConversationDetailDTO(
+    let baseTime = Date(timeIntervalSince1970: 2_000)
+    let assistantTime = baseTime.addingTimeInterval(1)
+    return try ConversationDetailDTO(
         conversation: ConversationDTO(
             id: conversationID,
             title: "Agent Run",
             mode: .agent,
-            createdAt: .now,
-            updatedAt: .now,
+            createdAt: baseTime,
+            updatedAt: assistantTime,
             lastRunID: runID,
             lastSyncCursor: "cur_agent_final"
         ),
@@ -136,8 +140,8 @@ func makeAgentConversationDetailSnapshot(
                 role: .user,
                 content: "Run the council",
                 thinking: nil,
-                createdAt: .now,
-                completedAt: .now,
+                createdAt: baseTime,
+                completedAt: baseTime,
                 serverCursor: "cur_agent_user",
                 runID: nil,
                 annotations: nil,
@@ -151,8 +155,8 @@ func makeAgentConversationDetailSnapshot(
                 role: .assistant,
                 content: assistantContent,
                 thinking: nil,
-                createdAt: .now,
-                completedAt: .now,
+                createdAt: assistantTime,
+                completedAt: assistantTime,
                 serverCursor: "cur_agent_assistant",
                 runID: runID,
                 annotations: [URLCitationDTO(
@@ -307,6 +311,14 @@ func makeAgentSuccessStreamEvents() throws -> [SSEEvent] {
         SSEEvent(
             event: "status",
             data: makeJSONString(["visibleSummary": "Synthesizing final answer"]),
+            id: nil
+        ),
+        SSEEvent(
+            event: "stage",
+            data: makeJSONString([
+                "stage": "final_synthesis",
+                "visibleSummary": "Synthesizing final answer"
+            ]),
             id: nil
         ),
         SSEEvent(

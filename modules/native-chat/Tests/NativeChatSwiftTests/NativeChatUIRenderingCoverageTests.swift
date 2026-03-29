@@ -104,6 +104,24 @@ struct NativeChatUIRenderingCoverageTests {
     }
 
     @Test func `message bubble surfaces render live and attachment states`() throws {
+        let lightweightLiveBubble = MessageBubble(
+            message: makeBackendMessageSurface(
+                role: .assistant,
+                content: "Assistant body",
+                isComplete: false,
+                includeTrace: false
+            ),
+            liveContent: "Streaming content",
+            liveThinking: "Live thinking",
+            activeToolCalls: [],
+            liveCitations: [],
+            liveFilePathAnnotations: [],
+            isLiveThinking: true,
+            liveThinkingPresentationState: .reasoning
+        )
+        #expect(lightweightLiveBubble.shouldUseLightweightLiveContentRenderer)
+        hostView(lightweightLiveBubble)
+
         hostView(
             MessageBubble(
                 message: makeBackendMessageSurface(

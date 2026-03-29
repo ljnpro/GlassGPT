@@ -2058,3 +2058,72 @@
 
 ## Immediate Next Actions
 1. None. `5.1.2 (20213)` has been deployed and published successfully.
+
+## Post-5.1.2 Streaming Smoothness Investigation
+- Investigation started:
+  - `2026-03-29T01:45:46Z`
+- User-reported symptom:
+  - active streaming is visible, but updates arrive in visually chunky bursts every few seconds instead of the old `stable-4.12` smooth token flow
+- Verified findings:
+  - the active-run transport path is real SSE, not periodic polling:
+    - iOS uses `URLSession.bytes(for:)` in `BackendSSEStream`
+    - controllers attempt `streamRun()` first and only poll on thrown transport/setup failure
+    - backend `/v1/runs/:id/stream` is a real SSE route relaying Durable Object frames
+  - therefore the symptom is not “backend only polls every few seconds”; the primary issue is in the rendering/update chain
+- Confirmed root-cause candidates:
+  1. draft-message streaming currently routes through the heavy assistant `MessageBubble` rendering path, which uses `MarkdownContentView`
+     - this is materially heavier than the old `stable-4.12` detached live bubble path that used lightweight `StreamingTextView`
+     - once a live draft assistant message exists, detached streaming bubble display is suppressed
+  2. chat/agent stream handlers do not explicitly handle `stage` events
+     - `stage` currently falls through the `default` branch and triggers full projection refresh work instead of a light in-memory process update
+  3. `status` events currently trigger projection refresh work during the live stream
+     - this can contend with high-frequency visible text updates on the main actor
+  4. backend projection persistence intentionally flushes text deltas in chunks
+     - chat flush threshold is content-length based
+     - agent stage-stream flush threshold is chunk-count based
+     - this is acceptable for persisted projection, but any UI path that depends on those flushes will feel chunky
+- Stable 4.12 comparison:
+  - old local-runtime flow felt smooth because the visible live surface stayed on the detached streaming bubble + `StreamingTextView` path for streaming text
+  - new backend path is architecturally correct but currently loses that smoothness once streaming content is hosted inside the heavier assistant message surface
+- Active remediation goals:
+  1. restore a lightweight rendering path for live draft assistant text inside the transcript
+  2. stop treating `stage` events as “refresh everything” events
+  3. reduce heavy projection refresh work during an otherwise healthy SSE session
+  4. preserve the complete backend-owned architecture while restoring `stable-4.12`-class visible smoothness
+
+## 5.1.3 Streaming Smoothness Fix In Progress
+- Release target:
+  - marketing version: `5.1.3`
+  - build number: `20214`
+- Implemented changes so far:
+  - transcript-hosted live assistant content now has a lightweight rendering path
+    - `MessageBubble` now uses `StreamingTextView` for live assistant text when live content is present and there are no live file-path annotations
+    - this restores the old `stable-4.12` streaming advantage even when a live draft message has already attached to the transcript
+  - chat `status` and `stage` events no longer trigger heavy projection refresh work during a healthy SSE session
+  - agent `status` and `stage` events now apply lightweight in-memory live state updates instead of forcing refresh/fetch behavior during the stream
+  - agent `stage` now updates visible activity/status directly so stage transitions do not fall through the expensive unknown-event path
+- Regression tests added/updated:
+  - stream success paths now assert no fallback `fetchRun()` traffic on healthy SSE
+  - agent success stream fixtures now include explicit `stage` events
+  - rendering coverage now asserts the lightweight live renderer path for transcript-hosted streaming text
+  - conversation detail fixtures now use deterministic timestamps so assistant/user ordering is stable and not accidentally flaky
+- Validation status:
+  - `./scripts/ci_ios.sh package-tests`
+    - passed
+    - log:
+      - `.local/build/ci/nativechat-package-tests.log`
+    - integrity:
+      - `Skipped-test check passed.`
+      - `Required UI suite integrity passed for 20 test cases.`
+  - `./scripts/ci_ios.sh app-tests,ui-tests`
+    - passed
+    - logs:
+      - `.local/build/ci/glassgpt-unit-tests.log`
+      - all `.local/build/ci/glassgpt-ui-*.log`
+    - integrity:
+      - `Skipped-test check passed.`
+      - `Required UI suite integrity passed for 20 test cases.`
+- Next concrete step:
+  - run backend/contracts/release-readiness validation for the release candidate commit
+  - deploy backend
+  - publish `5.1.3 (20214)` with the release wrapper and manually inspect all release logs

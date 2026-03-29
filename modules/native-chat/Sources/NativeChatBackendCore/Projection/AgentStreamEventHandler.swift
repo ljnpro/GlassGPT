@@ -1,4 +1,5 @@
 import BackendClient
+import BackendContracts
 import ChatDomain
 import ChatProjectionPersistence
 import Foundation
@@ -12,6 +13,11 @@ private struct ThinkingDeltaPayload: Decodable {
 }
 
 private struct StatusPayload: Decodable {
+    let visibleSummary: String?
+}
+
+private struct StagePayload: Decodable {
+    let stage: AgentStageDTO?
     let visibleSummary: String?
 }
 
@@ -83,7 +89,10 @@ package extension BackendAgentController {
             applyAgentTaskUpdate(from: event)
             return .continueLoop
         case "status":
-            try await applyAgentStatus(from: event, runID: runID)
+            applyAgentStatus(from: event)
+            return .continueLoop
+        case "stage":
+            applyAgentStage(from: event)
             return .continueLoop
         case "done":
             try await finalizeAgentStream(conversationServerID: conversationServerID)
@@ -92,7 +101,6 @@ package extension BackendAgentController {
             errorMessage = event.data
             return .finish
         default:
-            try await refreshAgentProjection()
             return .continueLoop
         }
     }
@@ -163,7 +171,7 @@ package extension BackendAgentController {
         processSnapshot = snapshot
     }
 
-    func applyAgentStatus(from event: SSEEvent, runID: String) async throws {
+    func applyAgentStatus(from event: SSEEvent) {
         guard let payload = decodeAgentPayload(event, as: StatusPayload.self),
               let summary = payload.visibleSummary
         else {
@@ -174,19 +182,34 @@ package extension BackendAgentController {
             currentThinkingText = summary
         }
         isThinking = true
+        processSnapshot.leaderLiveSummary = summary
+        if processSnapshot.leaderLiveStatus.isEmpty {
+            processSnapshot.leaderLiveStatus = summary
+        }
+        if processSnapshot.currentFocus.isEmpty {
+            processSnapshot.currentFocus = summary
+        }
+        processSnapshot.updatedAt = .now
+    }
 
-        try await refreshAgentProjection()
+    func applyAgentStage(from event: SSEEvent) {
+        guard let payload = decodeAgentPayload(event, as: StagePayload.self) else {
+            return
+        }
 
-        let run = try await client.fetchRun(runID)
-        lastRunSummary = run
-        let synthesizedSnapshot = BackendConversationSupport.processSnapshot(
-            for: run,
-            progressLabel: summary
-        )
-        processSnapshot = mergeAgentProcessSnapshot(
-            existing: processSnapshot,
-            synthesized: synthesizedSnapshot
-        )
+        if let stage = payload.stage {
+            processSnapshot.activity = processActivity(for: stage)
+            processSnapshot.leaderLiveStatus = stageStatusLabel(for: stage)
+        }
+
+        if let summary = payload.visibleSummary, !summary.isEmpty {
+            processSnapshot.leaderLiveSummary = summary
+            if processSnapshot.currentFocus.isEmpty {
+                processSnapshot.currentFocus = summary
+            }
+        }
+
+        processSnapshot.updatedAt = .now
     }
 
     func refreshAgentProjection() async throws {
@@ -233,6 +256,32 @@ package extension BackendAgentController {
             return try decoder.decode(Payload.self, from: payloadData)
         } catch {
             return nil
+        }
+    }
+
+    private func processActivity(for stage: AgentStageDTO) -> AgentProcessActivity {
+        switch stage {
+        case .leaderPlanning:
+            return .triage
+        case .workerWave:
+            return .delegation
+        case .leaderReview:
+            return .reviewing
+        case .finalSynthesis:
+            return .synthesis
+        }
+    }
+
+    private func stageStatusLabel(for stage: AgentStageDTO) -> String {
+        switch stage {
+        case .leaderPlanning:
+            return "Leader planning"
+        case .workerWave:
+            return "Workers running"
+        case .leaderReview:
+            return "Leader review"
+        case .finalSynthesis:
+            return "Final synthesis"
         }
     }
 }

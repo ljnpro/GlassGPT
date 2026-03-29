@@ -164,6 +164,7 @@ struct NativeChatChatControllerCoverageTests {
             selectionToken: controller.visibleSelectionToken
         )
 
+        #expect(harness.client.fetchRunCallCount == 0)
         #expect(controller.messages.count == 2)
         #expect(controller.messages.last?.content == "Alpha Beta")
         #expect(controller.currentStreamingText.isEmpty)
