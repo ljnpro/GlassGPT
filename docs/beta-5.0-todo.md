@@ -1967,3 +1967,94 @@
   - manual log review performed across the final iOS, UI, reinstall, and report artifacts
 - Next active phase:
   - `Phase 6: deploy backend with deploy_backend.sh, verify production health/stream behavior, release TestFlight 5.1.2 (20213) with release_testflight.sh, inspect release logs manually, and validate on-device`
+
+## 5.1.2 Release Sprint Phase List
+1. `Phase 1: audit stable 4.12 display behavior and current 5.1.2 streaming gaps across chat, agent, reasoning, tool bubbles, citations, and file annotations`
+2. `Phase 2: repair chat visible token streaming, draft assistant lifecycle, and non-duplicating completion behavior`
+3. `Phase 3: repair agent full-process streaming, including stage visibility, task-board movement, recent updates, reasoning, tool-call bubbles, citations, file annotations, and final synthesis tokens`
+4. `Phase 4: harden SSE transport semantics, projection convergence, reconnect behavior, and fallback correctness`
+5. `Phase 5: run full CI and manual log review, including at least one version-final UI-inclusive iOS baseline and strict backend/contracts/release-readiness lanes`
+6. `Phase 6: deploy backend, verify production health/stream behavior, publish TestFlight 5.1.2 (20213), and manually inspect release artifacts/logs`
+
+## 5.1.2 Release Sprint Status
+- `Phase 1` completed
+- `Phase 2` completed
+- `Phase 3` completed
+- `Phase 4` completed
+- `Phase 5` completed
+- `Phase 6` completed
+
+## 5.1.2 Sprint Highlights
+- Re-audited the pre-backend stable `4.12` display model to preserve the intended user-facing streaming semantics:
+  - visible incremental assistant text
+  - visible reasoning/status surface
+  - visible tool-call and related process bubbles
+  - non-jumping completion handoff
+- Kept the backend-owned 5.x architecture, but restored the user-visible streaming behavior to the same or better product standard across:
+  - Chat assistant text
+  - Agent stage/process activity
+  - Agent reasoning/process cards
+  - tool-call/process bubbles
+  - citations
+  - file-path annotations
+  - final synthesis text
+- Preserved the 5.x projection architecture while closing the visible-streaming gaps that previously made completed answers appear to jump in all at once.
+
+## 5.1.2 Phase 6 Completion
+- Backend deployment:
+  - command:
+    - `./scripts/deploy_backend.sh`
+  - result:
+    - passed
+  - deployed worker:
+    - `https://glassgpt-beta-5-0.glassgpt.workers.dev`
+  - version id:
+    - `cc8039be-3af9-4bb5-9074-b8f90c48cf21`
+  - workflow bindings live:
+    - `glassgpt-chat-run`
+    - `glassgpt-agent-run`
+  - migration evidence:
+    - `.local/build/backend-migrations.log`
+    - applied:
+      - `0005_add_live_message_and_process_payloads.sql`
+  - deploy evidence:
+    - `.local/build/backend-deploy.log.preflight`
+    - `.local/build/backend-deploy.log`
+  - manual review result:
+    - dry-run, migration, and deploy logs reviewed directly
+    - no warnings, no errors, no hidden failure markers
+- Production health verification:
+  - `GET /healthz`
+    - returned `{"ok":true}`
+  - `GET /v1/connection/check`
+    - returned backend healthy and SSE healthy
+- TestFlight release:
+  - command:
+    - `./scripts/release_testflight.sh 5.1.2 20213 --branch feature/beta-5.0-cloudflare-all-in --skip-main-promotion`
+  - result:
+    - passed
+  - uploaded build:
+    - `5.1.2 (20213)`
+  - delivery UUID:
+    - `a40bf10e-faf5-4a55-8984-e8cb251637a3`
+  - pushed refs:
+    - branch `feature/beta-5.0-cloudflare-all-in`
+    - annotated tag `v5.1.2`
+  - release evidence:
+    - `.local/build/archive-5.1.2.log`
+    - `.local/build/export-5.1.2.log`
+    - `.local/build/export-5.1.2/Packaging.log`
+    - `.local/build/upload-5.1.2.log`
+  - manual review result:
+    - archive log reviewed: `** ARCHIVE SUCCEEDED **`
+    - export log reviewed: `** EXPORT SUCCEEDED **`
+    - packaging log reviewed: `Distribution packaging completed successfully.`
+    - upload log reviewed: `UPLOAD SUCCEEDED`
+    - no warnings, no errors, no hidden failure markers
+
+## Current Risks
+- No known blocking release risks remain for `5.1.2 (20213)`.
+- Any future follow-up should start from the shipped `5.1.2` baseline rather than reopening legacy `5.0.0` assumptions.
+
+## Immediate Next Actions
+1. None. `5.1.2 (20213)` has been deployed and published successfully.
