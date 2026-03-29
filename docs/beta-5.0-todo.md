@@ -2139,3 +2139,76 @@
   - commit the final `5.1.3 (20214)` candidate state
   - publish `5.1.3 (20214)` with the release wrapper using the already-validated CI/UI baseline
   - manually inspect archive/export/upload logs after publication
+
+## 5.1.3 Release Completion
+- Candidate commits:
+  - `0a06efe`
+    - `Improve streaming smoothness for 5.1.3`
+  - `b6d02eb`
+    - `Finalize 5.1.3 release candidate`
+- Backend deploy:
+  - command:
+    - `./scripts/deploy_backend.sh`
+  - result:
+    - passed
+  - worker:
+    - `glassgpt-beta-5-0`
+  - url:
+    - `https://glassgpt-beta-5-0.glassgpt.workers.dev`
+  - version id:
+    - `5016a2ed-f406-481f-8c54-8e6291ebf080`
+  - migration status:
+    - no pending D1 migrations remained
+  - log:
+    - `.local/build/backend-deploy.log`
+- Final release strategy:
+  - `5.1.3` already had:
+    - green `package-tests`
+    - green `app-tests`
+    - green 20/20 UI baseline
+    - green backend lane
+    - green contracts lane
+    - green `release-readiness`
+  - after that point, only non-UI changes remained:
+    - formatting compliance
+    - non-UI stream handler cleanup
+    - final version/build update
+  - therefore the final TestFlight publication used:
+    - `./scripts/release_testflight.sh 5.1.3 20214 --branch feature/beta-5.0-cloudflare-all-in --skip-main-promotion --skip-ci`
+  - note:
+    - `release-readiness` still ran inside the wrapper before archive/export/upload
+    - full CI was intentionally not rerun because the already-green UI baseline remained valid and no later UI-behavior changes were introduced
+- TestFlight publication:
+  - result:
+    - passed
+  - uploaded build:
+    - `5.1.3 (20214)`
+  - delivery UUID:
+    - `f8018154-c70b-42f6-ac32-9ab86b01342a`
+  - pushed branch:
+    - `feature/beta-5.0-cloudflare-all-in`
+    - remote commit: `b6d02ebdb8331c45e560360b3c725bf6301ac463`
+  - pushed tag:
+    - `v5.1.3`
+    - remote ref: `55655d2ba514d916f94b1bbfc1bc4260e85916e0`
+- Manual release-log review:
+  - archive:
+    - `.local/build/archive-5.1.3.log`
+    - reviewed result:
+      - `** ARCHIVE SUCCEEDED **`
+  - export:
+    - `.local/build/export-5.1.3.log`
+    - reviewed result:
+      - `** EXPORT SUCCEEDED **`
+  - packaging:
+    - `.local/build/export-5.1.3/Packaging.log`
+    - reviewed result:
+      - `Distribution packaging completed successfully.`
+  - upload:
+    - `.local/build/upload-5.1.3.log`
+    - reviewed result:
+      - `UPLOAD SUCCEEDED`
+      - `Delivery UUID: f8018154-c70b-42f6-ac32-9ab86b01342a`
+- Final state:
+  - `5.1.3 (20214)` is deployed and published
+  - worktree should be returned to clean after recording this ledger update
