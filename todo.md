@@ -175,7 +175,7 @@
 - ID: `REL-001`
   - Priority: `release-gate`
   - Owner: `Codex`
-  - Status: `in_progress`
+  - Status: `completed`
   - Depends On: `all implementation tasks`
   - Categories: `CI/CD Pipeline, Release Management, Operational Maturity`
   - Exit Criteria: Full final CI run achieves `0 error`, `0 warning`, `0 skipped`, and `0 avoidable noise`; backend/TestFlight publish remain blocked until this evidence exists.
