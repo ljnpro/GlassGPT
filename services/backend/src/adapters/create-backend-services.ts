@@ -3,6 +3,7 @@ import { createAuthService } from '../application/auth-service.js';
 import { createChatRunService } from '../application/chat-run-service.js';
 import { createConversationService } from '../application/conversation-service.js';
 import { createCredentialService } from '../application/credential-service.js';
+import { createFileProxySupport } from '../application/file-proxy-support.js';
 import { createRateLimitService } from '../application/rate-limit-service.js';
 import { createRunService } from '../application/run-service.js';
 import { createSyncService } from '../application/sync-service.js';
@@ -161,6 +162,10 @@ export const createBackendServices = () => {
     }),
     agentRunService,
     chatRunService,
+    fileProxySupport: createFileProxySupport({
+      decryptSecret,
+      findProviderCredential,
+    }),
     rateLimitService,
     syncService: createSyncService({
       listRunEventsForUser,

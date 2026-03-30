@@ -1,24 +1,15 @@
-import { findProviderCredential } from '../../adapters/persistence/provider-credential-repository.js';
-import { decryptSecret } from '../../adapters/security/credential-encryption.js';
-import { ApplicationError } from '../../application/errors.js';
+import type { FileProxySupport } from '../../application/file-proxy-support.js';
 import { logError, sanitizeLogValue } from '../../observability/logger.js';
 import { requireAuthenticatedSession } from '../require-authenticated-session.js';
 import { asBackendRuntimeContext } from '../runtime-context.js';
 import type { BackendServices } from '../services.js';
 import type { BackendApp } from '../types.js';
 
-const loadApiKey = async (
-  env: Parameters<typeof findProviderCredential>[0],
-  userId: string,
-): Promise<string> => {
-  const credential = await findProviderCredential(env, userId, 'openai');
-  if (!credential || credential.status !== 'valid') {
-    throw new ApplicationError('forbidden', 'openai_credential_unavailable');
-  }
-  return decryptSecret(env, credential);
-};
-
-export const installFileRoutes = (app: BackendApp, services: BackendServices): void => {
+export const installFileRoutes = (
+  app: BackendApp,
+  services: BackendServices,
+  fileProxySupport: FileProxySupport,
+): void => {
   // Upload a file to OpenAI via the backend (proxies multipart form data)
   app.post('/v1/files/upload', async (context) => {
     const session = await requireAuthenticatedSession(context, services);
@@ -32,7 +23,7 @@ export const installFileRoutes = (app: BackendApp, services: BackendServices): v
       return context.json({ error: 'file_required' }, 400);
     }
 
-    const apiKey = await loadApiKey(env, session.userId);
+    const apiKey = await fileProxySupport.loadApiKey(env, session.userId);
 
     const openAIForm = new FormData();
     openAIForm.append('file', file, file.name);
@@ -68,7 +59,7 @@ export const installFileRoutes = (app: BackendApp, services: BackendServices): v
     const fileId = context.req.param('fileId');
     const containerId = context.req.query('container_id') ?? null;
 
-    const apiKey = await loadApiKey(env, session.userId);
+    const apiKey = await fileProxySupport.loadApiKey(env, session.userId);
 
     const urls = containerId
       ? [

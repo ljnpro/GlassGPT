@@ -3,6 +3,7 @@ import type { AuthService } from '../application/auth-service.js';
 import type { ChatRunService } from '../application/chat-run-types.js';
 import type { ConversationService } from '../application/conversation-service.js';
 import type { CredentialService } from '../application/credential-service.js';
+import type { FileProxySupport } from '../application/file-proxy-support.js';
 import type { RateLimitService } from '../application/rate-limit-service.js';
 import type { RunService } from '../application/run-service.js';
 import type { SyncService } from '../application/sync-service.js';
@@ -15,6 +16,7 @@ export interface BackendServices {
   readonly chatRunService: ChatRunService;
   readonly conversationService: ConversationService;
   readonly credentialService: CredentialService;
+  readonly fileProxySupport: FileProxySupport;
   readonly rateLimitService: RateLimitService;
   readonly runService: RunService;
   readonly syncService: SyncService;

@@ -69,7 +69,7 @@ export const createApp = (services: BackendServices): BackendApp => {
   installRunStreamRoutes(app, services);
   installSyncRoutes(app, services);
   installArtifactRoutes(app, services);
-  installFileRoutes(app, services);
+  installFileRoutes(app, services, services.fileProxySupport);
 
   app.notFound((context) => {
     return context.json(errorResponseSchema.parse({ error: 'not_found' }), 404);

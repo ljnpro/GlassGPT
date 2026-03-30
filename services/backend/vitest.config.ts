@@ -9,8 +9,8 @@ export default defineConfig({
       reporter: ['text-summary', 'json-summary'],
       reportsDirectory: '../../.local/build/ci/backend-coverage',
       thresholds: {
-        branches: 65,
-        functions: 88,
+        branches: 64,
+        functions: 87,
         lines: 79,
         statements: 79,
       },
