@@ -412,6 +412,19 @@ export async function* createStreamingResponse(
         if (!parsedLine) {
           if (line === '' && eventData.length > 0) {
             if (eventData === '[DONE]') {
+              // OpenAI may send [DONE] without a preceding response.completed
+              // event.  Yield a synthetic completed event so the consumer can
+              // flush pending state and persist the full content.
+              if (currentOutputText.length > 0) {
+                yield {
+                  citations,
+                  filePathAnnotations,
+                  kind: 'completed' as const,
+                  outputText: currentOutputText,
+                  thinkingText: currentThinkingText || null,
+                  toolCalls,
+                };
+              }
               return;
             }
 
