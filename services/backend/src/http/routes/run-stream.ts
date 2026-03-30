@@ -7,8 +7,8 @@ import type { BackendServices } from '../services.js';
 import type { BackendApp } from '../types.js';
 
 const SSE_HEARTBEAT_INTERVAL_MS = 5_000;
-const MICRO_BUFFER_MAX_BYTES = 0;
-const MICRO_BUFFER_FLUSH_MS = 0;
+const MICRO_BUFFER_MAX_BYTES = 1024;
+const MICRO_BUFFER_FLUSH_MS = 50;
 const REALTIME_STREAM_UNAVAILABLE = 'realtime_stream_unavailable';
 const REALTIME_STREAM_RETRY_MESSAGE = 'Realtime stream became unavailable. Please retry.';
 const processSnapshotTaskEnvelopeSchema = z.object({
@@ -385,16 +385,11 @@ export const installRunStreamRoutes = (app: BackendApp, services: BackendService
       },
     });
 
-    // @ts-expect-error -- encodeBody is a Cloudflare-specific Response option
-    // that prevents the Workers runtime from compressing the response body.
-    // Without this, CF edge may gzip/brotli-buffer the entire SSE stream.
     return new Response(stream, {
-      encodeBody: 'manual',
       headers: {
-        'Cache-Control': 'no-cache, no-transform',
+        'Cache-Control': 'no-cache',
         Connection: 'keep-alive',
         'Content-Type': 'text/event-stream',
-        'X-Accel-Buffering': 'no',
       },
     });
   });

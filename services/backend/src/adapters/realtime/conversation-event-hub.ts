@@ -101,7 +101,7 @@ export class ConversationEventHub extends DurableObject<Env> {
               heartbeatTimer = null;
             }
           }
-        }, 100);
+        }, 500);
       },
       cancel: (controller) => {
         if (heartbeatTimer !== null) {
