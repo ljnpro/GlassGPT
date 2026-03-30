@@ -177,6 +177,14 @@ export const createAgentRunExecutionOperations = (
         run: completedRun,
         syncMessageCursor: false,
       });
+      try {
+        await deps.broadcastStreamDelta(env, activeContext.conversation.id, {
+          type: 'done',
+          data: { runId: input.runId, status: 'completed' },
+        });
+      } catch {
+        // Best-effort broadcast; run is already persisted as completed.
+      }
     },
 
     executeFinalSynthesis: async (env, input) => {
@@ -855,6 +863,14 @@ export const createAgentRunExecutionOperations = (
         run: failedRun,
         syncMessageCursor: false,
       });
+      try {
+        await deps.broadcastStreamDelta(env, activeContext.conversation.id, {
+          type: 'done',
+          data: { runId: input.runId, status: 'failed' },
+        });
+      } catch {
+        // Best-effort broadcast; run is already persisted as failed.
+      }
     },
 
     startQueuedRun: async (env, input) => {

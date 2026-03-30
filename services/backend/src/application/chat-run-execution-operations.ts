@@ -155,6 +155,11 @@ export const createChatRunExecutionOperations = (
           if (streamEventCount % 20 === 0) {
             const latestRun = await deps.findRunById(env, run.id);
             if (latestRun?.status === 'cancelled') {
+              deltaDispatcher.enqueue({
+                type: 'done',
+                data: { runId: run.id, status: 'cancelled' },
+              });
+              await deltaDispatcher.flush();
               return;
             }
           }
@@ -320,6 +325,14 @@ export const createChatRunExecutionOperations = (
           run: failedRun,
           syncMessageCursor: false,
         });
+        try {
+          await deps.broadcastStreamDelta(env, conversation.id, {
+            type: 'done',
+            data: { runId: run.id, status: 'failed' },
+          });
+        } catch {
+          // Best-effort broadcast; run is already persisted as failed.
+        }
       }
     },
   };
