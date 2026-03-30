@@ -51,7 +51,13 @@ package extension BackendConversationRunStreamDriving {
         }
     }
 
-    /// Attempts a live SSE stream first, then falls back to polling if needed.
+    /// Polls the backend at high frequency for run progress.
+    ///
+    /// SSE streaming through Cloudflare's multi-layer infrastructure
+    /// (Workflow → Durable Object → Worker relay → CF edge) introduces
+    /// opaque buffering that prevents real-time token delivery.
+    /// High-frequency polling (250ms) against the persisted conversation
+    /// state provides reliable, predictable update cadence.
     func streamOrPollRun(conversationServerID: String, runID: String, selectionToken: UUID) async {
         defer {
             if activeRunID == runID {
@@ -62,21 +68,10 @@ package extension BackendConversationRunStreamDriving {
             isThinking = false
             isRunActive = false
         }
-        await runStreamWithRetryAndPolling(
-            stream: {
-                try await streamRun(
-                    conversationServerID: conversationServerID,
-                    runID: runID,
-                    selectionToken: selectionToken
-                )
-            },
-            poll: {
-                await pollRun(
-                    conversationServerID: conversationServerID,
-                    runID: runID,
-                    selectionToken: selectionToken
-                )
-            }
+        await pollRun(
+            conversationServerID: conversationServerID,
+            runID: runID,
+            selectionToken: selectionToken
         )
     }
 
@@ -129,21 +124,6 @@ package extension BackendConversationRunStreamDriving {
             }
         )
 
-        // Parallel polling task refreshes persisted content every 2 seconds
-        // as a fallback when SSE events are buffered by intermediary infra.
-        let pollingFallback = Task { @MainActor [weak self] in
-            while !Task.isCancelled {
-                do { try await Task.sleep(for: .seconds(2)) } catch { break }
-                guard let self, visibleSelectionToken == selectionToken else { break }
-                do {
-                    try await refreshVisibleConversation()
-                } catch {
-                    // Best-effort; SSE is the primary path.
-                }
-            }
-        }
-        defer { pollingFallback.cancel() }
-
         for try await event in stream {
             if let eventID = event.id, !eventID.isEmpty {
                 lastStreamEventID = eventID
@@ -181,12 +161,17 @@ package extension BackendConversationRunStreamDriving {
         runID: String,
         selectionToken: UUID
     ) async {
-        var backoffSeconds: TimeInterval = 1
-        let maxBackoff: TimeInterval = 15
+        let pollInterval: Duration = .milliseconds(250)
+        var consecutiveErrors = 0
+        let maxConsecutiveErrors = 10
 
         while !Task.isCancelled {
             do {
-                try await loader.applyIncrementalSync()
+                try await Task.sleep(for: pollInterval)
+            } catch {
+                break
+            }
+            do {
                 guard visibleSelectionToken == selectionToken else {
                     break
                 }
@@ -196,17 +181,15 @@ package extension BackendConversationRunStreamDriving {
                 if run.status == .completed || run.status == .failed || run.status == .cancelled {
                     break
                 }
-                backoffSeconds = 1
+                consecutiveErrors = 0
             } catch is CancellationError {
                 break
             } catch {
-                errorMessage = error.localizedDescription
-                backoffSeconds = min(backoffSeconds * 2, maxBackoff)
-            }
-            do {
-                try await Task.sleep(for: .seconds(backoffSeconds))
-            } catch {
-                break
+                consecutiveErrors += 1
+                if consecutiveErrors >= maxConsecutiveErrors {
+                    errorMessage = error.localizedDescription
+                    break
+                }
             }
         }
 

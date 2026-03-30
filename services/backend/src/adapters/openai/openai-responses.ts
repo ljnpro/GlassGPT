@@ -171,7 +171,10 @@ const buildInputMessages = (
   }
 
   return input.map((message) => ({
-    content: [{ text: message.content, type: 'input_text' }],
+    content:
+      message.role === 'assistant'
+        ? [{ text: message.content, type: 'output_text' as const }]
+        : [{ text: message.content, type: 'input_text' as const }],
     role: message.role,
   }));
 };

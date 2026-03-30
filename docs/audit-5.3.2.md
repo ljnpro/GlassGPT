@@ -50,6 +50,34 @@ updates were not reaching the iOS client in real time.
 - `Sources/NativeChatBackendCore/Projection/BackendConversationRunStreamDriver.swift`:
   `finishRunStreamAfterTermination` also applies streaming fallback.
 
+## Architectural Decision: SSE → Polling (build 20219)
+
+**Context**: Cloudflare Workers' multi-layer SSE relay architecture
+(Workflow → Durable Object → Worker relay → CF edge → client) introduces
+opaque internal buffering at the DO→Worker RPC level that cannot be
+controlled or bypassed at the application layer. All attempts failed:
+`Content-Encoding: identity`, `encodeBody: 'manual'`, `Cache-Control:
+no-transform`, `X-Accel-Buffering: no`, micro-buffer removal, DO
+heartbeat injection, and SSE frame padding. The result was that the
+entire SSE response body was buffered until the stream closed, delivering
+all tokens at once instead of streaming.
+
+**Decision**: Replace SSE streaming with 250ms high-frequency polling
+against the persisted conversation state in D1. The SSE connection is no
+longer established during active runs. The polling path calls
+`refreshVisibleConversation()` every 250ms, which fetches the latest
+message content from D1.
+
+**Consequences**:
+- Predictable 250ms update cadence regardless of infrastructure behavior
+- ~4 API calls/second during active generation (negligible cost on CF
+  Workers/D1 free tier)
+- Content updates depend on backend persistence frequency (every 24 chars
+  for text deltas)
+- SSE infrastructure (DO event hub, relay route, frame IDs) remains in
+  place for future use if CF fixes the buffering, but is not the active
+  delivery path for the iOS client
+
 ## Evidence
 
 - Backend CI: 92/92 tests passed, 0 errors, 0 warnings
