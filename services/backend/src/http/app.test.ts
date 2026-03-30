@@ -1212,6 +1212,95 @@ describe('backend worker scaffold', () => {
     }
   });
 
+  it('proxies sandbox file downloads through container and direct file URLs', async () => {
+    const app = createApp(createTestServices());
+    const originalFetch = globalThis.fetch;
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = input.toString();
+      if (url === 'https://api.openai.com/v1/containers/container_123/files/file_123/content') {
+        return new Response('missing', { status: 404 });
+      }
+
+      if (url === 'https://api.openai.com/v1/files/file_123/content') {
+        return new Response('downloaded-content', {
+          headers: {
+            'Content-Disposition': 'attachment; filename="report.pdf"',
+            'Content-Type': 'application/pdf',
+          },
+          status: 200,
+        });
+      }
+
+      throw new Error(`unexpected_fetch_url:${url}`);
+    });
+    globalThis.fetch = fetchMock as typeof fetch;
+
+    try {
+      const response = await app.fetch(
+        new Request('https://example.com/v1/files/file_123/content?container_id=container_123', {
+          headers: {
+            Authorization: 'Bearer access-token',
+          },
+        }),
+        testEnv,
+        testExecutionContext,
+      );
+
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+      expect(fetchMock.mock.calls[0]?.[0]).toBe(
+        'https://api.openai.com/v1/containers/container_123/files/file_123/content',
+      );
+      expect(fetchMock.mock.calls[1]?.[0]).toBe(
+        'https://api.openai.com/v1/files/file_123/content',
+      );
+
+      expect(response.status).toBe(200);
+      expect(response.headers.get('Content-Type')).toBe('application/pdf');
+      expect(response.headers.get('Content-Disposition')).toBe(
+        'attachment; filename="report.pdf"',
+      );
+      await expect(response.text()).resolves.toBe('downloaded-content');
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
+  it('returns the upstream sandbox download error when fallback attempts also fail', async () => {
+    const app = createApp(createTestServices());
+    const originalFetch = globalThis.fetch;
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = input.toString();
+      if (url === 'https://api.openai.com/v1/containers/container_123/files/file_123/content') {
+        return new Response('container failure', { status: 500 });
+      }
+
+      if (url === 'https://api.openai.com/v1/files/file_123/content') {
+        return new Response('missing', { status: 404 });
+      }
+
+      throw new Error(`unexpected_fetch_url:${url}`);
+    });
+    globalThis.fetch = fetchMock as typeof fetch;
+
+    try {
+      const response = await app.fetch(
+        new Request('https://example.com/v1/files/file_123/content?container_id=container_123', {
+          headers: {
+            Authorization: 'Bearer access-token',
+          },
+        }),
+        testEnv,
+        testExecutionContext,
+      );
+
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+      expect(response.status).toBe(500);
+      await expect(response.text()).resolves.toBe('container failure');
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
   it('exposes scaffolded auth, credential, sync, and error routes', async () => {
     const app = createApp(createTestServices());
 

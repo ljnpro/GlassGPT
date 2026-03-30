@@ -123,6 +123,10 @@ private func enqueueAuthResponses(encoder: JSONEncoder) throws {
     )
     try CoverageBackendURLProtocol.state.enqueueResponse(
         statusCode: 200,
+        body: Data("downloaded-generated-file".utf8)
+    )
+    try CoverageBackendURLProtocol.state.enqueueResponse(
+        statusCode: 200,
         body: encoder.encode(
             CredentialStatusDTO(
                 provider: "openai",

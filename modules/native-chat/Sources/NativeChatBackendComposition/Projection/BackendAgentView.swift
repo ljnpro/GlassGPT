@@ -8,6 +8,7 @@ import SwiftUI
 package struct BackendAgentView: View {
     @Bindable var viewModel: BackendAgentController
     let openSettings: @MainActor () -> Void
+    let onSandboxLinkTap: (String, FilePathAnnotation?) -> Void
     @State private var liveSummaryExpanded: Bool? = true
     @State private var streamingThinkingExpanded: Bool? = nil
     @State private var expandedTraceMessageIDs: Set<UUID> = []
@@ -15,10 +16,12 @@ package struct BackendAgentView: View {
     /// Creates the agent surface bound to a backend-owned projection controller.
     package init(
         viewModel: BackendAgentController,
-        openSettings: @escaping @MainActor () -> Void
+        openSettings: @escaping @MainActor () -> Void,
+        onSandboxLinkTap: @escaping (String, FilePathAnnotation?) -> Void = { _, _ in }
     ) {
         self.viewModel = viewModel
         self.openSettings = openSettings
+        self.onSandboxLinkTap = onSandboxLinkTap
     }
 
     /// The full agent navigation stack, composer, selector, and live summary presentation flow.
@@ -50,7 +53,8 @@ package struct BackendAgentView: View {
                     liveSummaryExpanded: $liveSummaryExpanded,
                     streamingThinkingExpanded: $streamingThinkingExpanded,
                     expandedTraceMessageIDs: $expandedTraceMessageIDs,
-                    openSettings: openSettings
+                    openSettings: openSettings,
+                    onSandboxLinkTap: onSandboxLinkTap
                 )
             },
             composer: { composerResetToken, onSendAccepted, onPickImage, onPickDocument in

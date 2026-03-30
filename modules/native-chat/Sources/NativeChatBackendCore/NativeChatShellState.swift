@@ -1,4 +1,5 @@
 import AppRouting
+import ChatDomain
 import ChatPresentation
 import Foundation
 import GeneratedFilesCore
@@ -15,6 +16,8 @@ package final class NativeChatShellState {
     package var isUITestPreviewMode = false
     /// The file preview item injected by UI tests, if any.
     package var uiTestPreviewItem: FilePreviewItem?
+    /// Production generated-file preview/share state.
+    package let filePreviewStore: FilePreviewStore
 
     /// The backend-backed chat controller managing active conversations.
     package let chatController: BackendChatController
@@ -24,6 +27,8 @@ package final class NativeChatShellState {
     package var settingsPresenter: SettingsPresenter
     /// The history presenter for the History tab.
     package var historyPresenter: HistoryPresenter
+    @ObservationIgnored
+    private let generatedFileInteractionCoordinator: GeneratedFileInteractionCoordinator?
 
     /// Creates an app store with the given controllers and presenters.
     package init(
@@ -31,6 +36,8 @@ package final class NativeChatShellState {
         agentController: BackendAgentController,
         settingsPresenter: SettingsPresenter,
         historyPresenter: HistoryPresenter,
+        filePreviewStore: FilePreviewStore = FilePreviewStore(),
+        generatedFileInteractionCoordinator: GeneratedFileInteractionCoordinator? = nil,
         selectedTab: Int = 0,
         isUITestPreviewMode: Bool = false,
         uiTestPreviewItem: FilePreviewItem? = nil
@@ -39,6 +46,8 @@ package final class NativeChatShellState {
         self.agentController = agentController
         self.settingsPresenter = settingsPresenter
         self.historyPresenter = historyPresenter
+        self.filePreviewStore = filePreviewStore
+        self.generatedFileInteractionCoordinator = generatedFileInteractionCoordinator
         self.selectedTab = selectedTab
         self.isUITestPreviewMode = isUITestPreviewMode
         self.uiTestPreviewItem = uiTestPreviewItem
@@ -47,6 +56,27 @@ package final class NativeChatShellState {
     /// Clears the UI-test preview item and the controller's file preview state.
     package func handleUITestPreviewDismiss() {
         uiTestPreviewItem = nil
+    }
+
+    package func dismissGeneratedFilePreview() {
+        filePreviewStore.filePreviewItem = nil
+    }
+
+    package func dismissGeneratedFileShareSheet() {
+        filePreviewStore.sharedGeneratedFileItem = nil
+    }
+
+    package func clearGeneratedFileDownloadError() {
+        filePreviewStore.fileDownloadError = nil
+    }
+
+    package func handleSandboxLinkTap(_ sandboxURL: String, annotation: FilePathAnnotation?) {
+        Task { @MainActor [generatedFileInteractionCoordinator] in
+            await generatedFileInteractionCoordinator?.handleSandboxLinkTap(
+                sandboxURL,
+                annotation: annotation
+            )
+        }
     }
 
     /// Updates the selected tab and keeps the router's tab index in sync.

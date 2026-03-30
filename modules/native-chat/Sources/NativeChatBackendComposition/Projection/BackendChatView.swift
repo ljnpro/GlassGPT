@@ -9,15 +9,18 @@ import SwiftUI
 package struct BackendChatView: View {
     @Bindable var viewModel: BackendChatController
     let openSettings: @MainActor () -> Void
+    let onSandboxLinkTap: (String, FilePathAnnotation?) -> Void
     @State private var streamingThinkingExpanded: Bool? = true
 
     /// Creates the chat surface bound to a backend-owned projection controller.
     package init(
         viewModel: BackendChatController,
-        openSettings: @escaping @MainActor () -> Void
+        openSettings: @escaping @MainActor () -> Void,
+        onSandboxLinkTap: @escaping (String, FilePathAnnotation?) -> Void = { _, _ in }
     ) {
         self.viewModel = viewModel
         self.openSettings = openSettings
+        self.onSandboxLinkTap = onSandboxLinkTap
     }
 
     /// The full chat navigation stack, message list, composer, and selector presentation flow.
@@ -45,7 +48,8 @@ package struct BackendChatView: View {
                     viewModel: viewModel,
                     assistantBubbleMaxWidth: assistantBubbleMaxWidth,
                     streamingThinkingExpanded: $streamingThinkingExpanded,
-                    openSettings: openSettings
+                    openSettings: openSettings,
+                    onSandboxLinkTap: onSandboxLinkTap
                 )
             },
             composer: { composerResetToken, onSendAccepted, onPickImage, onPickDocument in

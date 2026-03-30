@@ -89,6 +89,7 @@ struct BackendConversationMessageListCore<
     let viewModel: ViewModel
     let assistantBubbleMaxWidth: CGFloat
     @Binding var streamingThinkingExpanded: Bool?
+    let onSandboxLinkTap: (String, FilePathAnnotation?) -> Void
     let messagePrefix: (BackendMessageSurface) -> MessagePrefix
     let messageSuffix: (BackendMessageSurface) -> MessageSuffix
     let detachedTail: () -> DetachedTail
@@ -109,7 +110,8 @@ struct BackendConversationMessageListCore<
                         isLiveThinking: viewModel.liveDraftMessageID == message.id && viewModel.isThinking,
                         liveThinkingPresentationState: viewModel.liveDraftMessageID == message.id
                             ? viewModel.thinkingPresentationState
-                            : nil
+                            : nil,
+                        onSandboxLinkTap: onSandboxLinkTap
                     )
                     .equatable()
                     .id(message.id)

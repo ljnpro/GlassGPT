@@ -10,6 +10,22 @@ export const installFileRoutes = (
   services: BackendServices,
   fileProxySupport: FileProxySupport,
 ): void => {
+  const makeFileDownloadResponse = (openAIResponse: Response): Response => {
+    const headers = new Headers(openAIResponse.headers);
+
+    if (!headers.get('Content-Type')) {
+      headers.set('Content-Type', 'application/octet-stream');
+    }
+    if (!headers.get('Content-Disposition')) {
+      headers.set('Content-Disposition', 'attachment');
+    }
+
+    return new Response(openAIResponse.body, {
+      headers,
+      status: openAIResponse.status,
+    });
+  };
+
   // Upload a file to OpenAI via the backend (proxies multipart form data)
   app.post('/v1/files/upload', async (context) => {
     const session = await requireAuthenticatedSession(context, services);
@@ -61,27 +77,28 @@ export const installFileRoutes = (
 
     const apiKey = await fileProxySupport.loadApiKey(env, session.userId);
 
+    const encodedFileId = encodeURIComponent(fileId);
     const urls = containerId
       ? [
-          `https://api.openai.com/v1/containers/${containerId}/files/${fileId}/content`,
-          `https://api.openai.com/v1/files/${fileId}/content`,
+          `https://api.openai.com/v1/containers/${encodeURIComponent(containerId)}/files/${encodedFileId}/content`,
+          `https://api.openai.com/v1/files/${encodedFileId}/content`,
         ]
-      : [`https://api.openai.com/v1/files/${fileId}/content`];
+      : [`https://api.openai.com/v1/files/${encodedFileId}/content`];
 
+    let lastOpenAIResponse: Response | null = null;
+    let lastHardErrorResponse: Response | null = null;
     for (const url of urls) {
       try {
         const openAIResponse = await fetch(url, {
           headers: { Authorization: `Bearer ${apiKey}` },
         });
         if (openAIResponse.ok && openAIResponse.body) {
-          return new Response(openAIResponse.body, {
-            headers: {
-              'Content-Disposition':
-                openAIResponse.headers.get('Content-Disposition') ?? 'attachment',
-              'Content-Type':
-                openAIResponse.headers.get('Content-Type') ?? 'application/octet-stream',
-            },
-          });
+          return makeFileDownloadResponse(openAIResponse);
+        }
+        if (openAIResponse.status === 404 || openAIResponse.status === 410) {
+          lastOpenAIResponse = openAIResponse;
+        } else {
+          lastHardErrorResponse = openAIResponse;
         }
       } catch (error) {
         logError('openai_file_download_attempt_failed', {
@@ -90,6 +107,17 @@ export const installFileRoutes = (
           url: sanitizeLogValue(url),
         });
       }
+    }
+
+    if (lastHardErrorResponse) {
+      return new Response(lastHardErrorResponse.body, {
+        headers: new Headers(lastHardErrorResponse.headers),
+        status: lastHardErrorResponse.status,
+      });
+    }
+
+    if (lastOpenAIResponse) {
+      return context.json({ error: 'file_not_found' }, 404);
     }
 
     return context.json({ error: 'file_not_found' }, 404);

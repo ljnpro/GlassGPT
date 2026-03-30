@@ -2,6 +2,7 @@ import ChatDomain
 import ChatUIComponents
 import ConversationSurfaceLogic
 import Foundation
+import GeneratedFilesCore
 import SwiftUI
 
 /// Renders inline segments (text and inline LaTeX converted to Unicode) as rich attributed text with link handling.
@@ -38,9 +39,12 @@ package struct RichTextView: View {
             .textSelection(.enabled)
             .environment(\.openURL, OpenURLAction { url in
                 if url.scheme == "sandbox" {
+                    guard let onSandboxLinkTap else {
+                        return .discarded
+                    }
                     let sandboxPath = url.absoluteString
                     let annotation = findFilePathAnnotation(for: sandboxPath)
-                    onSandboxLinkTap?(sandboxPath, annotation)
+                    onSandboxLinkTap(sandboxPath, annotation)
                     return .handled
                 }
                 return .systemAction
@@ -49,39 +53,11 @@ package struct RichTextView: View {
 
     /// Looks up a ``FilePathAnnotation`` matching the given sandbox URL using progressively looser matching.
     package func findFilePathAnnotation(for sandboxURL: String) -> FilePathAnnotation? {
-        if let exact = filePathAnnotations.first(where: { $0.sandboxPath == sandboxURL }) {
-            return exact
-        }
-
-        let pathOnly: String = if sandboxURL.hasPrefix("sandbox:") {
-            String(sandboxURL.dropFirst("sandbox:".count))
-        } else {
-            sandboxURL
-        }
-
-        if let match = filePathAnnotations.first(where: {
-            $0.sandboxPath == pathOnly ||
-                $0.sandboxPath.hasSuffix(pathOnly) ||
-                pathOnly.hasSuffix($0.sandboxPath)
-        }) {
-            return match
-        }
-
-        let filename = URL(fileURLWithPath: pathOnly).lastPathComponent
-        if !filename.isEmpty {
-            if let match = filePathAnnotations.first(where: {
-                URL(fileURLWithPath: $0.sandboxPath).lastPathComponent == filename ||
-                    $0.filename == filename
-            }) {
-                return match
-            }
-        }
-
-        if filePathAnnotations.count == 1 {
-            return filePathAnnotations.first
-        }
-
-        return nil
+        GeneratedFileAnnotationMatcher().findMatchingFilePathAnnotation(
+            in: filePathAnnotations,
+            sandboxURL: sandboxURL,
+            fallback: nil
+        )
     }
 
     /// Converts a LaTeX expression to a best-effort Unicode approximation for inline display.

@@ -55,6 +55,12 @@ package struct NativeChatCompositionRoot {
             sessionStore: services.backendSessionStore,
             settingsStore: settingsStore
         )
+        let filePreviewStore = FilePreviewStore()
+        let generatedFileInteractionCoordinator = GeneratedFileInteractionCoordinator(
+            client: services.backendClient,
+            cacheManager: services.cacheManager,
+            filePreviewStore: filePreviewStore
+        )
         let store = NativeChatShellState(
             chatController: chatController,
             agentController: agentController,
@@ -67,7 +73,9 @@ package struct NativeChatCompositionRoot {
             historyPresenter: HistoryPresenter(
                 loadConversations: { [] },
                 selectConversation: { _, _ in }
-            )
+            ),
+            filePreviewStore: filePreviewStore,
+            generatedFileInteractionCoordinator: generatedFileInteractionCoordinator
         )
         store.historyPresenter = NativeChatHistoryPresenterFactory.makePresenter(
             modelContext: modelContext,

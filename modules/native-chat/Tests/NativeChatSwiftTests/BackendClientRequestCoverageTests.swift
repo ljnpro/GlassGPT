@@ -50,6 +50,10 @@ struct BackendClientRequestCoverageTests {
             deviceID: "device_1"
         )
         _ = try await client.refreshSession()
+        let downloadedFile = try await client.downloadGeneratedFile(
+            fileId: "file_1",
+            containerId: "container_1"
+        )
         _ = try await client.storeOpenAIKey("sk-test")
         try await client.deleteOpenAIKey()
         try await client.logout()
@@ -68,6 +72,7 @@ struct BackendClientRequestCoverageTests {
             "/v1/sync/events",
             "/v1/auth/apple",
             "/v1/auth/refresh",
+            "/v1/files/file_1/content",
             "/v1/credentials/openai",
             "/v1/credentials/openai",
             "/v1/auth/logout"
@@ -85,6 +90,7 @@ struct BackendClientRequestCoverageTests {
             "GET",
             "POST",
             "POST",
+            "GET",
             "PUT",
             "DELETE",
             "POST"
@@ -92,10 +98,13 @@ struct BackendClientRequestCoverageTests {
         #expect(requests[0].authorizationHeader == "Bearer access-token")
         #expect(requests[10].authorizationHeader == nil)
         #expect(requests[11].authorizationHeader == nil)
+        #expect(requests[12].query == "container_id=container_1")
         #expect(requests[12].authorizationHeader == "Bearer refreshed-access-token")
-        #expect(requests[14].authorizationHeader == "Bearer refreshed-access-token")
+        #expect(requests[13].authorizationHeader == "Bearer refreshed-access-token")
+        #expect(requests[15].authorizationHeader == "Bearer refreshed-access-token")
         #expect(requests[7].body?.contains("\"imageBase64\":\"ZmFrZS1qcGVn\"") == true)
         #expect(requests[7].body?.contains("\"fileIds\":[\"file_1\",\"file_2\"]") == true)
+        #expect(downloadedFile.data == Data("downloaded-generated-file".utf8))
         #expect(sessionStore.loadSession() == nil)
         session.invalidateAndCancel()
     }

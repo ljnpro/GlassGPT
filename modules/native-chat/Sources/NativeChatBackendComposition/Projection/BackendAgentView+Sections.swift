@@ -26,6 +26,25 @@ struct BackendAgentMessageList: View {
     @Binding var streamingThinkingExpanded: Bool?
     @Binding var expandedTraceMessageIDs: Set<UUID>
     let openSettings: @MainActor () -> Void
+    let onSandboxLinkTap: (String, FilePathAnnotation?) -> Void
+
+    init(
+        viewModel: BackendAgentController,
+        assistantBubbleMaxWidth: CGFloat,
+        liveSummaryExpanded: Binding<Bool?>,
+        streamingThinkingExpanded: Binding<Bool?>,
+        expandedTraceMessageIDs: Binding<Set<UUID>>,
+        openSettings: @escaping @MainActor () -> Void,
+        onSandboxLinkTap: @escaping (String, FilePathAnnotation?) -> Void = { _, _ in }
+    ) {
+        self.viewModel = viewModel
+        self.assistantBubbleMaxWidth = assistantBubbleMaxWidth
+        _liveSummaryExpanded = liveSummaryExpanded
+        _streamingThinkingExpanded = streamingThinkingExpanded
+        _expandedTraceMessageIDs = expandedTraceMessageIDs
+        self.openSettings = openSettings
+        self.onSandboxLinkTap = onSandboxLinkTap
+    }
 
     var body: some View {
         Group {
@@ -37,6 +56,7 @@ struct BackendAgentMessageList: View {
                     viewModel: viewModel,
                     assistantBubbleMaxWidth: assistantBubbleMaxWidth,
                     streamingThinkingExpanded: $streamingThinkingExpanded,
+                    onSandboxLinkTap: onSandboxLinkTap,
                     messagePrefix: { message in
                         Group {
                             if showsLiveSummary(for: message) {

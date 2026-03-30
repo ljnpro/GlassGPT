@@ -24,6 +24,11 @@ final class UICoverageBackendRequester: BackendRequesting {
         let byteCount: Int
     }
 
+    struct DownloadGeneratedFileCall: Equatable {
+        let fileID: String
+        let containerID: String?
+    }
+
     var conversations: [ConversationDTO] = []
     var detail: ConversationDetailDTO?
     var connectionCheckError: Error?
@@ -46,10 +51,14 @@ final class UICoverageBackendRequester: BackendRequesting {
     var fetchRunCallCount = 0
     var sentMessages: [SentMessageCall] = []
     var uploadFileCalls: [UploadFileCall] = []
+    var downloadGeneratedFileCalls: [DownloadGeneratedFileCall] = []
     var nextUploadedFileID = "file_uploaded_1"
     var uploadBehavior: UploadBehavior = .immediateSuccess("file_uploaded_1")
     var onUploadFile: (() -> Void)?
     private var pendingUploadContinuations: [CheckedContinuation<Void, Never>] = []
+    var downloadGeneratedFileResult: Result<(data: Data, contentType: String?), Error> = .success(
+        (Data("preview".utf8), "application/octet-stream")
+    )
     var connectionStatus = ConnectionCheckDTO(
         backend: .healthy,
         auth: .healthy,
@@ -185,6 +194,16 @@ final class UICoverageBackendRequester: BackendRequesting {
             testEvents: streamEvents,
             setupError: streamSetupError
         )
+    }
+
+    func downloadGeneratedFile(fileId: String, containerId: String?) async throws -> (data: Data, contentType: String?) {
+        downloadGeneratedFileCalls.append(
+            DownloadGeneratedFileCall(
+                fileID: fileId,
+                containerID: containerId
+            )
+        )
+        return try downloadGeneratedFileResult.get()
     }
 
     func syncEvents(after _: String?) async throws -> SyncEnvelopeDTO {

@@ -63,12 +63,10 @@ public extension BackendClient {
     ) async throws -> (data: Data, contentType: String?) {
         try await refreshSessionIfNeeded(for: .required)
 
-        var path = "/v1/files/\(fileId)/content"
-        if let containerId {
-            path += "?container_id=\(containerId)"
-        }
-
-        let url = environment.baseURL.appendingPathComponent(path)
+        let url = try makeURL(
+            path: "/v1/files/\(fileId)/content",
+            queryItems: containerId.map { [URLQueryItem(name: "container_id", value: $0)] } ?? []
+        )
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
         request.timeoutInterval = 60

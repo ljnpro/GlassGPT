@@ -1,4 +1,5 @@
 import ChatPersistenceCore
+import ChatPresentation
 import ChatUIComponents
 import GeneratedFilesCore
 import NativeChatBackendCore
@@ -23,7 +24,8 @@ package struct ContentView: View {
             Tab(String(localized: "Chat"), systemImage: "bubble.left.and.bubble.right.fill", value: 0) {
                 BackendChatView(
                     viewModel: appStore.chatController,
-                    openSettings: { appStore.selectTab(3) }
+                    openSettings: { appStore.selectTab(3) },
+                    onSandboxLinkTap: appStore.handleSandboxLinkTap
                 )
             }
             .accessibilityIdentifier("tab.chat")
@@ -31,7 +33,8 @@ package struct ContentView: View {
             Tab(String(localized: "Agent"), systemImage: "person.3.fill", value: 1) {
                 BackendAgentView(
                     viewModel: appStore.agentController,
-                    openSettings: { appStore.selectTab(3) }
+                    openSettings: { appStore.selectTab(3) },
+                    onSandboxLinkTap: appStore.handleSandboxLinkTap
                 )
             }
             .accessibilityIdentifier("tab.agent")
@@ -62,6 +65,39 @@ package struct ContentView: View {
                     .ignoresSafeArea()
             }
         }
+        .fullScreenCover(item: generatedFilePreviewItemBinding, onDismiss: appStore.dismissGeneratedFilePreview) { previewItem in
+            FilePreviewSheet(
+                previewItem: previewItem,
+                onRequestDismiss: appStore.dismissGeneratedFilePreview
+            )
+        }
+        .sheet(item: sharedGeneratedFileItemBinding, onDismiss: appStore.dismissGeneratedFileShareSheet) { item in
+            ActivityViewController(activityItems: [item.url])
+        }
+        .alert("Download Failed", isPresented: generatedFileDownloadErrorPresentedBinding) {
+            Button(String(localized: "OK"), role: .cancel) {
+                appStore.clearGeneratedFileDownloadError()
+            }
+        } message: {
+            Text(
+                appStore.filePreviewStore.fileDownloadError
+                    ?? String(localized: "Unable to download this file.")
+            )
+        }
+        .overlay(alignment: .bottom) {
+            if appStore.filePreviewStore.isDownloadingFile {
+                HStack(spacing: 8) {
+                    ProgressView()
+                        .controlSize(.small)
+                    Text(String(localized: "Downloading file…"))
+                        .font(.callout)
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
+                .background(.ultraThinMaterial, in: Capsule())
+                .padding(.bottom, 24)
+            }
+        }
     }
 
     private func handleUITestPreviewDismiss() {
@@ -79,6 +115,31 @@ package struct ContentView: View {
         Binding(
             get: { appStore.uiTestPreviewItem },
             set: { appStore.uiTestPreviewItem = $0 }
+        )
+    }
+
+    private var generatedFilePreviewItemBinding: Binding<FilePreviewItem?> {
+        Binding(
+            get: { appStore.filePreviewStore.filePreviewItem },
+            set: { appStore.filePreviewStore.filePreviewItem = $0 }
+        )
+    }
+
+    private var sharedGeneratedFileItemBinding: Binding<SharedGeneratedFileItem?> {
+        Binding(
+            get: { appStore.filePreviewStore.sharedGeneratedFileItem },
+            set: { appStore.filePreviewStore.sharedGeneratedFileItem = $0 }
+        )
+    }
+
+    private var generatedFileDownloadErrorPresentedBinding: Binding<Bool> {
+        Binding(
+            get: { appStore.filePreviewStore.fileDownloadError != nil },
+            set: { newValue in
+                if !newValue {
+                    appStore.clearGeneratedFileDownloadError()
+                }
+            }
         )
     }
 }

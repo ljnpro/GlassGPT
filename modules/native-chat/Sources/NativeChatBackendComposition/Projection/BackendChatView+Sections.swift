@@ -24,6 +24,21 @@ struct BackendChatMessageList: View {
     let assistantBubbleMaxWidth: CGFloat
     @Binding var streamingThinkingExpanded: Bool?
     let openSettings: @MainActor () -> Void
+    let onSandboxLinkTap: (String, FilePathAnnotation?) -> Void
+
+    init(
+        viewModel: BackendChatController,
+        assistantBubbleMaxWidth: CGFloat,
+        streamingThinkingExpanded: Binding<Bool?>,
+        openSettings: @escaping @MainActor () -> Void,
+        onSandboxLinkTap: @escaping (String, FilePathAnnotation?) -> Void = { _, _ in }
+    ) {
+        self.viewModel = viewModel
+        self.assistantBubbleMaxWidth = assistantBubbleMaxWidth
+        _streamingThinkingExpanded = streamingThinkingExpanded
+        self.openSettings = openSettings
+        self.onSandboxLinkTap = onSandboxLinkTap
+    }
 
     var body: some View {
         Group {
@@ -35,6 +50,7 @@ struct BackendChatMessageList: View {
                     viewModel: viewModel,
                     assistantBubbleMaxWidth: assistantBubbleMaxWidth,
                     streamingThinkingExpanded: $streamingThinkingExpanded,
+                    onSandboxLinkTap: onSandboxLinkTap,
                     messagePrefix: { _ in EmptyView() },
                     messageSuffix: { _ in EmptyView() },
                     detachedTail: { EmptyView() }
