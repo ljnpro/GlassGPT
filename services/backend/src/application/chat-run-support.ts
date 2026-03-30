@@ -69,12 +69,12 @@ export const buildChatExecutionRequest = (
   fileIds?: string[],
 ): StreamingConversationRequest => {
   return {
-    fileIds,
-    imageBase64,
     input: buildConversationInput(conversationHistory, input),
     model: conversation.model ?? 'gpt-5.4',
     reasoningEffort: conversation.reasoningEffort ?? 'medium',
     serviceTier: conversation.serviceTier ?? 'default',
+    ...(fileIds ? { fileIds } : {}),
+    ...(imageBase64 ? { imageBase64 } : {}),
   };
 };
 
