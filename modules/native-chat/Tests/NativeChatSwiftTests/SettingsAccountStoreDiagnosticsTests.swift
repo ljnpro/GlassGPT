@@ -57,7 +57,7 @@ struct SettingsAccountStoreDiagnosticsTests {
                 checkedAt: .now,
                 latencyMilliseconds: 0,
                 errorSummary: "auth_runtime_configuration_missing",
-                backendVersion: "5.3.2",
+                backendVersion: "5.4.0",
                 minimumSupportedAppVersion: "5.3.0",
                 appCompatibility: .compatible
             )

@@ -13,7 +13,7 @@ func makeConnectionCheckResponseData() throws -> Data {
         "sse": "healthy",
         "checkedAt": "1970-01-01T00:00:00Z",
         "latencyMilliseconds": 12,
-        "backendVersion": "5.3.0",
+        "backendVersion": "5.4.0",
         "minimumSupportedAppVersion": "5.3.0",
         "appCompatibility": "compatible"
     ])

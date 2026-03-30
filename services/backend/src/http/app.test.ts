@@ -591,7 +591,7 @@ describe('backend worker scaffold', () => {
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({
       appEnv: 'beta',
-      backendVersion: '5.3.2',
+      backendVersion: '5.4.0',
       minimumSupportedAppVersion: '5.3.0',
       appCompatibility: 'compatible',
       ok: true,
@@ -613,7 +613,7 @@ describe('backend worker scaffold', () => {
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({
       appEnv: 'beta',
-      backendVersion: '5.3.2',
+      backendVersion: '5.4.0',
       minimumSupportedAppVersion: '5.3.0',
       appCompatibility: 'compatible',
       errorSummary: 'auth_runtime_configuration_missing',
@@ -650,7 +650,7 @@ describe('backend worker scaffold', () => {
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toMatchObject({
       appCompatibility: 'compatible',
-      backendVersion: '5.3.2',
+      backendVersion: '5.4.0',
       minimumSupportedAppVersion: '5.3.0',
     });
   });
@@ -671,7 +671,7 @@ describe('backend worker scaffold', () => {
     await expect(response.json()).resolves.toMatchObject({
       auth: 'unavailable',
       errorSummary: 'auth_runtime_configuration_missing',
-      backendVersion: '5.3.2',
+      backendVersion: '5.4.0',
       minimumSupportedAppVersion: '5.3.0',
     });
   });
@@ -855,7 +855,7 @@ describe('backend worker scaffold', () => {
       new Request('https://example.com/v1/connection/check', {
         headers: {
           Authorization: 'Bearer access-token',
-          'X-GlassGPT-App-Version': '5.3.2',
+          'X-GlassGPT-App-Version': '5.4.0',
         },
       }),
       createTestEnv({
@@ -885,7 +885,7 @@ describe('backend worker scaffold', () => {
       new Request('https://example.com/v1/connection/check', {
         headers: {
           Authorization: 'Bearer access-token',
-          'X-GlassGPT-App-Version': '5.3.2',
+          'X-GlassGPT-App-Version': '5.4.0',
         },
       }),
       testEnv,
