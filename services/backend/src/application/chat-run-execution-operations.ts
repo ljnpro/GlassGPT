@@ -287,6 +287,38 @@ export const createChatRunExecutionOperations = (
           }
         }
 
+        // Flush any remaining pending text that was not persisted during
+        // streaming (responses shorter than the 24-char batch threshold).
+        if (pendingTextDelta.length > 0) {
+          await persistAssistantSnapshot({
+            kind: 'assistant_delta',
+            textDelta: pendingTextDelta,
+          });
+          pendingTextDelta = '';
+        }
+
+        // If the streaming generator returned without yielding a 'completed'
+        // event (e.g. OpenAI sent [DONE] without response.completed), the
+        // liveState.content may still reflect the accumulated text deltas.
+        // Ensure the assistant message is persisted with final state.
+        if (liveState.content.length > 0 && assistantMessage.content !== liveState.content) {
+          assistantMessage = applyLiveStateToMessage(assistantMessage, liveState, {
+            completedAt: deps.now().toISOString(),
+          });
+          const result = await persistProjectedEvent(deps, env, {
+            conversation,
+            event: createRunEventDraft(deps.now(), run, {
+              kind: 'assistant_completed',
+            }),
+            message: assistantMessage,
+            run,
+            syncMessageCursor: true,
+          });
+          conversation = result.conversation;
+          run = result.run;
+          assistantMessage = result.message ?? assistantMessage;
+        }
+
         if (liveState.content.length === 0) {
           throw new Error('openai_response_empty');
         }

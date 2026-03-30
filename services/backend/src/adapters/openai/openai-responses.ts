@@ -397,11 +397,9 @@ export async function* createStreamingResponse(
   let toolCalls: LiveToolCall[] = [];
 
   try {
-    let rawEventCount = 0;
     while (true) {
       const { done, value } = await reader.read();
       if (done) {
-        console.log(`[openai-stream] reader done after ${rawEventCount} raw SSE events, outputLen=${currentOutputText.length}`);
         break;
       }
 
@@ -414,7 +412,6 @@ export async function* createStreamingResponse(
         if (!parsedLine) {
           if (line === '' && eventData.length > 0) {
             if (eventData === '[DONE]') {
-              console.log(`[openai-stream] [DONE] received, outputLen=${currentOutputText.length}, thinkingLen=${currentThinkingText.length}`);
               // OpenAI may send [DONE] without a preceding response.completed
               // event.  Yield a synthetic completed event so the consumer can
               // flush pending state and persist the full content.
@@ -432,11 +429,7 @@ export async function* createStreamingResponse(
             }
 
             try {
-              rawEventCount += 1;
               const event = JSON.parse(eventData) as StreamEnvelope;
-              if (rawEventCount <= 5 || event.type === 'response.completed' || event.type === 'response.incomplete' || event.type === 'response.failed') {
-                console.log(`[openai-stream] event #${rawEventCount}: ${event.type}`);
-              }
               switch (event.type) {
                 case 'response.created': {
                   const responseId = event.response?.id;
