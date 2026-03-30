@@ -21,7 +21,7 @@ public protocol BackendRequesting: AnyObject {
     func authenticateWithApple(_ payload: AppleSignInPayload, deviceID: String) async throws -> SessionDTO
     func refreshSession() async throws -> SessionDTO
     func retryRun(_ runID: String) async throws -> RunSummaryDTO
-    func sendMessage(_ content: String, to conversationID: String) async throws -> RunSummaryDTO
+    func sendMessage(_ content: String, to conversationID: String, imageBase64: String?, fileIds: [String]?) async throws -> RunSummaryDTO
     func startAgentRun(prompt: String?, in conversationID: String) async throws -> RunSummaryDTO
     func streamRun(_ runID: String, lastEventID: String?) async throws -> BackendSSEStream
     func syncEvents(after cursor: String?) async throws -> SyncEnvelopeDTO

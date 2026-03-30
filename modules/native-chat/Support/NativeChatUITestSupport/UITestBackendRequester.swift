@@ -90,7 +90,7 @@ final class UITestBackendRequester: BackendRequesting {
         try makeRun(id: runID, kind: .agent)
     }
 
-    func sendMessage(_ content: String, to conversationID: String) async throws -> RunSummaryDTO {
+    func sendMessage(_ content: String, to conversationID: String, imageBase64: String?, fileIds: [String]?) async throws -> RunSummaryDTO {
         try makeRun(id: "run_chat_1", kind: .chat, conversationID: conversationID, summary: content)
     }
 

@@ -116,7 +116,7 @@ final class UICoverageBackendRequester: BackendRequesting {
         makeRunSummary(id: id)
     }
 
-    func sendMessage(_ text: String, to _: String) async throws -> RunSummaryDTO {
+    func sendMessage(_ content: String, to conversationID: String, imageBase64: String?, fileIds: [String]?) async throws -> RunSummaryDTO {
         makeRunSummary(id: "run_msg_\(text.count)")
     }
 

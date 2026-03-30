@@ -262,7 +262,7 @@ final class SnapshotBackendRequester: BackendRequesting {
         makeRunSummary(id: runID)
     }
 
-    func sendMessage(_ content: String, to conversationID: String) async throws -> RunSummaryDTO {
+    func sendMessage(_ content: String, to conversationID: String, imageBase64: String?, fileIds: [String]?) async throws -> RunSummaryDTO {
         _ = content
         return makeRunSummary(id: "run_\(conversationID)")
     }

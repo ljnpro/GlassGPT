@@ -138,7 +138,7 @@ private final class SettingsAccountDiagnosticsBackendRequester: BackendRequestin
         throw DiagnosticsTestError.unimplemented
     }
 
-    func sendMessage(_: String, to _: String) async throws -> RunSummaryDTO {
+    func sendMessage(_ content: String, to conversationID: String, imageBase64: String?, fileIds: [String]?) async throws -> RunSummaryDTO {
         throw DiagnosticsTestError.unimplemented
     }
 
