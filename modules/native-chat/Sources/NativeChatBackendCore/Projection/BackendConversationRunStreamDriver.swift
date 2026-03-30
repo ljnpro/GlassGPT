@@ -199,6 +199,10 @@ package extension BackendConversationRunStreamDriving {
                 return
             }
             try await finalizeVisibleRun(conversationServerID: conversationServerID)
+            let remainingToolCallGrace = toolCallGracePeriodRemaining()
+            if remainingToolCallGrace > 0 {
+                try await Task.sleep(for: .milliseconds(Int(remainingToolCallGrace * 1000)))
+            }
             clearLiveSurface()
         } catch {
             errorMessage = error.localizedDescription

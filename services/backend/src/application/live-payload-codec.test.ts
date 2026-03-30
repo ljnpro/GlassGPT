@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import type { MessageRecord } from '../domain/message-model.js';
-import { parseMessageLiveState } from './live-payload-codec.js';
+import { applyLiveStateToMessage, parseMessageLiveState } from './live-payload-codec.js';
 
 const messageFixture = (overrides: Partial<MessageRecord> = {}): MessageRecord => ({
   agentTraceJSON: null,
@@ -72,5 +72,65 @@ describe('parseMessageLiveState', () => {
     expect(state.citations).toHaveLength(1);
     expect(state.filePathAnnotations).toHaveLength(1);
     expect(state.toolCalls).toHaveLength(1);
+  });
+
+  it('accepts legacy tool call payloads with null optional fields', () => {
+    const state = parseMessageLiveState(
+      messageFixture({
+        toolCallsJSON: JSON.stringify([
+          {
+            code: null,
+            id: 'tool_legacy',
+            queries: null,
+            results: null,
+            status: 'completed',
+            type: 'web_search',
+          },
+        ]),
+      }),
+    );
+
+    expect(state.toolCalls).toEqual([
+      {
+        code: null,
+        id: 'tool_legacy',
+        queries: null,
+        results: null,
+        status: 'completed',
+        type: 'web_search',
+      },
+    ]);
+  });
+
+  it('writes tool call JSON without contract-incompatible null optionals', () => {
+    const message = applyLiveStateToMessage(
+      messageFixture(),
+      {
+        citations: [],
+        content: 'assistant reply',
+        filePathAnnotations: [],
+        thinking: null,
+        toolCalls: [
+          {
+            code: null,
+            id: 'tool_01',
+            queries: null,
+            results: null,
+            status: 'completed',
+            type: 'web_search',
+          },
+        ],
+      },
+    );
+
+    expect(message.toolCallsJSON).toBe(
+      JSON.stringify([
+        {
+          id: 'tool_01',
+          status: 'completed',
+          type: 'web_search',
+        },
+      ]),
+    );
   });
 });

@@ -20,10 +20,10 @@ const liveFilePathAnnotationSchema = z.object({
 });
 
 const liveToolCallSchema = z.object({
-  code: z.string().nullable(),
+  code: z.string().nullable().optional(),
   id: z.string().min(1),
-  queries: z.array(z.string()).nullable(),
-  results: z.array(z.string()).nullable(),
+  queries: z.array(z.string()).nullable().optional(),
+  results: z.array(z.string()).nullable().optional(),
   status: z.enum(['in_progress', 'searching', 'interpreting', 'file_searching', 'completed']),
   type: z.enum(['web_search', 'code_interpreter', 'file_search']),
 });
@@ -31,6 +31,17 @@ const liveToolCallSchema = z.object({
 const liveCitationsSchema = z.array(liveCitationSchema);
 const liveFilePathAnnotationsSchema = z.array(liveFilePathAnnotationSchema);
 const liveToolCallsSchema = z.array(liveToolCallSchema);
+
+const normalizeToolCallForStorage = (toolCall: LiveToolCall): Record<string, unknown> => {
+  return {
+    ...(toolCall.code ? { code: toolCall.code } : {}),
+    id: toolCall.id,
+    ...(toolCall.queries && toolCall.queries.length > 0 ? { queries: toolCall.queries } : {}),
+    ...(toolCall.results && toolCall.results.length > 0 ? { results: toolCall.results } : {}),
+    status: toolCall.status,
+    type: toolCall.type,
+  };
+};
 
 export interface MessageLiveState {
   readonly agentTraceJSON?: string | null;
@@ -82,6 +93,6 @@ export const applyLiveStateToMessage = (
     filePathAnnotationsJSON: encodeJSON(state.filePathAnnotations),
     serverCursor: input?.serverCursor ?? message.serverCursor,
     thinking: state.thinking,
-    toolCallsJSON: encodeJSON(state.toolCalls),
+    toolCallsJSON: encodeJSON(state.toolCalls.map(normalizeToolCallForStorage)),
   };
 };

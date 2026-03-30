@@ -462,6 +462,65 @@ describe('createChatRunService', () => {
     consoleError.mockRestore();
   });
 
+  it('persists toolCallsJSON before the run reaches completed', async () => {
+    let harness!: ServiceHarness;
+    const persistedSnapshots: string[] = [];
+    const createStreamingResponse = vi.fn(
+      (_apiKey: string, _request: StreamingConversationRequest) =>
+        (async function* () {
+          yield {
+            kind: 'tool_call_updated' as const,
+            toolCall: {
+              code: null,
+              id: 'tool_live',
+              queries: ['glassgpt'],
+              results: null,
+              status: 'searching',
+              type: 'web_search',
+            },
+          };
+          persistedSnapshots.push(
+            harness.messages.find((message) => message.role === 'assistant')?.toolCallsJSON ?? '',
+          );
+          yield {
+            citations: [],
+            filePathAnnotations: [],
+            kind: 'completed' as const,
+            outputText: 'Assistant reply',
+            thinkingText: null,
+            toolCalls: [],
+          };
+        })(),
+    );
+    harness = createServiceHarness({
+      createStreamingResponse,
+    });
+
+    const queuedRun = await harness.service.queueChatRun(testEnv, harness.workflow, {
+      content: 'Use tools',
+      conversationId: conversationFixture.id,
+      userId: conversationFixture.userId,
+    });
+
+    await harness.service.executeQueuedRun(testEnv, {
+      content: 'Use tools',
+      conversationId: conversationFixture.id,
+      runId: queuedRun.id,
+      userId: conversationFixture.userId,
+    });
+
+    expect(persistedSnapshots).toContain(
+      JSON.stringify([
+        {
+          id: 'tool_live',
+          queries: ['glassgpt'],
+          status: 'searching',
+          type: 'web_search',
+        },
+      ]),
+    );
+  });
+
   it('keeps authoritative state when live cursor fanout fails', async () => {
     const harness = createServiceHarness({
       publishConversationCursor: async () => {

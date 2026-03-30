@@ -34,7 +34,9 @@ package extension BackendConversationProjectionController {
         // and keep it displayed as "in_progress" for a 3-second grace period so
         // the user sees the indicator.
         let now = Date()
-        let gracePeriod: TimeInterval = 3.0
+        let gracePeriod = toolCallGracePeriodSeconds
+        let currentToolCallIDs = Set(lastAssistant.toolCalls.map(\.id))
+        toolCallFirstSeen = toolCallFirstSeen.filter { currentToolCallIDs.contains($0.key) }
         for toolCall in lastAssistant.toolCalls {
             if toolCallFirstSeen[toolCall.id] == nil {
                 toolCallFirstSeen[toolCall.id] = now
@@ -63,6 +65,13 @@ package extension BackendConversationProjectionController {
         if !lastAssistant.filePathAnnotations.isEmpty {
             liveFilePathAnnotations = lastAssistant.filePathAnnotations
         }
+    }
+
+    func toolCallGracePeriodRemaining(now: Date = Date()) -> TimeInterval {
+        activeToolCalls
+            .compactMap { toolCallFirstSeen[$0.id] }
+            .map { max(0, toolCallGracePeriodSeconds - now.timeIntervalSince($0)) }
+            .max() ?? 0
     }
 
     /// When the D1 read replica has not yet replicated the latest content,

@@ -11,6 +11,8 @@ import type {
 import {
   filePathAnnotationSchema,
   toolCallInfoSchema,
+  toolCallStatusSchema,
+  toolCallTypeSchema,
   urlCitationSchema,
 } from '@glassgpt/backend-contracts';
 import { z } from 'zod';
@@ -23,7 +25,24 @@ import { parseOptionalJSONPayload } from './json-payload-codec.js';
 
 const messageAnnotationsSchema = z.array(urlCitationSchema);
 const messageFilePathAnnotationsSchema = z.array(filePathAnnotationSchema);
-const messageToolCallsSchema = z.array(toolCallInfoSchema);
+const persistedToolCallInfoSchema = z
+  .object({
+    code: z.string().min(1).nullable().optional(),
+    id: z.string().min(1),
+    queries: z.array(z.string()).nullable().optional(),
+    results: z.array(z.string()).nullable().optional(),
+    status: toolCallStatusSchema,
+    type: toolCallTypeSchema,
+  })
+  .transform(({ code, queries, results, ...rest }) => ({
+    ...(code ? { code } : {}),
+    id: rest.id,
+    ...(queries ? { queries } : {}),
+    ...(results ? { results } : {}),
+    status: rest.status,
+    type: rest.type,
+  }));
+const messageToolCallsSchema = z.array(persistedToolCallInfoSchema).or(z.array(toolCallInfoSchema));
 
 export const buildConversationDTO = (conversation: ConversationRecord): ConversationDTO => {
   return {

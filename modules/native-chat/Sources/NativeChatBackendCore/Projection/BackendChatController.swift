@@ -54,6 +54,8 @@ package final class BackendChatController {
     package var presentsSelectorOnLaunch = false
     @ObservationIgnored
     package var toolCallFirstSeen: [String: Date] = [:]
+    @ObservationIgnored
+    package var toolCallGracePeriodSeconds: TimeInterval = 3
 
     /// Creates the backend-owned chat projection controller for one account-scoped shell.
     package init(

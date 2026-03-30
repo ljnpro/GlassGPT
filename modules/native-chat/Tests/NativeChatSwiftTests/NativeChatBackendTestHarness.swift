@@ -217,7 +217,10 @@ func makeBackendMessageSurface(
     role: MessageRole = .assistant,
     content: String = "Rendered message",
     isComplete: Bool = true,
-    includeTrace: Bool = false
+    includeTrace: Bool = false,
+    toolCalls: [ToolCallInfo] = [
+        ToolCallInfo(id: "tool_1", type: .codeInterpreter, status: .completed, code: "print(1)", results: ["1"])
+    ]
 ) -> BackendMessageSurface {
     let message = Message(
         role: role,
@@ -225,7 +228,7 @@ func makeBackendMessageSurface(
         thinking: role == .assistant ? "Reasoning" : nil,
         isComplete: isComplete,
         annotations: [URLCitation(url: "https://example.com", title: "Example", startIndex: 0, endIndex: 7)],
-        toolCalls: [ToolCallInfo(id: "tool_1", type: .codeInterpreter, status: .completed, code: "print(1)", results: ["1"])],
+        toolCalls: toolCalls,
         fileAttachments: [FileAttachment(filename: "report.pdf", fileSize: 12, fileType: "pdf", fileId: "file_1", uploadStatus: .uploaded)],
         filePathAnnotations: [
             FilePathAnnotation(
