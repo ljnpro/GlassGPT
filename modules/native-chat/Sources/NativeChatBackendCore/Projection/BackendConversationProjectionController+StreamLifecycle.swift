@@ -10,6 +10,32 @@ package extension BackendConversationProjectionController {
         syncVisibleState()
     }
 
+    /// Syncs live overlay state (thinking, tool calls, streaming text) from
+    /// the latest polled messages so the UI shows progress during active runs.
+    /// Without this, the live overlay properties stay empty because no SSE
+    /// events populate them in the polling-only architecture.
+    func applyLiveOverlayFromPolledMessages() {
+        guard let lastAssistant = messages.last(where: { $0.role == .assistant }) else { return }
+        let hasThinking = !(lastAssistant.thinking?.isEmpty ?? true)
+        let hasContent = !lastAssistant.content.isEmpty
+        isThinking = hasThinking && !hasContent
+        if hasThinking {
+            currentThinkingText = lastAssistant.thinking ?? ""
+        }
+        if hasContent {
+            currentStreamingText = lastAssistant.content
+        }
+        if !lastAssistant.toolCalls.isEmpty {
+            activeToolCalls = lastAssistant.toolCalls
+        }
+        if !lastAssistant.annotations.isEmpty {
+            liveCitations = lastAssistant.annotations
+        }
+        if !lastAssistant.filePathAnnotations.isEmpty {
+            liveFilePathAnnotations = lastAssistant.filePathAnnotations
+        }
+    }
+
     /// When the D1 read replica has not yet replicated the latest content,
     /// the last assistant message may be empty despite the SSE stream having
     /// delivered the full text.  This method patches the visible messages with

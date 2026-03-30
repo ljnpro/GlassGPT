@@ -176,6 +176,7 @@ package extension BackendConversationRunStreamDriving {
                     break
                 }
                 try await refreshVisibleConversation()
+                applyLiveOverlayFromPolledMessages()
                 let run = try await client.fetchRun(runID)
                 applyPolledRunSummary(run)
                 if run.status == .completed || run.status == .failed || run.status == .cancelled {
