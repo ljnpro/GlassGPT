@@ -1,6 +1,6 @@
 # GlassGPT 5.3.1 Audit
 
-Status: release candidate; backend and TestFlight publication pending
+Status: published; backend and TestFlight publication complete
 Date: 2026-03-29
 
 ## Goal
@@ -35,11 +35,11 @@ Published companion entrypoints:
 | CI/CD Pipeline | 19 | Node drift is fixed, the backend lane now enforces TypeScript coverage thresholds through Vitest V8 coverage, backend CI now runs an OSV scan against `pnpm-lock.yaml`, and the final perfect-log release evidence now exists at `.local/build/evidence/rel-001-final-ci.txt`. |
 | Documentation Quality | 18 | Security, architecture, testing, release, backend local-dev, API entrypoint, audit publication, and push/release guidance docs are refreshed and now align with the 5.3.0 release flow. |
 | Developer Experience | 16 | Toolchain truth, backend local-dev guidance, and the new API/release/audit docs entrypoint materially reduce repo orientation friction. |
-| Release Management | 18 | Script-only release path exists, deploys now emit backup artifacts explicitly, and the supported D1 restore/import helper is documented; environment/tooling blockers remain. |
+| Release Management | 19 | The script-only release path executed successfully for `5.3.1`, including backend staging/prod deploys, IPA verification, TestFlight upload, and branch/tag publication without relying on manual release steps. |
 | Dependency Management | 19 | Strict package discipline remains, npm/pnpm Dependabot coverage now exists at the workspace root, and backend CI now runs a real OSV vulnerability scan against `pnpm-lock.yaml`. |
 | Error Handling | 18 | Persistence payload paths now use the standard logger, chat/agent broadcast failures log sanitized metadata, backend relay failures now log `run_stream_relay_failed` and emit structured client-safe error frames, malformed OpenAI stream payloads no longer fail silently, and the shared iOS stream projection now decodes the user-facing message instead of surfacing raw JSON payload text. |
 | Maintainability | 18 | Swift maintainability gates are green and common controller scaffolding is landed. |
-| Operational Maturity | 16 | Staging/prod envs, backup/export, deploy dry-runs, smoke gating, and the replacement-database restore workflow are in place; live release execution evidence and stronger observability still remain. |
+| Operational Maturity | 17 | Staging/prod envs, backup/export, deploy dry-runs, smoke gating, and the replacement-database restore workflow are in place, and the live `5.3.1` release execution evidence now exists for both backend promotion and TestFlight publication. |
 
 ## Evidence So Far
 
@@ -85,16 +85,20 @@ Published companion entrypoints:
 - `/Applications/GlassGPT/.local/build/evidence/release-5.3.0-20215/testflight.txt`
 - `/Applications/GlassGPT/.local/build/evidence/5.3.1-coverage-uplift.txt`
 - `/Applications/GlassGPT/.local/build/evidence/5.3.1-hotfix-verification.txt`
-## Remaining Release Blockers
+- `/Applications/GlassGPT/.local/build/evidence/release-5.3.1-20216/backend-staging.txt`
+- `/Applications/GlassGPT/.local/build/evidence/release-5.3.1-20216/backend-production.txt`
+- `/Applications/GlassGPT/.local/build/evidence/release-5.3.1-20216/testflight.txt`
+## Publication Outcome
 
-- `5.3.1` backend/TestFlight publication has not run yet on the current tree, so the final hotfix evidence directory under `.local/build/evidence/release-5.3.1-20216/` does not exist yet.
-- The release scripts still require a clean worktree before orchestration, so the hotfix changes must be committed first.
-- After publication, the audit must be updated with the new `5.3.1` backend staging/production and TestFlight evidence paths.
+- `5.3.1` backend publication completed through the scripted staging and production deploy path.
+- `5.3.1 (20216)` uploaded to TestFlight through the scripted Transporter path.
+- Branch `codex/stable-5.3` and tag `v5.3.1` were pushed successfully.
+- Direct `main` promotion was intentionally skipped during the hotfix publish because branch protection remains enforced; that follow-up is outside the release-critical path.
 
 ## Finalization Checklist
 
-- Replace this snapshot with the final score table.
-- Link the final CI evidence log.
-- Link backend staging/prod deploy evidence for `5.3.1`.
-- Link TestFlight publish evidence for `5.3.1`.
-- Confirm every `todo.md` exit gate is green.
+- [x] Replace this snapshot with the final score table.
+- [x] Link the final CI evidence log.
+- [x] Link backend staging/prod deploy evidence for `5.3.1`.
+- [x] Link TestFlight publish evidence for `5.3.1`.
+- [x] Confirm every `todo.md` exit gate is green.
