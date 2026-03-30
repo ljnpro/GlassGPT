@@ -1,6 +1,6 @@
 # GlassGPT 5.3.2 Audit
 
-Status: in-progress
+Status: published; backend and TestFlight publication complete
 Date: 2026-03-29
 
 ## Goal
@@ -57,3 +57,10 @@ updates were not reaching the iOS client in real time.
 - Backend staging deploy: health check passed, version 5.3.2
 - Backend production deploy: health check passed, version 5.3.2
 - iOS build: version 5.3.2 (20217)
+- TestFlight upload: successful
+- Git tag: v5.3.2
+- Branch: codex/stable-5.3 (commit 201eb80)
+- Archive: /Applications/GlassGPT/.local/build/GlassGPT-5.3.2.xcarchive
+- IPA: /Applications/GlassGPT/.local/build/export-5.3.2/GlassGPT.ipa
+- D1 staging backup: /Applications/GlassGPT/.local/build/d1-staging-backup-20260329T220855.sql
+- D1 production backup: /Applications/GlassGPT/.local/build/d1-production-backup-20260329T220926.sql
