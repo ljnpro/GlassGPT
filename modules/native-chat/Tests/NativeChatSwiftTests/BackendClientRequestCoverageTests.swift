@@ -30,7 +30,12 @@ struct BackendClientRequestCoverageTests {
         _ = try await client.fetchRun("run_1")
         _ = try await client.cancelRun("run_1")
         _ = try await client.retryRun("run_1")
-        _ = try await client.sendMessage("Hello", to: "conv_1")
+        _ = try await client.sendMessage(
+            "Hello",
+            to: "conv_1",
+            imageBase64: "ZmFrZS1qcGVn",
+            fileIds: ["file_1", "file_2"]
+        )
         _ = try await client.startAgentRun(prompt: "Investigate", in: "conv_1")
         _ = try await client.syncEvents(after: "cur_0")
         _ = try await client.authenticateWithApple(
@@ -89,6 +94,8 @@ struct BackendClientRequestCoverageTests {
         #expect(requests[11].authorizationHeader == nil)
         #expect(requests[12].authorizationHeader == "Bearer refreshed-access-token")
         #expect(requests[14].authorizationHeader == "Bearer refreshed-access-token")
+        #expect(requests[7].body?.contains("\"imageBase64\":\"ZmFrZS1qcGVn\"") == true)
+        #expect(requests[7].body?.contains("\"fileIds\":[\"file_1\",\"file_2\"]") == true)
         #expect(sessionStore.loadSession() == nil)
         session.invalidateAndCancel()
     }

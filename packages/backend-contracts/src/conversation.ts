@@ -48,11 +48,21 @@ export const createConversationRequestSchema = z.object({
   serviceTier: serviceTierSchema.optional(),
 });
 
-export const createMessageRequestSchema = z.object({
-  content: z.string().min(1),
-  fileIds: z.array(z.string()).optional(),
-  imageBase64: z.string().optional(),
-});
+export const createMessageRequestSchema = z
+  .object({
+    content: z.string(),
+    fileIds: z.array(z.string()).optional(),
+    imageBase64: z.string().optional(),
+  })
+  .refine(
+    (value) =>
+      value.content.trim().length > 0 ||
+      (value.fileIds?.length ?? 0) > 0 ||
+      (value.imageBase64?.length ?? 0) > 0,
+    {
+      message: 'content_or_attachment_required',
+    },
+  );
 
 export const updateConversationConfigurationRequestSchema = z.object({
   model: modelSchema.optional(),

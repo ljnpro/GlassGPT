@@ -9,7 +9,8 @@ package extension BackendConversationProjectionController {
     @discardableResult
     func sendMessage(text rawText: String) -> Bool {
         let trimmedText = rawText.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmedText.isEmpty else {
+        let hasAttachments = selectedImageData != nil || !pendingAttachments.isEmpty
+        guard !trimmedText.isEmpty || hasAttachments else {
             return false
         }
         guard sessionStore.isSignedIn else {

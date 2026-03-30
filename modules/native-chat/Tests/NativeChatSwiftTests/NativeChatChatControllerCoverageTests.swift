@@ -8,22 +8,39 @@ import Testing
 @Suite(.tags(.runtime, .presentation))
 @MainActor
 struct NativeChatChatControllerCoverageTests {
-    @Test func `chat controller handles signed out blocked and reset states`() throws {
+    @Test func `chat controller handles signed out blocked and reset states`() async throws {
         let signedOut = try makeNativeChatHarness(signedIn: false).makeChatController()
 
         #expect(!signedOut.sendMessage(text: ""))
         #expect(!signedOut.sendMessage(text: "Hello"))
         #expect(signedOut.errorMessage == "Sign in with Apple in Settings to use chat.")
 
-        let signedInHarness = try makeNativeChatHarness(signedIn: true)
-        let controller = signedInHarness.makeChatController()
-        controller.selectedImageData = Data([0x01])
-        #expect(!controller.sendMessage(text: "Hello"))
-        #expect(controller.errorMessage == "Attachments are not available yet.")
+        let imageHarness = try makeNativeChatHarness(signedIn: true)
+        let imageController = imageHarness.makeChatController()
+        imageController.setCurrentConversation(makeHarnessConversation())
+        imageController.selectedImageData = Data([0x01])
+        #expect(imageController.sendMessage(text: ""))
+        let imageTask = try #require(imageController.submissionTask)
+        await imageTask.value
+        #expect(imageHarness.client.sentMessages.last?.imageBase64 == "AQ==")
 
-        controller.selectedImageData = nil
-        controller.pendingAttachments = [FileAttachment(filename: "doc.pdf", fileType: "pdf")]
-        #expect(!controller.sendMessage(text: "Hello"))
+        let fileHarness = try makeNativeChatHarness(signedIn: true)
+        let controller = fileHarness.makeChatController()
+        controller.setCurrentConversation(makeHarnessConversation())
+        controller.pendingAttachments = [
+            FileAttachment(
+                filename: "doc.pdf",
+                fileSize: 4,
+                fileType: "pdf",
+                localData: Data([0x01, 0x02, 0x03, 0x04])
+            )
+        ]
+        fileHarness.client.nextUploadedFileID = "file_chat_doc"
+        #expect(controller.sendMessage(text: ""))
+        let fileTask = try #require(controller.submissionTask)
+        await fileTask.value
+        #expect(fileHarness.client.uploadFileCalls.last?.filename == "doc.pdf")
+        #expect(fileHarness.client.sentMessages.last?.fileIDs == ["file_chat_doc"])
         controller.pendingAttachments = []
 
         controller.isStreaming = true

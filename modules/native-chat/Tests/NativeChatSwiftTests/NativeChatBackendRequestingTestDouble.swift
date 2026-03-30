@@ -5,6 +5,19 @@ import Foundation
 
 @MainActor
 final class UICoverageBackendRequester: BackendRequesting {
+    struct SentMessageCall: Equatable {
+        let content: String
+        let conversationID: String
+        let imageBase64: String?
+        let fileIDs: [String]?
+    }
+
+    struct UploadFileCall: Equatable {
+        let filename: String
+        let mimeType: String
+        let byteCount: Int
+    }
+
     var conversations: [ConversationDTO] = []
     var detail: ConversationDetailDTO?
     var connectionCheckError: Error?
@@ -25,6 +38,9 @@ final class UICoverageBackendRequester: BackendRequesting {
     var deleteOpenAIKeyCallCount = 0
     var logoutCallCount = 0
     var fetchRunCallCount = 0
+    var sentMessages: [SentMessageCall] = []
+    var uploadFileCalls: [UploadFileCall] = []
+    var nextUploadedFileID = "file_uploaded_1"
     var connectionStatus = ConnectionCheckDTO(
         backend: .healthy,
         auth: .healthy,
@@ -117,7 +133,26 @@ final class UICoverageBackendRequester: BackendRequesting {
     }
 
     func sendMessage(_ content: String, to conversationID: String, imageBase64: String?, fileIds: [String]?) async throws -> RunSummaryDTO {
-        makeRunSummary(id: "run_msg_\(text.count)")
+        sentMessages.append(
+            SentMessageCall(
+                content: content,
+                conversationID: conversationID,
+                imageBase64: imageBase64,
+                fileIDs: fileIds
+            )
+        )
+        return makeRunSummary(id: "run_msg_\(content.count)")
+    }
+
+    func uploadFile(data: Data, filename: String, mimeType: String) async throws -> String {
+        uploadFileCalls.append(
+            UploadFileCall(
+                filename: filename,
+                mimeType: mimeType,
+                byteCount: data.count
+            )
+        )
+        return nextUploadedFileID
     }
 
     func startAgentRun(prompt: String?, in _: String) async throws -> RunSummaryDTO {

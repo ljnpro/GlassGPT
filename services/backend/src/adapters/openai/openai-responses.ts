@@ -170,7 +170,10 @@ const buildInputMessages = (
     if (!hasAttachments) {
       return input;
     }
-    const parts: Array<Record<string, unknown>> = [{ text: input, type: 'input_text' }];
+    const parts: Array<Record<string, unknown>> = [];
+    if (input.length > 0) {
+      parts.push({ text: input, type: 'input_text' });
+    }
     if (imageBase64) {
       parts.push({ image_url: `data:image/jpeg;base64,${imageBase64}`, type: 'input_image' });
     }
@@ -183,7 +186,10 @@ const buildInputMessages = (
   return input.map((message, index) => {
     const isLastUser = message.role === 'user' && index === input.length - 1;
     const contentType = message.role === 'assistant' ? 'output_text' : 'input_text';
-    const parts: Array<Record<string, unknown>> = [{ text: message.content, type: contentType }];
+    const parts: Array<Record<string, unknown>> = [];
+    if (message.content.length > 0) {
+      parts.push({ text: message.content, type: contentType });
+    }
     if (isLastUser && imageBase64) {
       parts.push({ image_url: `data:image/jpeg;base64,${imageBase64}`, type: 'input_image' });
     }

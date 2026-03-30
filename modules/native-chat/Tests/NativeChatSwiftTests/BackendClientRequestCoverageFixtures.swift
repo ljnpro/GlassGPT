@@ -208,8 +208,10 @@ final class CoverageBackendURLProtocolState: @unchecked Sendable {
 
     struct RecordedRequest: Equatable {
         let path: String
+        let query: String?
         let method: String
         let authorizationHeader: String?
+        let body: String?
     }
 
     struct Snapshot {
@@ -234,17 +236,47 @@ final class CoverageBackendURLProtocolState: @unchecked Sendable {
     }
 
     func recordRequest(_ request: URLRequest) {
+        let bodyData = request.httpBody ?? readBody(from: request.httpBodyStream)
         lock.lock()
         recordedRequests.append(
             RecordedRequest(
                 path: request.url?.path(percentEncoded: false)
                     ?? request.url?.path
                     ?? "",
+                query: request.url?.query,
                 method: request.httpMethod ?? "GET",
-                authorizationHeader: request.value(forHTTPHeaderField: "Authorization")
+                authorizationHeader: request.value(forHTTPHeaderField: "Authorization"),
+                body: bodyData.flatMap { String(data: $0, encoding: .utf8) }
             )
         )
         lock.unlock()
+    }
+
+    private func readBody(from stream: InputStream?) -> Data? {
+        guard let stream else {
+            return nil
+        }
+
+        stream.open()
+        defer { stream.close() }
+
+        var data = Data()
+        let bufferSize = 4_096
+        let buffer = UnsafeMutablePointer<UInt8>.allocate(capacity: bufferSize)
+        defer { buffer.deallocate() }
+
+        while stream.hasBytesAvailable {
+            let count = stream.read(buffer, maxLength: bufferSize)
+            if count < 0 {
+                return nil
+            }
+            if count == 0 {
+                break
+            }
+            data.append(buffer, count: count)
+        }
+
+        return data.isEmpty ? nil : data
     }
 
     func dequeueResponse() -> StubbedResponse {

@@ -352,6 +352,88 @@ describe('createChatRunService', () => {
     });
   });
 
+  it('builds an attachment-only OpenAI request without an empty input_text part', async () => {
+    const createStreamingResponse = vi.fn(
+      (_apiKey: string, request: StreamingConversationRequest) =>
+        (async function* () {
+          yield {
+            citations: [],
+            filePathAnnotations: [],
+            kind: 'completed',
+            outputText: 'File summary',
+            thinkingText: null,
+            toolCalls: [],
+          } as const;
+          void request;
+        })(),
+    );
+    const harness = createServiceHarness({
+      createStreamingResponse,
+    });
+
+    const queuedRun = await harness.service.queueChatRun(testEnv, harness.workflow, {
+      content: '',
+      conversationId: conversationFixture.id,
+      fileIds: ['file_123'],
+      userId: conversationFixture.userId,
+    });
+
+    await harness.service.executeQueuedRun(testEnv, {
+      content: '',
+      conversationId: conversationFixture.id,
+      fileIds: ['file_123'],
+      runId: queuedRun.id,
+      userId: conversationFixture.userId,
+    });
+
+    expect(createStreamingResponse).toHaveBeenCalledTimes(1);
+    expect(createStreamingResponse.mock.calls[0]?.[1]).toMatchObject({
+      fileIds: ['file_123'],
+      input: '',
+    });
+  });
+
+  it('threads imageBase64 into the live execution request for multimodal chat runs', async () => {
+    const createStreamingResponse = vi.fn(
+      (_apiKey: string, request: StreamingConversationRequest) =>
+        (async function* () {
+          yield {
+            citations: [],
+            filePathAnnotations: [],
+            kind: 'completed',
+            outputText: 'Image summary',
+            thinkingText: null,
+            toolCalls: [],
+          } as const;
+          void request;
+        })(),
+    );
+    const harness = createServiceHarness({
+      createStreamingResponse,
+    });
+
+    const queuedRun = await harness.service.queueChatRun(testEnv, harness.workflow, {
+      content: 'Describe the image',
+      conversationId: conversationFixture.id,
+      imageBase64: 'ZmFrZS1qcGVn',
+      userId: conversationFixture.userId,
+    });
+
+    await harness.service.executeQueuedRun(testEnv, {
+      content: 'Describe the image',
+      conversationId: conversationFixture.id,
+      imageBase64: 'ZmFrZS1qcGVn',
+      runId: queuedRun.id,
+      userId: conversationFixture.userId,
+    });
+
+    expect(createStreamingResponse).toHaveBeenCalledTimes(1);
+    expect(createStreamingResponse.mock.calls[0]?.[1]).toMatchObject({
+      imageBase64: 'ZmFrZS1qcGVn',
+      input: 'Describe the image',
+    });
+  });
+
   it('logs non-fatal chat stream broadcast failures and still completes the run', async () => {
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
     const harness = createServiceHarness({

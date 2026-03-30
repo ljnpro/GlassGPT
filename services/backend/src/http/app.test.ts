@@ -461,6 +461,9 @@ const createTestServices = (overrides: Partial<BackendServices> = {}): BackendSe
     chatRunService: createChatRunServiceStub(),
     conversationService: createConversationServiceStub(),
     credentialService: createCredentialServiceStub(),
+    fileProxySupport: {
+      loadApiKey: async () => 'sk-user-key',
+    },
     rateLimitService: createRateLimitServiceStub(),
     runService: createRunServiceStub(),
     syncService: createSyncServiceStub(),
@@ -1138,6 +1141,75 @@ describe('backend worker scaffold', () => {
       kind: 'agent',
       status: 'cancelled',
     });
+  });
+
+  it('accepts oversized image-bearing message bodies on the conversation message route', async () => {
+    const app = createApp(createTestServices());
+    const response = await app.fetch(
+      new Request(`https://example.com/v1/conversations/${chatConversationFixture.id}/messages`, {
+        method: 'POST',
+        headers: {
+          Authorization: 'Bearer access-token',
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          content: 'Describe this image',
+          imageBase64: 'a'.repeat(1_400_000),
+        }),
+      }),
+      testEnv,
+      testExecutionContext,
+    );
+
+    expect(response.status).toBe(202);
+    await expect(response.json()).resolves.toMatchObject({
+      conversationId: chatConversationFixture.id,
+      kind: 'chat',
+      status: 'queued',
+    });
+  });
+
+  it('accepts oversized multipart uploads on the file proxy route', async () => {
+    const app = createApp(createTestServices());
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = vi.fn(async () =>
+      new Response(JSON.stringify({ bytes: 1_200_000, filename: 'large.pdf', id: 'file_large_01' }), {
+        headers: { 'Content-Type': 'application/json' },
+        status: 200,
+      }),
+    ) as typeof fetch;
+
+    try {
+      const formData = new FormData();
+      formData.append(
+        'file',
+        new File([new Uint8Array(1_200_000)], 'large.pdf', {
+          type: 'application/pdf',
+        }),
+      );
+      formData.append('purpose', 'user_data');
+
+      const response = await app.fetch(
+        new Request('https://example.com/v1/files/upload', {
+          method: 'POST',
+          headers: {
+            Authorization: 'Bearer access-token',
+          },
+          body: formData,
+        }),
+        testEnv,
+        testExecutionContext,
+      );
+
+      expect(response.status).toBe(201);
+      await expect(response.json()).resolves.toEqual({
+        bytes: 1_200_000,
+        fileId: 'file_large_01',
+        filename: 'large.pdf',
+      });
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
   });
 
   it('exposes scaffolded auth, credential, sync, and error routes', async () => {

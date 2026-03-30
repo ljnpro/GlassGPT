@@ -963,8 +963,7 @@
         "type": "object",
         "properties": {
           "content": {
-            "type": "string",
-            "minLength": 1
+            "type": "string"
           },
           "fileIds": {
             "type": "array",

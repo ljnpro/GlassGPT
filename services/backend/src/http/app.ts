@@ -45,6 +45,9 @@ const statusCodeForApplicationError = (code: string): ApplicationErrorStatusCode
 
 export const createApp = (services: BackendServices): BackendApp => {
   const app = new Hono<BackendAppContext>();
+  const defaultBodyLimit = bodyLimit({ maxSize: 1024 * 1024 });
+  const conversationMessageBodyLimit = bodyLimit({ maxSize: 20 * 1024 * 1024 });
+  const fileUploadBodyLimit = bodyLimit({ maxSize: 50 * 1024 * 1024 });
 
   app.use(
     '*',
@@ -55,8 +58,18 @@ export const createApp = (services: BackendServices): BackendApp => {
       origin: (origin, context) => resolveCorsOrigin(origin, context.env),
     }),
   );
-  app.use('*', bodyLimit({ maxSize: 1024 * 1024 }));
-  app.use('/v1/files/upload', bodyLimit({ maxSize: 50 * 1024 * 1024 }));
+  app.use('*', async (context, next) => {
+    if (context.req.path === '/v1/files/upload') {
+      return fileUploadBodyLimit(context, next);
+    }
+    if (
+      context.req.method === 'POST' &&
+      /^\/v1\/conversations\/[^/]+\/messages$/.test(context.req.path)
+    ) {
+      return conversationMessageBodyLimit(context, next);
+    }
+    return defaultBodyLimit(context, next);
+  });
   app.use('*', requestIdMiddleware);
   app.use('/v1/*', createRateLimiterMiddleware(services));
 
