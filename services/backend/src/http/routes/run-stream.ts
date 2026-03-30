@@ -355,7 +355,7 @@ export const installRunStreamRoutes = (app: BackendApp, services: BackendService
                 return;
               }
 
-              enqueue(frame);
+              enqueueMicroBuffered(frame);
             }
           }
 
