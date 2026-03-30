@@ -23,6 +23,8 @@ public protocol BackendRequesting: AnyObject {
     func retryRun(_ runID: String) async throws -> RunSummaryDTO
     func sendMessage(_ content: String, to conversationID: String, imageBase64: String?, fileIds: [String]?) async throws -> RunSummaryDTO
     func startAgentRun(prompt: String?, in conversationID: String) async throws -> RunSummaryDTO
+    func uploadFile(data: Data, filename: String, mimeType: String) async throws -> String
+    func downloadGeneratedFile(fileId: String, containerId: String?) async throws -> (data: Data, contentType: String?)
     func streamRun(_ runID: String, lastEventID: String?) async throws -> BackendSSEStream
     func syncEvents(after cursor: String?) async throws -> SyncEnvelopeDTO
     func updateConversationConfiguration(
@@ -66,6 +68,16 @@ public extension BackendRequesting {
         _ = reasoningEffort
         _ = agentWorkerReasoningEffort
         _ = serviceTier
+        throw URLError(.unsupportedURL)
+    }
+
+    func uploadFile(data: Data, filename: String, mimeType: String) async throws -> String {
+        _ = data; _ = filename; _ = mimeType
+        throw URLError(.unsupportedURL)
+    }
+
+    func downloadGeneratedFile(fileId: String, containerId: String?) async throws -> (data: Data, contentType: String?) {
+        _ = fileId; _ = containerId
         throw URLError(.unsupportedURL)
     }
 }
