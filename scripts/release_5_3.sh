@@ -18,10 +18,10 @@ function require_clean_worktree() {
 function usage() {
   cat <<'EOF'
 Usage:
-  ./scripts/release_5_3.sh <marketing_version> <build_number> [--branch <name>] [--preserve-main-as <name>] [--force-main-with-lease] [--skip-ci] [--preflight-only]
+  ./scripts/release_5_3.sh <marketing_version> <build_number> [--branch <name>] [--preserve-main-as <name>] [--force-main-with-lease] [--skip-main-promotion] [--skip-ci] [--preflight-only]
 
 Examples:
-  ./scripts/release_5_3.sh 5.3.1 20216 --branch codex/stable-5.3
+  ./scripts/release_5_3.sh 5.3.1 20216 --branch codex/stable-5.3 --skip-main-promotion
 EOF
 }
 
@@ -49,6 +49,7 @@ shift 2
 TARGET_BRANCH=""
 PRESERVE_MAIN_AS=""
 FORCE_MAIN_WITH_LEASE=0
+SKIP_MAIN_PROMOTION=0
 PREFLIGHT_ONLY=0
 SKIP_CI=0
 
@@ -64,6 +65,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --force-main-with-lease)
       FORCE_MAIN_WITH_LEASE=1
+      shift
+      ;;
+    --skip-main-promotion)
+      SKIP_MAIN_PROMOTION=1
       shift
       ;;
     --preflight-only)
@@ -135,6 +140,9 @@ if [[ -n "$PRESERVE_MAIN_AS" ]]; then
 fi
 if (( FORCE_MAIN_WITH_LEASE == 1 )); then
   testflight_args+=("--force-main-with-lease")
+fi
+if (( SKIP_MAIN_PROMOTION == 1 )); then
+  testflight_args+=("--skip-main-promotion")
 fi
 
 echo "==> Publishing TestFlight build"
