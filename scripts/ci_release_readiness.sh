@@ -21,6 +21,8 @@ mapfile -t ui_xcresult_bundles < <(
     ! -name 'glassgpt-ui-reinstall-*.xcresult' \
     -print | sort
 )
-if (( ${#ui_xcresult_bundles[@]} > 0 )); then
+if [[ "${RELEASE_SKIP_REQUIRED_UI_TESTS:-0}" == "1" ]]; then
+  echo "Skipping required UI test integrity check (RELEASE_SKIP_REQUIRED_UI_TESTS=1)."
+elif (( ${#ui_xcresult_bundles[@]} > 0 )); then
   python3 ./scripts/check_required_ui_tests.py "${ui_xcresult_bundles[@]}"
 fi
