@@ -75,6 +75,9 @@ export class ConversationEventHub extends DurableObject<Env> {
   }
 
   private handleSSEConnection(runId: string, lastEventID: string | null): Response {
+    const heartbeatFrame = this.encoder.encode(': hb\n\n');
+    let heartbeatTimer: ReturnType<typeof setInterval> | null = null;
+
     const stream = new ReadableStream<Uint8Array>({
       start: async (controller) => {
         let clients = this.runClients.get(runId);
@@ -86,8 +89,25 @@ export class ConversationEventHub extends DurableObject<Env> {
         const ping = this.encoder.encode(': connected\n\n');
         controller.enqueue(ping);
         await this.replayBufferedEvents(runId, lastEventID, controller);
+
+        // High-frequency heartbeat pushes data through the internal
+        // DO → Worker RPC buffer that holds small writes.
+        heartbeatTimer = setInterval(() => {
+          try {
+            controller.enqueue(heartbeatFrame);
+          } catch {
+            if (heartbeatTimer !== null) {
+              clearInterval(heartbeatTimer);
+              heartbeatTimer = null;
+            }
+          }
+        }, 100);
       },
       cancel: (controller) => {
+        if (heartbeatTimer !== null) {
+          clearInterval(heartbeatTimer);
+          heartbeatTimer = null;
+        }
         const clients = this.runClients.get(runId);
         if (clients) {
           clients.delete(controller as ReadableStreamDefaultController<Uint8Array>);
