@@ -47,6 +47,10 @@ export interface ChatRunServiceDependencies extends RunProjectionDependencies {
     env: BackendRuntimeContext,
     runId: string,
   ) => Promise<MessageRecord | null>;
+  readonly listMessagesForConversation: (
+    env: BackendRuntimeContext,
+    conversationId: string,
+  ) => Promise<MessageRecord[]>;
   readonly findRunById: (env: BackendRuntimeContext, runId: string) => Promise<RunRecord | null>;
   readonly findRunByIdForUser: (
     env: BackendRuntimeContext,

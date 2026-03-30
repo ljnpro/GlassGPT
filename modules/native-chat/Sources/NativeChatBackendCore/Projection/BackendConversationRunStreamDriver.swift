@@ -129,6 +129,21 @@ package extension BackendConversationRunStreamDriving {
             }
         )
 
+        // Parallel polling task refreshes persisted content every 2 seconds
+        // as a fallback when SSE events are buffered by intermediary infra.
+        let pollingFallback = Task { @MainActor [weak self] in
+            while !Task.isCancelled {
+                do { try await Task.sleep(for: .seconds(2)) } catch { break }
+                guard let self, visibleSelectionToken == selectionToken else { break }
+                do {
+                    try await refreshVisibleConversation()
+                } catch {
+                    // Best-effort; SSE is the primary path.
+                }
+            }
+        }
+        defer { pollingFallback.cancel() }
+
         for try await event in stream {
             if let eventID = event.id, !eventID.isEmpty {
                 lastStreamEventID = eventID

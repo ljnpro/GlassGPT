@@ -141,6 +141,9 @@ const createServiceHarness = (options?: {
         messages.find((message) => message.runId === runId && message.role === 'assistant') ?? null
       );
     },
+    listMessagesForConversation: async (_env, conversationId) => {
+      return messages.filter((message) => message.conversationId === conversationId);
+    },
     findRunById: async (_env, runId) => runs.get(runId) ?? null,
     findRunByIdForUser: async (_env, runId, userId) => {
       const run = runs.get(runId) ?? null;

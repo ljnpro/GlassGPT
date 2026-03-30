@@ -63,6 +63,10 @@ export const createChatRunExecutionOperations = (
 
       try {
         const apiKey = await support.loadApiKey(env, input.userId);
+        const allMessages = await deps.listMessagesForConversation(env, conversation.id);
+        // Exclude messages from the current run (user message already included
+        // in input.content; assistant message is being created now).
+        const conversationHistory = allMessages.filter((m) => m.runId !== run.id);
         const existingAssistantMessage = await deps.findAssistantMessageByRunId(env, run.id);
         let assistantMessage: MessageRecord = existingAssistantMessage ?? {
           agentTraceJSON: null,
@@ -149,7 +153,7 @@ export const createChatRunExecutionOperations = (
 
         for await (const event of deps.createStreamingResponse(
           apiKey,
-          buildChatExecutionRequest(conversation, input.content),
+          buildChatExecutionRequest(conversation, input.content, conversationHistory),
         )) {
           streamEventCount += 1;
           if (streamEventCount % 20 === 0) {

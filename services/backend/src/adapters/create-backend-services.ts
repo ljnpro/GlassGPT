@@ -81,6 +81,7 @@ export const createBackendServices = () => {
     insertMessage,
     insertRun,
     insertRunEvent,
+    listMessagesForConversation,
     now: () => new Date(),
     publishConversationCursor,
     updateMessage,

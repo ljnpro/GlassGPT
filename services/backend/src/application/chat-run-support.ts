@@ -1,9 +1,13 @@
 import type { ConversationRecord } from '../domain/conversation-model.js';
+import type { MessageRecord } from '../domain/message-model.js';
 import type { RunRecord } from '../domain/run-model.js';
 import type { ProviderCredentialRecord } from './auth-records.js';
 import type { ChatExecutionContext, ChatRunServiceDependencies } from './chat-run-types.js';
 import { ApplicationError } from './errors.js';
-import type { StreamingConversationRequest } from './live-stream-model.js';
+import type {
+  StreamingConversationMessage,
+  StreamingConversationRequest,
+} from './live-stream-model.js';
 import { requireConversation, requireRun } from './run-projection.js';
 import type { BackendRuntimeContext } from './runtime-context.js';
 
@@ -37,12 +41,33 @@ export const requireChatRun = (run: RunRecord): RunRecord => {
   return run;
 };
 
+const buildConversationInput = (
+  history: readonly MessageRecord[],
+  currentContent: string,
+): string | StreamingConversationMessage[] => {
+  const prior = history.filter(
+    (message) =>
+      (message.role === 'user' || message.role === 'assistant') && message.content.length > 0,
+  );
+  if (prior.length === 0) {
+    return currentContent;
+  }
+
+  const messages: StreamingConversationMessage[] = prior.map((message) => ({
+    content: message.content,
+    role: message.role as 'user' | 'assistant',
+  }));
+  messages.push({ content: currentContent, role: 'user' });
+  return messages;
+};
+
 export const buildChatExecutionRequest = (
   conversation: ConversationRecord,
   input: string,
+  conversationHistory: readonly MessageRecord[],
 ): StreamingConversationRequest => {
   return {
-    input,
+    input: buildConversationInput(conversationHistory, input),
     model: conversation.model ?? 'gpt-5.4',
     reasoningEffort: conversation.reasoningEffort ?? 'medium',
     serviceTier: conversation.serviceTier ?? 'default',
