@@ -5,6 +5,12 @@ import Foundation
 
 @MainActor
 final class UICoverageBackendRequester: BackendRequesting {
+    enum UploadBehavior {
+        case immediateSuccess(String)
+        case deferredSuccess(String)
+        case failure(any Error)
+    }
+
     struct SentMessageCall: Equatable {
         let content: String
         let conversationID: String
@@ -41,6 +47,9 @@ final class UICoverageBackendRequester: BackendRequesting {
     var sentMessages: [SentMessageCall] = []
     var uploadFileCalls: [UploadFileCall] = []
     var nextUploadedFileID = "file_uploaded_1"
+    var uploadBehavior: UploadBehavior = .immediateSuccess("file_uploaded_1")
+    var onUploadFile: (() -> Void)?
+    private var pendingUploadContinuations: [CheckedContinuation<Void, Never>] = []
     var connectionStatus = ConnectionCheckDTO(
         backend: .healthy,
         auth: .healthy,
@@ -152,7 +161,19 @@ final class UICoverageBackendRequester: BackendRequesting {
                 byteCount: data.count
             )
         )
-        return nextUploadedFileID
+        onUploadFile?()
+
+        switch uploadBehavior {
+        case let .immediateSuccess(fileID):
+            return fileID
+        case let .deferredSuccess(fileID):
+            await withCheckedContinuation { continuation in
+                pendingUploadContinuations.append(continuation)
+            }
+            return fileID
+        case let .failure(error):
+            throw error
+        }
     }
 
     func startAgentRun(prompt: String?, in _: String) async throws -> RunSummaryDTO {
@@ -228,5 +249,13 @@ final class UICoverageBackendRequester: BackendRequesting {
             visibleSummary: "Done",
             processSnapshotJSON: nil
         )
+    }
+
+    func resumePendingUploads() {
+        let continuations = pendingUploadContinuations
+        pendingUploadContinuations.removeAll()
+        for continuation in continuations {
+            continuation.resume()
+        }
     }
 }

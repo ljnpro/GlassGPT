@@ -29,7 +29,7 @@ struct NativeChatAttachmentFlowTests {
                 localData: Data([0x01, 0x02, 0x03, 0x04])
             )
         ]
-        fileHarness.client.nextUploadedFileID = "file_chat_doc"
+        fileHarness.client.uploadBehavior = .immediateSuccess("file_chat_doc")
 
         #expect(fileController.sendMessage(text: ""))
         let fileTask = try #require(fileController.submissionTask)

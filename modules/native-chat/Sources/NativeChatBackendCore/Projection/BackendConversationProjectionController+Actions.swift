@@ -143,20 +143,24 @@ package extension BackendConversationProjectionController {
             // Upload pending file attachments to OpenAI via backend proxy
             var uploadedFileIds: [String] = []
             for i in pendingAttachments.indices {
-                guard let data = pendingAttachments[i].localData else { continue }
-                pendingAttachments[i].uploadStatus = .uploading
+                var attachment = pendingAttachments[i]
+                guard let data = attachment.localData else { continue }
+                attachment.uploadStatus = .uploading
+                pendingAttachments[i] = attachment
                 do {
                     let fileId = try await client.uploadFile(
                         data: data,
-                        filename: pendingAttachments[i].filename,
-                        mimeType: mimeTypeForExtension(pendingAttachments[i].fileType)
+                        filename: attachment.filename,
+                        mimeType: mimeTypeForExtension(attachment.fileType)
                     )
-                    pendingAttachments[i].fileId = fileId
-                    pendingAttachments[i].uploadStatus = .uploaded
+                    attachment.fileId = fileId
+                    attachment.uploadStatus = .uploaded
+                    pendingAttachments[i] = attachment
                     uploadedFileIds.append(fileId)
                 } catch {
-                    pendingAttachments[i].uploadStatus = .failed
-                    errorMessage = "File upload failed: \(pendingAttachments[i].filename)"
+                    attachment.uploadStatus = .failed
+                    pendingAttachments[i] = attachment
+                    errorMessage = "File upload failed: \(attachment.filename)"
                     isRunActive = false
                     return
                 }

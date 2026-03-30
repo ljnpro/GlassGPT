@@ -102,6 +102,42 @@ struct BackendClientRequestCoverageTests {
 
     @MainActor
     @Test
+    func `upload file posts multipart form data to backend file proxy`() async throws {
+        CoverageBackendURLProtocol.state.reset()
+        try CoverageBackendURLProtocol.state.enqueueResponse(
+            statusCode: 201,
+            body: Data(#"{"fileId":"file_upload_1"}"#.utf8)
+        )
+
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [CoverageBackendURLProtocol.self]
+        let session = URLSession(configuration: configuration)
+        let sessionStore = try BackendSessionStore(session: makeCoverageSessionDTO())
+        let client = try BackendClient(
+            environment: BackendEnvironment(baseURL: #require(URL(string: "https://example.com"))),
+            sessionStore: sessionStore,
+            urlSession: session
+        )
+
+        let fileID = try await client.uploadFile(
+            data: Data("hello".utf8),
+            filename: "notes.txt",
+            mimeType: "text/plain"
+        )
+
+        let requests = CoverageBackendURLProtocol.state.snapshot.recordedRequests
+        #expect(fileID == "file_upload_1")
+        #expect(requests.count == 1)
+        #expect(requests[0].path == "/v1/files/upload")
+        #expect(requests[0].body?.contains("name=\"file\"; filename=\"notes.txt\"") == true)
+        #expect(requests[0].body?.contains("Content-Type: text/plain") == true)
+        #expect(requests[0].body?.contains("name=\"purpose\"") == true)
+        #expect(requests[0].body?.contains("user_data") == true)
+        session.invalidateAndCancel()
+    }
+
+    @MainActor
+    @Test
     func `make request applies authorization modes and query items`() throws {
         let configuration = URLSessionConfiguration.ephemeral
         configuration.protocolClasses = [CoverageBackendURLProtocol.self]
