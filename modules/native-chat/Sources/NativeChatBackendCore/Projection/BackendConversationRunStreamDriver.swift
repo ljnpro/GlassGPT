@@ -212,7 +212,13 @@ package extension BackendConversationRunStreamDriving {
     ) async {
         do {
             guard visibleSelectionToken == selectionToken else { return }
+            let streamedContent = currentStreamingText
+            let streamedThinking = currentThinkingText
             try await finalizeVisibleRun(conversationServerID: conversationServerID)
+            applyStreamingFallbackIfNeeded(
+                streamedContent: streamedContent,
+                streamedThinking: streamedThinking
+            )
             clearLiveSurface()
         } catch {
             errorMessage = error.localizedDescription

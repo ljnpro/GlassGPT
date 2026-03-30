@@ -49,7 +49,7 @@ extension NativeChatCompositionRoot {
     private func resolvedBackendAppVersion() -> String {
         let appVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
         let trimmed = appVersion?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        return trimmed.isEmpty ? "5.3.1" : trimmed
+        return trimmed.isEmpty ? "5.3.2" : trimmed
     }
 }
 

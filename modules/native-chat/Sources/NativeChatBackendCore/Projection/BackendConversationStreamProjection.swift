@@ -115,7 +115,13 @@ package extension BackendConversationStreamProjecting {
             applyStreamStageEvent(from: event)
             return .continueLoop
         case "done":
+            let streamedContent = currentStreamingText
+            let streamedThinking = currentThinkingText
             try await finalizeVisibleRun(conversationServerID: conversationServerID)
+            applyStreamingFallbackIfNeeded(
+                streamedContent: streamedContent,
+                streamedThinking: streamedThinking
+            )
             clearLiveSurface()
             return .finish
         case "error":

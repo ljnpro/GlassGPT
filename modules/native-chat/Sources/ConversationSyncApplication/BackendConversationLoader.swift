@@ -57,7 +57,7 @@ public final class BackendConversationLoader {
             model: cachedConversation.mode == .chat
                 ? ModelType(rawValue: cachedConversation.model) ?? .gpt5_4
                 : nil,
-            reasoningEffort: ReasoningEffort(rawValue: cachedConversation.reasoningEffort) ?? .high,
+            reasoningEffort: ReasoningEffort(rawValue: cachedConversation.reasoningEffort) ?? .medium,
             agentWorkerReasoningEffort: cachedConversation.mode == .agent
                 ? (cachedConversation.agentWorkerReasoningEffort ?? .low)
                 : nil,

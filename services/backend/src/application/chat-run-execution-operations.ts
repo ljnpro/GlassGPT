@@ -11,6 +11,7 @@ import {
   persistProjectedEvent,
   truncateSummary,
 } from './run-projection.js';
+import { createStreamDeltaDispatcher } from './stream-delta-dispatcher.js';
 
 type ChatRunExecutionOperations = Pick<ChatRunService, 'executeQueuedRun'>;
 type BroadcastDelta = Parameters<ChatRunServiceDependencies['broadcastStreamDelta']>[2];
@@ -99,10 +100,11 @@ export const createChatRunExecutionOperations = (
         let pendingTextDelta = '';
         let streamEventCount = 0;
 
-        const broadcastNonFatalDelta = async (delta: BroadcastDelta): Promise<void> => {
-          try {
+        const deltaDispatcher = createStreamDeltaDispatcher<BroadcastDelta>({
+          dispatch: async (delta) => {
             await deps.broadcastStreamDelta(env, conversation.id, delta);
-          } catch (error) {
+          },
+          onError: (error, delta) => {
             const errorMessage =
               error instanceof Error ? sanitizeLogValue(error.message) : 'unknown_error';
             logError('chat_stream_broadcast_failed', {
@@ -111,8 +113,8 @@ export const createChatRunExecutionOperations = (
               error: errorMessage,
               runId: run.id,
             });
-          }
-        };
+          },
+        });
 
         const persistAssistantSnapshot = async (input: {
           readonly kind: 'assistant_completed' | 'assistant_delta' | 'run_progress';
@@ -164,7 +166,7 @@ export const createChatRunExecutionOperations = (
                 content: liveState.content + event.textDelta,
               };
               pendingTextDelta += event.textDelta;
-              await broadcastNonFatalDelta({
+              deltaDispatcher.enqueue({
                 type: 'delta',
                 data: { runId: run.id, textDelta: event.textDelta },
               });
@@ -182,7 +184,7 @@ export const createChatRunExecutionOperations = (
                 ...liveState,
                 thinking: `${liveState.thinking ?? ''}${event.thinkingDelta}`,
               };
-              await broadcastNonFatalDelta({
+              deltaDispatcher.enqueue({
                 type: 'thinking_delta',
                 data: { runId: run.id, thinkingDelta: event.thinkingDelta },
               });
@@ -193,7 +195,7 @@ export const createChatRunExecutionOperations = (
               break;
 
             case 'thinking_finished':
-              await broadcastNonFatalDelta({
+              deltaDispatcher.enqueue({
                 type: 'thinking_done',
                 data: { runId: run.id },
               });
@@ -207,7 +209,7 @@ export const createChatRunExecutionOperations = (
                   event.toolCall,
                 ],
               };
-              await broadcastNonFatalDelta({
+              deltaDispatcher.enqueue({
                 type: 'tool_call_update',
                 data: { runId: run.id, toolCall: event.toolCall },
               });
@@ -222,7 +224,7 @@ export const createChatRunExecutionOperations = (
                 ...liveState,
                 citations: [...liveState.citations, event.citation],
               };
-              await broadcastNonFatalDelta({
+              deltaDispatcher.enqueue({
                 type: 'citations_update',
                 data: { citations: liveState.citations, runId: run.id },
               });
@@ -237,7 +239,7 @@ export const createChatRunExecutionOperations = (
                 ...liveState,
                 filePathAnnotations: [...liveState.filePathAnnotations, event.annotation],
               };
-              await broadcastNonFatalDelta({
+              deltaDispatcher.enqueue({
                 type: 'file_path_annotations_update',
                 data: { filePathAnnotations: liveState.filePathAnnotations, runId: run.id },
               });
@@ -284,10 +286,11 @@ export const createChatRunExecutionOperations = (
           throw new Error('openai_response_empty');
         }
 
-        await broadcastNonFatalDelta({
+        deltaDispatcher.enqueue({
           type: 'done',
           data: { runId: run.id, status: 'completed' },
         });
+        await deltaDispatcher.flush();
 
         const completedRun: RunRecord = {
           ...run,

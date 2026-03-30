@@ -112,7 +112,7 @@ describe('createConversationService', () => {
       agentWorkerReasoningEffort: null,
       mode: 'chat',
       model: 'gpt-5.4',
-      reasoningEffort: 'high',
+      reasoningEffort: 'medium',
       serviceTier: 'default',
       title: 'Configured chat',
       userId: 'usr_01',
@@ -121,7 +121,7 @@ describe('createConversationService', () => {
       agentWorkerReasoningEffort: undefined,
       mode: 'chat',
       model: 'gpt-5.4',
-      reasoningEffort: 'high',
+      reasoningEffort: 'medium',
       serviceTier: 'default',
       title: 'Configured chat',
     });

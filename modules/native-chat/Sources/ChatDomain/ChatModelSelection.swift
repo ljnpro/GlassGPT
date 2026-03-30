@@ -31,7 +31,7 @@ public enum ModelType: String, CaseIterable, Identifiable, Codable, Sendable {
     /// The default reasoning effort level for this model.
     public var defaultEffort: ReasoningEffort {
         switch self {
-        case .gpt5_4: .high
+        case .gpt5_4: .medium
         case .gpt5_4_pro: .xhigh
         }
     }

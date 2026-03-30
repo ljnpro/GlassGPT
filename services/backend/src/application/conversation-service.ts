@@ -89,7 +89,7 @@ export interface ConversationService {
 const defaultChatConfiguration = {
   agentWorkerReasoningEffort: null,
   model: 'gpt-5.4',
-  reasoningEffort: 'high',
+  reasoningEffort: 'medium',
   serviceTier: 'default',
 } as const satisfies Pick<
   ConversationRecord,

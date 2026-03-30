@@ -34,7 +34,7 @@ struct BackendClientTests {
             RecordingBackendURLProtocol.state.snapshot.lastAuthorizationHeader == "Bearer access-token"
         )
         #expect(
-            RecordingBackendURLProtocol.state.snapshot.recordedRequests.last?.appVersionHeader == "5.3.0"
+            RecordingBackendURLProtocol.state.snapshot.recordedRequests.last?.appVersionHeader == "5.3.2"
         )
         #expect(response.backendVersion == "5.3.0")
         #expect(response.minimumSupportedAppVersion == "5.3.0")
@@ -85,7 +85,7 @@ struct BackendClientTests {
         let recorded = RecordingBackendURLProtocol.state.snapshot.recordedRequests
         #expect(recorded.map(\.path) == ["/v1/auth/refresh", "/v1/connection/check"])
         #expect(recorded.last?.authorizationHeader == "Bearer refreshed-access-token")
-        #expect(recorded.last?.appVersionHeader == "5.3.0")
+        #expect(recorded.last?.appVersionHeader == "5.3.2")
         #expect(sessionStore.loadSession()?.accessToken == "refreshed-access-token")
         #expect(persistence.loadSession()?.accessToken == "refreshed-access-token")
         #expect(response.backendVersion == "5.3.0")

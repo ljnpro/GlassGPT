@@ -19,7 +19,7 @@ struct NativeChatChatControllerCoverageTests {
         let controller = signedInHarness.makeChatController()
         controller.selectedImageData = Data([0x01])
         #expect(!controller.sendMessage(text: "Hello"))
-        #expect(controller.errorMessage == "Attachments are not available in 5.3.0 yet.")
+        #expect(controller.errorMessage == "Attachments are not available yet.")
 
         controller.selectedImageData = nil
         controller.pendingAttachments = [FileAttachment(filename: "doc.pdf", fileType: "pdf")]

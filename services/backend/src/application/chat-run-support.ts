@@ -44,7 +44,7 @@ export const buildChatExecutionRequest = (
   return {
     input,
     model: conversation.model ?? 'gpt-5.4',
-    reasoningEffort: conversation.reasoningEffort ?? 'high',
+    reasoningEffort: conversation.reasoningEffort ?? 'medium',
     serviceTier: conversation.serviceTier ?? 'default',
   };
 };

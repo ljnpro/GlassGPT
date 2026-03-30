@@ -23,7 +23,7 @@ struct SettingsAccountStoreCompatibilityTests {
                 latencyMilliseconds: nil,
                 errorSummary: nil,
                 backendVersion: "5.3.0",
-                minimumSupportedAppVersion: "5.3.1",
+                minimumSupportedAppVersion: "5.3.2",
                 appCompatibility: .updateRequired
             )
         )
@@ -32,10 +32,10 @@ struct SettingsAccountStoreCompatibilityTests {
 
         #expect(store.syncStatusState == .invalid)
         #expect(store.syncStatusText == "App Update Required")
-        #expect(store.syncStatusDetailText == "Install GlassGPT 5.3.1 or newer.")
+        #expect(store.syncStatusDetailText == "Install GlassGPT 5.3.2 or newer.")
         #expect(
             store.compatibilityMessage
-                == "Backend 5.3.0 requires app version 5.3.1 or newer."
+                == "Backend 5.3.0 requires app version 5.3.2 or newer."
         )
     }
 }

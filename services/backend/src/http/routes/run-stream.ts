@@ -389,7 +389,9 @@ export const installRunStreamRoutes = (app: BackendApp, services: BackendService
       headers: {
         'Cache-Control': 'no-cache',
         Connection: 'keep-alive',
+        'Content-Encoding': 'identity',
         'Content-Type': 'text/event-stream',
+        'X-Accel-Buffering': 'no',
       },
     });
   });

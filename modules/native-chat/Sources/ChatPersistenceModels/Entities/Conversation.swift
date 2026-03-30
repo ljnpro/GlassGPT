@@ -51,7 +51,7 @@ public final class Conversation {
         lastSyncCursor: String? = nil,
         modeRawValue: String? = nil,
         model: String = ModelType.gpt5_4.rawValue,
-        reasoningEffort: String = ReasoningEffort.high.rawValue,
+        reasoningEffort: String = ReasoningEffort.medium.rawValue,
         agentWorkerReasoningEffortRawValue: String? = nil,
         serviceTierRawValue: String = ServiceTier.standard.rawValue,
         agentStateData: Data? = nil

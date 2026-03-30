@@ -39,7 +39,7 @@ public extension BackendClient {
 
         return BackendSSEStream(
             url: makeBackendStreamURL(environment: environment, runID: runID),
-            urlSession: urlSession,
+            urlSession: sseURLSession,
             authorizationHeader: makeAuthorizationHeader(sessionStore: sessionStore),
             lastEventID: lastEventID,
             appVersionHeader: environment.appVersion

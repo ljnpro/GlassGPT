@@ -4,6 +4,14 @@ import Foundation
 import Testing
 
 struct SettingsStorePersistenceTests {
+    @Test func `gpt 5 4 defaults to medium reasoning effort`() {
+        let store = SettingsStore(valueStore: InMemorySettingsValueStore())
+
+        #expect(store.defaultModel == .gpt5_4)
+        #expect(store.defaultEffort == .medium)
+        #expect(store.defaultConversationConfiguration.reasoningEffort == .medium)
+    }
+
     @Test func `default effort corrections are written back to storage`() {
         let valueStore = InMemorySettingsValueStore()
         valueStore.storage[SettingsStore.Keys.defaultModel] = ModelType.gpt5_4_pro.rawValue

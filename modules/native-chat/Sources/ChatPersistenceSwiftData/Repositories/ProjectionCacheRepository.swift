@@ -42,7 +42,7 @@ public final class ProjectionCacheRepository {
             lastSyncCursor: record.lastSyncCursor,
             modeRawValue: record.mode == .chat ? nil : record.mode.rawValue,
             model: record.model ?? ModelType.gpt5_4.rawValue,
-            reasoningEffort: record.reasoningEffort ?? ReasoningEffort.high.rawValue,
+            reasoningEffort: record.reasoningEffort ?? ReasoningEffort.medium.rawValue,
             agentWorkerReasoningEffortRawValue: record.agentWorkerReasoningEffort,
             serviceTierRawValue: record.serviceTier ?? ServiceTier.standard.rawValue
         )

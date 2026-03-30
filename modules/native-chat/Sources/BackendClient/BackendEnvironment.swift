@@ -8,7 +8,7 @@ public struct BackendEnvironment: Sendable, Equatable {
     public init(
         baseURL: URL,
         timeoutInterval: TimeInterval = 60,
-        appVersion: String = "5.3.1"
+        appVersion: String = "5.3.2"
     ) {
         self.baseURL = baseURL
         self.timeoutInterval = timeoutInterval

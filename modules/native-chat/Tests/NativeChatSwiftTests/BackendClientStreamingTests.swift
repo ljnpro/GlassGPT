@@ -60,7 +60,8 @@ extension BackendClientTests {
         let client = try BackendClient(
             environment: BackendEnvironment(baseURL: #require(URL(string: "https://api.example.com"))),
             sessionStore: sessionStore,
-            urlSession: session
+            urlSession: session,
+            sseURLSession: session
         )
 
         let stream = try await client.streamRun("run_stream_refresh")
@@ -70,7 +71,7 @@ extension BackendClientTests {
         let recorded = RecordingBackendURLProtocol.state.snapshot.recordedRequests
         #expect(recorded.map(\.path) == ["/v1/auth/refresh", "/v1/runs/run_stream_refresh/stream"])
         #expect(recorded.last?.authorizationHeader == "Bearer refreshed-access-token")
-        #expect(recorded.last?.appVersionHeader == "5.3.0")
+        #expect(recorded.last?.appVersionHeader == "5.3.2")
         #expect(event?.event == "delta")
         session.invalidateAndCancel()
     }
@@ -93,7 +94,8 @@ extension BackendClientTests {
         let client = try BackendClient(
             environment: BackendEnvironment(baseURL: #require(URL(string: "https://api.example.com"))),
             sessionStore: sessionStore,
-            urlSession: session
+            urlSession: session,
+            sseURLSession: session
         )
 
         var iterator = try await client.streamRun("run_stream_401").makeAsyncIterator()
@@ -134,7 +136,8 @@ extension BackendClientTests {
         let client = try BackendClient(
             environment: BackendEnvironment(baseURL: #require(URL(string: "https://api.example.com"))),
             sessionStore: sessionStore,
-            urlSession: session
+            urlSession: session,
+            sseURLSession: session
         )
 
         let stream = try await client.streamRun(
@@ -152,7 +155,7 @@ extension BackendClientTests {
         )
         #expect(
             RecordingBackendURLProtocol.state.snapshot.recordedRequests.last?.appVersionHeader
-                == "5.3.0"
+                == "5.3.2"
         )
         session.invalidateAndCancel()
     }

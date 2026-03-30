@@ -97,6 +97,19 @@ extension BackendClient {
         configuration.waitsForConnectivity = true
         return URLSession(configuration: configuration)
     }
+
+    /// A dedicated URLSession for SSE streaming with no resource timeout and
+    /// compression explicitly disabled so Cloudflare edge cannot buffer the stream.
+    static func makeSSEURLSession(requestTimeout: TimeInterval) -> URLSession {
+        let configuration = URLSessionConfiguration.default
+        configuration.timeoutIntervalForRequest = requestTimeout
+        configuration.timeoutIntervalForResource = .infinity
+        configuration.waitsForConnectivity = true
+        configuration.httpAdditionalHeaders = [
+            "Accept-Encoding": "identity"
+        ]
+        return URLSession(configuration: configuration)
+    }
 }
 
 enum AuthorizationMode {
