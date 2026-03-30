@@ -227,6 +227,14 @@ function test_backend_release_scripts_are_scaffolded() {
     fail "deploy_backend.sh must export a D1 backup before remote migrations."
   fi
 
+  if ! grep -Fq 'wrangler secret bulk "$secret_file"' "$deploy_script"; then
+    fail "deploy_backend.sh must sync required Worker secrets before live deploys."
+  fi
+
+  if ! grep -Fq 'wrangler secret list --name "$WORKER_NAME" >"$verification_file"' "$deploy_script"; then
+    fail "deploy_backend.sh must verify required Worker secrets after syncing them."
+  fi
+
   if ! grep -Fq 'ln -s ../migrations "$resolved_migrations_dir"' "$deploy_script"; then
     fail "deploy_backend.sh must mirror the backend migrations directory next to the resolved wrangler config."
   fi

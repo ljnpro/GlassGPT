@@ -7,6 +7,8 @@ import Observation
 @Observable
 @MainActor
 public final class SettingsAccountStore {
+    private static let authRuntimeConfigurationErrorSummary = "auth_runtime_configuration_missing"
+
     public private(set) var connectionStatus: ConnectionCheckDTO?
     public private(set) var isCheckingConnection = false
     public private(set) var isAuthenticating = false
@@ -113,6 +115,10 @@ public final class SettingsAccountStore {
            connectionStatus.sse == .healthy {
             return String(localized: "Realtime Sync Ready")
         }
+        if connectionStatus.auth == .unavailable,
+           connectionStatus.errorSummary == Self.authRuntimeConfigurationErrorSummary {
+            return String(localized: "Backend Sign-In Unavailable")
+        }
         if connectionStatus.auth == .unauthorized {
             return String(localized: "Session Needs Refresh")
         }
@@ -132,6 +138,12 @@ public final class SettingsAccountStore {
         if let connectionStatus, connectionStatus.appCompatibility == .updateRequired {
             return String(
                 localized: "Install GlassGPT \(connectionStatus.minimumSupportedAppVersion) or newer."
+            )
+        }
+        if let connectionStatus,
+           connectionStatus.errorSummary == Self.authRuntimeConfigurationErrorSummary {
+            return String(
+                localized: "Backend authentication is temporarily unavailable. The server is missing required auth configuration."
             )
         }
         return lastCheckedText.map { String(localized: "Last checked \($0)") }
@@ -166,7 +178,12 @@ public final class SettingsAccountStore {
         } catch is CancellationError {
             lastErrorMessage = nil
         } catch {
-            lastErrorMessage = Self.describeSignInError(error)
+            let fallbackMessage = Self.describeSignInError(error)
+            if let diagnosticMessage = await diagnoseBackendAuthenticationFailure(error) {
+                lastErrorMessage = diagnosticMessage
+            } else {
+                lastErrorMessage = fallbackMessage
+            }
         }
     }
 
@@ -206,5 +223,41 @@ public final class SettingsAccountStore {
         }
 
         return "\(error.localizedDescription) [\(nsError.domain):\(nsError.code)]"
+    }
+
+    private func diagnoseBackendAuthenticationFailure(_ error: Error) async -> String? {
+        guard Self.shouldDiagnoseBackendAuthenticationFailure(error) else {
+            return nil
+        }
+
+        do {
+            let status = try await client.connectionCheck()
+            connectionStatus = status
+            return Self.backendAuthenticationDiagnosticMessage(for: status)
+        } catch {
+            return nil
+        }
+    }
+
+    private static func shouldDiagnoseBackendAuthenticationFailure(_ error: Error) -> Bool {
+        guard let signInFlowError = error as? SignInFlowError,
+              signInFlowError.stageLabel == "backend-auth",
+              let backendError = signInFlowError.underlyingError as? BackendAPIError else {
+            return false
+        }
+
+        return backendError == .serverError || backendError == .serviceUnavailable
+    }
+
+    private static func backendAuthenticationDiagnosticMessage(
+        for status: ConnectionCheckDTO
+    ) -> String? {
+        guard status.errorSummary == authRuntimeConfigurationErrorSummary else {
+            return nil
+        }
+
+        return String(
+            localized: "Apple sign-in succeeded, but backend authentication is temporarily unavailable."
+        )
     }
 }

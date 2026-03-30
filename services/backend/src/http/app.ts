@@ -21,7 +21,7 @@ import { installSyncRoutes } from './routes/sync.js';
 import type { BackendServices } from './services.js';
 import type { BackendApp, BackendAppContext } from './types.js';
 
-type ApplicationErrorStatusCode = 400 | 401 | 403 | 404 | 409 | 500;
+type ApplicationErrorStatusCode = 400 | 401 | 403 | 404 | 409 | 500 | 503;
 
 const statusCodeForApplicationError = (code: string): ApplicationErrorStatusCode => {
   switch (code) {
@@ -35,6 +35,8 @@ const statusCodeForApplicationError = (code: string): ApplicationErrorStatusCode
       return 404;
     case 'conflict':
       return 409;
+    case 'service_unavailable':
+      return 503;
     default:
       return 500;
   }

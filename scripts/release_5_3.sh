@@ -3,7 +3,7 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 TODO_PATH="${TODO_PATH:-$ROOT_DIR/todo.md}"
-AUDIT_PATH="${AUDIT_PATH:-$ROOT_DIR/docs/audit-5.3.0.md}"
+AUDIT_PATH="${AUDIT_PATH:-}"
 FINAL_CI_EVIDENCE_PATH="${FINAL_CI_EVIDENCE_PATH:-$ROOT_DIR/.local/build/evidence/rel-001-final-ci.txt}"
 FINAL_CI_RAW_LOG_PATH="${FINAL_CI_RAW_LOG_PATH:-$ROOT_DIR/.local/build/evidence/rel-001-final-ci.raw.log}"
 
@@ -21,7 +21,7 @@ Usage:
   ./scripts/release_5_3.sh <marketing_version> <build_number> [--branch <name>] [--preserve-main-as <name>] [--force-main-with-lease] [--skip-ci] [--preflight-only]
 
 Examples:
-  ./scripts/release_5_3.sh 5.3.0 20300 --branch feature/release-5.3
+  ./scripts/release_5_3.sh 5.3.1 20216 --branch codex/stable-5.3
 EOF
 }
 
@@ -87,6 +87,10 @@ if [[ "$VERSION" != 5.3.* ]]; then
   exit 1
 fi
 
+if [[ -z "$AUDIT_PATH" ]]; then
+  AUDIT_PATH="$ROOT_DIR/docs/audit-${VERSION}.md"
+fi
+
 RUN_EVIDENCE_DIR="${RUN_EVIDENCE_DIR:-$ROOT_DIR/.local/build/evidence/release-${VERSION}-${BUILD_NUMBER}}"
 BACKEND_STAGING_EVIDENCE_PATH="$RUN_EVIDENCE_DIR/backend-staging.txt"
 BACKEND_PRODUCTION_EVIDENCE_PATH="$RUN_EVIDENCE_DIR/backend-production.txt"
@@ -97,7 +101,7 @@ require_existing_release_docs
 mkdir -p "$RUN_EVIDENCE_DIR"
 
 if (( PREFLIGHT_ONLY == 1 )); then
-  echo "5.3.0 release preflight checks passed."
+  echo "${VERSION} release preflight checks passed."
   exit 0
 fi
 
@@ -145,7 +149,7 @@ python3 "$ROOT_DIR/scripts/record_release_evidence.py" \
   --entry "WS8 release orchestrator TestFlight publish|$TESTFLIGHT_EVIDENCE_PATH"
 
 echo ""
-echo "5.3.0 orchestrated release complete."
+echo "${VERSION} orchestrated release complete."
 echo "Version: $VERSION ($BUILD_NUMBER)"
 echo "Fresh CI evidence: $FINAL_CI_EVIDENCE_PATH"
 echo "Fresh CI raw log: $FINAL_CI_RAW_LOG_PATH"

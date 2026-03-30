@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { ApplicationError } from '../application/errors.js';
+import * as logger from '../observability/logger.js';
 import { createApp } from './app.js';
 import {
   ANONYMOUS_MAX_REQUESTS_PER_WINDOW,
@@ -172,9 +173,15 @@ const credentialStatusFixture = {
 
 const createTestEnv = (overrides: Partial<Env> = {}): Env => ({
   APP_ENV: 'beta',
+  APPLE_AUDIENCE: 'space.manus.liquid.glass.chat.t20260308214621',
+  APPLE_BUNDLE_ID: 'space.manus.liquid.glass.chat.t20260308214621',
+  CREDENTIAL_ENCRYPTION_KEY: '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef',
+  CREDENTIAL_ENCRYPTION_KEY_VERSION: 'v1',
   CORS_ALLOWED_ORIGINS:
     'https://glassgpt.com,https://beta.glassgpt.com,https://staging.glassgpt.com,http://localhost:3000,http://127.0.0.1:3000,http://localhost:5173,http://127.0.0.1:5173',
+  REFRESH_TOKEN_SIGNING_KEY: 'abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789',
   R2_BUCKET_NAME: 'glassgpt-beta-artifacts',
+  SESSION_SIGNING_KEY: 'fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210',
   CHAT_RUN_WORKFLOW: createWorkflowStub(),
   AGENT_RUN_WORKFLOW: createWorkflowStub(),
   CONVERSATION_EVENT_HUB: createConversationEventHubStub(),
@@ -581,10 +588,33 @@ describe('backend worker scaffold', () => {
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({
       appEnv: 'beta',
-      backendVersion: '5.3.0',
+      backendVersion: '5.3.1',
       minimumSupportedAppVersion: '5.3.0',
       appCompatibility: 'compatible',
       ok: true,
+    });
+  });
+
+  it('marks the health route unhealthy when required auth runtime secrets are missing', async () => {
+    const response = await createApp(createTestServices()).fetch(
+      new Request('https://example.com/healthz', {
+        headers: {
+          'X-GlassGPT-App-Version': '5.3.0',
+        },
+      }),
+      createTestEnv({
+        SESSION_SIGNING_KEY: '',
+      }),
+      testExecutionContext,
+    );
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      appEnv: 'beta',
+      backendVersion: '5.3.1',
+      minimumSupportedAppVersion: '5.3.0',
+      appCompatibility: 'compatible',
+      errorSummary: 'auth_runtime_configuration_missing',
+      ok: false,
     });
   });
 
@@ -617,9 +647,375 @@ describe('backend worker scaffold', () => {
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toMatchObject({
       appCompatibility: 'compatible',
-      backendVersion: '5.3.0',
+      backendVersion: '5.3.1',
       minimumSupportedAppVersion: '5.3.0',
     });
+  });
+
+  it('surfaces auth runtime misconfiguration in unsigned connection checks', async () => {
+    const response = await createApp(createTestServices()).fetch(
+      new Request('https://example.com/v1/connection/check', {
+        headers: {
+          'X-GlassGPT-App-Version': '5.3.0',
+        },
+      }),
+      createTestEnv({
+        APPLE_AUDIENCE: '',
+      }),
+      testExecutionContext,
+    );
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      auth: 'unavailable',
+      errorSummary: 'auth_runtime_configuration_missing',
+      backendVersion: '5.3.1',
+      minimumSupportedAppVersion: '5.3.0',
+    });
+  });
+
+  it('fails closed for apple auth when auth runtime secrets are missing', async () => {
+    const response = await createApp(createTestServices()).fetch(
+      new Request('https://example.com/v1/auth/apple', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          identityToken: 'identity-token',
+          authorizationCode: 'auth-code',
+          deviceId: 'device-01',
+        }),
+      }),
+      createTestEnv({
+        SESSION_SIGNING_KEY: '',
+      }),
+      testExecutionContext,
+    );
+
+    expect(response.status).toBe(503);
+    await expect(response.json()).resolves.toEqual({
+      error: 'service_unavailable',
+    });
+  });
+
+  it('fails closed for credential writes when auth runtime secrets are missing', async () => {
+    const response = await createApp(createTestServices()).fetch(
+      new Request('https://example.com/v1/credentials/openai', {
+        method: 'PUT',
+        headers: {
+          Authorization: 'Bearer access-token',
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          apiKey: 'sk-test-key',
+        }),
+      }),
+      createTestEnv({
+        REFRESH_TOKEN_SIGNING_KEY: '',
+      }),
+      testExecutionContext,
+    );
+
+    expect(response.status).toBe(503);
+    await expect(response.json()).resolves.toEqual({
+      error: 'service_unavailable',
+    });
+  });
+
+  it('returns service_unavailable for Apple auth when required runtime secrets are missing', async () => {
+    const response = await createApp(createTestServices()).fetch(
+      new Request('https://example.com/v1/auth/apple', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          identityToken: 'identity-token',
+          deviceId: 'device_01',
+          email: 'glass@example.com',
+          givenName: 'Glass',
+          familyName: 'User',
+        }),
+      }),
+      createTestEnv({
+        SESSION_SIGNING_KEY: '',
+      }),
+      testExecutionContext,
+    );
+
+    expect(response.status).toBe(503);
+    await expect(response.json()).resolves.toEqual({
+      error: 'service_unavailable',
+    });
+  });
+
+  it('fails closed for me refresh and logout when auth runtime secrets are missing', async () => {
+    const app = createApp(createTestServices());
+    const env = createTestEnv({
+      SESSION_SIGNING_KEY: '',
+    });
+
+    const meResponse = await app.fetch(
+      new Request('https://example.com/v1/me', {
+        headers: {
+          Authorization: 'Bearer access-token',
+        },
+      }),
+      env,
+      testExecutionContext,
+    );
+    expect(meResponse.status).toBe(503);
+    await expect(meResponse.json()).resolves.toEqual({
+      error: 'service_unavailable',
+    });
+
+    const refreshResponse = await app.fetch(
+      new Request('https://example.com/v1/auth/refresh', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          refreshToken: 'refresh-token',
+        }),
+      }),
+      env,
+      testExecutionContext,
+    );
+    expect(refreshResponse.status).toBe(503);
+    await expect(refreshResponse.json()).resolves.toEqual({
+      error: 'service_unavailable',
+    });
+
+    const logoutResponse = await app.fetch(
+      new Request('https://example.com/v1/auth/logout', {
+        method: 'POST',
+        headers: {
+          Authorization: 'Bearer access-token',
+        },
+      }),
+      env,
+      testExecutionContext,
+    );
+    expect(logoutResponse.status).toBe(503);
+    await expect(logoutResponse.json()).resolves.toEqual({
+      error: 'service_unavailable',
+    });
+  });
+
+  it('supports credential deletion and rejects unauthenticated credential mutations', async () => {
+    const app = createApp(createTestServices());
+
+    const unauthenticatedWriteResponse = await app.fetch(
+      new Request('https://example.com/v1/credentials/openai', {
+        method: 'PUT',
+        headers: {
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          apiKey: 'sk-example',
+        }),
+      }),
+      testEnv,
+      testExecutionContext,
+    );
+    expect(unauthenticatedWriteResponse.status).toBe(401);
+    await expect(unauthenticatedWriteResponse.json()).resolves.toEqual({
+      error: 'unauthorized',
+    });
+
+    const unauthenticatedDeleteResponse = await app.fetch(
+      new Request('https://example.com/v1/credentials/openai', {
+        method: 'DELETE',
+      }),
+      testEnv,
+      testExecutionContext,
+    );
+    expect(unauthenticatedDeleteResponse.status).toBe(401);
+    await expect(unauthenticatedDeleteResponse.json()).resolves.toEqual({
+      error: 'unauthorized',
+    });
+
+    const authenticatedDeleteResponse = await app.fetch(
+      new Request('https://example.com/v1/credentials/openai', {
+        method: 'DELETE',
+        headers: {
+          Authorization: 'Bearer access-token',
+        },
+      }),
+      testEnv,
+      testExecutionContext,
+    );
+    expect(authenticatedDeleteResponse.status).toBe(204);
+  });
+
+  it('surfaces signed connection-check auth misconfiguration and unauthorized sessions', async () => {
+    const runtimeMisconfigurationResponse = await createApp(createTestServices()).fetch(
+      new Request('https://example.com/v1/connection/check', {
+        headers: {
+          Authorization: 'Bearer access-token',
+          'X-GlassGPT-App-Version': '5.3.1',
+        },
+      }),
+      createTestEnv({
+        APPLE_BUNDLE_ID: '',
+      }),
+      testExecutionContext,
+    );
+    expect(runtimeMisconfigurationResponse.status).toBe(200);
+    await expect(runtimeMisconfigurationResponse.json()).resolves.toMatchObject({
+      appCompatibility: 'compatible',
+      auth: 'unavailable',
+      errorSummary: 'auth_runtime_configuration_missing',
+      openaiCredential: 'missing',
+    });
+
+    const unauthorizedApp = createApp(
+      createTestServices({
+        authService: {
+          ...createAuthServiceStub(),
+          resolveSession: async () => {
+            throw new ApplicationError('unauthorized', 'invalid_access_token');
+          },
+        },
+      }),
+    );
+    const unauthorizedResponse = await unauthorizedApp.fetch(
+      new Request('https://example.com/v1/connection/check', {
+        headers: {
+          Authorization: 'Bearer access-token',
+          'X-GlassGPT-App-Version': '5.3.1',
+        },
+      }),
+      testEnv,
+      testExecutionContext,
+    );
+    expect(unauthorizedResponse.status).toBe(200);
+    await expect(unauthorizedResponse.json()).resolves.toMatchObject({
+      appCompatibility: 'compatible',
+      auth: 'unauthorized',
+      errorSummary: 'authentication_failed',
+      openaiCredential: 'missing',
+    });
+  });
+
+  it('maps forbidden conflict and server_error application failures to the expected HTTP statuses', async () => {
+    const forbiddenApp = createApp(
+      createTestServices({
+        authService: {
+          ...createAuthServiceStub(),
+          fetchCurrentUser: async () => {
+            throw new ApplicationError('forbidden', 'user_blocked');
+          },
+        },
+      }),
+    );
+    const forbiddenResponse = await forbiddenApp.fetch(
+      new Request('https://example.com/v1/me', {
+        headers: {
+          Authorization: 'Bearer access-token',
+        },
+      }),
+      testEnv,
+      testExecutionContext,
+    );
+    expect(forbiddenResponse.status).toBe(403);
+    await expect(forbiddenResponse.json()).resolves.toEqual({
+      error: 'forbidden',
+    });
+
+    const conflictApp = createApp(
+      createTestServices({
+        authService: {
+          ...createAuthServiceStub(),
+          refreshSession: async () => {
+            throw new ApplicationError('conflict', 'session_conflict');
+          },
+        },
+      }),
+    );
+    const conflictResponse = await conflictApp.fetch(
+      new Request('https://example.com/v1/auth/refresh', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          refreshToken: 'refresh-token',
+        }),
+      }),
+      testEnv,
+      testExecutionContext,
+    );
+    expect(conflictResponse.status).toBe(409);
+    await expect(conflictResponse.json()).resolves.toEqual({
+      error: 'conflict',
+    });
+
+    const serverErrorApp = createApp(
+      createTestServices({
+        authService: {
+          ...createAuthServiceStub(),
+          logout: async () => {
+            throw new ApplicationError('server_error', 'unexpected_state');
+          },
+        },
+      }),
+    );
+    const serverErrorResponse = await serverErrorApp.fetch(
+      new Request('https://example.com/v1/auth/logout', {
+        method: 'POST',
+        headers: {
+          Authorization: 'Bearer access-token',
+        },
+      }),
+      testEnv,
+      testExecutionContext,
+    );
+    expect(serverErrorResponse.status).toBe(500);
+    await expect(serverErrorResponse.json()).resolves.toEqual({
+      error: 'server_error',
+    });
+  });
+
+  it('maps unexpected failures to internal_server_error and logs the request failure', async () => {
+    const logErrorSpy = vi.spyOn(logger, 'logError').mockImplementation(() => {});
+    const app = createApp(
+      createTestServices({
+        authService: {
+          ...createAuthServiceStub(),
+          refreshSession: async () => {
+            throw new Error('refresh_pipeline_failed');
+          },
+        },
+      }),
+    );
+
+    const response = await app.fetch(
+      new Request('https://example.com/v1/auth/refresh', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          refreshToken: 'refresh-token',
+        }),
+      }),
+      testEnv,
+      testExecutionContext,
+    );
+
+    expect(response.status).toBe(500);
+    await expect(response.json()).resolves.toEqual({
+      error: 'internal_server_error',
+    });
+    expect(logErrorSpy).toHaveBeenCalledWith(
+      'backend_request_failed',
+      expect.objectContaining({
+        errorMessage: 'refresh_pipeline_failed',
+        errorName: 'Error',
+      }),
+    );
+
+    logErrorSpy.mockRestore();
   });
 
   it('exposes scaffolded conversation and run routes', async () => {

@@ -4,6 +4,7 @@ export type ApplicationErrorCode =
   | 'invalid_request'
   | 'not_found'
   | 'server_error'
+  | 'service_unavailable'
   | 'unauthorized';
 
 export class ApplicationError extends Error {

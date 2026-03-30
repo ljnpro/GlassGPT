@@ -44,10 +44,50 @@ struct SettingsAccountStoreDiagnosticsTests {
         #expect(backendFailure.lastErrorMessage?.contains("Backend sign-in failed after Apple authorization.") == true)
         #expect(backendFailure.lastErrorMessage?.contains("[NSURLErrorDomain:-1001]") == true)
     }
+
+    @Test func `settings account store diagnoses backend auth runtime misconfiguration after sign-in server errors`() async {
+        let sessionStore = BackendSessionStore(session: TestFixtures.session())
+        let client = SettingsAccountDiagnosticsBackendRequester()
+        client.connectionCheckResult = .success(
+            ConnectionCheckDTO(
+                backend: .healthy,
+                auth: .unavailable,
+                openaiCredential: .missing,
+                sse: .healthy,
+                checkedAt: .now,
+                latencyMilliseconds: 0,
+                errorSummary: "auth_runtime_configuration_missing",
+                backendVersion: "5.3.1",
+                minimumSupportedAppVersion: "5.3.0",
+                appCompatibility: .compatible
+            )
+        )
+
+        let backendFailure = SettingsAccountStore(
+            sessionStore: sessionStore,
+            client: client,
+            signInAction: {
+                throw SignInFlowError.backendAuthentication(underlying: BackendAPIError.serverError)
+            }
+        )
+        await backendFailure.signIn()
+
+        #expect(
+            backendFailure.lastErrorMessage
+                == "Apple sign-in succeeded, but backend authentication is temporarily unavailable."
+        )
+        #expect(backendFailure.syncStatusText == "Backend Sign-In Unavailable")
+        #expect(
+            backendFailure.syncStatusDetailText
+                == "Backend authentication is temporarily unavailable. The server is missing required auth configuration."
+        )
+    }
 }
 
 @MainActor
 private final class SettingsAccountDiagnosticsBackendRequester: BackendRequesting {
+    var connectionCheckResult: Result<ConnectionCheckDTO, Error> = .failure(DiagnosticsTestError.unimplemented)
+
     func cancelRun(_: String) async throws -> RunSummaryDTO {
         throw DiagnosticsTestError.unimplemented
     }
@@ -80,7 +120,7 @@ private final class SettingsAccountDiagnosticsBackendRequester: BackendRequestin
     }
 
     func connectionCheck() async throws -> ConnectionCheckDTO {
-        throw DiagnosticsTestError.unimplemented
+        try connectionCheckResult.get()
     }
 
     func authenticateWithApple(

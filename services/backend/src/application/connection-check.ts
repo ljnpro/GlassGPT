@@ -3,10 +3,21 @@ import {
   type CredentialStatusDTO,
   connectionCheckSchema,
 } from '@glassgpt/backend-contracts';
+import type { BackendSecretEnv } from './runtime-context.js';
 
-export const BACKEND_VERSION = '5.3.0';
+export const BACKEND_VERSION = '5.3.1';
 export const MINIMUM_SUPPORTED_APP_VERSION = '5.3.0';
 export const APP_VERSION_HEADER = 'X-GlassGPT-App-Version';
+export const AUTH_RUNTIME_CONFIGURATION_ERROR = 'auth_runtime_configuration_missing';
+
+const REQUIRED_AUTH_SECRET_FIELDS = [
+  'APPLE_AUDIENCE',
+  'APPLE_BUNDLE_ID',
+  'SESSION_SIGNING_KEY',
+  'REFRESH_TOKEN_SIGNING_KEY',
+  'CREDENTIAL_ENCRYPTION_KEY',
+  'CREDENTIAL_ENCRYPTION_KEY_VERSION',
+] as const;
 
 export interface BuildConnectionCheckInput {
   readonly auth: ConnectionCheckDTO['auth'];
@@ -89,6 +100,16 @@ export const healthStateForCredentialStatus = (
     case 'missing':
       return 'missing';
   }
+};
+
+export const authRuntimeConfigurationError = (
+  env: Partial<BackendSecretEnv>,
+): string | undefined => {
+  const hasMissingSecret = REQUIRED_AUTH_SECRET_FIELDS.some((field) => {
+    const value = env[field];
+    return typeof value !== 'string' || value.trim().length === 0;
+  });
+  return hasMissingSecret ? AUTH_RUNTIME_CONFIGURATION_ERROR : undefined;
 };
 
 export const buildConnectionCheck = (input: BuildConnectionCheckInput): ConnectionCheckDTO => {

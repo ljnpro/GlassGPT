@@ -15,7 +15,7 @@ REMOTE="${GITHUB_REMOTE:-origin}"
 REMOTE_REPO="${GITHUB_REPO_URL:-}"
 XCODEBUILD_APPINTENTS_LINKER_SETTING='OTHER_LDFLAGS=$(inherited) -framework AppIntents'
 TODO_PATH="${TODO_PATH:-$ROOT_DIR/todo.md}"
-AUDIT_PATH="${AUDIT_PATH:-$ROOT_DIR/docs/audit-5.3.0.md}"
+AUDIT_PATH="${AUDIT_PATH:-}"
 FINAL_CI_EVIDENCE_PATH="${FINAL_CI_EVIDENCE_PATH:-$ROOT_DIR/.local/build/evidence/rel-001-final-ci.txt}"
 
 function usage() {
@@ -24,7 +24,7 @@ Usage:
   ./scripts/release_testflight.sh <marketing_version> <build_number> [--branch <name>] [--commit-message "<message>"] [--preserve-main-as <name>] [--force-main-with-lease] [--skip-main-promotion] [--skip-ci] [--preflight-only]
 
 Examples:
-  ./scripts/release_testflight.sh 5.3.0 20300 --branch feature/release-5.3 --skip-main-promotion --skip-ci
+  ./scripts/release_testflight.sh 5.3.1 20216 --branch codex/stable-5.3 --skip-main-promotion --skip-ci
 EOF
 }
 
@@ -249,6 +249,10 @@ fi
 if [[ "$VERSION" != 5.3.* ]]; then
   echo "release_testflight.sh is 5.3-aware and only accepts 5.3.x versions. Got: $VERSION" >&2
   exit 1
+fi
+
+if [[ -z "$AUDIT_PATH" ]]; then
+  AUDIT_PATH="$ROOT_DIR/docs/audit-${VERSION}.md"
 fi
 
 python3 "$ROOT_DIR/scripts/check_todo_release_gates.py" \

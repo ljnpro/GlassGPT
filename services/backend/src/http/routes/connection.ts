@@ -1,5 +1,6 @@
 import {
   APP_VERSION_HEADER,
+  authRuntimeConfigurationError,
   buildConnectionCheck,
   buildUnsignedConnectionCheck,
   healthStateForCredentialStatus,
@@ -13,18 +14,42 @@ import type { BackendApp } from '../types.js';
 export const installConnectionRoutes = (app: BackendApp, services: BackendServices): void => {
   app.get('/v1/connection/check', async (context) => {
     const clientAppVersion = context.req.header(APP_VERSION_HEADER) ?? undefined;
+    const runtimeContext = asBackendRuntimeContext(context.env);
+    const runtimeConfigurationError = authRuntimeConfigurationError(runtimeContext);
     const accessToken = readBearerToken(context.req.header('Authorization'));
     if (!accessToken) {
+      if (runtimeConfigurationError) {
+        return context.json(
+          buildConnectionCheck({
+            auth: 'unavailable',
+            backend: 'unavailable',
+            clientAppVersion,
+            errorSummary: runtimeConfigurationError,
+            latencyMs: 0,
+            openaiCredential: 'missing',
+          }),
+        );
+      }
       return context.json(buildUnsignedConnectionCheck(clientAppVersion));
     }
 
-    try {
-      const session = await services.authService.resolveSession(
-        asBackendRuntimeContext(context.env),
-        accessToken,
+    if (runtimeConfigurationError) {
+      return context.json(
+        buildConnectionCheck({
+          auth: 'unavailable',
+          backend: 'unavailable',
+          clientAppVersion,
+          errorSummary: runtimeConfigurationError,
+          latencyMs: 0,
+          openaiCredential: 'missing',
+        }),
       );
+    }
+
+    try {
+      const session = await services.authService.resolveSession(runtimeContext, accessToken);
       const credentialStatus = await services.credentialService.readOpenAiKeyStatus(
-        asBackendRuntimeContext(context.env),
+        runtimeContext,
         session.userId,
       );
 

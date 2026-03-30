@@ -17,7 +17,7 @@ package extension BackendConversationProjectionController {
             return false
         }
         guard selectedImageData == nil, pendingAttachments.isEmpty else {
-            errorMessage = "Attachments are not available in 5.3.0 yet."
+            errorMessage = "Attachments are not available yet."
             return false
         }
         guard !isRunActive else {

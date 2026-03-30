@@ -1,11 +1,11 @@
-# GlassGPT 5.3.0 Audit
+# GlassGPT 5.3.1 Audit
 
-Status: published; protected-main integration in progress
+Status: release candidate; backend and TestFlight publication pending
 Date: 2026-03-29
 
 ## Goal
 
-This document is the evidence-backed audit for the `5.3.0` hardening release.
+This document is the evidence-backed audit for the `5.3.1` hotfix release.
 It is not final until every release gate in `todo.md` is green and the final CI
 evidence exists.
 
@@ -30,7 +30,7 @@ Published companion entrypoints:
 | API Design | 18 | Conversation config, pagination, and SSE replay are truthful and round-trippable. |
 | Security | 18 | Origin allowlist, persistent limiter, Keychain device identity, and the D1 backup/export plus replacement-database restore path are now all landed and evidenced. |
 | Performance Optimization | 18 | Breaker isolation, `StreamingTextCache` heuristic improvements, and adaptive cache trimming are landed. |
-| Test Coverage | 18 | Config, pagination, retry, SSE replay, stream recovery, release-path recovery gating, and restored root/hosted snapshot suites are landed and revalidated on the current tree. |
+| Test Coverage | 18 | Config, pagination, retry, SSE replay, stream recovery, release-path recovery gating, restored root/hosted snapshot suites, and the new 5.3.1 auth/runtime route regression coverage are landed and revalidated on the current tree. |
 | Test Quality | 18 | Deterministic retry, SSE coverage, batcher stress tests, release-path recovery gates, and golden snapshot baselines now exercise more behavior than the prior rendering smoke tests alone. |
 | CI/CD Pipeline | 19 | Node drift is fixed, the backend lane now enforces TypeScript coverage thresholds through Vitest V8 coverage, backend CI now runs an OSV scan against `pnpm-lock.yaml`, and the final perfect-log release evidence now exists at `.local/build/evidence/rel-001-final-ci.txt`. |
 | Documentation Quality | 18 | Security, architecture, testing, release, backend local-dev, API entrypoint, audit publication, and push/release guidance docs are refreshed and now align with the 5.3.0 release flow. |
@@ -83,23 +83,18 @@ Published companion entrypoints:
 - `/Applications/GlassGPT/.local/build/evidence/release-5.3.0-20215/backend-staging.txt`
 - `/Applications/GlassGPT/.local/build/evidence/release-5.3.0-20215/backend-production.txt`
 - `/Applications/GlassGPT/.local/build/evidence/release-5.3.0-20215/testflight.txt`
+- `/Applications/GlassGPT/.local/build/evidence/5.3.1-coverage-uplift.txt`
+- `/Applications/GlassGPT/.local/build/evidence/5.3.1-hotfix-verification.txt`
 ## Remaining Release Blockers
 
-- Publication is complete, but direct `main` promotion failed because the branch
-  is protected. Release PR `#6` is now the required integration path.
-- PR `#6` is currently blocked by a single content conflict in
-  [CONTRIBUTING.md](/Applications/GlassGPT/CONTRIBUTING.md) plus a GitHub
-  Actions workflow issue where `pnpm` was not installed before
-  `actions/setup-node` attempted `cache: pnpm`.
-- Live backend/TestFlight publish evidence is archived at:
-  - `/Applications/GlassGPT/.local/build/evidence/release-5.3.0-20215/backend-staging.txt`
-  - `/Applications/GlassGPT/.local/build/evidence/release-5.3.0-20215/backend-production.txt`
-  - `/Applications/GlassGPT/.local/build/evidence/release-5.3.0-20215/testflight.txt`
+- `5.3.1` backend/TestFlight publication has not run yet on the current tree, so the final hotfix evidence directory under `.local/build/evidence/release-5.3.1-20216/` does not exist yet.
+- The release scripts still require a clean worktree before orchestration, so the hotfix changes must be committed first.
+- After publication, the audit must be updated with the new `5.3.1` backend staging/production and TestFlight evidence paths.
 
 ## Finalization Checklist
 
 - Replace this snapshot with the final score table.
 - Link the final CI evidence log.
-- Link backend staging/prod deploy evidence.
-- Link TestFlight publish evidence.
+- Link backend staging/prod deploy evidence for `5.3.1`.
+- Link TestFlight publish evidence for `5.3.1`.
 - Confirm every `todo.md` exit gate is green.

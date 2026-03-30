@@ -210,6 +210,7 @@
   - `5.` Continue `WS8` by clearing release blockers, validating staged/prod backend promotion, and validating the modernized TestFlight path.
   - `6.` Only after every upstream workstream is complete: run the full perfect-log CI, run the final rubric-based quality review/rescore, then execute backend publish and TestFlight publish scripts.
 - Current live focus:
+  - `2026-03-29 20:26 EDT` 5.3.1 outage validation complete: the Apple sign-in 500 is fully explained by zero configured Worker secrets on both deployed Workers (`APPLE_AUDIENCE`, `APPLE_BUNDLE_ID`, `SESSION_SIGNING_KEY`, `REFRESH_TOKEN_SIGNING_KEY`, and credential-encryption secrets missing), while the misleading healthy `/healthz` and unsigned `/v1/connection/check` responses were a separate observability gap because those routes did not previously validate auth-runtime secret presence; the minimal safe backend hotfix set therefore remains secret sync plus fail-closed auth/credential routes, explicit health/connection runtime-config reporting, and deploy-script secret verification.
   - `2026-03-29 18:02 EDT` resumed from tracker + plan on the current tree: `.local/build/evidence/rel-001-final-ci.txt` is missing again after subsequent release-path changes, so `U-007` and `U-008` are reopened until fresh perfect-log evidence is regenerated; `/Applications/Transporter.app` is still missing; two fresh independent `gpt-5.4` `xhigh` cross-checks are now running in parallel for stream/credential compatibility and overall maintainability/rubric quality on the current codebase
   - `2026-03-29 12:15 EDT` session state is restored and tracker-backed; the shared Chat/Agent stream reducer, persistence payload coder, backend-owned view support helpers, conversation-state skeleton, display-state protocol, and configuration/ensure-conversation layer are landed cleanly, so the next `P0-002` edit is the remaining mirrored mode-specific run-lifecycle surface
   - `WS2` shared controller, top-bar, selector-overlay, root-scaffold, display-state, and configuration scaffolds are landed; continue with the remaining controller run-lifecycle capsule follow-through
@@ -251,14 +252,20 @@
   - `2026-03-29 19:53 EDT` release preflight is now green on the committed release tree: `./scripts/release_testflight.sh 5.3.0 20215 --branch codex/stable-5.3 --preserve-main-as codex/stable-4.12 --force-main-with-lease --preflight-only` and `./scripts/release_5_3.sh 5.3.0 20215 --branch codex/stable-5.3 --preserve-main-as codex/stable-4.12 --force-main-with-lease --preflight-only` both pass, so the next command is the full orchestrated release run.
   - `2026-03-29 19:55 EDT` user-authorized release override is now tracked: the archived `REL-001` perfect-log evidence remains authoritative, so the formal release run may use `--skip-ci` and reuse the existing final CI evidence instead of regenerating it. Backend deploy, TestFlight publish, release evidence recording, and client/backend compatibility validation remain mandatory.
   - `2026-03-29 19:56 EDT` the first live staging deploy succeeded but the smoke gate failed due a transient post-deploy propagation race on Cloudflare: health, connection, and stream were all correct once the new version settled, so `deploy_backend.sh` now retries the smoke convergence window before declaring staging/prod failure. The active queue remains `U-013 -> U-014 -> U-015`.
+  - `2026-03-29 19:59 EDT` the full release path has now published successfully: staging deploy passed, production deploy passed, TestFlight upload for `5.3.0 (20215)` passed, `v5.3.0` was tagged and pushed, and `codex/stable-5.3` plus preserved `codex/stable-4.12` were pushed. The only remaining release-program work is the protected-`main` integration path and final ledger cleanup because direct `main` promotion was rejected by GitHub branch protection.
+  - `2026-03-29 20:01 EDT` release PR `#6` is now the protected-branch integration path. Its current blockers are PR-local, not publication blockers: `CONTRIBUTING.md` needs the branch-strategy merge resolved against `main`, and the GitHub Actions workflow needs explicit `pnpm` setup before `actions/setup-node` uses `cache: pnpm`.
+  - `2026-03-29 20:12 EDT` critical 5.3.1 hotfix root cause is now confirmed with hard evidence: both `glassgpt-staging` and `glassgpt-production` Workers had zero configured secrets, which fully explains why `/v1/auth/apple` returned 500 after Apple authorization while `/healthz` and `/v1/connection/check` still looked healthy. The hotfix scope is narrowed to runtime config detection, deploy-script secret sync + verification, and the minimal client-side diagnostics needed for a 5.3.1 TestFlight release.
+  - `2026-03-29 20:18 EDT` the 5.3.1 backend hotfix is now live on both staging and production: required Worker secrets were synced and verified on both Workers, staging/prod smoke checks passed, and live `/healthz` plus `/v1/connection/check` now report `backendVersion: 5.3.1` while keeping `minimumSupportedAppVersion: 5.3.0`.
+  - `2026-03-29 20:26 EDT` the 5.3.1 hotfix coverage buffer is now re-established on the current tree: targeted auth/credential/connection/error-mapping route tests were added for the new runtime-config fail-closed behavior, `src/http/app.test.ts` now passes `27` tests on its own, and `./scripts/ci.sh backend` is green again with backend branch coverage lifted from `65.15%` to `66.77%`; evidence is archived at `.local/build/evidence/5.3.1-coverage-uplift.txt`.
+  - `2026-03-29 20:28 EDT` 5.3.1 cross-stack hotfix verification is green: the iOS app builds cleanly, the targeted `SettingsAccountStore` diagnostics/compatibility package tests pass, production `/healthz` and `/v1/connection/check` both report `backendVersion: 5.3.1` with `appCompatibility: compatible`, and both staging/production Workers still expose all 6 required auth/credential secrets; evidence is archived at `.local/build/evidence/5.3.1-hotfix-verification.txt`.
   - `WS6` broadened regression coverage after the new cache-pressure suite
   - `WS7` documentation refresh, release/runbook truthfulness, and final audit publication
   - `WS8` deploy environment resolution, live publish blockers, and release-script gating
 - Live task status:
   - `completed`: `P0-001`, `P0-003`, `P1-001`, `P1-002`, `P1-003`, `P1-004`, `P1-005`, `P2-001`, `P2-002`, `P2-003`, `P2-004`, `P3-001`, `WS1`, `WS3`, `WS4`, `WS5`
   - `in_progress`: `WS6`, `WS7`, `WS8`
-  - `next`: `U-013`, `U-014`, `U-015`
-  - `blocked_until_release_finish`: final backend publish, final TestFlight publish, final tag/branch promotion, final archive step
+  - `next`: `U-015`, protected-`main` PR cleanup, final archive step
+  - `blocked_until_release_finish`: protected-`main` PR cleanup and final archive step
 - Remaining Unfinished Task List:
   - `[x] U-001` Finish `P0-002` by extracting the remaining shared Chat/Agent run-lifecycle surface so controller-local run state mutation is no longer mirrored in both modes.
   - `[x] U-002` Finish `P0-002` by removing the remaining duplicated Chat/Agent root-scene and section-view scaffolding that still prevents the dedup workstream from closing.
@@ -281,12 +288,13 @@
   - `[x] U-021` Run a fresh independent `gpt-5.4` `xhigh` stream/auth/credential compatibility audit against the current tree; if it finds any blocker in app-to-backend communication, auth/session refresh, headers, or streaming quality, fix those issues and rerun before release.
   - `[x] U-022` Run a fresh independent `gpt-5.4` `xhigh` maintainability/rubric audit against the current tree; if it finds any blocker to the score thresholds or release rigor, fix those issues and rerun before release.
   - `[x] U-023` Fix every concrete issue surfaced by `U-021` and `U-022`, archive targeted validation evidence, and rerun those cross-validation audits until no blocking findings remain.
-  - `[ ] U-013` Run the backend publish script only after `U-001` through `U-012`, `U-016`, `U-017`, `U-018`, `U-019`, and `U-020` are complete and every release gate is green.
-  - `[ ] U-014` Run the TestFlight publish script only after backend publish succeeds and the supported uploader path is verified.
+  - `[x] U-024` Raise the 5.3.1 hotfix backend coverage buffer above the Vitest branch threshold by adding direct route-level regression coverage for auth runtime misconfiguration, credential auth guards, signed connection-check failure modes, and HTTP error mapping, then archive the validation evidence.
+  - `[x] U-013` Run the backend publish script only after `U-001` through `U-012`, `U-016`, `U-017`, `U-018`, `U-019`, and `U-020` are complete and every release gate is green.
+  - `[x] U-014` Run the TestFlight publish script only after backend publish succeeds and the supported uploader path is verified.
   - `[ ] U-015` Record final backend/TestFlight release evidence, branch/tag evidence, and mark the release program complete only after both publish scripts succeed.
 - Front-of-queue execution order:
-  - `active now`: `U-013`
-  - `next after U-013`: `U-014`, `U-015`
+  - `active now`: `U-015`
+  - `next after U-015`: protected-`main` PR cleanup and final archive step
 
 - `WS1` End-to-End Product Truth
   - Status: `completed`
@@ -537,6 +545,8 @@
   - `U-021`: `.local/build/evidence/u-021-stream-auth-audit.txt`
   - `U-022`: `.local/build/evidence/u-022-maintainability-audit.txt`
   - `U-023` partial UI-runner stabilization: `.local/build/evidence/u-023-ui-runner-stabilization.txt`
+  - `U-024` 5.3.1 backend coverage uplift: `.local/build/evidence/5.3.1-coverage-uplift.txt`
+  - `5.3.1` cross-stack hotfix verification: `.local/build/evidence/5.3.1-hotfix-verification.txt`
   - `WS2` partial maintainability recovery: `.local/build/evidence/ws2-maintainability-recovery.txt`
   - `WS2` shared top-bar and selector-overlay scaffolds: `.local/build/evidence/ws2-shared-topbar-overlay.txt`
   - `WS2` shared run-stream driver shell: `.local/build/evidence/ws2-shared-run-driver.txt`
@@ -584,6 +594,9 @@
 
   - `U-016 through U-019 client/backend hardening`: `/Applications/GlassGPT/.local/build/evidence/u-016-u-019-client-backend-hardening.txt`
   - `U-020 release orchestrator refresh`: `/Applications/GlassGPT/.local/build/evidence/u-020-release-orchestrator-refresh.txt`
+  - `WS8 release orchestrator staging deploy`: `/Applications/GlassGPT/.local/build/evidence/release-5.3.0-20215/backend-staging.txt`
+  - `WS8 release orchestrator production deploy`: `/Applications/GlassGPT/.local/build/evidence/release-5.3.0-20215/backend-production.txt`
+  - `WS8 release orchestrator TestFlight publish`: `/Applications/GlassGPT/.local/build/evidence/release-5.3.0-20215/testflight.txt`
 ## Release Checklist
 
 - [ ] Read `todo.md` before each work session.

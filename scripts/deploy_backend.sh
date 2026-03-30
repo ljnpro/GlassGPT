@@ -16,9 +16,17 @@ BACKEND_ENV_FILE="$ROOT_DIR/.local/backend.env"
 TODO_PATH="${TODO_PATH:-$ROOT_DIR/todo.md}"
 AUDIT_PATH="${AUDIT_PATH:-$ROOT_DIR/docs/audit-5.3.0.md}"
 FINAL_CI_EVIDENCE_PATH="${FINAL_CI_EVIDENCE_PATH:-$ROOT_DIR/.local/build/evidence/rel-001-final-ci.txt}"
-SMOKE_APP_VERSION="${SMOKE_APP_VERSION:-5.3.0}"
+SMOKE_APP_VERSION="${SMOKE_APP_VERSION:-5.3.1}"
 SMOKE_MAX_ATTEMPTS="${SMOKE_MAX_ATTEMPTS:-10}"
 SMOKE_RETRY_DELAY_SECONDS="${SMOKE_RETRY_DELAY_SECONDS:-3}"
+BACKEND_SECRET_NAMES=(
+  "SESSION_SIGNING_KEY"
+  "REFRESH_TOKEN_SIGNING_KEY"
+  "CREDENTIAL_ENCRYPTION_KEY"
+  "CREDENTIAL_ENCRYPTION_KEY_VERSION"
+  "APPLE_AUDIENCE"
+  "APPLE_BUNDLE_ID"
+)
 
 # Source Cloudflare credentials if available (CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID)
 if [[ -f "$BACKEND_ENV_FILE" ]]; then
@@ -199,6 +207,57 @@ PY
   ln -s ../migrations "$resolved_migrations_dir"
 }
 
+function require_backend_secret_values() {
+  local missing=()
+  for secret_name in "${BACKEND_SECRET_NAMES[@]}"; do
+    if [[ -z "${!secret_name:-}" ]]; then
+      missing+=("$secret_name")
+    fi
+  done
+
+  if (( ${#missing[@]} > 0 )); then
+    fail "Missing backend secret values in ${BACKEND_ENV_FILE}: ${missing[*]}"
+  fi
+}
+
+function sync_backend_secrets() {
+  local secret_file="$BUILD_DIR/backend-secrets-${TARGET_ENV}.env"
+  local verification_file="$BUILD_DIR/backend-secrets-${TARGET_ENV}.json"
+  python3 - "$secret_file" "${BACKEND_SECRET_NAMES[@]}" <<'PY'
+from pathlib import Path
+import os
+import sys
+
+output_path = Path(sys.argv[1])
+secret_names = sys.argv[2:]
+lines: list[str] = []
+for secret_name in secret_names:
+    value = os.environ.get(secret_name)
+    if value is None or value == "":
+        raise SystemExit(f"missing {secret_name}")
+    lines.append(f"{secret_name}={value}")
+output_path.write_text("\n".join(lines) + "\n")
+PY
+
+  log "Syncing Worker secrets"
+  wrangler secret bulk "$secret_file"
+  wrangler secret list --name "$WORKER_NAME" >"$verification_file"
+  python3 - "$verification_file" "${BACKEND_SECRET_NAMES[@]}" <<'PY'
+from pathlib import Path
+import json
+import sys
+
+verification_path = Path(sys.argv[1])
+required_secret_names = set(sys.argv[2:])
+configured_secret_names = {
+    entry["name"] for entry in json.loads(verification_path.read_text())
+}
+missing = sorted(required_secret_names - configured_secret_names)
+if missing:
+    raise SystemExit("worker secrets still missing after sync: " + ", ".join(missing))
+PY
+}
+
 function wrangler() {
   npx wrangler "$@" --config "$WRANGLER_CONFIG"
 }
@@ -217,6 +276,9 @@ cd "$ROOT_DIR"
 mkdir -p "$BUILD_DIR"
 require_target_environment_for_live_deploy
 resolve_deploy_config
+if (( DRY_RUN == 0 )); then
+  require_backend_secret_values
+fi
 
 if (( DRY_RUN == 0 )); then
   require_release_gates
@@ -339,6 +401,7 @@ fi
 # Step 6: Deploy Worker
 # ---------------------------------------------------------------------------
 
+sync_backend_secrets
 log "Deploying Worker: $WORKER_NAME"
 rm -f "$DEPLOY_LOG"
 wrangler deploy --keep-vars 2>&1 | tee "$DEPLOY_LOG"
