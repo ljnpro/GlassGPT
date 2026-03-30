@@ -62,11 +62,20 @@ public extension BackendClient {
         )
     }
 
-    func sendMessage(_ content: String, to conversationID: String) async throws -> RunSummaryDTO {
+    func sendMessage(
+        _ content: String,
+        to conversationID: String,
+        imageBase64: String? = nil,
+        fileIds: [String]? = nil
+    ) async throws -> RunSummaryDTO {
         try await perform(
             path: "/v1/conversations/\(conversationID)/messages",
             method: "POST",
-            body: CreateMessageRequestDTO(content: content),
+            body: CreateMessageRequestDTO(
+                content: content,
+                fileIds: fileIds,
+                imageBase64: imageBase64
+            ),
             authorizationMode: .required,
             responseType: RunSummaryDTO.self
         )

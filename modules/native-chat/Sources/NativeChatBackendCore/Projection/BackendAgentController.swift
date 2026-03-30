@@ -56,6 +56,8 @@ package final class BackendAgentController {
     package var skipAutomaticBootstrap = false
     @ObservationIgnored
     package var presentsSelectorOnLaunch = false
+    @ObservationIgnored
+    package var toolCallFirstSeen: [String: Date] = [:]
 
     /// Creates the backend-owned agent projection controller for one account-scoped shell.
     package init(

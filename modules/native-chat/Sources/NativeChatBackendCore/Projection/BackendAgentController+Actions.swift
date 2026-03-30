@@ -36,9 +36,12 @@ extension BackendAgentController: BackendConversationProjectionController {
     }
 
     /// Starts an agent run for the current conversation on the backend.
+    /// Agent runs do not currently support image/file attachments.
     package func startConversationRun(
         text: String,
-        conversationServerID: String
+        conversationServerID: String,
+        imageBase64: String?,
+        fileIds: [String]?
     ) async throws -> RunSummaryDTO {
         try await client.startAgentRun(prompt: text, in: conversationServerID)
     }

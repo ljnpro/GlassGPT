@@ -16,6 +16,8 @@ package extension BackendConversationProjectionController {
     /// events populate them in the polling-only architecture.
     func applyLiveOverlayFromPolledMessages() {
         guard let lastAssistant = messages.last(where: { $0.role == .assistant }) else { return }
+
+        // Thinking state
         let hasThinking = !(lastAssistant.thinking?.isEmpty ?? true)
         let hasContent = !lastAssistant.content.isEmpty
         isThinking = hasThinking && !hasContent
@@ -25,9 +27,36 @@ package extension BackendConversationProjectionController {
         if hasContent {
             currentStreamingText = lastAssistant.content
         }
-        if !lastAssistant.toolCalls.isEmpty {
-            activeToolCalls = lastAssistant.toolCalls
+
+        // Tool calls — grace period state machine.
+        // With 250ms polling, tool calls often transition to "completed" within
+        // a single poll interval. We track when each tool call was first observed
+        // and keep it displayed as "in_progress" for a 3-second grace period so
+        // the user sees the indicator.
+        let now = Date()
+        let gracePeriod: TimeInterval = 3.0
+        for toolCall in lastAssistant.toolCalls {
+            if toolCallFirstSeen[toolCall.id] == nil {
+                toolCallFirstSeen[toolCall.id] = now
+            }
         }
+        activeToolCalls = lastAssistant.toolCalls.map { toolCall in
+            let firstSeen = toolCallFirstSeen[toolCall.id] ?? now
+            let age = now.timeIntervalSince(firstSeen)
+            if toolCall.status == .completed && age < gracePeriod {
+                return ToolCallInfo(
+                    id: toolCall.id,
+                    type: toolCall.type,
+                    status: .inProgress,
+                    code: toolCall.code,
+                    results: toolCall.results,
+                    queries: toolCall.queries
+                )
+            }
+            return toolCall
+        }
+
+        // Citations and file path annotations
         if !lastAssistant.annotations.isEmpty {
             liveCitations = lastAssistant.annotations
         }

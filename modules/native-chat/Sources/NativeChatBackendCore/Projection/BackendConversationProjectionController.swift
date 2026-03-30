@@ -47,7 +47,8 @@ package protocol BackendConversationProjectionController: AnyObject {
     func requestUpdatedConversationConfiguration(serverID: String) async throws -> Conversation
     func resetModeSpecificState()
     func restoreActiveRunIfNeeded(selectionToken: UUID) async
-    func startConversationRun(text: String, conversationServerID: String) async throws -> RunSummaryDTO
+    var toolCallFirstSeen: [String: Date] { get set }
+    func startConversationRun(text: String, conversationServerID: String, imageBase64: String?, fileIds: [String]?) async throws -> RunSummaryDTO
     func startRunPolling(conversationServerID: String, runID: String, selectionToken: UUID)
     func syncVisibleConfigurationToBackendIfNeeded() async throws
     func syncVisibleState()

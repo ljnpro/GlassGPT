@@ -16,10 +16,6 @@ package extension BackendConversationProjectionController {
             errorMessage = signInRequiredMessage
             return false
         }
-        guard selectedImageData == nil, pendingAttachments.isEmpty else {
-            errorMessage = "Attachments are not available yet."
-            return false
-        }
         guard !isRunActive else {
             return false
         }
@@ -142,7 +138,38 @@ package extension BackendConversationProjectionController {
             let serverID = try requireConversationServerID(for: conversation)
             persistVisibleConfiguration()
             try await syncVisibleConfigurationToBackendIfNeeded()
-            let run = try await startConversationRun(text: text, conversationServerID: serverID)
+
+            // Upload pending file attachments to OpenAI via backend proxy
+            var uploadedFileIds: [String] = []
+            for i in pendingAttachments.indices {
+                guard let data = pendingAttachments[i].localData else { continue }
+                pendingAttachments[i].uploadStatus = .uploading
+                do {
+                    let fileId = try await client.uploadFile(
+                        data: data,
+                        filename: pendingAttachments[i].filename,
+                        mimeType: mimeTypeForExtension(pendingAttachments[i].fileType)
+                    )
+                    pendingAttachments[i].fileId = fileId
+                    pendingAttachments[i].uploadStatus = .uploaded
+                    uploadedFileIds.append(fileId)
+                } catch {
+                    pendingAttachments[i].uploadStatus = .failed
+                    errorMessage = "File upload failed: \(pendingAttachments[i].filename)"
+                    isRunActive = false
+                    return
+                }
+            }
+
+            let imageBase64 = selectedImageData?.base64EncodedString()
+            let fileIds: [String]? = uploadedFileIds.isEmpty ? nil : uploadedFileIds
+
+            let run = try await startConversationRun(
+                text: text,
+                conversationServerID: serverID,
+                imageBase64: imageBase64,
+                fileIds: fileIds
+            )
             guard visibleSelectionToken == selectionToken else {
                 return
             }
@@ -160,6 +187,22 @@ package extension BackendConversationProjectionController {
             errorMessage = error.localizedDescription
             isRunActive = false
             isThinking = false
+        }
+    }
+
+    private func mimeTypeForExtension(_ ext: String) -> String {
+        switch ext.lowercased() {
+        case "pdf": "application/pdf"
+        case "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        case "doc": "application/msword"
+        case "pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+        case "ppt": "application/vnd.ms-powerpoint"
+        case "xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        case "xls": "application/vnd.ms-excel"
+        case "csv": "text/csv"
+        case "png": "image/png"
+        case "jpg", "jpeg": "image/jpeg"
+        default: "application/octet-stream"
         }
     }
 }

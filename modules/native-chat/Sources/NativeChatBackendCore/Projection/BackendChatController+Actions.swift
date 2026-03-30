@@ -22,8 +22,15 @@ extension BackendChatController: BackendConversationProjectionController {
     /// Starts a chat run for the current conversation on the backend.
     package func startConversationRun(
         text: String,
-        conversationServerID: String
+        conversationServerID: String,
+        imageBase64: String?,
+        fileIds: [String]?
     ) async throws -> RunSummaryDTO {
-        try await client.sendMessage(text, to: conversationServerID)
+        try await client.sendMessage(
+            text,
+            to: conversationServerID,
+            imageBase64: imageBase64,
+            fileIds: fileIds
+        )
     }
 }

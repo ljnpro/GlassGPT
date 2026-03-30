@@ -144,6 +144,7 @@ package extension BackendConversationStreamProjecting {
         liveCitations = []
         liveFilePathAnnotations = []
         isThinking = false
+        toolCallFirstSeen = [:]
     }
 
     /// Default mode-specific stream hook for controllers without extra event types.
