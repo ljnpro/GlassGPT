@@ -27,9 +27,13 @@ public struct CreateConversationRequestDTO: Codable, Equatable, Sendable {
 
 public struct CreateMessageRequestDTO: Codable, Equatable, Sendable {
     public let content: String
+    public let fileIds: [String]?
+    public let imageBase64: String?
 
-    public init(content: String) {
+    public init(content: String, fileIds: [String]? = nil, imageBase64: String? = nil) {
         self.content = content
+        self.fileIds = fileIds
+        self.imageBase64 = imageBase64
     }
 }
 

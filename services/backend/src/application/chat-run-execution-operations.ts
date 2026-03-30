@@ -153,7 +153,13 @@ export const createChatRunExecutionOperations = (
 
         for await (const event of deps.createStreamingResponse(
           apiKey,
-          buildChatExecutionRequest(conversation, input.content, conversationHistory),
+          buildChatExecutionRequest(
+            conversation,
+            input.content,
+            conversationHistory,
+            input.imageBase64,
+            input.fileIds,
+          ),
         )) {
           streamEventCount += 1;
           if (streamEventCount % 20 === 0) {

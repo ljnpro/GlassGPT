@@ -50,6 +50,8 @@ export const createConversationRequestSchema = z.object({
 
 export const createMessageRequestSchema = z.object({
   content: z.string().min(1),
+  fileIds: z.array(z.string()).optional(),
+  imageBase64: z.string().optional(),
 });
 
 export const updateConversationConfigurationRequestSchema = z.object({

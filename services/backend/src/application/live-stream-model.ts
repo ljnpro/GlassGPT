@@ -42,6 +42,8 @@ export type StreamingServiceTier = 'default' | 'flex';
 
 export interface StreamingConversationRequest {
   readonly input: string | readonly StreamingConversationMessage[];
+  readonly fileIds?: readonly string[];
+  readonly imageBase64?: string;
   readonly model?: string;
   readonly reasoningEffort?: StreamingReasoningEffort;
   readonly serviceTier?: StreamingServiceTier;

@@ -965,6 +965,15 @@
           "content": {
             "type": "string",
             "minLength": 1
+          },
+          "fileIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "imageBase64": {
+            "type": "string"
           }
         },
         "required": [

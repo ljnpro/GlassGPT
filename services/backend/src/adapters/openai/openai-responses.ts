@@ -60,12 +60,7 @@ interface StreamEnvelope {
 interface ResponsesApiBody extends ResponsesResponse {}
 
 interface ResponsesApiInputMessage {
-  readonly content:
-    | string
-    | ReadonlyArray<{
-        readonly text: string;
-        readonly type: 'input_text';
-      }>;
+  readonly content: string | ReadonlyArray<Record<string, unknown>>;
   readonly role: StreamingConversationMessage['role'];
 }
 
@@ -165,23 +160,45 @@ const fetchWithRetry = async (
 
 const buildInputMessages = (
   input: string | readonly StreamingConversationMessage[],
+  imageBase64?: string,
+  fileIds?: readonly string[],
 ): string | ResponsesApiInputMessage[] => {
+  const hasAttachments =
+    (imageBase64 != null && imageBase64.length > 0) || (fileIds != null && fileIds.length > 0);
+
   if (typeof input === 'string') {
-    return input;
+    if (!hasAttachments) {
+      return input;
+    }
+    const parts: Array<Record<string, unknown>> = [{ text: input, type: 'input_text' }];
+    if (imageBase64) {
+      parts.push({ image_url: `data:image/jpeg;base64,${imageBase64}`, type: 'input_image' });
+    }
+    for (const fileId of fileIds ?? []) {
+      parts.push({ file_id: fileId, type: 'input_file' });
+    }
+    return [{ content: parts, role: 'user' as const }];
   }
 
-  return input.map((message) => ({
-    content:
-      message.role === 'assistant'
-        ? [{ text: message.content, type: 'output_text' as const }]
-        : [{ text: message.content, type: 'input_text' as const }],
-    role: message.role,
-  }));
+  return input.map((message, index) => {
+    const isLastUser = message.role === 'user' && index === input.length - 1;
+    const contentType = message.role === 'assistant' ? 'output_text' : 'input_text';
+    const parts: Array<Record<string, unknown>> = [{ text: message.content, type: contentType }];
+    if (isLastUser && imageBase64) {
+      parts.push({ image_url: `data:image/jpeg;base64,${imageBase64}`, type: 'input_image' });
+    }
+    if (isLastUser) {
+      for (const fileId of fileIds ?? []) {
+        parts.push({ file_id: fileId, type: 'input_file' });
+      }
+    }
+    return { content: parts, role: message.role };
+  });
 };
 
 const buildRequestBody = (request: StreamingConversationRequest) => {
   return {
-    input: buildInputMessages(request.input),
+    input: buildInputMessages(request.input, request.imageBase64, request.fileIds),
     model: request.model ?? DEFAULT_CHAT_MODEL,
     reasoning: {
       effort: request.reasoningEffort ?? DEFAULT_REASONING_EFFORT,

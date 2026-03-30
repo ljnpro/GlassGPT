@@ -13,6 +13,8 @@ export interface ChatRunWorkflowParams {
   readonly conversationId: string;
   readonly userId: string;
   readonly content: string;
+  readonly fileIds?: string[];
+  readonly imageBase64?: string;
 }
 
 export interface ChatRunServiceDependencies extends RunProjectionDependencies {
@@ -76,6 +78,8 @@ export interface ChatRunService {
     input: {
       readonly content: string;
       readonly conversationId: string;
+      readonly fileIds?: string[];
+      readonly imageBase64?: string;
       readonly userId: string;
     },
   ): Promise<RunSummaryDTO>;

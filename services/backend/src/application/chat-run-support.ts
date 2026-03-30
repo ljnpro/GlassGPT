@@ -65,8 +65,12 @@ export const buildChatExecutionRequest = (
   conversation: ConversationRecord,
   input: string,
   conversationHistory: readonly MessageRecord[],
+  imageBase64?: string,
+  fileIds?: string[],
 ): StreamingConversationRequest => {
   return {
+    fileIds,
+    imageBase64,
     input: buildConversationInput(conversationHistory, input),
     model: conversation.model ?? 'gpt-5.4',
     reasoningEffort: conversation.reasoningEffort ?? 'medium',

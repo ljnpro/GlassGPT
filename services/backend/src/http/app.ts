@@ -14,6 +14,7 @@ import { installAuthRoutes } from './routes/auth.js';
 import { installConnectionRoutes } from './routes/connection.js';
 import { installConversationRoutes } from './routes/conversations.js';
 import { installCredentialRoutes } from './routes/credentials.js';
+import { installFileRoutes } from './routes/files.js';
 import { installHealthRoutes } from './routes/health.js';
 import { installRunStreamRoutes } from './routes/run-stream.js';
 import { installRunRoutes } from './routes/runs.js';
@@ -55,6 +56,7 @@ export const createApp = (services: BackendServices): BackendApp => {
     }),
   );
   app.use('*', bodyLimit({ maxSize: 1024 * 1024 }));
+  app.use('/v1/files/upload', bodyLimit({ maxSize: 50 * 1024 * 1024 }));
   app.use('*', requestIdMiddleware);
   app.use('/v1/*', createRateLimiterMiddleware(services));
 
@@ -67,6 +69,7 @@ export const createApp = (services: BackendServices): BackendApp => {
   installRunStreamRoutes(app, services);
   installSyncRoutes(app, services);
   installArtifactRoutes(app, services);
+  installFileRoutes(app, services);
 
   app.notFound((context) => {
     return context.json(errorResponseSchema.parse({ error: 'not_found' }), 404);

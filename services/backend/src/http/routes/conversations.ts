@@ -75,6 +75,8 @@ export const installConversationRoutes = (app: BackendApp, services: BackendServ
       {
         content: body.content,
         conversationId: context.req.param('conversationId'),
+        fileIds: body.fileIds,
+        imageBase64: body.imageBase64,
         userId: session.userId,
       },
     );
