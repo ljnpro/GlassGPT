@@ -45,7 +45,7 @@ package extension BackendConversationProjectionController {
         activeToolCalls = lastAssistant.toolCalls.map { toolCall in
             let firstSeen = toolCallFirstSeen[toolCall.id] ?? now
             let age = now.timeIntervalSince(firstSeen)
-            if toolCall.status == .completed && age < gracePeriod {
+            if toolCall.status == .completed, age < gracePeriod {
                 return ToolCallInfo(
                     id: toolCall.id,
                     type: toolCall.type,

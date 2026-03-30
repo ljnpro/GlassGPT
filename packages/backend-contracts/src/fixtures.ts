@@ -57,14 +57,14 @@ export const connectionCheckFixture = connectionCheckSchema.parse({
   sse: 'healthy',
   checkedAt: timestamp,
   latencyMilliseconds: 18,
-  backendVersion: '5.3.1',
-  minimumSupportedAppVersion: '5.3.0',
+  backendVersion: '5.4.0',
+  minimumSupportedAppVersion: '5.4.0',
   appCompatibility: 'compatible',
 });
 
 export const conversationFixture = conversationSchema.parse({
   id: 'conv_01',
-  title: 'GlassGPT 5.3.1',
+  title: 'GlassGPT 5.4.0',
   mode: 'chat',
   createdAt: timestamp,
   updatedAt: timestamp,

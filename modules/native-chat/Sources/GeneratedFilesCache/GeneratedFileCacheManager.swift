@@ -1,4 +1,3 @@
-import ChatDomain
 import Foundation
 import GeneratedFilesCore
 

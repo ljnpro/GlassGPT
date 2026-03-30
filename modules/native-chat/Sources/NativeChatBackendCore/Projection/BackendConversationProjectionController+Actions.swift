@@ -10,6 +10,10 @@ package extension BackendConversationProjectionController {
     func sendMessage(text rawText: String) -> Bool {
         let trimmedText = rawText.trimmingCharacters(in: .whitespacesAndNewlines)
         let hasAttachments = selectedImageData != nil || !pendingAttachments.isEmpty
+        if hasAttachments, !supportsAttachments {
+            errorMessage = "Attachments are not available yet."
+            return false
+        }
         guard !trimmedText.isEmpty || hasAttachments else {
             return false
         }
@@ -142,11 +146,11 @@ package extension BackendConversationProjectionController {
 
             // Upload pending file attachments to OpenAI via backend proxy
             var uploadedFileIds: [String] = []
-            for i in pendingAttachments.indices {
-                var attachment = pendingAttachments[i]
+            for attachmentIndex in pendingAttachments.indices {
+                var attachment = pendingAttachments[attachmentIndex]
                 guard let data = attachment.localData else { continue }
                 attachment.uploadStatus = .uploading
-                pendingAttachments[i] = attachment
+                pendingAttachments[attachmentIndex] = attachment
                 do {
                     let fileId = try await client.uploadFile(
                         data: data,
@@ -155,11 +159,11 @@ package extension BackendConversationProjectionController {
                     )
                     attachment.fileId = fileId
                     attachment.uploadStatus = .uploaded
-                    pendingAttachments[i] = attachment
+                    pendingAttachments[attachmentIndex] = attachment
                     uploadedFileIds.append(fileId)
                 } catch {
                     attachment.uploadStatus = .failed
-                    pendingAttachments[i] = attachment
+                    pendingAttachments[attachmentIndex] = attachment
                     errorMessage = "File upload failed: \(attachment.filename)"
                     isRunActive = false
                     return

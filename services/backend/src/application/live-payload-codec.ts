@@ -19,18 +19,29 @@ const liveFilePathAnnotationSchema = z.object({
   startIndex: z.number().int().nonnegative(),
 });
 
-const liveToolCallSchema = z.object({
-  code: z.string().nullable().optional(),
-  id: z.string().min(1),
-  queries: z.array(z.string()).nullable().optional(),
-  results: z.array(z.string()).nullable().optional(),
-  status: z.enum(['in_progress', 'searching', 'interpreting', 'file_searching', 'completed']),
-  type: z.enum(['web_search', 'code_interpreter', 'file_search']),
-});
+const persistedLiveToolCallSchema = z
+  .object({
+    code: z.string().nullable().optional(),
+    id: z.string().min(1),
+    queries: z.array(z.string()).nullable().optional(),
+    results: z.array(z.string()).nullable().optional(),
+    status: z.enum(['in_progress', 'searching', 'interpreting', 'file_searching', 'completed']),
+    type: z.enum(['web_search', 'code_interpreter', 'file_search']),
+  })
+  .transform(
+    (toolCall): LiveToolCall => ({
+      code: toolCall.code ?? null,
+      id: toolCall.id,
+      queries: toolCall.queries ?? null,
+      results: toolCall.results ?? null,
+      status: toolCall.status,
+      type: toolCall.type,
+    }),
+  );
 
 const liveCitationsSchema = z.array(liveCitationSchema);
 const liveFilePathAnnotationsSchema = z.array(liveFilePathAnnotationSchema);
-const liveToolCallsSchema = z.array(liveToolCallSchema);
+const liveToolCallsSchema = z.array(persistedLiveToolCallSchema);
 
 const normalizeToolCallForStorage = (toolCall: LiveToolCall): Record<string, unknown> => {
   return {

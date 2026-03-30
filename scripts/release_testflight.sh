@@ -24,7 +24,7 @@ Usage:
   ./scripts/release_testflight.sh <marketing_version> <build_number> [--branch <name>] [--commit-message "<message>"] [--preserve-main-as <name>] [--force-main-with-lease] [--skip-main-promotion] [--skip-ci] [--preflight-only]
 
 Examples:
-  ./scripts/release_testflight.sh 5.3.1 20216 --branch codex/stable-5.3 --skip-main-promotion --skip-ci
+  ./scripts/release_testflight.sh 5.4.0 20223 --branch codex/stable-5.4 --skip-main-promotion
 EOF
 }
 
@@ -246,10 +246,12 @@ if [[ ! -f "$ENV_FILE" ]]; then
   exit 1
 fi
 
-if [[ "$VERSION" != 5.3.* ]]; then
-  echo "release_testflight.sh is 5.3-aware and only accepts 5.3.x versions. Got: $VERSION" >&2
+if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+  echo "release_testflight.sh expects a semantic version like 5.4.0. Got: $VERSION" >&2
   exit 1
 fi
+
+RELEASE_SERIES="${VERSION%.*}"
 
 if [[ -z "$AUDIT_PATH" ]]; then
   AUDIT_PATH="$ROOT_DIR/docs/audit-${VERSION}.md"
@@ -267,10 +269,10 @@ if [[ -z "$TARGET_BRANCH" ]]; then
 fi
 
 case "$TARGET_BRANCH" in
-  main|stable-5.3|codex/stable-5.3|feature/release-5.3*|codex/feature/release-5.3*|feature/beta-5.3*|codex/feature/beta-5.3*)
+  main|stable-${RELEASE_SERIES}|codex/stable-${RELEASE_SERIES}|feature/release-${RELEASE_SERIES}*|codex/feature/release-${RELEASE_SERIES}*|feature/beta-${RELEASE_SERIES}*|codex/feature/beta-${RELEASE_SERIES}*)
     ;;
   *)
-    echo "Release target branch must be the 5.3 release-preparation branch, a 5.3 stable branch, or main. Got: $TARGET_BRANCH" >&2
+    echo "Release target branch must be the ${RELEASE_SERIES} release-preparation branch, a ${RELEASE_SERIES} stable branch, or main. Got: $TARGET_BRANCH" >&2
     exit 1
     ;;
 esac

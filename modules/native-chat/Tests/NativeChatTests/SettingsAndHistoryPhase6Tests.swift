@@ -137,7 +137,7 @@ private final class Phase6BackendRequester: BackendRequesting {
         throw Phase6TestError.unimplemented
     }
 
-    func sendMessage(_ content: String, to conversationID: String, imageBase64: String?, fileIds: [String]?) async throws -> RunSummaryDTO {
+    func sendMessage(_: String, to _: String, imageBase64 _: String?, fileIds _: [String]?) async throws -> RunSummaryDTO {
         throw Phase6TestError.unimplemented
     }
 

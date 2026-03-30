@@ -227,7 +227,7 @@ function is_transient_xcodebuild_failure() {
   fi
 
   search_quiet \
-    'Application failed preflight checks|reason: Busy \("Application failed preflight checks"\)|Simulator device failed to launch|Lost connection to test runner|Unable to boot device in current state|Failed to background test runner|Invalid device state|Failed to launch app with identifier|server died|mkstemp: No such file or directory|database is locked|Early unexpected exit, operation never finished bootstrapping|Test crashed with signal kill before establishing connection|Application info provider \(FBSApplicationLibrary\) returned nil|CoreSimulatorService connection interrupted|Connection interrupted|Restarting after unexpected exit, crash, or test timeout|There are no test bundles available to test|Could not resolve package dependencies|Failed to clone repository|Could not resolve host: github.com|remote end hung up unexpectedly|Connection timed out|network connection was lost|killed' \
+    'Application failed preflight checks|reason: Busy \("Application failed preflight checks"\)|Simulator device failed to launch|Lost connection to test runner|Unable to boot device in current state|Failed to background test runner|Invalid device state|Failed to launch app with identifier|server died|mkstemp: No such file or directory|database is locked|Early unexpected exit, operation never finished bootstrapping|Test crashed with signal kill before establishing connection|Application info provider \(FBSApplicationLibrary\) returned nil|CoreSimulatorService connection interrupted|Connection interrupted|Restarting after unexpected exit, crash, or test timeout|There are no test bundles available to test|Could not resolve package dependencies|Failed to clone repository|Could not resolve host: github.com|remote end hung up unexpectedly|Connection timed out|network connection was lost|DebuggerVersionStore\.StoreError|no debugger version|\*\* TEST EXECUTE FAILED \*\*|killed' \
     "$log_file"
 }
 
@@ -461,6 +461,49 @@ function emit_completion_notice() {
   printf '%s\n' "$notice" >> "$CI_COMPLETION_NOTICES_FILE"
 }
 
+function terminate_process_tree() {
+  local pid="$1"
+
+  if [[ -z "$pid" ]]; then
+    return 0
+  fi
+
+  pkill -TERM -P "$pid" >/dev/null 2>&1 || true
+  kill "$pid" >/dev/null 2>&1 || true
+  sleep 2
+  pkill -KILL -P "$pid" >/dev/null 2>&1 || true
+  kill -9 "$pid" >/dev/null 2>&1 || true
+}
+
+function xcodebuild_debugger_version_hang_detected() {
+  local log_file="$1"
+  local debugger_version_errors
+
+  [[ -f "$log_file" ]] || return 1
+
+  debugger_version_errors="$(
+    python3 - "$log_file" <<'PY'
+from pathlib import Path
+import sys
+
+text = Path(sys.argv[1]).read_text(errors="ignore")
+print(text.count("DebuggerVersionStore.StoreError"))
+PY
+  )"
+
+  if (( debugger_version_errors < 3 )); then
+    return 1
+  fi
+
+  if search_quiet \
+    'Test Suite .+ started|Test Case .+ started|Test completed successfully\.|\*\* TEST SUCCEEDED \*\*|Test run with [0-9]+ tests' \
+    "$log_file"; then
+    return 1
+  fi
+
+  return 0
+}
+
 function run_report_command() {
   local report_path="$1"
   local success_summary="${2:-}"
@@ -528,6 +571,8 @@ function run_checked_xcodebuild_impl() {
   result_bundle_path="$(find_requested_result_bundle_path "${command[@]}" || true)"
   local attempt=1
   local command_status=0
+  local command_pid=""
+  local watchdog_triggered=0
 
   if [[ "${command[0]}" == "xcodebuild" ]]; then
     command+=("$XCODEBUILD_APPINTENTS_LINKER_SETTING")
@@ -545,11 +590,30 @@ function run_checked_xcodebuild_impl() {
       (
         cd "$workdir"
         "${command[@]}"
-      ) >"$log_file" 2>&1
+      ) >"$log_file" 2>&1 &
     else
-      "${command[@]}" >"$log_file" 2>&1
+      "${command[@]}" >"$log_file" 2>&1 &
     fi
-    command_status=$?
+    command_pid=$!
+    watchdog_triggered=0
+
+    while kill -0 "$command_pid" >/dev/null 2>&1; do
+      sleep 5
+      if xcodebuild_debugger_version_hang_detected "$log_file"; then
+        echo "Transient xcodebuild debugger-version hang detected for ${label} (attempt ${attempt}/${XCODEBUILD_RETRY_ATTEMPTS}). Retrying..." >&2
+        tail -n 40 "$log_file" >&2 || true
+        terminate_process_tree "$command_pid"
+        wait "$command_pid" 2>/dev/null || true
+        command_status=143
+        watchdog_triggered=1
+        break
+      fi
+    done
+
+    if (( watchdog_triggered == 0 )); then
+      wait "$command_pid"
+      command_status=$?
+    fi
     set -e
 
     if (( command_status == 0 )); then
@@ -884,6 +948,7 @@ function gate_ui_tests() {
   log "Running UI tests"
   local -a selected_ui_cases=()
   local resolved_ui_case
+  local batch_size batch_index total_batches start_index
   while IFS= read -r resolved_ui_case; do
     selected_ui_cases+=("$resolved_ui_case")
   done < <(resolve_ui_test_cases "$UI_TEST_FILTER")
@@ -893,8 +958,15 @@ function gate_ui_tests() {
   fi
 
   ensure_ui_test_build_artifacts
-  progress_bar 1 1 "UI: ${#selected_ui_cases[@]} selected case(s)"
-  run_ui_test_batch "glassgpt-ui-tests" "${selected_ui_cases[@]}"
+  batch_size="${UI_TEST_BATCH_SIZE:-1}"
+  total_batches=$(( (${#selected_ui_cases[@]} + batch_size - 1) / batch_size ))
+
+  for (( batch_index = 0; batch_index < total_batches; batch_index++ )); do
+    start_index=$(( batch_index * batch_size ))
+    local -a ui_batch=("${selected_ui_cases[@]:start_index:batch_size}")
+    progress_bar "$(( batch_index + 1 ))" "$total_batches" "UI batch $(( batch_index + 1 ))/${total_batches}: ${#ui_batch[@]} case(s)"
+    run_ui_test_batch "glassgpt-ui-tests-batch-$(( batch_index + 1 ))" "${ui_batch[@]}"
+  done
 }
 
 function gate_reinstall_compatibility() {
@@ -959,6 +1031,10 @@ function assert_expected_versions_config() {
 
 function assert_release_readiness() {
   log "Running release-readiness gate"
+  local marketing_version
+  local release_series
+  marketing_version="$(read_versions_xcconfig_value MARKETING_VERSION | awk '{print $1}')"
+  release_series="${marketing_version%.*}"
 
   if [[ ! -x "$ROOT_DIR/scripts/check_warnings.sh" ]]; then
     echo "Missing scripts/check_warnings.sh executable." >&2
@@ -982,7 +1058,7 @@ function assert_release_readiness() {
   current_branch="${GITHUB_REF_NAME:-$(git rev-parse --abbrev-ref HEAD)}"
 
   case "$current_branch" in
-    main|stable-5.3|codex/stable-5.3|feature/release-5.3*|codex/feature/release-5.3*|feature/beta-5.3*|codex/feature/beta-5.3*|HEAD)
+    main|stable-${release_series}|codex/stable-${release_series}|feature/release-${release_series}*|codex/feature/release-${release_series}*|feature/beta-${release_series}*|codex/feature/beta-${release_series}*|HEAD)
       ;;
     *)
       echo "Release-readiness gate does not permit branch '$current_branch'." >&2
@@ -990,8 +1066,8 @@ function assert_release_readiness() {
       ;;
   esac
 
-  if ! search_quiet "codex/stable-5.3" "$ROOT_DIR/docs/branch-strategy.md"; then
-    echo "branch-strategy.md must include the active 5.3 release line." >&2
+  if ! search_quiet "codex/stable-${release_series}" "$ROOT_DIR/docs/branch-strategy.md"; then
+    echo "branch-strategy.md must include the active ${release_series} release line." >&2
     exit 1
   fi
 
@@ -1000,23 +1076,28 @@ function assert_release_readiness() {
     exit 1
   fi
 
-  if ! search_quiet "5\\.3\\.0" "$ROOT_DIR/docs/parity-baseline.md"; then
-    echo "parity-baseline.md must include the active 5.3.0 candidate marker." >&2
+  if ! search_quiet "active release line: \`codex/stable-${release_series}\`" "$ROOT_DIR/docs/parity-baseline.md"; then
+    echo "parity-baseline.md must include the active ${release_series} release branch marker." >&2
     exit 1
   fi
 
-  if ! search_quiet "5\\.2\\.0" "$ROOT_DIR/docs/parity-baseline.md"; then
-    echo "parity-baseline.md must include the current 5.2.0 production baseline marker." >&2
+  if ! search_quiet "candidate app version: \`${marketing_version}\`" "$ROOT_DIR/docs/parity-baseline.md"; then
+    echo "parity-baseline.md must include the active ${marketing_version} candidate marker." >&2
     exit 1
   fi
 
-  if ! search_quiet "release_5_3\\.sh" "$ROOT_DIR/docs/release.md"; then
-    echo "release.md must describe the 5.3 orchestrated release entrypoint." >&2
+  if ! search_quiet "codex/stable-${release_series}" "$ROOT_DIR/docs/release.md"; then
+    echo "release.md must describe the active ${release_series} release branch." >&2
     exit 1
   fi
 
-  if ! search_quiet "release_testflight|release-testflight|tracked wrapper" "$ROOT_DIR/docs/release.md"; then
-    echo "release.md must describe the tracked release entrypoint." >&2
+  if ! search_quiet "deploy_backend\\.sh --env production" "$ROOT_DIR/docs/release.md"; then
+    echo "release.md must document the production backend deploy entrypoint." >&2
+    exit 1
+  fi
+
+  if ! search_quiet "release_testflight\\.sh" "$ROOT_DIR/docs/release.md"; then
+    echo "release.md must describe the tracked TestFlight entrypoint." >&2
     exit 1
   fi
 

@@ -35,6 +35,7 @@ package protocol BackendConversationProjectionController: AnyObject {
     var isThinking: Bool { get set }
     var sessionAccountID: String? { get }
     var signInRequiredMessage: String { get }
+    var supportsAttachments: Bool { get }
 
     func applyStartedRun(_ run: RunSummaryDTO)
     func applyCancelledRun(_ run: RunSummaryDTO?)
@@ -49,7 +50,12 @@ package protocol BackendConversationProjectionController: AnyObject {
     func restoreActiveRunIfNeeded(selectionToken: UUID) async
     var toolCallFirstSeen: [String: Date] { get set }
     var toolCallGracePeriodSeconds: TimeInterval { get set }
-    func startConversationRun(text: String, conversationServerID: String, imageBase64: String?, fileIds: [String]?) async throws -> RunSummaryDTO
+    func startConversationRun(
+        text: String,
+        conversationServerID: String,
+        imageBase64: String?,
+        fileIds: [String]?
+    ) async throws -> RunSummaryDTO
     func startRunPolling(conversationServerID: String, runID: String, selectionToken: UUID)
     func syncVisibleConfigurationToBackendIfNeeded() async throws
     func syncVisibleState()
@@ -74,6 +80,10 @@ package extension BackendConversationProjectionController {
     /// Default submission preparation for controllers without mode-specific setup.
     func prepareForMessageSubmission() {
         prepareSharedMessageSubmission()
+    }
+
+    var supportsAttachments: Bool {
+        true
     }
 
     /// Stores the accepted run identifier in shared controller state.

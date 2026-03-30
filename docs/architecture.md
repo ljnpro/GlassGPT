@@ -1,8 +1,8 @@
-# 5.3.0 Architecture
+# 5.4.0 Architecture
 
 ## Goal
 
-`5.3.0` is a hardening release. The architecture must describe the real shipped
+`5.4.0` is the current feature release. The architecture must describe the real shipped
 system across iOS, backend contracts, backend services, CI, and release
 governance instead of only describing one layer in isolation.
 
@@ -111,10 +111,10 @@ governance instead of only describing one layer in isolation.
   - `backend`
   - `ios`
   - `release-readiness`
-- Release scripts are gated by `todo.md`, the 5.3.0 audit, and final CI
+- Release scripts are gated by `todo.md`, the 5.4.0 audit, and final CI
   evidence.
 
-## Known 5.3.0 Work Still In Flight
+## Known 5.4.0 Work Still In Flight
 
 - Final publication still depends on a supported TestFlight upload tool being
   present on the release machine.

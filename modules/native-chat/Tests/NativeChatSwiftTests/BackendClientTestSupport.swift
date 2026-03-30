@@ -14,7 +14,7 @@ func makeConnectionCheckResponseData() throws -> Data {
         "checkedAt": "1970-01-01T00:00:00Z",
         "latencyMilliseconds": 12,
         "backendVersion": "5.4.0",
-        "minimumSupportedAppVersion": "5.3.0",
+        "minimumSupportedAppVersion": "5.4.0",
         "appCompatibility": "compatible"
     ])
 }

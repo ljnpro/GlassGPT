@@ -37,7 +37,7 @@ struct BackendClientTests {
             RecordingBackendURLProtocol.state.snapshot.recordedRequests.last?.appVersionHeader == "5.4.0"
         )
         #expect(response.backendVersion == "5.4.0")
-        #expect(response.minimumSupportedAppVersion == "5.3.0")
+        #expect(response.minimumSupportedAppVersion == "5.4.0")
         #expect(response.appCompatibility == .compatible)
         session.invalidateAndCancel()
     }

@@ -58,18 +58,22 @@ package final class NativeChatShellState {
         uiTestPreviewItem = nil
     }
 
+    /// Dismisses the currently presented generated-file preview item.
     package func dismissGeneratedFilePreview() {
         filePreviewStore.filePreviewItem = nil
     }
 
+    /// Dismisses the generated-file share sheet state.
     package func dismissGeneratedFileShareSheet() {
         filePreviewStore.sharedGeneratedFileItem = nil
     }
 
+    /// Clears the current generated-file download error message.
     package func clearGeneratedFileDownloadError() {
         filePreviewStore.fileDownloadError = nil
     }
 
+    /// Routes a tapped sandbox link through the generated-file download and preview flow.
     package func handleSandboxLinkTap(_ sandboxURL: String, annotation: FilePathAnnotation?) {
         Task { @MainActor [generatedFileInteractionCoordinator] in
             await generatedFileInteractionCoordinator?.handleSandboxLinkTap(

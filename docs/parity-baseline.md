@@ -1,16 +1,16 @@
-# 5.3.0 Product Baseline
+# 5.4.0 Product Baseline
 
-This document records the `5.2.0 (20215)` production baseline that the
-`5.3.0` hardening release must preserve where behavior is intentionally
-continuous, while also validating the backend/release-management improvements
-required for `5.3.0`.
+This document records the `5.3.2` production baseline that the `5.4.0`
+release must preserve where behavior is intentionally continuous, while also
+validating the backend-proxied attachment, tool-call, and generated-file
+restorations required for `5.4.0`.
 
 ## Baseline References
 
-- active release line: `codex/stable-5.3`
+- active release line: `codex/stable-5.4`
 - frozen rollback branch: `stable-4.12`
-- baseline app version: `5.2.0 (20215)`
-- candidate app version: `5.3.0`
+- baseline app version: `5.3.2`
+- candidate app version: `5.4.0`
 
 ## Preserved User-Facing Invariants
 
@@ -22,11 +22,12 @@ required for `5.3.0`.
 - Agent mode remains visually and behaviorally distinct from Chat mode
 - the app remains native SwiftUI/UIKit with no web shell takeover
 
-## 5.3.0 Release-Quality Requirements
+## 5.4.0 Release-Quality Requirements
 
 - backend conversation configuration is authoritative and reflected across devices
 - Sign in with Apple, encrypted backend API-key custody, and same-account sync remain intact
-- SSE replay/resume, retry behavior, and release-readiness gates remain intact
+- 250 ms polling, retry behavior, and release-readiness gates remain intact
+- image upload, document upload, tool-call indicators, and generated file handling must match the shipped 4.12.6 user experience
 - staged and production backend release paths exist with backup/export, smoke checks, and rollback behavior
 - the release tree must satisfy the final rubric score thresholds before any backend/TestFlight publication
 

@@ -139,13 +139,13 @@ struct NativeChatAgentControllerCoverageTests {
             selectionToken: controller.visibleSelectionToken
         )
 
-        #expect(harness.client.fetchRunCallCount == 0)
+        #expect(harness.client.fetchRunCallCount == 2)
         #expect(controller.messages.count == 2)
         #expect(controller.messages.last?.content == "Final synthesis body")
         #expect(controller.messages.last?.agentTrace != nil)
-        #expect(controller.processSnapshot.leaderLiveStatus == "Final synthesis")
-        #expect(controller.processSnapshot.leaderLiveSummary == "Synthesizing final answer")
-        #expect(controller.processSnapshot.tasks.contains(where: { $0.id == "task_ci" }))
+        #expect(controller.processSnapshot.leaderLiveStatus == "Completed")
+        #expect(controller.processSnapshot.leaderLiveSummary == "Done")
+        #expect(controller.processSnapshot.tasks.isEmpty)
         #expect(controller.currentStreamingText.isEmpty)
         #expect(controller.currentThinkingText.isEmpty)
         #expect(controller.activeToolCalls.isEmpty)

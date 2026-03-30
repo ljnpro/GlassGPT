@@ -137,7 +137,7 @@ extension UITestScenarioAppStoreFactory {
 
     private static func makeRichAgentLiveMessages() -> [BackendMessageSurface] {
         [
-            makeMessageSurface(role: .user, content: "Audit the 5.3.0 hardening release quality.", isComplete: true),
+            makeMessageSurface(role: .user, content: "Audit the 5.4.0 hardening release quality.", isComplete: true),
             makeMessageSurface(
                 role: .assistant,
                 content: "The council is synthesizing the final architecture review.",
@@ -149,7 +149,7 @@ extension UITestScenarioAppStoreFactory {
 
     private static func makeRichAgentCompletedMessages() -> [BackendMessageSurface] {
         [
-            makeMessageSurface(role: .user, content: "Audit the 5.3.0 hardening release quality.", isComplete: true),
+            makeMessageSurface(role: .user, content: "Audit the 5.4.0 hardening release quality.", isComplete: true),
             makeMessageSurface(
                 role: .assistant,
                 content: "The council completed the final architecture review.",
@@ -161,8 +161,8 @@ extension UITestScenarioAppStoreFactory {
 
     private static func makeRichChatToolCalls() -> [ToolCallInfo] {
         [
-            ToolCallInfo(id: "tool_web", type: .webSearch, status: .searching, queries: ["GlassGPT 5.3.0 release notes"]),
-            ToolCallInfo(id: "tool_file", type: .fileSearch, status: .fileSearching, queries: ["5.3.0-plan.md"]),
+            ToolCallInfo(id: "tool_web", type: .webSearch, status: .searching, queries: ["GlassGPT 5.4.0 release notes"]),
+            ToolCallInfo(id: "tool_file", type: .fileSearch, status: .fileSearching, queries: ["5.4.0-plan.md"]),
             ToolCallInfo(id: "tool_code", type: .codeInterpreter, status: .interpreting, code: "print('release')")
         ]
     }
@@ -176,8 +176,8 @@ extension UITestScenarioAppStoreFactory {
             FilePathAnnotation(
                 fileId: "file_1",
                 containerId: "container_1",
-                sandboxPath: "/tmp/5.3.0-plan.md",
-                filename: "5.3.0-plan.md",
+                sandboxPath: "/tmp/5.4.0-plan.md",
+                filename: "5.4.0-plan.md",
                 startIndex: 0,
                 endIndex: 14
             )
@@ -200,8 +200,8 @@ extension UITestScenarioAppStoreFactory {
             FilePathAnnotation(
                 fileId: "file_1",
                 containerId: "container_1",
-                sandboxPath: "/tmp/5.3.0-audit.md",
-                filename: "5.3.0-audit.md",
+                sandboxPath: "/tmp/5.4.0-audit.md",
+                filename: "5.4.0-audit.md",
                 startIndex: 0,
                 endIndex: 4
             )
@@ -211,8 +211,8 @@ extension UITestScenarioAppStoreFactory {
     private static func makeRichAgentProcessSnapshot() -> AgentProcessSnapshot {
         AgentProcessSnapshot(
             activity: .synthesis,
-            currentFocus: "Finalize the 5.3.0 hardening review",
-            leaderAcceptedFocus: "Finalize the 5.3.0 hardening review",
+            currentFocus: "Finalize the 5.4.0 hardening review",
+            leaderAcceptedFocus: "Finalize the 5.4.0 hardening review",
             leaderLiveStatus: "Synthesizing",
             leaderLiveSummary: "Combining validated findings from the worker wave.",
             plan: makeRichAgentPlan(),
@@ -233,7 +233,7 @@ extension UITestScenarioAppStoreFactory {
             activeTaskIDs: ["task_ci"],
             recentUpdateItems: makeRichAgentProcessUpdates(),
             stopReason: .sufficientAnswer,
-            outcome: "Ready to finalize 5.3.0 after the render-surface gate closes."
+            outcome: "Ready to finalize 5.4.0 after the render-surface gate closes."
         )
     }
 
@@ -307,8 +307,8 @@ extension UITestScenarioAppStoreFactory {
             ],
             processSnapshot: AgentProcessSnapshot(
                 activity: .completed,
-                currentFocus: "Finalize the 5.3.0 release candidate",
-                leaderAcceptedFocus: "Finalize the 5.3.0 release candidate",
+                currentFocus: "Finalize the 5.4.0 release candidate",
+                leaderAcceptedFocus: "Finalize the 5.4.0 release candidate",
                 leaderLiveStatus: "Completed",
                 leaderLiveSummary: "The council aligned on the release path.",
                 plan: [

@@ -265,7 +265,7 @@ final class CoverageBackendURLProtocolState: @unchecked Sendable {
         defer { stream.close() }
 
         var data = Data()
-        let bufferSize = 4_096
+        let bufferSize = 4096
         let buffer = UnsafeMutablePointer<UInt8>.allocate(capacity: bufferSize)
         defer { buffer.deallocate() }
 

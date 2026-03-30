@@ -103,25 +103,22 @@ describe('parseMessageLiveState', () => {
   });
 
   it('writes tool call JSON without contract-incompatible null optionals', () => {
-    const message = applyLiveStateToMessage(
-      messageFixture(),
-      {
-        citations: [],
-        content: 'assistant reply',
-        filePathAnnotations: [],
-        thinking: null,
-        toolCalls: [
-          {
-            code: null,
-            id: 'tool_01',
-            queries: null,
-            results: null,
-            status: 'completed',
-            type: 'web_search',
-          },
-        ],
-      },
-    );
+    const message = applyLiveStateToMessage(messageFixture(), {
+      citations: [],
+      content: 'assistant reply',
+      filePathAnnotations: [],
+      thinking: null,
+      toolCalls: [
+        {
+          code: null,
+          id: 'tool_01',
+          queries: null,
+          results: null,
+          status: 'completed',
+          type: 'web_search',
+        },
+      ],
+    });
 
     expect(message.toolCallsJSON).toBe(
       JSON.stringify([

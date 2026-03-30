@@ -1,4 +1,3 @@
-import ChatDomain
 import Foundation
 
 /// Identifies the cache storage bucket for a generated file.

@@ -5,53 +5,51 @@
 - live execution tracker:
   [todo.md](/Applications/GlassGPT/todo.md)
 - full release plan:
-  [5.3.0-plan.md](/Applications/GlassGPT/5.3.0-plan.md)
+  [2026-03-30-glassgpt-5.4.0-release.md](/Applications/GlassGPT/docs/superpowers/plans/2026-03-30-glassgpt-5.4.0-release.md)
 - evidence-backed release audit:
-  [audit-5.3.0.md](/Applications/GlassGPT/docs/audit-5.3.0.md)
+  [audit-5.4.0.md](/Applications/GlassGPT/docs/audit-5.4.0.md)
 - version/build source of truth:
   [Versions.xcconfig](/Applications/GlassGPT/ios/GlassGPT/Config/Versions.xcconfig)
 - backend deploy helper:
   [deploy_backend.sh](/Applications/GlassGPT/scripts/deploy_backend.sh)
 - TestFlight publish helper:
   [release_testflight.sh](/Applications/GlassGPT/scripts/release_testflight.sh)
-- top-level release orchestrator:
-  [release_5_3.sh](/Applications/GlassGPT/scripts/release_5_3.sh)
 - frozen rollback line:
   `stable-4.12` and `codex/stable-4.12`
-- active 5.3 release line:
-  `codex/stable-5.3`
+- active 5.4 release line:
+  `codex/stable-5.4`
 
 ## Canonical Release Command
 
-The only approved top-level release entrypoint for this line is:
+Run the backend deploy and TestFlight publish directly on the release branch:
 
 ```bash
-./scripts/release_5_3.sh 5.3.0 20300 --branch codex/stable-5.3 --preserve-main-as codex/stable-4.12 --force-main-with-lease
+./scripts/deploy_backend.sh --env production
+./scripts/release_testflight.sh 5.4.0 20223 --branch codex/stable-5.4 --skip-main-promotion
 ```
 
 Preflight-only checks:
 
 ```bash
-./scripts/release_5_3.sh 5.3.0 20300 --branch codex/stable-5.3 --preflight-only
+./scripts/release_testflight.sh 5.4.0 20223 --branch codex/stable-5.4 --skip-main-promotion --preflight-only
 ```
 
-`release_testflight.sh` remains the tracked TestFlight helper, but for the
-`5.3.0` line it is an internal step inside `release_5_3.sh`, not the primary
-release entrypoint.
+`release_5_3.sh` remains the historical 5.3-line orchestrator, but it is not
+the primary entrypoint for the `5.4.0` release line.
 
 ## Release Order
 
-`release_5_3.sh` enforces this order:
+Use this order on the `5.4.0` line:
 
-1. verify a clean worktree
-2. verify `todo.md` release gates and required evidence files
-3. run the final full `./scripts/ci.sh`
-4. deploy backend to staging
-5. run staging smoke checks
-6. deploy backend to production
-7. run production smoke checks or trigger rollback on failure
-8. publish the iOS build to TestFlight through
+1. verify a clean worktree on `codex/stable-5.4`
+2. run full backend and iOS CI with zero-warning, zero-skipped output
+3. generate or refresh the final CI evidence bundle
+4. deploy backend to production through
+   [deploy_backend.sh](/Applications/GlassGPT/scripts/deploy_backend.sh)
+5. verify the production health and connection-check contract on version `5.4.0`
+6. publish the iOS build to TestFlight through
    [release_testflight.sh](/Applications/GlassGPT/scripts/release_testflight.sh)
+7. push the release branch and `v5.4.0` tag after both publications succeed
 
 ## Required Inputs
 
@@ -60,7 +58,7 @@ release entrypoint.
 - a supported Transporter install at:
   `/Applications/Transporter.app/Contents/itms/bin/iTMSTransporter`
 - green `todo.md` exit gates
-- [audit-5.3.0.md](/Applications/GlassGPT/docs/audit-5.3.0.md)
+- [audit-5.4.0.md](/Applications/GlassGPT/docs/audit-5.4.0.md)
 - final CI evidence at:
   `.local/build/evidence/rel-001-final-ci.txt`
 
@@ -73,7 +71,7 @@ release entrypoint.
    - `0` skipped tests
    - `0` avoidable noise
 3. [todo.md](/Applications/GlassGPT/todo.md) exit gates are green
-4. [audit-5.3.0.md](/Applications/GlassGPT/docs/audit-5.3.0.md) is current
+4. [audit-5.4.0.md](/Applications/GlassGPT/docs/audit-5.4.0.md) is current
 5. the worktree is clean on the release branch
 6. the intended version/build are written to
    [Versions.xcconfig](/Applications/GlassGPT/ios/GlassGPT/Config/Versions.xcconfig)

@@ -19,6 +19,10 @@ extension BackendAgentController: BackendConversationProjectionController {
         "Sign in with Apple in Settings to use Agent mode."
     }
 
+    package var supportsAttachments: Bool {
+        false
+    }
+
     /// Seeds agent-specific live state immediately before submission starts.
     package func prepareForMessageSubmission() {
         prepareSharedMessageSubmission(startThinking: true)
@@ -40,8 +44,8 @@ extension BackendAgentController: BackendConversationProjectionController {
     package func startConversationRun(
         text: String,
         conversationServerID: String,
-        imageBase64: String?,
-        fileIds: [String]?
+        imageBase64 _: String?,
+        fileIds _: [String]?
     ) async throws -> RunSummaryDTO {
         try await client.startAgentRun(prompt: text, in: conversationServerID)
     }

@@ -12,6 +12,7 @@ package final class GeneratedFileInteractionCoordinator {
     private let filePreviewStore: FilePreviewStore
     private let annotationMatcher = GeneratedFileAnnotationMatcher()
 
+    /// Creates a coordinator that resolves sandbox links into cached or downloaded local files.
     package init(
         client: any BackendRequesting,
         cacheManager: GeneratedFileCacheManager,
@@ -22,6 +23,7 @@ package final class GeneratedFileInteractionCoordinator {
         self.filePreviewStore = filePreviewStore
     }
 
+    /// Resolves a tapped sandbox URL into a locally presentable file resource or a user-facing error.
     package func handleSandboxLinkTap(_ sandboxURL: String, annotation: FilePathAnnotation?) async {
         filePreviewStore.fileDownloadError = nil
 

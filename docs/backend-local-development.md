@@ -96,14 +96,15 @@ Common optional overrides:
 ./scripts/deploy_backend.sh --env staging
 ```
 
-- The release wrapper is:
+- The current release entrypoints are:
 
 ```bash
-./scripts/release_5_3.sh
+./scripts/deploy_backend.sh --env production
+./scripts/release_testflight.sh 5.4.0 20223 --branch codex/stable-5.4 --skip-main-promotion
 ```
 
-That wrapper is intentionally gated by `todo.md`, the audit document, and final
-CI evidence. Do not bypass it for the 5.3.0 line.
+Those commands are intentionally gated by `todo.md`, the audit document, and
+final CI evidence. Do not bypass them for the 5.4.0 line.
 
 ## D1 Backup And Restore Path
 

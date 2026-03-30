@@ -72,12 +72,15 @@ public extension BackendRequesting {
     }
 
     func uploadFile(data: Data, filename: String, mimeType: String) async throws -> String {
-        _ = data; _ = filename; _ = mimeType
+        _ = data
+        _ = filename
+        _ = mimeType
         throw URLError(.unsupportedURL)
     }
 
     func downloadGeneratedFile(fileId: String, containerId: String?) async throws -> (data: Data, contentType: String?) {
-        _ = fileId; _ = containerId
+        _ = fileId
+        _ = containerId
         throw URLError(.unsupportedURL)
     }
 }

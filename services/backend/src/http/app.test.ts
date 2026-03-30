@@ -582,7 +582,7 @@ describe('backend worker scaffold', () => {
     const response = await createApp(createTestServices()).fetch(
       new Request('https://example.com/healthz', {
         headers: {
-          'X-GlassGPT-App-Version': '5.3.0',
+          'X-GlassGPT-App-Version': '5.4.0',
         },
       }),
       testEnv,
@@ -592,7 +592,7 @@ describe('backend worker scaffold', () => {
     await expect(response.json()).resolves.toEqual({
       appEnv: 'beta',
       backendVersion: '5.4.0',
-      minimumSupportedAppVersion: '5.3.0',
+      minimumSupportedAppVersion: '5.4.0',
       appCompatibility: 'compatible',
       ok: true,
     });
@@ -602,7 +602,7 @@ describe('backend worker scaffold', () => {
     const response = await createApp(createTestServices()).fetch(
       new Request('https://example.com/healthz', {
         headers: {
-          'X-GlassGPT-App-Version': '5.3.0',
+          'X-GlassGPT-App-Version': '5.4.0',
         },
       }),
       createTestEnv({
@@ -614,7 +614,7 @@ describe('backend worker scaffold', () => {
     await expect(response.json()).resolves.toEqual({
       appEnv: 'beta',
       backendVersion: '5.4.0',
-      minimumSupportedAppVersion: '5.3.0',
+      minimumSupportedAppVersion: '5.4.0',
       appCompatibility: 'compatible',
       errorSummary: 'auth_runtime_configuration_missing',
       ok: false,
@@ -641,7 +641,7 @@ describe('backend worker scaffold', () => {
     const response = await createApp(createTestServices()).fetch(
       new Request('https://example.com/v1/connection/check', {
         headers: {
-          'X-GlassGPT-App-Version': '5.3.0',
+          'X-GlassGPT-App-Version': '5.4.0',
         },
       }),
       testEnv,
@@ -651,7 +651,7 @@ describe('backend worker scaffold', () => {
     await expect(response.json()).resolves.toMatchObject({
       appCompatibility: 'compatible',
       backendVersion: '5.4.0',
-      minimumSupportedAppVersion: '5.3.0',
+      minimumSupportedAppVersion: '5.4.0',
     });
   });
 
@@ -659,7 +659,7 @@ describe('backend worker scaffold', () => {
     const response = await createApp(createTestServices()).fetch(
       new Request('https://example.com/v1/connection/check', {
         headers: {
-          'X-GlassGPT-App-Version': '5.3.0',
+          'X-GlassGPT-App-Version': '5.4.0',
         },
       }),
       createTestEnv({
@@ -672,7 +672,7 @@ describe('backend worker scaffold', () => {
       auth: 'unavailable',
       errorSummary: 'auth_runtime_configuration_missing',
       backendVersion: '5.4.0',
-      minimumSupportedAppVersion: '5.3.0',
+      minimumSupportedAppVersion: '5.4.0',
     });
   });
 
@@ -1172,11 +1172,15 @@ describe('backend worker scaffold', () => {
   it('accepts oversized multipart uploads on the file proxy route', async () => {
     const app = createApp(createTestServices());
     const originalFetch = globalThis.fetch;
-    globalThis.fetch = vi.fn(async () =>
-      new Response(JSON.stringify({ bytes: 1_200_000, filename: 'large.pdf', id: 'file_large_01' }), {
-        headers: { 'Content-Type': 'application/json' },
-        status: 200,
-      }),
+    globalThis.fetch = vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify({ bytes: 1_200_000, filename: 'large.pdf', id: 'file_large_01' }),
+          {
+            headers: { 'Content-Type': 'application/json' },
+            status: 200,
+          },
+        ),
     ) as typeof fetch;
 
     try {
@@ -1250,15 +1254,11 @@ describe('backend worker scaffold', () => {
       expect(fetchMock.mock.calls[0]?.[0]).toBe(
         'https://api.openai.com/v1/containers/container_123/files/file_123/content',
       );
-      expect(fetchMock.mock.calls[1]?.[0]).toBe(
-        'https://api.openai.com/v1/files/file_123/content',
-      );
+      expect(fetchMock.mock.calls[1]?.[0]).toBe('https://api.openai.com/v1/files/file_123/content');
 
       expect(response.status).toBe(200);
       expect(response.headers.get('Content-Type')).toBe('application/pdf');
-      expect(response.headers.get('Content-Disposition')).toBe(
-        'attachment; filename="report.pdf"',
-      );
+      expect(response.headers.get('Content-Disposition')).toBe('attachment; filename="report.pdf"');
       await expect(response.text()).resolves.toBe('downloaded-content');
     } finally {
       globalThis.fetch = originalFetch;
@@ -1574,7 +1574,7 @@ describe('backend worker scaffold', () => {
                   {
                     code: null,
                     id: 'tool_1',
-                    queries: ['GlassGPT 5.3.0'],
+                    queries: ['GlassGPT 5.4.0'],
                     results: ['ok'],
                     status: 'completed',
                     type: 'web_search',

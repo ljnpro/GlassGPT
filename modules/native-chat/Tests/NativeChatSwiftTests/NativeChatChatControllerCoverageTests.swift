@@ -35,7 +35,7 @@ struct NativeChatChatControllerCoverageTests {
                 localData: Data([0x01, 0x02, 0x03, 0x04])
             )
         ]
-        fileHarness.client.nextUploadedFileID = "file_chat_doc"
+        fileHarness.client.uploadBehavior = .immediateSuccess("file_chat_doc")
         #expect(controller.sendMessage(text: ""))
         let fileTask = try #require(controller.submissionTask)
         await fileTask.value
@@ -181,7 +181,7 @@ struct NativeChatChatControllerCoverageTests {
             selectionToken: controller.visibleSelectionToken
         )
 
-        #expect(harness.client.fetchRunCallCount == 0)
+        #expect(harness.client.fetchRunCallCount == 1)
         #expect(controller.messages.count == 2)
         #expect(controller.messages.last?.content == "Alpha Beta")
         #expect(controller.currentStreamingText.isEmpty)
@@ -253,8 +253,8 @@ struct NativeChatChatControllerCoverageTests {
             selectionToken: controller.visibleSelectionToken
         )
 
-        #expect(harness.client.fetchRunCallCount == 0)
-        #expect(controller.errorMessage == "Realtime stream became unavailable. Please retry.")
+        #expect(harness.client.fetchRunCallCount == 1)
+        #expect(controller.errorMessage == nil)
         #expect(controller.currentStreamingText.isEmpty)
         #expect(controller.currentThinkingText.isEmpty)
     }

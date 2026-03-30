@@ -14,14 +14,14 @@ struct PersistenceRecoveryTests {
         let storeURL = tempDirectory.appendingPathComponent("chat.sqlite")
         let timestamp = Date(timeIntervalSince1970: 1_742_000_000)
         let plan = StoreMigrationPlan(
-            targetVersion: "5.3.0",
-            supportedSourceVersions: ["5.2.0"],
+            targetVersion: "5.4.0",
+            supportedSourceVersions: ["5.3.2"],
             failureRecoveryAction: .restoreBackup
         )
 
         let backupURL = plan.backupURL(for: storeURL, timestamp: timestamp)
 
-        #expect(plan.supportsUpgrade(from: "5.2.0"))
+        #expect(plan.supportsUpgrade(from: "5.3.2"))
         #expect(backupURL.deletingLastPathComponent().lastPathComponent == "migration-backups")
         #expect(backupURL.pathExtension == "sqlite")
     }

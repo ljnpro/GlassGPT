@@ -6,7 +6,7 @@ import {
 import type { BackendSecretEnv } from './runtime-context.js';
 
 export const BACKEND_VERSION = '5.4.0';
-export const MINIMUM_SUPPORTED_APP_VERSION = '5.3.0';
+export const MINIMUM_SUPPORTED_APP_VERSION = '5.4.0';
 export const APP_VERSION_HEADER = 'X-GlassGPT-App-Version';
 export const AUTH_RUNTIME_CONFIGURATION_ERROR = 'auth_runtime_configuration_missing';
 

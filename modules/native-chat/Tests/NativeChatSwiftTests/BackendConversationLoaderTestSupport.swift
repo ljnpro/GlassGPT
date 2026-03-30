@@ -191,7 +191,7 @@ final class LoaderBackendRequester: BackendRequesting {
         throw URLError(.unsupportedURL)
     }
 
-    func sendMessage(_ content: String, to conversationID: String, imageBase64: String?, fileIds: [String]?) async throws -> RunSummaryDTO {
+    func sendMessage(_: String, to _: String, imageBase64 _: String?, fileIds _: [String]?) async throws -> RunSummaryDTO {
         throw URLError(.unsupportedURL)
     }
 

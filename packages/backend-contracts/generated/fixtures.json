@@ -36,13 +36,13 @@
     "sse": "healthy",
     "checkedAt": "2026-03-27T00:00:00.000Z",
     "latencyMilliseconds": 18,
-    "backendVersion": "5.3.1",
-    "minimumSupportedAppVersion": "5.3.0",
+    "backendVersion": "5.4.0",
+    "minimumSupportedAppVersion": "5.4.0",
     "appCompatibility": "compatible"
   },
   "ConversationDTO": {
     "id": "conv_01",
-    "title": "GlassGPT 5.3.1",
+    "title": "GlassGPT 5.4.0",
     "mode": "chat",
     "createdAt": "2026-03-27T00:00:00.000Z",
     "updatedAt": "2026-03-27T00:00:00.000Z",
@@ -55,7 +55,7 @@
   "ConversationDetailDTO": {
     "conversation": {
       "id": "conv_01",
-      "title": "GlassGPT 5.3.1",
+      "title": "GlassGPT 5.4.0",
       "mode": "chat",
       "createdAt": "2026-03-27T00:00:00.000Z",
       "updatedAt": "2026-03-27T00:00:00.000Z",
@@ -94,7 +94,7 @@
     "items": [
       {
         "id": "conv_01",
-        "title": "GlassGPT 5.3.1",
+        "title": "GlassGPT 5.4.0",
         "mode": "chat",
         "createdAt": "2026-03-27T00:00:00.000Z",
         "updatedAt": "2026-03-27T00:00:00.000Z",
@@ -147,7 +147,7 @@
     "createdAt": "2026-03-27T00:00:00.000Z",
     "conversation": {
       "id": "conv_01",
-      "title": "GlassGPT 5.3.1",
+      "title": "GlassGPT 5.4.0",
       "mode": "chat",
       "createdAt": "2026-03-27T00:00:00.000Z",
       "updatedAt": "2026-03-27T00:00:00.000Z",
@@ -216,7 +216,7 @@
         "createdAt": "2026-03-27T00:00:00.000Z",
         "conversation": {
           "id": "conv_01",
-          "title": "GlassGPT 5.3.1",
+          "title": "GlassGPT 5.4.0",
           "mode": "chat",
           "createdAt": "2026-03-27T00:00:00.000Z",
           "updatedAt": "2026-03-27T00:00:00.000Z",
