@@ -136,15 +136,21 @@ extension MessageBubble {
     @ViewBuilder
     private var assistantToolIndicators: some View {
         if message.role == .assistant {
-            if displayedToolCalls.contains(where: { $0.type == .webSearch && $0.status != .completed }) {
+            // During active runs (isDisplayingLiveAssistantState), show indicators
+            // for all tool calls regardless of status because polling may only
+            // observe the completed state.  After the run finishes, hide them
+            // so completed tool calls don't clutter the final message.
+            let showAll = isDisplayingLiveAssistantState
+
+            if displayedToolCalls.contains(where: { $0.type == .webSearch && (showAll || $0.status != .completed) }) {
                 WebSearchIndicator()
             }
 
-            if displayedToolCalls.contains(where: { $0.type == .codeInterpreter && $0.status != .completed }) {
+            if displayedToolCalls.contains(where: { $0.type == .codeInterpreter && (showAll || $0.status != .completed) }) {
                 CodeInterpreterIndicator()
             }
 
-            if displayedToolCalls.contains(where: { $0.type == .fileSearch && $0.status != .completed }) {
+            if displayedToolCalls.contains(where: { $0.type == .fileSearch && (showAll || $0.status != .completed) }) {
                 FileSearchIndicator()
             }
         }
