@@ -12,7 +12,7 @@ package final class StreamEventBatcher<Event: Sendable> {
 
     /// Creates a batcher with the given flush interval and callback.
     package init(
-        flushInterval: Duration = .milliseconds(66),
+        flushInterval: Duration = .milliseconds(16),
         onFlushError: @escaping @MainActor (Error) -> Void = { error in
             assertionFailure("StreamEventBatcher onFlush threw: \(error)")
         },

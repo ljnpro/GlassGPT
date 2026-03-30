@@ -355,7 +355,7 @@ export const installRunStreamRoutes = (app: BackendApp, services: BackendService
                 return;
               }
 
-              enqueueMicroBuffered(frame);
+              enqueue(frame);
             }
           }
 
@@ -385,11 +385,14 @@ export const installRunStreamRoutes = (app: BackendApp, services: BackendService
       },
     });
 
+    // @ts-expect-error -- encodeBody is a Cloudflare-specific Response option
+    // that prevents the Workers runtime from compressing the response body.
+    // Without this, CF edge may gzip/brotli-buffer the entire SSE stream.
     return new Response(stream, {
+      encodeBody: 'manual',
       headers: {
-        'Cache-Control': 'no-cache',
+        'Cache-Control': 'no-cache, no-transform',
         Connection: 'keep-alive',
-        'Content-Encoding': 'identity',
         'Content-Type': 'text/event-stream',
         'X-Accel-Buffering': 'no',
       },
