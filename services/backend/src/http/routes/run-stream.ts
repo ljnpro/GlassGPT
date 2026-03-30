@@ -7,8 +7,8 @@ import type { BackendServices } from '../services.js';
 import type { BackendApp } from '../types.js';
 
 const SSE_HEARTBEAT_INTERVAL_MS = 5_000;
-const MICRO_BUFFER_MAX_BYTES = 1024;
-const MICRO_BUFFER_FLUSH_MS = 50;
+const MICRO_BUFFER_MAX_BYTES = 0;
+const MICRO_BUFFER_FLUSH_MS = 0;
 const REALTIME_STREAM_UNAVAILABLE = 'realtime_stream_unavailable';
 const REALTIME_STREAM_RETRY_MESSAGE = 'Realtime stream became unavailable. Please retry.';
 const processSnapshotTaskEnvelopeSchema = z.object({
