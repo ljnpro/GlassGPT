@@ -12,7 +12,7 @@ import {
 describe('connection-check', () => {
   it('marks matching and newer app versions as compatible', () => {
     expect(appCompatibilityForVersion('5.4.0')).toBe('compatible');
-    expect(appCompatibilityForVersion('5.5.0')).toBe('compatible');
+    expect(appCompatibilityForVersion('5.6.0')).toBe('compatible');
     expect(appCompatibilityForVersion('6.0.0')).toBe('compatible');
   });
 
@@ -24,14 +24,14 @@ describe('connection-check', () => {
   });
 
   it('builds compatibility metadata from the client app version header', () => {
-    expect(buildCompatibilityMetadata('5.5.0')).toEqual({
+    expect(buildCompatibilityMetadata('5.6.0')).toEqual({
       appCompatibility: 'compatible',
-      backendVersion: '5.5.0',
+      backendVersion: '5.6.0',
       minimumSupportedAppVersion: '5.4.0',
     });
     expect(buildCompatibilityMetadata('5.4.0')).toEqual({
       appCompatibility: 'compatible',
-      backendVersion: '5.5.0',
+      backendVersion: '5.6.0',
       minimumSupportedAppVersion: '5.4.0',
     });
   });
@@ -40,7 +40,7 @@ describe('connection-check', () => {
     expect(
       buildConnectionCheck({
         auth: 'healthy',
-        clientAppVersion: '5.5.0',
+        clientAppVersion: '5.6.0',
         latencyMs: 0,
         openaiCredential: 'healthy',
       }).appCompatibility,
