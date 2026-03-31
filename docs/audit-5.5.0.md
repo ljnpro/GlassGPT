@@ -38,11 +38,14 @@
 
 - Backend CI: 20 test files, 116 tests passed, 0 failures, 0 warnings, 0 skipped.
 - Backend coverage: statements 83.53%, branches 70.7%, functions 91.15%, lines 83.51% (all above new thresholds).
-- iOS CI: pending final run.
+- iOS CI: 17/17 lanes passed, 0 errors, 0 warnings, 0 skipped, localization check passed, 278/278 declarations documented.
 - Contracts CI: 1 test file, 1 test passed, 0 failures.
+- CI evidence: `.local/build/evidence/rel-001-final-ci.txt`
 
 ## Release Status
 
-- Backend production deploy: pending
-- TestFlight upload for `5.5.0 (20224)`: pending
-- Final branch push and `v5.5.0` tag: pending
+- Backend staging deploy: completed (glassgpt-staging, version 5.5.0, health check passed)
+- Backend production deploy: completed (glassgpt-production, version 5.5.0, health check passed)
+- D1 backups: staging and production exported before deploy
+- TestFlight upload for `5.5.0 (20224)`: archive succeeded, export blocked by PLA/certificate issue (requires manual Apple Developer credential update)
+- Final branch push and `v5.5.0` tag: pending TestFlight completion
