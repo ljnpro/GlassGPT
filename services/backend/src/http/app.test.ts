@@ -582,7 +582,7 @@ describe('backend worker scaffold', () => {
     const response = await createApp(createTestServices()).fetch(
       new Request('https://example.com/healthz', {
         headers: {
-          'X-GlassGPT-App-Version': '5.4.0',
+          'X-GlassGPT-App-Version': '5.5.0',
         },
       }),
       testEnv,
@@ -591,8 +591,8 @@ describe('backend worker scaffold', () => {
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({
       appEnv: 'beta',
-      backendVersion: '5.4.0',
-      minimumSupportedAppVersion: '5.4.0',
+      backendVersion: '5.5.0',
+      minimumSupportedAppVersion: '5.5.0',
       appCompatibility: 'compatible',
       ok: true,
     });
@@ -602,7 +602,7 @@ describe('backend worker scaffold', () => {
     const response = await createApp(createTestServices()).fetch(
       new Request('https://example.com/healthz', {
         headers: {
-          'X-GlassGPT-App-Version': '5.4.0',
+          'X-GlassGPT-App-Version': '5.5.0',
         },
       }),
       createTestEnv({
@@ -613,8 +613,8 @@ describe('backend worker scaffold', () => {
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({
       appEnv: 'beta',
-      backendVersion: '5.4.0',
-      minimumSupportedAppVersion: '5.4.0',
+      backendVersion: '5.5.0',
+      minimumSupportedAppVersion: '5.5.0',
       appCompatibility: 'compatible',
       errorSummary: 'auth_runtime_configuration_missing',
       ok: false,
@@ -641,7 +641,7 @@ describe('backend worker scaffold', () => {
     const response = await createApp(createTestServices()).fetch(
       new Request('https://example.com/v1/connection/check', {
         headers: {
-          'X-GlassGPT-App-Version': '5.4.0',
+          'X-GlassGPT-App-Version': '5.5.0',
         },
       }),
       testEnv,
@@ -650,8 +650,8 @@ describe('backend worker scaffold', () => {
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toMatchObject({
       appCompatibility: 'compatible',
-      backendVersion: '5.4.0',
-      minimumSupportedAppVersion: '5.4.0',
+      backendVersion: '5.5.0',
+      minimumSupportedAppVersion: '5.5.0',
     });
   });
 
@@ -659,7 +659,7 @@ describe('backend worker scaffold', () => {
     const response = await createApp(createTestServices()).fetch(
       new Request('https://example.com/v1/connection/check', {
         headers: {
-          'X-GlassGPT-App-Version': '5.4.0',
+          'X-GlassGPT-App-Version': '5.5.0',
         },
       }),
       createTestEnv({
@@ -671,8 +671,8 @@ describe('backend worker scaffold', () => {
     await expect(response.json()).resolves.toMatchObject({
       auth: 'unavailable',
       errorSummary: 'auth_runtime_configuration_missing',
-      backendVersion: '5.4.0',
-      minimumSupportedAppVersion: '5.4.0',
+      backendVersion: '5.5.0',
+      minimumSupportedAppVersion: '5.5.0',
     });
   });
 
@@ -855,7 +855,7 @@ describe('backend worker scaffold', () => {
       new Request('https://example.com/v1/connection/check', {
         headers: {
           Authorization: 'Bearer access-token',
-          'X-GlassGPT-App-Version': '5.4.0',
+          'X-GlassGPT-App-Version': '5.5.0',
         },
       }),
       createTestEnv({
@@ -885,7 +885,7 @@ describe('backend worker scaffold', () => {
       new Request('https://example.com/v1/connection/check', {
         headers: {
           Authorization: 'Bearer access-token',
-          'X-GlassGPT-App-Version': '5.4.0',
+          'X-GlassGPT-App-Version': '5.5.0',
         },
       }),
       testEnv,
@@ -1574,7 +1574,7 @@ describe('backend worker scaffold', () => {
                   {
                     code: null,
                     id: 'tool_1',
-                    queries: ['GlassGPT 5.4.0'],
+                    queries: ['GlassGPT 5.5.0'],
                     results: ['ok'],
                     status: 'completed',
                     type: 'web_search',
