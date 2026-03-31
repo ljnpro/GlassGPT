@@ -102,7 +102,7 @@ const openApiDocument = {
   openapi: '3.1.0',
   info: {
     title: 'GlassGPT Backend API',
-    version: '5.5.0',
+    version: '5.6.0',
   },
   paths: {
     '/v1/auth/apple': {
