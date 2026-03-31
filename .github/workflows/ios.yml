@@ -1,4 +1,4 @@
-name: 5.3 Release CI
+name: 5.5 Release CI
 
 on:
   push:
@@ -8,6 +8,8 @@ on:
       - codex/stable-4.11
       - codex/stable-4.12
       - codex/stable-5.3
+      - codex/stable-5.4
+      - codex/stable-5.5
       - codex/feature/**
       - feature/**
   pull_request:
