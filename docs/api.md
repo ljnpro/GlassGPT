@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This page is the stable entrypoint for the `5.5.0` API and contract surface.
+This page is the stable entrypoint for the `5.6.0` API and contract surface.
 It exists so the release audit, local development docs, and release scripts all
 point at one documented publication path instead of scattering API entrypoints
 across chat history or source comments.
@@ -14,7 +14,7 @@ across chat history or source comments.
 - Backend contract source of truth:
   [packages/backend-contracts/src](/Applications/GlassGPT/packages/backend-contracts/src)
 - Release audit:
-  [audit-5.5.0.md](/Applications/GlassGPT/docs/audit-5.5.0.md)
+  [audit-5.6.0.md](/Applications/GlassGPT/docs/audit-5.6.0.md)
 - Backend local operations:
   [backend-local-development.md](/Applications/GlassGPT/docs/backend-local-development.md)
 - Release runbook:
@@ -26,7 +26,7 @@ across chat history or source comments.
   API surface that ships with the app modules.
 - `packages/backend-contracts/src` is the source of truth for wire-level DTOs
   and cross-stack request/response shapes used by the iOS app and backend.
-- `docs/audit-5.5.0.md` is the evidence-backed release audit for this line. It
+- `docs/audit-5.6.0.md` is the evidence-backed release audit for this line. It
   is not the API reference itself, but it is the published record of the
   release-quality scorecard and evidence set.
 
@@ -52,6 +52,6 @@ For backend and contract shapes:
   exists.
 - `./scripts/ci.sh doc-completeness` verifies public/package declaration
   documentation completeness.
-- The `5.5.0` release gates also require
-  [audit-5.5.0.md](/Applications/GlassGPT/docs/audit-5.5.0.md) to exist before
+- The `5.6.0` release gates also require
+  [audit-5.6.0.md](/Applications/GlassGPT/docs/audit-5.6.0.md) to exist before
   any backend or TestFlight publish step can run.

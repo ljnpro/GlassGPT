@@ -1,16 +1,16 @@
-# 5.5.0 Product Baseline
+# 5.6.0 Product Baseline
 
-This document records the `5.4.0` production baseline that the `5.5.0`
+This document records the `5.4.0` production baseline that the `5.6.0`
 release must preserve where behavior is intentionally continuous, while also
 validating the backend-proxied attachment, tool-call, and generated-file
-restorations required for `5.5.0`.
+restorations required for `5.6.0`.
 
 ## Baseline References
 
-- active release line: `codex/stable-5.5`
+- active release line: `codex/stable-5.6`
 - frozen rollback branch: `stable-4.12`
 - baseline app version: `5.4.0`
-- candidate app version: `5.5.0`
+- candidate app version: `5.6.0`
 
 ## Preserved User-Facing Invariants
 
@@ -22,7 +22,7 @@ restorations required for `5.5.0`.
 - Agent mode remains visually and behaviorally distinct from Chat mode
 - the app remains native SwiftUI/UIKit with no web shell takeover
 
-## 5.5.0 Release-Quality Requirements
+## 5.6.0 Release-Quality Requirements
 
 - backend conversation configuration is authoritative and reflected across devices
 - Sign in with Apple, encrypted backend API-key custody, and same-account sync remain intact
