@@ -74,7 +74,7 @@ package struct ContentView: View {
         .sheet(item: sharedGeneratedFileItemBinding, onDismiss: appStore.dismissGeneratedFileShareSheet) { item in
             ActivityViewController(activityItems: [item.url])
         }
-        .alert("Download Failed", isPresented: generatedFileDownloadErrorPresentedBinding) {
+        .alert(String(localized: "Download Failed"), isPresented: generatedFileDownloadErrorPresentedBinding) {
             Button(String(localized: "OK"), role: .cancel) {
                 appStore.clearGeneratedFileDownloadError()
             }

@@ -98,6 +98,54 @@
         }
       }
     },
+    "Accepted Plan": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Accepted Plan"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已采纳计划"
+          }
+        }
+      }
+    },
+    "Account & Sync": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Account & Sync"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "账户与同步"
+          }
+        }
+      }
+    },
+    "Active Workers": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Active Workers"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "活跃 Worker"
+          }
+        }
+      }
+    },
     "Add your API key in Settings": {
       "localizations": {
         "en": {
@@ -126,6 +174,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "采纳要点"
+          }
+        }
+      }
+    },
+    "Advanced": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Advanced"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "高级"
           }
         }
       }
@@ -162,6 +226,38 @@
         }
       }
     },
+    "Agent Defaults": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Agent Defaults"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Agent 默认值"
+          }
+        }
+      }
+    },
+    "Agent Mode": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Agent Mode"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Agent 模式"
+          }
+        }
+      }
+    },
     "Agent Process": {
       "localizations": {
         "en": {
@@ -194,34 +290,50 @@
         }
       }
     },
-    "Ask the Agent Council": {
+    "Agent Settings": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Ask the Agent Council"
+            "value": "Agent Settings"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "向 Agent Council 提问"
+            "value": "Agent 设置"
           }
         }
       }
     },
-    "Ask the council": {
+    "Agent Summary": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Ask the council"
+            "value": "Agent Summary"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "向 council 提问"
+            "value": "Agent 摘要"
+          }
+        }
+      }
+    },
+    "All chat and agent execution now runs through your backend account and syncs back to this device.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "All chat and agent execution now runs through your backend account and syncs back to this device."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "所有聊天和 Agent 执行现已通过你的后端账户运行，并同步回这台设备。"
           }
         }
       }
@@ -290,18 +402,66 @@
         }
       }
     },
-    "Advanced": {
+    "Apple ID": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Advanced"
+            "value": "Apple ID"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "高级"
+            "value": "Apple ID"
+          }
+        }
+      }
+    },
+    "Ask the Agent Council": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ask the Agent Council"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "向 Agent Council 提问"
+          }
+        }
+      }
+    },
+    "Ask the council": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ask the council"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "向 council 提问"
+          }
+        }
+      }
+    },
+    "Assistant": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Assistant"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "助手"
           }
         }
       }
@@ -402,6 +562,22 @@
         }
       }
     },
+    "Auth": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Auth"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "认证"
+          }
+        }
+      }
+    },
     "Available": {
       "localizations": {
         "en": {
@@ -418,6 +594,22 @@
         }
       }
     },
+    "Backend": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Backend"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "后端"
+          }
+        }
+      }
+    },
     "Background": {
       "localizations": {
         "en": {
@@ -430,6 +622,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "后台"
+          }
+        }
+      }
+    },
+    "Cache": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cache"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "缓存"
           }
         }
       }
@@ -690,6 +898,22 @@
         }
       }
     },
+    "Comparing": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Comparing"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "比较中"
+          }
+        }
+      }
+    },
     "Connected": {
       "localizations": {
         "en": {
@@ -834,6 +1058,70 @@
         }
       }
     },
+    "Data Sharing Disclosure": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Data Sharing Disclosure"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "数据共享声明"
+          }
+        }
+      }
+    },
+    "Default Agent Flex Mode": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Default Agent Flex Mode"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "默认 Agent Flex 模式"
+          }
+        }
+      }
+    },
+    "Default Agent Leader Reasoning": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Default Agent Leader Reasoning"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "默认 Agent Leader 推理强度"
+          }
+        }
+      }
+    },
+    "Default Agent Worker Reasoning": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Default Agent Worker Reasoning"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "默认 Agent Worker 推理强度"
+          }
+        }
+      }
+    },
     "Default Flex Mode": {
       "localizations": {
         "en": {
@@ -878,6 +1166,38 @@
           "stringUnit": {
             "state": "translated",
             "value": "默认推理强度"
+          }
+        }
+      }
+    },
+    "Degraded": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Degraded"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "降级"
+          }
+        }
+      }
+    },
+    "Delegated Tasks": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Delegated Tasks"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "委派任务"
           }
         }
       }
@@ -994,6 +1314,54 @@
         }
       }
     },
+    "Done": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Done"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "完成"
+          }
+        }
+      }
+    },
+    "Done with Agent settings": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Done with Agent settings"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "完成 Agent 设置"
+          }
+        }
+      }
+    },
+    "Done with model settings": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Done with model settings"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "完成模型设置"
+          }
+        }
+      }
+    },
     "Double-tap to collapse": {
       "localizations": {
         "en": {
@@ -1010,6 +1378,22 @@
         }
       }
     },
+    "Double-tap to dismiss": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Double-tap to dismiss"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "双击以关闭"
+          }
+        }
+      }
+    },
     "Double-tap to expand": {
       "localizations": {
         "en": {
@@ -1022,6 +1406,38 @@
           "stringUnit": {
             "state": "translated",
             "value": "双击以展开"
+          }
+        }
+      }
+    },
+    "Double-tap to save and dismiss": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Double-tap to save and dismiss"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "双击保存并关闭"
+          }
+        }
+      }
+    },
+    "Download Failed": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Download Failed"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "下载失败"
           }
         }
       }
@@ -1106,6 +1522,22 @@
         }
       }
     },
+    "Evidence": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Evidence"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "依据"
+          }
+        }
+      }
+    },
     "Expand code execution result": {
       "localizations": {
         "en": {
@@ -1186,22 +1618,6 @@
         }
       }
     },
-    "Gateway unavailable in this build": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Gateway unavailable in this build"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "此构建中网关不可用"
-          }
-        }
-      }
-    },
     "Gateway Configuration": {
       "localizations": {
         "en": {
@@ -1214,6 +1630,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "网关配置"
+          }
+        }
+      }
+    },
+    "Gateway unavailable in this build": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gateway unavailable in this build"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "此构建中网关不可用"
           }
         }
       }
@@ -1298,6 +1730,22 @@
         }
       }
     },
+    "Healthy": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Healthy"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正常"
+          }
+        }
+      }
+    },
     "High": {
       "localizations": {
         "en": {
@@ -1326,6 +1774,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "历史"
+          }
+        }
+      }
+    },
+    "I Understand & Agree": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "I Understand & Agree"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "我理解并同意"
           }
         }
       }
@@ -1378,6 +1842,86 @@
         }
       }
     },
+    "Invalid": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Invalid"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无效"
+          }
+        }
+      }
+    },
+    "Keeps Agent runs recoverable across longer interruptions.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Keeps Agent runs recoverable across longer interruptions."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在较长时间中断后仍可恢复 Agent 运行。"
+          }
+        }
+      }
+    },
+    "Last checked \\($0)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Last checked \\($0)"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "上次检查 \\($0)"
+          }
+        }
+      }
+    },
+    "Latency: \\(latency) ms": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Latency: \\(latency) ms"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "延迟：\\(latency) 毫秒"
+          }
+        }
+      }
+    },
+    "Latest Connection Check": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Latest Connection Check"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "最近连接检查"
+          }
+        }
+      }
+    },
     "Launch Time": {
       "localizations": {
         "en": {
@@ -1410,6 +1954,22 @@
         }
       }
     },
+    "Leader": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Leader"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "领导者"
+          }
+        }
+      }
+    },
     "Leader Brief": {
       "localizations": {
         "en": {
@@ -1426,6 +1986,38 @@
         }
       }
     },
+    "Leader Decisions": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Leader Decisions"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Leader 决策"
+          }
+        }
+      }
+    },
+    "Leader Focus": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Leader Focus"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Leader 焦点"
+          }
+        }
+      }
+    },
     "Leader High · 3 Workers Low": {
       "localizations": {
         "en": {
@@ -1438,6 +2030,54 @@
           "stringUnit": {
             "state": "translated",
             "value": "Leader 高 · 3 个 Worker 低"
+          }
+        }
+      }
+    },
+    "Leader Now": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Leader Now"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Leader 当前状态"
+          }
+        }
+      }
+    },
+    "Leader Reasoning": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Leader Reasoning"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Leader 推理强度"
+          }
+        }
+      }
+    },
+    "Leader Summary": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Leader Summary"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Leader 摘要"
           }
         }
       }
@@ -1586,6 +2226,22 @@
         }
       }
     },
+    "Missing": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Missing"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "缺失"
+          }
+        }
+      }
+    },
     "Model": {
       "localizations": {
         "en": {
@@ -1630,22 +2286,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "新对话"
-          }
-        }
-      }
-    },
-    "None": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "None"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "无"
           }
         }
       }
@@ -1698,6 +2338,22 @@
         }
       }
     },
+    "None": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "None"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无"
+          }
+        }
+      }
+    },
     "Not checked": {
       "localizations": {
         "en": {
@@ -1746,6 +2402,118 @@
         }
       }
     },
+    "Offline indicator": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Offline indicator"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "离线指示器"
+          }
+        }
+      }
+    },
+    "On": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "On"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "开"
+          }
+        }
+      }
+    },
+    "Open Account & Sync": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open Account & Sync"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "打开账户与同步"
+          }
+        }
+      }
+    },
+    "Open Agent settings": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open Agent settings"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "打开 Agent 设置"
+          }
+        }
+      }
+    },
+    "Open Settings": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open Settings"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "打开设置"
+          }
+        }
+      }
+    },
+    "Open model settings": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open model settings"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "打开模型设置"
+          }
+        }
+      }
+    },
+    "Open privacy policy": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open privacy policy"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "打开隐私政策"
+          }
+        }
+      }
+    },
     "Open support website": {
       "localizations": {
         "en": {
@@ -1758,6 +2526,38 @@
           "stringUnit": {
             "state": "translated",
             "value": "打开支持网站"
+          }
+        }
+      }
+    },
+    "OpenAI": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "OpenAI"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "OpenAI"
+          }
+        }
+      }
+    },
+    "OpenAI API Key": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "OpenAI API Key"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "OpenAI API 密钥"
           }
         }
       }
@@ -1794,6 +2594,22 @@
         }
       }
     },
+    "Paste": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Paste"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "粘贴"
+          }
+        }
+      }
+    },
     "Payloads Received": {
       "localizations": {
         "en": {
@@ -1826,6 +2642,54 @@
         }
       }
     },
+    "Plan": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Plan"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "计划"
+          }
+        }
+      }
+    },
+    "Plan Progress": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Plan Progress"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "计划进度"
+          }
+        }
+      }
+    },
+    "Planning": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Planning"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "规划中"
+          }
+        }
+      }
+    },
     "Platform": {
       "localizations": {
         "en": {
@@ -1838,6 +2702,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "平台"
+          }
+        }
+      }
+    },
+    "Privacy Policy": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Privacy Policy"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "隐私政策"
           }
         }
       }
@@ -1874,6 +2754,22 @@
         }
       }
     },
+    "Read our Privacy Policy": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Read our Privacy Policy"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "阅读我们的隐私政策"
+          }
+        }
+      }
+    },
     "Reading documents": {
       "localizations": {
         "en": {
@@ -1902,6 +2798,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "正在阅读文档…"
+          }
+        }
+      }
+    },
+    "Realtime": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Realtime"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "实时"
           }
         }
       }
@@ -2018,6 +2930,22 @@
         }
       }
     },
+    "Recent Updates": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Recent Updates"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "最近更新"
+          }
+        }
+      }
+    },
     "Recovering response": {
       "localizations": {
         "en": {
@@ -2046,6 +2974,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "正在恢复…"
+          }
+        }
+      }
+    },
+    "Refresh Status": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Refresh Status"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "刷新状态"
           }
         }
       }
@@ -2130,6 +3074,38 @@
         }
       }
     },
+    "Revoke": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Revoke"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "吊销"
+          }
+        }
+      }
+    },
+    "Running": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Running"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "运行中"
+          }
+        }
+      }
+    },
     "Running code…": {
       "localizations": {
         "en": {
@@ -2174,6 +3150,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "保存 API 密钥"
+          }
+        }
+      }
+    },
+    "Save Agent settings": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Save Agent settings"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "保存 Agent 设置"
           }
         }
       }
@@ -2242,7 +3234,7 @@
         }
       }
     },
-    "Search conversations": {
+    "Search": {
       "localizations": {
         "en": {
           "stringUnit": {
@@ -2258,7 +3250,7 @@
         }
       }
     },
-    "Search": {
+    "Search conversations": {
       "localizations": {
         "en": {
           "stringUnit": {
@@ -2338,6 +3330,22 @@
         }
       }
     },
+    "Session": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Session"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "会话"
+          }
+        }
+      }
+    },
     "Settings": {
       "localizations": {
         "en": {
@@ -2382,6 +3390,86 @@
           "stringUnit": {
             "state": "translated",
             "value": "分享消息"
+          }
+        }
+      }
+    },
+    "Sign In to Sync History": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sign In to Sync History"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "登录以同步历史记录"
+          }
+        }
+      }
+    },
+    "Sign In with Apple": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sign In with Apple"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "使用 Apple 登录"
+          }
+        }
+      }
+    },
+    "Sign Out": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sign Out"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "退出登录"
+          }
+        }
+      }
+    },
+    "Sign in with Apple first. Your key is stored encrypted on the backend and billed to your own OpenAI account.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sign in with Apple first. Your key is stored encrypted on the backend and billed to your own OpenAI account."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请先使用 Apple 登录。你的密钥会以加密形式存储在后端，并计费到你自己的 OpenAI 账户。"
+          }
+        }
+      }
+    },
+    "Sign in with Apple in Settings to sync conversations, agent runs, and results across devices.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sign in with Apple in Settings to sync conversations, agent runs, and results across devices."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在“设置”中使用 Apple 登录，以便在设备之间同步对话、Agent 运行和结果。"
           }
         }
       }
@@ -2482,22 +3570,6 @@
         }
       }
     },
-    "Stop generating": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Stop generating"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "停止生成"
-          }
-        }
-      }
-    },
     "Stop Agent run": {
       "localizations": {
         "en": {
@@ -2510,6 +3582,38 @@
           "stringUnit": {
             "state": "translated",
             "value": "停止 Agent 运行"
+          }
+        }
+      }
+    },
+    "Stop Reason": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stop Reason"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "停止原因"
+          }
+        }
+      }
+    },
+    "Stop generating": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stop generating"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "停止生成"
           }
         }
       }
@@ -2546,6 +3650,22 @@
         }
       }
     },
+    "Switch between GPT-5.4 and GPT-5.4 Pro.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Switch between GPT-5.4 and GPT-5.4 Pro."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在 GPT-5.4 与 GPT-5.4 Pro 之间切换。"
+          }
+        }
+      }
+    },
     "Switches between GPT-5.4 and GPT-5.4 Pro.": {
       "localizations": {
         "en": {
@@ -2558,6 +3678,38 @@
           "stringUnit": {
             "state": "translated",
             "value": "使用 GPT-5.4 Pro。"
+          }
+        }
+      }
+    },
+    "Sync": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sync"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "同步"
+          }
+        }
+      }
+    },
+    "System": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "System"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "系统"
           }
         }
       }
@@ -2642,6 +3794,22 @@
         }
       }
     },
+    "Unable to download this file.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unable to download this file."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法下载此文件。"
+          }
+        }
+      }
+    },
     "Unable to save this image to Photos.": {
       "localizations": {
         "en": {
@@ -2654,6 +3822,38 @@
           "stringUnit": {
             "state": "translated",
             "value": "无法将此图片保存到照片。"
+          }
+        }
+      }
+    },
+    "Unauthorized": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unauthorized"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未授权"
+          }
+        }
+      }
+    },
+    "Unavailable": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unavailable"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "不可用"
           }
         }
       }
@@ -2686,6 +3886,38 @@
           "stringUnit": {
             "state": "translated",
             "value": "正在上传"
+          }
+        }
+      }
+    },
+    "Use the flex service tier for lower-priority agent runs.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Use the flex service tier for lower-priority agent runs."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "对较低优先级的 Agent 运行使用 Flex 服务层级。"
+          }
+        }
+      }
+    },
+    "Use the flex service tier for lower-priority runs.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Use the flex service tier for lower-priority runs."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "对较低优先级的运行使用 Flex 服务层级。"
           }
         }
       }
@@ -2754,6 +3986,38 @@
         }
       }
     },
+    "Waiting": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Waiting"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "等待中"
+          }
+        }
+      }
+    },
+    "Waiting for Agent work": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Waiting for Agent work"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "等待 Agent 开始工作"
+          }
+        }
+      }
+    },
     "Waiting for response": {
       "localizations": {
         "en": {
@@ -2802,180 +4066,66 @@
         }
       }
     },
-    "Your API key is stored securely in the device Keychain.": {
+    "Worker Reasoning": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Stored securely in Keychain."
+            "value": "Worker Reasoning"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "安全存于钥匙串。"
+            "value": "Worker 推理强度"
           }
         }
       }
     },
-    "Your OpenAI API key has been saved to Keychain.": {
+    "Worker Summaries": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Your OpenAI API key has been saved to Keychain."
+            "value": "Worker Summaries"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "您的 OpenAI API 密钥已保存到钥匙串。"
+            "value": "Worker 摘要"
           }
         }
       }
     },
-    "Your chat history will appear here.": {
+    "Workers": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Your chat history will appear here."
+            "value": "Workers"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "您的聊天记录会显示在这里。"
+            "value": "工作单元"
           }
         }
       }
     },
-    "conversations_count": {
-      "localizations": {
-        "en": {
-          "variations": {
-            "plural": {
-              "one": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "%lld conversation"
-                }
-              },
-              "other": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "%lld conversations"
-                }
-              }
-            }
-          }
-        },
-        "zh-Hans": {
-          "variations": {
-            "plural": {
-              "other": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "%lld 个对话"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "sk-proj-...": {
+    "Writing": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "sk-proj-..."
+            "value": "Writing"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "sk-proj-..."
-          }
-        }
-      }
-    },
-    "Assistant": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Assistant"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "助手"
-          }
-        }
-      }
-    },
-    "Double-tap to save and dismiss": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Double-tap to save and dismiss"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "双击保存并关闭"
-          }
-        }
-      }
-    },
-    "Offline indicator": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Offline indicator"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "离线指示器"
-          }
-        }
-      }
-    },
-    "On": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "On"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "开"
-          }
-        }
-      }
-    },
-    "System": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "System"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "系统"
+            "value": "写作中"
           }
         }
       }
@@ -3028,674 +4178,66 @@
         }
       }
     },
-    "Data Sharing Disclosure": {
+    "Your API key is stored securely in the device Keychain.": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Data Sharing Disclosure"
+            "value": "Stored securely in Keychain."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "数据共享声明"
+            "value": "安全存于钥匙串。"
           }
         }
       }
     },
-    "I Understand & Agree": {
+    "Your OpenAI API key has been saved to Keychain.": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "I Understand & Agree"
+            "value": "Your OpenAI API key has been saved to Keychain."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "我理解并同意"
+            "value": "您的 OpenAI API 密钥已保存到钥匙串。"
           }
         }
       }
     },
-    "Open privacy policy": {
+    "Your OpenAI API key has been stored on the backend for this account.": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Open privacy policy"
+            "value": "Your OpenAI API key has been stored on the backend for this account."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "打开隐私政策"
+            "value": "你的 OpenAI API 密钥已为此账户存储在后端。"
           }
         }
       }
     },
-    "Privacy Policy": {
+    "Your chat history will appear here.": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Privacy Policy"
+            "value": "Your chat history will appear here."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "隐私政策"
-          }
-        }
-      }
-    },
-    "Read our Privacy Policy": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Read our Privacy Policy"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "阅读我们的隐私政策"
-          }
-        }
-      }
-    },
-    "Agent Defaults": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Agent Defaults"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Agent 默认值"
-          }
-        }
-      }
-    },
-    "Agent Mode": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Agent Mode"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Agent 模式"
-          }
-        }
-      }
-    },
-    "Agent Settings": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Agent Settings"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Agent 设置"
-          }
-        }
-      }
-    },
-    "Agent Summary": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Agent Summary"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Agent 摘要"
-          }
-        }
-      }
-    },
-    "Comparing": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Comparing"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "比较中"
-          }
-        }
-      }
-    },
-    "Default Agent Flex Mode": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Default Agent Flex Mode"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "默认 Agent Flex 模式"
-          }
-        }
-      }
-    },
-    "Default Agent Leader Reasoning": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Default Agent Leader Reasoning"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "默认 Agent Leader 推理强度"
-          }
-        }
-      }
-    },
-    "Default Agent Worker Reasoning": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Default Agent Worker Reasoning"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "默认 Agent Worker 推理强度"
-          }
-        }
-      }
-    },
-    "Delegated Tasks": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Delegated Tasks"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "委派任务"
-          }
-        }
-      }
-    },
-    "Done": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Done"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "完成"
-          }
-        }
-      }
-    },
-    "Done with Agent settings": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Done with Agent settings"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "完成 Agent 设置"
-          }
-        }
-      }
-    },
-    "Done with model settings": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Done with model settings"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "完成模型设置"
-          }
-        }
-      }
-    },
-    "Double-tap to dismiss": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Double-tap to dismiss"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "双击以关闭"
-          }
-        }
-      }
-    },
-    "Evidence": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Evidence"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "依据"
-          }
-        }
-      }
-    },
-    "Keeps Agent runs recoverable across longer interruptions.": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Keeps Agent runs recoverable across longer interruptions."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "在较长时间中断后仍可恢复 Agent 运行。"
-          }
-        }
-      }
-    },
-    "Leader Decisions": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Leader Decisions"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Leader 决策"
-          }
-        }
-      }
-    },
-    "Leader Focus": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Leader Focus"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Leader 焦点"
-          }
-        }
-      }
-    },
-    "Leader Reasoning": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Leader Reasoning"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Leader 推理强度"
-          }
-        }
-      }
-    },
-    "Open Agent settings": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Open Agent settings"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "打开 Agent 设置"
-          }
-        }
-      }
-    },
-    "Open model settings": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Open model settings"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "打开模型设置"
-          }
-        }
-      }
-    },
-    "Plan Progress": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Plan Progress"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "计划进度"
-          }
-        }
-      }
-    },
-    "Planning": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Planning"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "规划中"
-          }
-        }
-      }
-    },
-    "Running": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Running"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "运行中"
-          }
-        }
-      }
-    },
-    "Save Agent settings": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Save Agent settings"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "保存 Agent 设置"
-          }
-        }
-      }
-    },
-    "Stop Reason": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Stop Reason"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "停止原因"
-          }
-        }
-      }
-    },
-    "Waiting": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Waiting"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "等待中"
-          }
-        }
-      }
-    },
-    "Worker Summaries": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Worker Summaries"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Worker 摘要"
-          }
-        }
-      }
-    },
-    "Waiting for Agent work": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Waiting for Agent work"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "等待 Agent 开始工作"
-          }
-        }
-      }
-    },
-    "Worker Reasoning": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Worker Reasoning"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Worker 推理强度"
-          }
-        }
-      }
-    },
-    "Accepted Plan": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Accepted Plan"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "已采纳计划"
-          }
-        }
-      }
-    },
-    "Active Workers": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Active Workers"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "活跃 Worker"
-          }
-        }
-      }
-    },
-    "Leader Now": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Leader Now"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Leader 当前状态"
-          }
-        }
-      }
-    },
-    "Leader Summary": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Leader Summary"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Leader 摘要"
-          }
-        }
-      }
-    },
-    "Plan": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Plan"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "计划"
-          }
-        }
-      }
-    },
-    "Recent Updates": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Recent Updates"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "最近更新"
-          }
-        }
-      }
-    },
-    "Writing": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Writing"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "写作中"
-          }
-        }
-      }
-    },
-    "consent.openai.disclosure": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Your messages are sent to OpenAI to generate responses. OpenAI may process this data according to their usage policies."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "您的消息会发送给 OpenAI 以生成回复。OpenAI 可能会根据其使用政策处理这些数据。"
+            "value": "您的聊天记录会显示在这里。"
           }
         }
       }
@@ -3732,578 +4274,68 @@
         }
       }
     },
-    "Account & Sync": {
+    "consent.openai.disclosure": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Account & Sync"
+            "value": "Your messages are sent to OpenAI to generate responses. OpenAI may process this data according to their usage policies."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "账户与同步"
+            "value": "您的消息会发送给 OpenAI 以生成回复。OpenAI 可能会根据其使用政策处理这些数据。"
           }
         }
       }
     },
-    "All chat and agent execution now runs through your backend account and syncs back to this device.": {
+    "conversations_count": {
       "localizations": {
         "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "All chat and agent execution now runs through your backend account and syncs back to this device."
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld conversation"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld conversations"
+                }
+              }
+            }
           }
         },
         "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "所有聊天和 Agent 执行现已通过你的后端账户运行，并同步回这台设备。"
+          "variations": {
+            "plural": {
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld 个对话"
+                }
+              }
+            }
           }
         }
       }
     },
-    "Apple ID": {
+    "sk-proj-...": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Apple ID"
+            "value": "sk-proj-..."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Apple ID"
-          }
-        }
-      }
-    },
-    "Auth": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Auth"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "认证"
-          }
-        }
-      }
-    },
-    "Backend": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Backend"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "后端"
-          }
-        }
-      }
-    },
-    "Cache": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Cache"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "缓存"
-          }
-        }
-      }
-    },
-    "Degraded": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Degraded"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "降级"
-          }
-        }
-      }
-    },
-    "Healthy": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Healthy"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "正常"
-          }
-        }
-      }
-    },
-    "Invalid": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Invalid"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "无效"
-          }
-        }
-      }
-    },
-    "Last checked \\($0)": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Last checked \\($0)"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "上次检查 \\($0)"
-          }
-        }
-      }
-    },
-    "Latency: \\(latency) ms": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Latency: \\(latency) ms"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "延迟：\\(latency) 毫秒"
-          }
-        }
-      }
-    },
-    "Latest Connection Check": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Latest Connection Check"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "最近连接检查"
-          }
-        }
-      }
-    },
-    "Leader": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Leader"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "领导者"
-          }
-        }
-      }
-    },
-    "Missing": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Missing"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "缺失"
-          }
-        }
-      }
-    },
-    "Open Account & Sync": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Open Account & Sync"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "打开账户与同步"
-          }
-        }
-      }
-    },
-    "Open Settings": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Open Settings"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "打开设置"
-          }
-        }
-      }
-    },
-    "OpenAI": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "OpenAI"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "OpenAI"
-          }
-        }
-      }
-    },
-    "OpenAI API Key": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "OpenAI API Key"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "OpenAI API 密钥"
-          }
-        }
-      }
-    },
-    "Paste": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Paste"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "粘贴"
-          }
-        }
-      }
-    },
-    "Realtime": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Realtime"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "实时"
-          }
-        }
-      }
-    },
-    "Refresh Status": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Refresh Status"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "刷新状态"
-          }
-        }
-      }
-    },
-    "Revoke": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Revoke"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "吊销"
-          }
-        }
-      }
-    },
-    "Session": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Session"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "会话"
-          }
-        }
-      }
-    },
-    "Sign In to Sync History": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Sign In to Sync History"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "登录以同步历史记录"
-          }
-        }
-      }
-    },
-    "Sign In with Apple": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Sign In with Apple"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "使用 Apple 登录"
-          }
-        }
-      }
-    },
-    "Sign Out": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Sign Out"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "退出登录"
-          }
-        }
-      }
-    },
-    "Sign in with Apple first. Your key is stored encrypted on the backend and billed to your own OpenAI account.": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Sign in with Apple first. Your key is stored encrypted on the backend and billed to your own OpenAI account."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "请先使用 Apple 登录。你的密钥会以加密形式存储在后端，并计费到你自己的 OpenAI 账户。"
-          }
-        }
-      }
-    },
-    "Sign in with Apple in Settings to sync conversations, agent runs, and results across devices.": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Sign in with Apple in Settings to sync conversations, agent runs, and results across devices."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "在“设置”中使用 Apple 登录，以便在设备之间同步对话、Agent 运行和结果。"
-          }
-        }
-      }
-    },
-    "Switch between GPT-5.4 and GPT-5.4 Pro.": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Switch between GPT-5.4 and GPT-5.4 Pro."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "在 GPT-5.4 与 GPT-5.4 Pro 之间切换。"
-          }
-        }
-      }
-    },
-    "Sync": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Sync"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "同步"
-          }
-        }
-      }
-    },
-    "Unauthorized": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Unauthorized"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "未授权"
-          }
-        }
-      }
-    },
-    "Unavailable": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Unavailable"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "不可用"
-          }
-        }
-      }
-    },
-    "Use the flex service tier for lower-priority agent runs.": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Use the flex service tier for lower-priority agent runs."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "对较低优先级的 Agent 运行使用 Flex 服务层级。"
-          }
-        }
-      }
-    },
-    "Use the flex service tier for lower-priority runs.": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Use the flex service tier for lower-priority runs."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "对较低优先级的运行使用 Flex 服务层级。"
-          }
-        }
-      }
-    },
-    "Workers": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Workers"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "工作单元"
-          }
-        }
-      }
-    },
-    "Your OpenAI API key has been stored on the backend for this account.": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Your OpenAI API key has been stored on the backend for this account."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "你的 OpenAI API 密钥已为此账户存储在后端。"
+            "value": "sk-proj-..."
           }
         }
       }
