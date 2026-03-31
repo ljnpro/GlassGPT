@@ -58,7 +58,7 @@ export const connectionCheckFixture = connectionCheckSchema.parse({
   checkedAt: timestamp,
   latencyMilliseconds: 18,
   backendVersion: '5.5.0',
-  minimumSupportedAppVersion: '5.5.0',
+  minimumSupportedAppVersion: '5.4.0',
   appCompatibility: 'compatible',
 });
 

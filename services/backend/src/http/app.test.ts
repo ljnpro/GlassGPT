@@ -592,7 +592,7 @@ describe('backend worker scaffold', () => {
     await expect(response.json()).resolves.toEqual({
       appEnv: 'beta',
       backendVersion: '5.5.0',
-      minimumSupportedAppVersion: '5.5.0',
+      minimumSupportedAppVersion: '5.4.0',
       appCompatibility: 'compatible',
       ok: true,
     });
@@ -614,7 +614,7 @@ describe('backend worker scaffold', () => {
     await expect(response.json()).resolves.toEqual({
       appEnv: 'beta',
       backendVersion: '5.5.0',
-      minimumSupportedAppVersion: '5.5.0',
+      minimumSupportedAppVersion: '5.4.0',
       appCompatibility: 'compatible',
       errorSummary: 'auth_runtime_configuration_missing',
       ok: false,
@@ -651,7 +651,7 @@ describe('backend worker scaffold', () => {
     await expect(response.json()).resolves.toMatchObject({
       appCompatibility: 'compatible',
       backendVersion: '5.5.0',
-      minimumSupportedAppVersion: '5.5.0',
+      minimumSupportedAppVersion: '5.4.0',
     });
   });
 
@@ -672,7 +672,7 @@ describe('backend worker scaffold', () => {
       auth: 'unavailable',
       errorSummary: 'auth_runtime_configuration_missing',
       backendVersion: '5.5.0',
-      minimumSupportedAppVersion: '5.5.0',
+      minimumSupportedAppVersion: '5.4.0',
     });
   });
 
