@@ -71,7 +71,7 @@ extension BackendClientTests {
         let recorded = RecordingBackendURLProtocol.state.snapshot.recordedRequests
         #expect(recorded.map(\.path) == ["/v1/auth/refresh", "/v1/runs/run_stream_refresh/stream"])
         #expect(recorded.last?.authorizationHeader == "Bearer refreshed-access-token")
-        #expect(recorded.last?.appVersionHeader == "5.4.0")
+        #expect(recorded.last?.appVersionHeader == "5.5.0")
         #expect(event?.event == "delta")
         session.invalidateAndCancel()
     }
@@ -155,7 +155,7 @@ extension BackendClientTests {
         )
         #expect(
             RecordingBackendURLProtocol.state.snapshot.recordedRequests.last?.appVersionHeader
-                == "5.4.0"
+                == "5.5.0"
         )
         session.invalidateAndCancel()
     }

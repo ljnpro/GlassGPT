@@ -84,7 +84,7 @@ func makeSnapshotHarness(signedIn: Bool) throws -> SnapshotHarness {
             generatedDocumentCacheLimitString: "250 MB",
             cacheManager: cacheManager
         ),
-        about: SettingsAboutInfo(appVersionString: "5.4.0 (20223)", platformString: "iOS 26.4")
+        about: SettingsAboutInfo(appVersionString: "5.5.0 (20224)", platformString: "iOS 26.4")
     )
 
     return SnapshotHarness(
@@ -104,7 +104,7 @@ func makeSnapshotHistoryPresenter() -> HistoryPresenter {
             HistoryConversationSummary(
                 id: "conv_chat",
                 mode: .chat,
-                title: "5.4.0 Release Plan",
+                title: "5.5.0 Release Plan",
                 preview: "Close the remaining release gates before publishing.",
                 updatedAt: Date(timeIntervalSince1970: 1_700_000_000),
                 modelDisplayName: "GPT-5.4 Pro"

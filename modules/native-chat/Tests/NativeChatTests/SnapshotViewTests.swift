@@ -47,7 +47,7 @@ final class SnapshotViewTests: XCTestCase {
         defer { cleanupSnapshotHarness(standardHarness) }
         let standardController = standardHarness.makeChatController()
         standardController.messages = [
-            makeSnapshotMessageSurface(role: .user, content: "Can we ship 5.4.0 today?"),
+            makeSnapshotMessageSurface(role: .user, content: "Can we ship 5.5.0 today?"),
             makeSnapshotMessageSurface(role: .assistant, content: "Yes, after the final CI and staged deploy smoke checks.")
         ]
         standardController.selectedModel = .gpt5_4_pro
