@@ -47,4 +47,8 @@ public enum Loggers {
     public static let settings = AppLogger(category: "settings")
     /// Diagnostics, MetricKit, and performance logger.
     public static let diagnostics = AppLogger(category: "diagnostics")
+    /// HTTP network transport logger.
+    public static let network = AppLogger(category: "network")
+    /// Authentication and session lifecycle logger.
+    public static let auth = AppLogger(category: "auth")
 }

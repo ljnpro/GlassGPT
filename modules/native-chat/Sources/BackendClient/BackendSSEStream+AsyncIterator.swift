@@ -1,3 +1,4 @@
+import ChatPersistenceCore
 import Foundation
 
 public extension BackendSSEStream {
@@ -5,6 +6,7 @@ public extension BackendSSEStream {
         private let source: Source
         private var lines: AsyncLineSequence<URLSession.AsyncBytes>.AsyncIterator?
         private var started = false
+        private var streamPath: String = "unknown"
         private var scriptedEvents: [SSEEvent] = []
         private var scriptedIndex = 0
         private var scriptedSetupError: BackendSSEStreamError?
@@ -13,6 +15,9 @@ public extension BackendSSEStream {
 
         init(source: Source) {
             self.source = source
+            if case let .network(url, _, _, _, _) = source {
+                streamPath = url.path
+            }
             if case let .scripted(events, setupError, nextError) = source {
                 scriptedEvents = events
                 scriptedSetupError = setupError
@@ -64,14 +69,19 @@ public extension BackendSSEStream {
                     }
                 }
             } catch let error as URLError {
-                throw BackendSSEStreamError.transportFailure(.streamRead, error.code)
+                let sseError = BackendSSEStreamError.transportFailure(.streamRead, error.code)
+                BackendNetworkLogger.logSSEError(path: streamPath, error: sseError)
+                throw sseError
             } catch {
-                throw BackendSSEStreamError.transportFailure(.streamRead, nil)
+                let sseError = BackendSSEStreamError.transportFailure(.streamRead, nil)
+                BackendNetworkLogger.logSSEError(path: streamPath, error: sseError)
+                throw sseError
             }
 
             if !data.isEmpty {
                 return SSEEvent(event: eventType, data: data, id: eventID)
             }
+            BackendNetworkLogger.logSSEClose(path: streamPath)
             return nil
         }
 
@@ -99,20 +109,29 @@ public extension BackendSSEStream {
                 request.setValue(lastEventID, forHTTPHeaderField: "Last-Event-ID")
             }
 
+            BackendNetworkLogger.logSSEOpen(path: streamPath)
+
             let bytes: URLSession.AsyncBytes
             let response: URLResponse
             do {
                 (bytes, response) = try await urlSession.bytes(for: request)
             } catch let error as URLError {
-                throw BackendSSEStreamError.transportFailure(.connectionSetup, error.code)
+                let sseError = BackendSSEStreamError.transportFailure(.connectionSetup, error.code)
+                BackendNetworkLogger.logSSEError(path: streamPath, error: sseError)
+                throw sseError
             } catch {
-                throw BackendSSEStreamError.transportFailure(.connectionSetup, nil)
+                let sseError = BackendSSEStreamError.transportFailure(.connectionSetup, nil)
+                BackendNetworkLogger.logSSEError(path: streamPath, error: sseError)
+                throw sseError
             }
             guard let httpResponse = response as? HTTPURLResponse else {
+                BackendNetworkLogger.logSSEError(path: streamPath, error: BackendSSEStreamError.invalidHTTPResponse)
                 throw BackendSSEStreamError.invalidHTTPResponse
             }
             guard (200 ..< 300).contains(httpResponse.statusCode) else {
-                throw BackendSSEStreamError.unacceptableStatusCode(httpResponse.statusCode)
+                let sseError = BackendSSEStreamError.unacceptableStatusCode(httpResponse.statusCode)
+                BackendNetworkLogger.logSSEError(path: streamPath, error: sseError)
+                throw sseError
             }
             lines = bytes.lines.makeAsyncIterator()
         }

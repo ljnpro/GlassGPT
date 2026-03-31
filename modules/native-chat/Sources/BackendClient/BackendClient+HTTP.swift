@@ -1,4 +1,5 @@
 import BackendContracts
+import ChatPersistenceCore
 import Foundation
 
 @MainActor
@@ -58,14 +59,22 @@ extension BackendClient {
             authorizationMode: authorizationMode,
             queryItems: queryItems
         )
+        BackendNetworkLogger.logRequest(method: method, path: path)
         let requestStart = ContinuousClock.now
-        let (data, response) = try await urlSession.data(for: request)
+        let data: Data
+        let response: URLResponse
+        do {
+            (data, response) = try await urlSession.data(for: request)
+        } catch {
+            BackendNetworkLogger.logError(method: method, path: path, error: error)
+            throw error
+        }
         guard let httpResponse = response as? HTTPURLResponse else {
             throw BackendAPIError.invalidResponse
         }
-        BackendNetworkLogger.log(
+        BackendNetworkLogger.logResponse(
             method: method,
-            url: request.url,
+            path: path,
             statusCode: httpResponse.statusCode,
             startTime: requestStart
         )
@@ -106,9 +115,11 @@ extension BackendClient {
             return
         }
 
+        Loggers.auth.debug("[Session] proactive token refresh (expires in \(Int(session.expiresAt.timeIntervalSinceNow))s)")
         do {
             try await refreshSessionWithStoredRefreshToken()
         } catch {
+            Loggers.auth.error("[Session] proactive refresh failed: \(error.localizedDescription)")
             if authorizationMode == .required {
                 throw error
             }
@@ -117,9 +128,11 @@ extension BackendClient {
 
     func refreshSessionWithStoredRefreshToken() async throws {
         guard let currentSession = sessionStore.loadSession() else {
+            Loggers.auth.error("[Session] refresh attempted with no stored session")
             throw BackendAPIError.unauthorized
         }
 
+        Loggers.auth.debug("[Session] refreshing access token")
         do {
             let (data, response) = try await execute(
                 path: "/v1/auth/refresh",
@@ -134,7 +147,9 @@ extension BackendClient {
             }
             let session = try JSONDecoder.backend.decode(SessionDTO.self, from: data)
             sessionStore.replace(session: session)
+            Loggers.auth.debug("[Session] token refresh succeeded")
         } catch {
+            Loggers.auth.error("[Session] token refresh failed, clearing session: \(error.localizedDescription)")
             sessionStore.clear()
             throw error
         }

@@ -24,7 +24,7 @@ let boundaryTargets: [Target] = [
     ),
     .target(
         name: "BackendClient",
-        dependencies: ["BackendContracts", "BackendAuth"],
+        dependencies: ["BackendContracts", "BackendAuth", "ChatPersistenceCore"],
         path: "Sources/BackendClient"
     ),
     .target(
