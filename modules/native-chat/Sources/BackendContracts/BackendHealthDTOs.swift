@@ -34,8 +34,8 @@ public struct ConnectionCheckDTO: Codable, Equatable, Sendable {
         checkedAt: Date,
         latencyMilliseconds: Int?,
         errorSummary: String?,
-        backendVersion: String = "5.4.0",
-        minimumSupportedAppVersion: String = "5.4.0",
+        backendVersion: String = "5.5.0",
+        minimumSupportedAppVersion: String = "5.5.0",
         appCompatibility: AppCompatibilityDTO = .compatible
     ) {
         self.backend = backend
