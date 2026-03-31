@@ -37,15 +37,15 @@ package struct FileAttachmentChip: View {
 
                 HStack(spacing: 4) {
                     Text(attachment.fileType.uppercased())
-                        .font(.system(size: 9, weight: .bold))
+                        .font(.caption2.weight(.bold))
                         .foregroundStyle(.tertiary)
 
                     Text("·")
-                        .font(.system(size: 9))
+                        .font(.caption2)
                         .foregroundStyle(.quaternary)
 
                     Text(attachment.fileSizeString)
-                        .font(.system(size: 9))
+                        .font(.caption2)
                         .foregroundStyle(.tertiary)
 
                     if attachment.uploadStatus == .uploading {
@@ -54,7 +54,7 @@ package struct FileAttachmentChip: View {
                             .accessibilityLabel(String(localized: "Uploading"))
                     } else if attachment.uploadStatus == .failed {
                         Image(systemName: "exclamationmark.triangle.fill")
-                            .font(.system(size: 9))
+                            .font(.caption2)
                             .foregroundStyle(.red)
                             .accessibilityLabel(String(localized: "Upload failed"))
                     }

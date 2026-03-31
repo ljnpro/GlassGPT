@@ -28,7 +28,7 @@ package struct ContentView: View {
                     onSandboxLinkTap: appStore.handleSandboxLinkTap
                 )
             }
-            .accessibilityIdentifier("tab.chat")
+            .accessibilityIdentifier("glassgpt.tab.chat")
 
             Tab(String(localized: "Agent"), systemImage: "person.3.fill", value: 1) {
                 BackendAgentView(
@@ -37,17 +37,17 @@ package struct ContentView: View {
                     onSandboxLinkTap: appStore.handleSandboxLinkTap
                 )
             }
-            .accessibilityIdentifier("tab.agent")
+            .accessibilityIdentifier("glassgpt.tab.agent")
 
             Tab(String(localized: "History"), systemImage: "clock.fill", value: 2) {
                 NativeChatUI.HistoryView(store: appStore.historyPresenter)
             }
-            .accessibilityIdentifier("tab.history")
+            .accessibilityIdentifier("glassgpt.tab.history")
 
             Tab(String(localized: "Settings"), systemImage: "gearshape.fill", value: 3) {
                 NativeChatUI.SettingsView(viewModel: appStore.settingsPresenter)
             }
-            .accessibilityIdentifier("tab.settings")
+            .accessibilityIdentifier("glassgpt.tab.settings")
         }
         .environment(\.hapticsEnabled, settingsDefaults.hapticEnabled)
         .onOpenURL { url in

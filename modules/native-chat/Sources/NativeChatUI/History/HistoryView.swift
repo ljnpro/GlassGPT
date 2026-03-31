@@ -48,7 +48,7 @@ public struct HistoryView: View {
     private var emptyState: some View {
         VStack(spacing: 14) {
             Image(systemName: viewModel.isSignedIn ? "clock.badge.questionmark" : "person.crop.circle.badge.exclamationmark")
-                .font(.system(size: 32, weight: .semibold))
+                .font(.largeTitle.weight(.semibold))
                 .foregroundStyle(.secondary)
                 .accessibilityHidden(true)
 
@@ -71,7 +71,7 @@ public struct HistoryView: View {
             if !viewModel.isSignedIn {
                 SettingsCallToActionButton(
                     title: String(localized: "Open Settings"),
-                    accessibilityIdentifier: "history.openSettings"
+                    accessibilityIdentifier: "glassgpt.history.openSettings"
                 ) {
                     viewModel.openSettings()
                 }

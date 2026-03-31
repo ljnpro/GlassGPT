@@ -124,7 +124,7 @@ package struct MessageInputBar: View {
                 }
                 .buttonStyle(.glass)
                 .accessibilityLabel(String(localized: "Attach"))
-                .accessibilityIdentifier("composer.attach")
+                .accessibilityIdentifier("glassgpt.composer.attach")
 
                 messageComposer
 
@@ -138,7 +138,7 @@ package struct MessageInputBar: View {
                     }
                     .buttonStyle(.glass)
                     .accessibilityLabel(String(localized: "Stop generating"))
-                    .accessibilityIdentifier("composer.stop")
+                    .accessibilityIdentifier("glassgpt.composer.stop")
                 } else {
                     Button(action: handleSend) {
                         Image(systemName: "arrow.up.circle.fill")
@@ -148,7 +148,7 @@ package struct MessageInputBar: View {
                     .buttonStyle(.glass)
                     .disabled(!canSend)
                     .accessibilityLabel(String(localized: "Send message"))
-                    .accessibilityIdentifier("composer.send")
+                    .accessibilityIdentifier("glassgpt.composer.send")
                 }
             }
             .padding(.horizontal, 16)

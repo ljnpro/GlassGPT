@@ -61,7 +61,7 @@ struct BackendConversationEmptyStateCard: View {
     @ViewBuilder
     private var symbolView: some View {
         let base = Image(systemName: systemImageName)
-            .font(.system(size: 38, weight: .semibold))
+            .font(.largeTitle.weight(.semibold))
             .foregroundStyle(.blue, .primary.opacity(symbolSecondaryOpacity))
             .accessibilityHidden(true)
 

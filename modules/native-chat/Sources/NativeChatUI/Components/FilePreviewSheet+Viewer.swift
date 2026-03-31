@@ -20,7 +20,7 @@ extension FilePreviewSheet {
             viewerStateContainer {
                 VStack(spacing: 14) {
                     Image(systemName: "photo.badge.exclamationmark")
-                        .font(.system(size: 40, weight: .regular))
+                        .font(.largeTitle)
                         .foregroundStyle(viewerSecondaryColor)
                         .accessibilityHidden(true)
 
@@ -51,7 +51,7 @@ extension FilePreviewSheet {
             viewerStateContainer {
                 VStack(spacing: 14) {
                     Image(systemName: "doc.richtext")
-                        .font(.system(size: 40, weight: .regular))
+                        .font(.largeTitle)
                         .foregroundStyle(viewerSecondaryColor)
                         .accessibilityHidden(true)
 
@@ -144,7 +144,7 @@ extension FilePreviewSheet {
 
     var titleText: some View {
         Text(previewItem.viewerFilename)
-            .font(.system(size: isPad ? 20 : 18, weight: .semibold))
+            .font(.title3.weight(.semibold))
             .foregroundStyle(viewerPrimaryColor)
             .lineLimit(1)
             .minimumScaleFactor(0.7)
@@ -174,6 +174,7 @@ extension FilePreviewSheet {
             action: onRequestDismiss
         ) {
             Image(systemName: "xmark")
+                // Icon sized to fit fixed-diameter circular button; Dynamic Type not applicable.
                 .font(.system(size: closeIconSize, weight: .semibold))
                 .foregroundStyle(viewerPrimaryColor)
         }
@@ -191,6 +192,7 @@ extension FilePreviewSheet {
             switch saveState {
             case .idle:
                 Image(systemName: "arrow.down.to.line")
+                    // Icon sized to fit fixed-diameter circular button; Dynamic Type not applicable.
                     .font(.system(size: actionIconSize, weight: .semibold))
                     .foregroundStyle(viewerPrimaryColor)
             case .saving:
@@ -209,6 +211,7 @@ extension FilePreviewSheet {
             action: presentShareSheet
         ) {
             Image(systemName: "square.and.arrow.up")
+                // Icon sized to fit fixed-diameter circular button; Dynamic Type not applicable.
                 .font(.system(size: actionIconSize, weight: .semibold))
                 .foregroundStyle(viewerPrimaryColor)
         }
@@ -222,6 +225,7 @@ extension FilePreviewSheet {
             action: presentShareSheet
         ) {
             Image(systemName: "square.and.arrow.up")
+                // Icon sized to fit fixed-diameter circular button; Dynamic Type not applicable.
                 .font(.system(size: actionIconSize, weight: .semibold))
                 .foregroundStyle(viewerPrimaryColor)
         }
@@ -229,7 +233,7 @@ extension FilePreviewSheet {
 
     var saveSuccessHUD: some View {
         Label(String(localized: "Saved to Photos"), systemImage: "checkmark.circle.fill")
-            .font(.system(size: 14, weight: .semibold))
+            .font(.subheadline.weight(.semibold))
             .foregroundStyle(viewerPrimaryColor)
             .padding(.horizontal, 16)
             .padding(.vertical, 10)

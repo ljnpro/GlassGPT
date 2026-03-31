@@ -89,13 +89,13 @@ package struct CodeInterpreterResultView: View {
                     if let code = toolCall.code, !code.isEmpty {
                         VStack(alignment: .leading, spacing: 4) {
                             Text(String(localized: "Python").uppercased())
-                                .font(.system(size: 9, weight: .bold, design: .monospaced))
+                                .font(.caption2.weight(.bold).monospaced())
                                 .foregroundStyle(.tertiary)
                                 .padding(.horizontal, 10)
 
                             ScrollView(.horizontal, showsIndicators: false) {
                                 Text(code)
-                                    .font(.system(size: 12, design: .monospaced))
+                                    .font(.caption.monospaced())
                                     .foregroundStyle(.primary)
                                     .padding(.horizontal, 10)
                                     .padding(.bottom, 8)
@@ -117,13 +117,13 @@ package struct CodeInterpreterResultView: View {
                     if let results = toolCall.results, !results.isEmpty {
                         VStack(alignment: .leading, spacing: 4) {
                             Text(String(localized: "Output").uppercased())
-                                .font(.system(size: 9, weight: .bold, design: .monospaced))
+                                .font(.caption2.weight(.bold).monospaced())
                                 .foregroundStyle(.tertiary)
                                 .padding(.horizontal, 10)
 
                             ForEach(results, id: \.self) { result in
                                 Text(result)
-                                    .font(.system(size: 12, design: .monospaced))
+                                    .font(.caption.monospaced())
                                     .foregroundStyle(.green)
                                     .padding(.horizontal, 10)
                             }

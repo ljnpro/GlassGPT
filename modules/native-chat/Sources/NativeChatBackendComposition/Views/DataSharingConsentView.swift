@@ -12,7 +12,7 @@ package struct DataSharingConsentView: View {
                 Spacer(minLength: 40)
 
                 Image(systemName: "hand.raised.fill")
-                    .font(.system(size: 48))
+                    .font(.largeTitle)
                     .foregroundStyle(.tint)
                     .accessibilityHidden(true)
 

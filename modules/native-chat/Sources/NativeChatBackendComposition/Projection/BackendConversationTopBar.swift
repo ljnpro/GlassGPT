@@ -39,7 +39,7 @@ extension BackendChatController: BackendConversationTopBarDisplaying {
     }
 
     var selectorAccessibilityIdentifier: String {
-        "backendChat.selector"
+        "glassgpt.chat.modelSelector"
     }
 
     var newConversationAccessibilityLabel: String {
@@ -47,7 +47,7 @@ extension BackendChatController: BackendConversationTopBarDisplaying {
     }
 
     var newConversationAccessibilityIdentifier: String {
-        "backendChat.newConversation"
+        "glassgpt.chat.newConversation"
     }
 }
 
@@ -74,7 +74,7 @@ extension BackendAgentController: BackendConversationTopBarDisplaying {
     }
 
     var selectorAccessibilityIdentifier: String {
-        "backendAgent.selector"
+        "glassgpt.agent.modelSelector"
     }
 
     var newConversationAccessibilityLabel: String {
@@ -82,7 +82,7 @@ extension BackendAgentController: BackendConversationTopBarDisplaying {
     }
 
     var newConversationAccessibilityIdentifier: String {
-        "backendAgent.newConversation"
+        "glassgpt.agent.newConversation"
     }
 }
 
