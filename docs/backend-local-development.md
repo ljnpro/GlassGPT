@@ -100,11 +100,11 @@ Common optional overrides:
 
 ```bash
 ./scripts/deploy_backend.sh --env production
-./scripts/release_testflight.sh 5.4.0 20223 --branch codex/stable-5.4 --skip-main-promotion
+./scripts/release_testflight.sh 5.5.0 20224 --branch codex/stable-5.5 --skip-main-promotion
 ```
 
 Those commands are intentionally gated by `todo.md`, the audit document, and
-final CI evidence. Do not bypass them for the 5.4.0 line.
+final CI evidence. Do not bypass them for the 5.5.0 line.
 
 ## D1 Backup And Restore Path
 
