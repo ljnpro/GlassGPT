@@ -39,12 +39,21 @@ Perfect-score engineering optimization across all 12 quality dimensions.
 
 ## Pre-Release Evidence
 
-- Backend CI: pending final run
-- iOS CI: pending final run
-- Contracts CI: pending final run
+- Contracts CI: 1 test passed, 0 failures
+- Backend CI: 116 tests passed, coverage above raised thresholds (branches 70.7%, functions 91.15%, lines 83.51%, statements 83.53%), bundle 147.78 KB (under 200 KB budget)
+- iOS lint: SwiftLint passed, 0 violations
+- iOS format: SwiftFormat passed, 0/354 files need formatting
+- iOS build: passed
+- iOS unit tests: passed
+- iOS package tests: 208 tests in 46 suites passed
+- iOS architecture tests: passed
+- iOS doc completeness: 278/278 public/package declarations documented
+- iOS localization: passed (270 strings, zh-Hans complete)
+- iOS UI tests: blocked by Xcode simulator infrastructure failure (IDERunDestination empty platforms)
 
 ## Release Status
 
-- Backend production deploy: pending
-- TestFlight upload for `5.6.0 (20225)`: pending
-- Final branch push and `v5.6.0` tag: pending
+- Backend staging deploy: completed (glassgpt-staging, version 5.6.0, health check passed, minimumSupportedAppVersion 5.4.0)
+- Backend production deploy: completed (glassgpt-production, version 5.6.0, health check passed, minimumSupportedAppVersion 5.4.0)
+- TestFlight upload for `5.6.0 (20225)`: blocked by Xcode simulator + Apple PLA/certificate issues
+- Final branch push and `v5.6.0` tag: pending TestFlight completion
