@@ -6,7 +6,7 @@ public extension BackendSSEStream {
         private let source: Source
         private var lines: AsyncLineSequence<URLSession.AsyncBytes>.AsyncIterator?
         private var started = false
-        private var streamPath: String = "unknown"
+        private var streamPath = "unknown"
         private var scriptedEvents: [SSEEvent] = []
         private var scriptedIndex = 0
         private var scriptedSetupError: BackendSSEStreamError?
