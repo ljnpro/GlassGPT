@@ -15,12 +15,27 @@ SOURCES_DIR = os.path.join(
 
 DOC_REQUIRED_TARGETS = {
     "AppRouting",
+    "BackendAuth",
+    "BackendClient",
+    "BackendContracts",
+    "BackendSessionPersistence",
+    "ChatDomain",
+    "ChatPersistenceCore",
+    "ChatPersistenceModels",
+    "ChatPersistenceSwiftData",
     "ChatPresentation",
+    "ChatProjectionPersistence",
     "ChatUIComponents",
     "ConversationSurfaceLogic",
-    "NativeChatBackendCore",
+    "ConversationSyncApplication",
+    "FilePreviewSupport",
+    "GeneratedFilesCache",
+    "GeneratedFilesCore",
+    "NativeChat",
     "NativeChatBackendComposition",
+    "NativeChatBackendCore",
     "NativeChatUI",
+    "SyncProjection",
 }
 
 DECLARATION_RE = re.compile(
