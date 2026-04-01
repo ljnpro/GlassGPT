@@ -28,6 +28,7 @@ public extension BackendClient {
         if let appVersion = environment.appVersion as String? {
             request.setValue(appVersion, forHTTPHeaderField: backendAppVersionHeaderField)
         }
+        request.setValue(UUID().uuidString, forHTTPHeaderField: "X-Request-ID")
 
         var body = Data()
         body.append(Data("--\(boundary)\r\n".utf8))
