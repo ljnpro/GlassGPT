@@ -235,8 +235,16 @@ function prepare_simulator_state() {
   pkill -f 'xcodebuild .*GlassGPT.xcodeproj' >/dev/null 2>&1 || true
   pkill -f 'xcodebuild .* -scheme NativeChat ' >/dev/null 2>&1 || true
   sleep 1
-  xcrun simctl shutdown all >/dev/null 2>&1 || true
-  xcrun simctl boot "$SIM_UDID" >/dev/null 2>&1 || true
+
+  # Only restart simulator if it is not already booted to avoid destabilizing
+  # the CoreSimulator runtime between rapid shutdown→boot cycles (Xcode 26 bug).
+  local sim_state
+  sim_state="$(xcrun simctl list devices "$SIM_UDID" 2>/dev/null | grep "$SIM_UDID" | grep -o 'Booted\|Shutdown' | head -1)"
+  if [[ "$sim_state" != "Booted" ]]; then
+    xcrun simctl shutdown all >/dev/null 2>&1 || true
+    sleep 2
+    xcrun simctl boot "$SIM_UDID" >/dev/null 2>&1 || true
+  fi
   python3 - "$SIM_UDID" "$SIMULATOR_BOOT_TIMEOUT_SECONDS" <<'PY' >/dev/null 2>&1 || true
 import subprocess
 import sys
@@ -491,7 +499,11 @@ print(text.count("DebuggerVersionStore.StoreError"))
 PY
   )"
 
-  if (( debugger_version_errors < 3 )); then
+  # Xcode 26 emits DebuggerVersionStore.StoreError on nearly every launch
+  # as a non-fatal warning.  The process recovers and tests execute normally.
+  # Only treat as a hang if the count is extremely high (>= 20), indicating
+  # a genuine infinite-retry loop rather than normal Xcode noise.
+  if (( debugger_version_errors < 20 )); then
     return 1
   fi
 
@@ -931,8 +943,9 @@ function run_ui_test_batch() {
   log "Running ${#only_tests[@]} UI test(s)"
   run_checked_xcodebuild "$result_bundle_name" \
     xcodebuild \
-    -quiet \
-    -xctestrun "$UI_TEST_XCTESTRUN_PATH" \
+    -project "$XCODE_PROJECT" \
+    -scheme "$SCHEME" \
+    -clonedSourcePackagesDirPath "$CI_SOURCE_PACKAGES_DIR" \
     -enableCodeCoverage YES \
     -parallel-testing-enabled NO \
     -test-timeouts-enabled YES \
