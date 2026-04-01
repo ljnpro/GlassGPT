@@ -1025,6 +1025,29 @@ describe('backend worker scaffold', () => {
     logErrorSpy.mockRestore();
   });
 
+  it('includes requestId in structured error responses', async () => {
+    const app = createApp(createTestServices());
+
+    const response = await app.fetch(
+      new Request('https://example.com/v1/me', {
+        headers: {
+          Authorization: 'Bearer invalid-token',
+          'X-Request-ID': 'req-explicit-error-id',
+        },
+      }),
+      testEnv,
+      testExecutionContext,
+    );
+
+    expect(response.status).toBe(401);
+    await expect(response.json()).resolves.toEqual({
+      code: 'unauthorized',
+      error: 'unauthorized',
+      requestId: 'req-explicit-error-id',
+      retryable: false,
+    });
+  });
+
   it('exposes scaffolded conversation and run routes', async () => {
     const app = createApp(createTestServices());
 
@@ -1269,7 +1292,7 @@ describe('backend worker scaffold', () => {
     }
   });
 
-  it('returns the upstream sandbox download error when fallback attempts also fail', async () => {
+  it('normalizes sandbox download hard failures through the typed error envelope', async () => {
     const app = createApp(createTestServices());
     const originalFetch = globalThis.fetch;
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
@@ -1291,6 +1314,7 @@ describe('backend worker scaffold', () => {
         new Request('https://example.com/v1/files/file_123/content?container_id=container_123', {
           headers: {
             Authorization: 'Bearer access-token',
+            'X-Request-ID': 'req-file-hard-failure',
           },
         }),
         testEnv,
@@ -1298,8 +1322,13 @@ describe('backend worker scaffold', () => {
       );
 
       expect(fetchMock).toHaveBeenCalledTimes(2);
-      expect(response.status).toBe(500);
-      await expect(response.text()).resolves.toBe('container failure');
+      expect(response.status).toBe(502);
+      await expect(response.json()).resolves.toEqual({
+        code: 'server_error',
+        error: 'server_error',
+        requestId: 'req-file-hard-failure',
+        retryable: true,
+      });
     } finally {
       globalThis.fetch = originalFetch;
     }
