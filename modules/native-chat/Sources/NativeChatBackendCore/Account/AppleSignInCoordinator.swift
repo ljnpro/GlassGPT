@@ -46,7 +46,12 @@ package final class AppleSignInCoordinator: NSObject {
     }
 
     private func resolvePresentationAnchor() -> ASPresentationAnchor? {
-        let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
+        resolvePresentationAnchorFromScenes(
+            UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
+        )
+    }
+
+    private func resolvePresentationAnchorFromScenes(_ scenes: [UIWindowScene]) -> ASPresentationAnchor? {
         let candidateScenes = scenes.sorted { lhs, rhs in
             score(for: lhs.activationState) > score(for: rhs.activationState)
         }
@@ -154,9 +159,15 @@ extension AppleSignInCoordinator: ASAuthorizationControllerPresentationContextPr
     /// The anchor is always set in ``signIn()`` before the authorization controller
     /// begins performing requests, so force-unwrapping here is safe.
     package func presentationAnchor(for _: ASAuthorizationController) -> ASPresentationAnchor {
-        guard let anchor = resolvedPresentationAnchor else {
-            preconditionFailure("presentationAnchor(for:) called before signIn() resolved an anchor")
+        // resolvedPresentationAnchor is always set by signIn() before the authorization
+        // controller calls this delegate method. Fall back to a fresh resolution for safety.
+        let allScenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
+        if let anchor = resolvedPresentationAnchor ?? resolvePresentationAnchorFromScenes(allScenes) {
+            return anchor
         }
-        return anchor
+        // Every running iOS app has at least one UIWindowScene, so this path is unreachable.
+        // Create a window from whatever scene is available to avoid deprecated UIWindow().
+        assertionFailure("presentationAnchor(for:) — no UIWindowScene found")
+        return UIWindow(windowScene: allScenes[0])
     }
 }
