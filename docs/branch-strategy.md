@@ -3,39 +3,39 @@
 ## Long-Lived Branches
 
 - `main`
-  - promotion target after a `5.6.x` release is validated
+  - promotion target after a `5.7.x` release is validated
   - should point to the latest shipped product-quality line
 - `stable-4.12`
   - frozen local backup of the pre-backend architecture
   - keep as the rollback and parity reference line
 - `codex/stable-4.12`
   - GitHub mirror of the frozen pre-backend line when pushed remotely
-- `codex/stable-5.6`
-  - active `5.6` release line
-  - default base for `5.6.x` hardening and release-preparation work
+- `codex/stable-5.7`
+  - active `5.7` release line
+  - default base for `5.7.x` hardening and release-preparation work
 
 ## Active Release Work
 
-- `feature/release-5.6-*`
-  - local release-preparation or hardening branches that stack on `codex/stable-5.6`
-- `codex/feature/release-5.6-*`
-  - remote mirrors of `5.6` release-preparation branches when pushed to GitHub
+- `feature/release-5.7-*`
+  - local release-preparation or hardening branches that stack on `codex/stable-5.7`
+- `codex/feature/release-5.7-*`
+  - remote mirrors of `5.7` release-preparation branches when pushed to GitHub
 
 ## Short-Lived Branches
 
 - `feature/<topic>`
-  - branch from the active `5.6` release line unless a different release line is explicitly intended
+  - branch from the active `5.7` release line unless a different release line is explicitly intended
   - publish as `codex/feature/<topic>` if mirrored remotely
   - merge back only after local CI, release-readiness, and manual log review are clean
   - delete after the change lands
 
 ## Release Alignment
 
-- `5.6.x` release candidates should be prepared from `codex/stable-5.6` or a
-  `feature/release-5.6-*` branch cut from it.
-- Do not promote `main` until the `5.6` candidate has:
+- `5.7.x` release candidates should be prepared from `codex/stable-5.7` or a
+  `feature/release-5.7-*` branch cut from it.
+- Do not promote `main` until the `5.7` candidate has:
   - passed `./scripts/ci.sh release-readiness`
   - passed the required hard lanes on the same tree
   - produced the required final audit and perfect-log CI evidence
 - Preserve `stable-4.12` / `codex/stable-4.12` as the frozen rollback line
-  during the `5.6` rollout.
+  during the `5.7` rollout.

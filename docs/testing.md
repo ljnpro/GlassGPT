@@ -2,7 +2,7 @@
 
 ## Principle
 
-`5.6.0` testing is release-oriented. The suite must verify the real iOS +
+`5.7.0` testing is release-oriented. The suite must verify the real iOS +
 backend system, not only isolated helper functions.
 
 Current emphasis:
@@ -32,7 +32,7 @@ Current emphasis:
   - `packages/backend-contracts` fixtures and generated artifacts
   - Swift mirror tests against backend-facing contract shapes
 
-## Current Gaps Being Closed In 5.6.0
+## Current Gaps Being Closed In 5.7.0
 
 - migration-failure and corruption-recovery coverage that still needs richer
   behavior assertions
@@ -88,7 +88,7 @@ fine-grained local checks.
 Before any backend/TestFlight publish step:
 
 - `todo.md` exit gates must be green
-- the final audit must exist at `docs/audit-5.6.0.md`
+- the final audit must exist at `docs/audit-5.7.0.md`
 - full CI must pass
 - the final CI evidence log must be archived
 

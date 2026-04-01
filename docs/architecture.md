@@ -1,8 +1,8 @@
-# 5.6.0 Architecture
+# 5.7.0 Architecture
 
 ## Goal
 
-`5.6.0` is the current feature release. The architecture must describe the real shipped
+`5.7.0` is the current feature release. The architecture must describe the real shipped
 system across iOS, backend contracts, backend services, CI, and release
 governance instead of only describing one layer in isolation.
 
@@ -112,10 +112,10 @@ governance instead of only describing one layer in isolation.
   - `backend`
   - `ios`
   - `release-readiness`
-- Release scripts are gated by `todo.md`, the 5.6.0 audit, and final CI
+- Release scripts are gated by `todo.md`, the 5.7.0 audit, and final CI
   evidence.
 
-## Known 5.6.0 Work Still In Flight
+## Known 5.7.0 Work Still In Flight
 
 - Final publication still depends on a supported TestFlight upload tool being
   present on the release machine.
