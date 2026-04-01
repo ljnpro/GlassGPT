@@ -180,7 +180,7 @@ func makeSnapshotPDFFile() throws -> URL {
                 .foregroundColor: UIColor.black
             ]
         )
-        let body = "The 5.6.0 release candidate completed successfully." as NSString
+        let body = "The 5.7.0 release candidate completed successfully." as NSString
         body.draw(
             in: CGRect(x: 48, y: 120, width: 516, height: 200),
             withAttributes: [

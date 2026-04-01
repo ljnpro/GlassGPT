@@ -93,7 +93,7 @@ struct RunEventProjectorTests {
 private func makeConversation(cursor: String) -> ConversationDTO {
     ConversationDTO(
         id: "conv_01",
-        title: "GlassGPT 5.6.0",
+        title: "GlassGPT 5.7.0",
         mode: .chat,
         createdAt: Date(timeIntervalSince1970: 1_774_044_800),
         updatedAt: Date(timeIntervalSince1970: 1_774_044_800),
