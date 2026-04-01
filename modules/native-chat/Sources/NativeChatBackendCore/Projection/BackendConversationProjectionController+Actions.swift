@@ -63,42 +63,18 @@ package extension BackendConversationProjectionController {
     }
 
     func startNewConversation() {
-        submissionTask?.cancel()
-        runPollingTask?.cancel()
-        runPollingTask = nil
+        resetRunState()
         submissionTask = nil
-        activeRunID = nil
-        lastStreamEventID = nil
         setCurrentConversation(nil)
         visibleSelectionToken = UUID()
         messages = []
-        currentStreamingText = ""
-        currentThinkingText = ""
-        activeToolCalls = []
-        liveCitations = []
-        liveFilePathAnnotations = []
-        isRunActive = false
-        isThinking = false
-        resetModeSpecificState()
         errorMessage = nil
         selectedImageData = nil
         pendingAttachments.removeAll()
     }
 
     func loadConversation(serverID: String) {
-        submissionTask?.cancel()
-        runPollingTask?.cancel()
-        runPollingTask = nil
-        activeRunID = nil
-        lastStreamEventID = nil
-        currentStreamingText = ""
-        currentThinkingText = ""
-        activeToolCalls = []
-        liveCitations = []
-        liveFilePathAnnotations = []
-        isRunActive = false
-        isThinking = false
-        resetModeSpecificState()
+        resetRunState()
         let selectionToken = UUID()
         visibleSelectionToken = selectionToken
 
@@ -131,6 +107,22 @@ package extension BackendConversationProjectionController {
         pendingAttachments.removeAll { $0.id == attachment.id }
     }
 
+    private func resetRunState() {
+        submissionTask?.cancel()
+        runPollingTask?.cancel()
+        runPollingTask = nil
+        activeRunID = nil
+        lastStreamEventID = nil
+        currentStreamingText = ""
+        currentThinkingText = ""
+        activeToolCalls = []
+        liveCitations = []
+        liveFilePathAnnotations = []
+        isRunActive = false
+        isThinking = false
+        resetModeSpecificState()
+    }
+
     private func submitVisibleMessage(_ text: String, selectionToken: UUID) async {
         defer { submissionTask = nil }
 
@@ -155,7 +147,7 @@ package extension BackendConversationProjectionController {
                     let fileId = try await client.uploadFile(
                         data: data,
                         filename: attachment.filename,
-                        mimeType: mimeTypeForExtension(attachment.fileType)
+                        mimeType: BackendConversationSupport.mimeType(forExtension: attachment.fileType)
                     )
                     attachment.fileId = fileId
                     attachment.uploadStatus = .uploaded
@@ -196,22 +188,6 @@ package extension BackendConversationProjectionController {
             errorMessage = error.localizedDescription
             isRunActive = false
             isThinking = false
-        }
-    }
-
-    private func mimeTypeForExtension(_ ext: String) -> String {
-        switch ext.lowercased() {
-        case "pdf": "application/pdf"
-        case "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-        case "doc": "application/msword"
-        case "pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation"
-        case "ppt": "application/vnd.ms-powerpoint"
-        case "xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        case "xls": "application/vnd.ms-excel"
-        case "csv": "text/csv"
-        case "png": "image/png"
-        case "jpg", "jpeg": "image/jpeg"
-        default: "application/octet-stream"
         }
     }
 }

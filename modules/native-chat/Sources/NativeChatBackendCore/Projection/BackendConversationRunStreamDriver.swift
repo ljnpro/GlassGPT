@@ -2,12 +2,6 @@ import BackendClient
 import BackendContracts
 import Foundation
 
-/// Outcome returned by a streamed run event handler.
-package enum BackendConversationStreamOutcome {
-    case continueLoop
-    case finish
-}
-
 /// Shared live-stream and polling behavior for backend conversation controllers.
 @MainActor
 package protocol BackendConversationRunStreamDriving: BackendConversationProjectionController {
@@ -51,13 +45,7 @@ package extension BackendConversationRunStreamDriving {
         }
     }
 
-    /// Polls the backend at high frequency for run progress.
-    ///
-    /// SSE streaming through Cloudflare's multi-layer infrastructure
-    /// (Workflow → Durable Object → Worker relay → CF edge) introduces
-    /// opaque buffering that prevents real-time token delivery.
-    /// High-frequency polling (250ms) against the persisted conversation
-    /// state provides reliable, predictable update cadence.
+    /// Polls the backend at high frequency (250ms) for run progress, bypassing SSE buffering.
     func streamOrPollRun(conversationServerID: String, runID: String, selectionToken: UUID) async {
         defer {
             if activeRunID == runID {

@@ -47,6 +47,22 @@ package enum BackendConversationSupport {
             .map(BackendMessageSurface.init(message:))
     }
 
+    static func mimeType(forExtension ext: String) -> String {
+        switch ext.lowercased() {
+        case "pdf": "application/pdf"
+        case "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        case "doc": "application/msword"
+        case "pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+        case "ppt": "application/vnd.ms-powerpoint"
+        case "xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        case "xls": "application/vnd.ms-excel"
+        case "csv": "text/csv"
+        case "png": "image/png"
+        case "jpg", "jpeg": "image/jpeg"
+        default: "application/octet-stream"
+        }
+    }
+
     static func pendingAttachments(from urls: [URL]) -> [FileAttachment] {
         urls.compactMap { url in
             do {
