@@ -1,6 +1,5 @@
 import BackendAuth
 import BackendContracts
-import ChatPersistenceCore
 import Foundation
 
 @MainActor
@@ -62,7 +61,7 @@ public extension BackendClient {
         _ payload: AppleSignInPayload,
         deviceID: String
     ) async throws -> SessionDTO {
-        Loggers.auth.debug("[Auth] Apple sign-in started")
+        BackendNetworkLogger.logAuth("[Auth] Apple sign-in started")
         let session = try await perform(
             path: "/v1/auth/apple",
             method: "POST",
@@ -78,7 +77,7 @@ public extension BackendClient {
             responseType: SessionDTO.self
         )
         sessionStore.replace(session: session)
-        Loggers.auth.debug("[Auth] Apple sign-in succeeded")
+        BackendNetworkLogger.logAuth("[Auth] Apple sign-in succeeded")
         return session
     }
 
@@ -99,7 +98,7 @@ public extension BackendClient {
     }
 
     func logout() async throws {
-        Loggers.auth.debug("[Auth] logout started")
+        BackendNetworkLogger.logAuth("[Auth] logout started")
         try await performNoContent(
             path: "/v1/auth/logout",
             method: "POST",
@@ -107,7 +106,7 @@ public extension BackendClient {
             authorizationMode: .required
         )
         sessionStore.clear()
-        Loggers.auth.debug("[Auth] logout completed, session cleared")
+        BackendNetworkLogger.logAuth("[Auth] logout completed, session cleared")
     }
 
     func storeOpenAIKey(_ apiKey: String) async throws -> CredentialStatusDTO {

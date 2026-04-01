@@ -1,5 +1,4 @@
 import BackendContracts
-import ChatPersistenceCore
 import Foundation
 
 extension BackendClient {
@@ -112,7 +111,7 @@ extension BackendClient {
             return
         }
 
-        Loggers.network.error(
+        BackendNetworkLogger.logNetworkError(
             "[HTTP] error response status=\(statusCode) error=\(envelope.error) code=\(envelope.code ?? "unknown") requestId=\(envelope.requestId ?? "unknown") retryable=\(envelope.retryable.map(String.init) ?? "unknown")"
         )
     }

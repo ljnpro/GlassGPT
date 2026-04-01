@@ -1,12 +1,15 @@
-import ChatPersistenceCore
 import Foundation
+import OSLog
 
 /// Structured network logger for BackendClient HTTP requests.
-/// Logs method, path, status code, and response time via the unified `Loggers` infrastructure.
+/// Uses a local OSLog.Logger to avoid importing ChatPersistenceCore across module boundaries.
 /// Never logs request/response bodies, tokens, or user data.
 enum BackendNetworkLogger {
+    private static let networkLogger = Logger(subsystem: "GlassGPT", category: "network")
+    private static let authLogger = Logger(subsystem: "GlassGPT", category: "auth")
+
     static func logRequest(method: String, path: String) {
-        Loggers.network.debug("[HTTP] \(method) \(path)")
+        networkLogger.debug("[HTTP] \(method, privacy: .public) \(path, privacy: .public)")
     }
 
     static func logResponse(
@@ -18,27 +21,41 @@ enum BackendNetworkLogger {
         let elapsed = ContinuousClock.now - startTime
         let elapsedMs = Int(elapsed.components.seconds * 1000
             + elapsed.components.attoseconds / 1_000_000_000_000_000)
-        Loggers.network.debug("[HTTP] \(method) \(path) → \(statusCode) (\(elapsedMs)ms)")
+        networkLogger.debug("[HTTP] \(method, privacy: .public) \(path, privacy: .public) → \(statusCode, privacy: .public) (\(elapsedMs, privacy: .public)ms)")
     }
 
     static func logError(method: String, path: String, error: any Error) {
         let sanitized = sanitizeError(error)
-        Loggers.network.error("[HTTP] \(method) \(path) failed: \(sanitized)")
+        networkLogger.error("[HTTP] \(method, privacy: .public) \(path, privacy: .public) failed: \(sanitized, privacy: .public)")
     }
 
     // MARK: - SSE Lifecycle
 
     static func logSSEOpen(path: String) {
-        Loggers.network.debug("[SSE] stream opened: \(path)")
+        networkLogger.debug("[SSE] stream opened: \(path, privacy: .public)")
     }
 
     static func logSSEClose(path: String) {
-        Loggers.network.debug("[SSE] stream closed: \(path)")
+        networkLogger.debug("[SSE] stream closed: \(path, privacy: .public)")
     }
 
     static func logSSEError(path: String, error: any Error) {
         let sanitized = sanitizeError(error)
-        Loggers.network.error("[SSE] stream error on \(path): \(sanitized)")
+        networkLogger.error("[SSE] stream error on \(path, privacy: .public): \(sanitized, privacy: .public)")
+    }
+
+    static func logNetworkError(_ message: String) {
+        networkLogger.error("\(message, privacy: .public)")
+    }
+
+    // MARK: - Auth Logging
+
+    static func logAuth(_ message: String) {
+        authLogger.debug("\(message, privacy: .public)")
+    }
+
+    static func logAuthError(_ message: String) {
+        authLogger.error("\(message, privacy: .public)")
     }
 
     // MARK: - Sanitization

@@ -1,4 +1,3 @@
-import ChatPersistenceCore
 import Foundation
 
 @MainActor

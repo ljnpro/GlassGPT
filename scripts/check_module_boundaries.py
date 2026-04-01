@@ -74,7 +74,7 @@ TARGET_RULES: dict[str, TargetRule] = {
         ),
     ),
     "BackendClient": TargetRule(
-        allowed_imports=frozenset({"Foundation", "BackendContracts", "BackendAuth"}),
+        allowed_imports=frozenset({"Foundation", "BackendContracts", "BackendAuth", "OSLog"}),
         forbidden_patterns=(
             ("Bundle.main", "BackendClient must not reach app bundle state"),
             ("ProcessInfo.processInfo", "BackendClient must not read process environment"),
