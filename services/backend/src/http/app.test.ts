@@ -18,6 +18,14 @@ import type {
   SyncService,
 } from './services.js';
 
+/** Build the expected typed error envelope for test assertions. */
+const expectedErrorEnvelope = (error: string, retryable: boolean) => ({
+  code: error,
+  error,
+  requestId: expect.any(String),
+  retryable,
+});
+
 const unexpectedBindingAccess = (bindingName: string): never => {
   throw new Error(`${bindingName}_binding_accessed_in_scaffold_test`);
 };
@@ -548,9 +556,7 @@ describe('backend worker scaffold', () => {
 
     expect(response).not.toBeNull();
     expect(response?.status).toBe(429);
-    await expect(response?.json()).resolves.toEqual({
-      error: 'rate_limited',
-    });
+    await expect(response?.json()).resolves.toEqual(expectedErrorEnvelope('rate_limited', true));
   });
 
   it('rate limits authenticated traffic by resolved user identity', async () => {
@@ -573,9 +579,7 @@ describe('backend worker scaffold', () => {
 
     expect(response).not.toBeNull();
     expect(response?.status).toBe(429);
-    await expect(response?.json()).resolves.toEqual({
-      error: 'rate_limited',
-    });
+    await expect(response?.json()).resolves.toEqual(expectedErrorEnvelope('rate_limited', true));
   });
 
   it('serves the health route', async () => {
@@ -696,9 +700,9 @@ describe('backend worker scaffold', () => {
     );
 
     expect(response.status).toBe(503);
-    await expect(response.json()).resolves.toEqual({
-      error: 'service_unavailable',
-    });
+    await expect(response.json()).resolves.toEqual(
+      expectedErrorEnvelope('service_unavailable', true),
+    );
   });
 
   it('fails closed for credential writes when auth runtime secrets are missing', async () => {
@@ -720,9 +724,9 @@ describe('backend worker scaffold', () => {
     );
 
     expect(response.status).toBe(503);
-    await expect(response.json()).resolves.toEqual({
-      error: 'service_unavailable',
-    });
+    await expect(response.json()).resolves.toEqual(
+      expectedErrorEnvelope('service_unavailable', true),
+    );
   });
 
   it('returns service_unavailable for Apple auth when required runtime secrets are missing', async () => {
@@ -745,9 +749,9 @@ describe('backend worker scaffold', () => {
     );
 
     expect(response.status).toBe(503);
-    await expect(response.json()).resolves.toEqual({
-      error: 'service_unavailable',
-    });
+    await expect(response.json()).resolves.toEqual(
+      expectedErrorEnvelope('service_unavailable', true),
+    );
   });
 
   it('fails closed for me refresh and logout when auth runtime secrets are missing', async () => {
@@ -766,9 +770,9 @@ describe('backend worker scaffold', () => {
       testExecutionContext,
     );
     expect(meResponse.status).toBe(503);
-    await expect(meResponse.json()).resolves.toEqual({
-      error: 'service_unavailable',
-    });
+    await expect(meResponse.json()).resolves.toEqual(
+      expectedErrorEnvelope('service_unavailable', true),
+    );
 
     const refreshResponse = await app.fetch(
       new Request('https://example.com/v1/auth/refresh', {
@@ -784,9 +788,9 @@ describe('backend worker scaffold', () => {
       testExecutionContext,
     );
     expect(refreshResponse.status).toBe(503);
-    await expect(refreshResponse.json()).resolves.toEqual({
-      error: 'service_unavailable',
-    });
+    await expect(refreshResponse.json()).resolves.toEqual(
+      expectedErrorEnvelope('service_unavailable', true),
+    );
 
     const logoutResponse = await app.fetch(
       new Request('https://example.com/v1/auth/logout', {
@@ -799,9 +803,9 @@ describe('backend worker scaffold', () => {
       testExecutionContext,
     );
     expect(logoutResponse.status).toBe(503);
-    await expect(logoutResponse.json()).resolves.toEqual({
-      error: 'service_unavailable',
-    });
+    await expect(logoutResponse.json()).resolves.toEqual(
+      expectedErrorEnvelope('service_unavailable', true),
+    );
   });
 
   it('supports credential deletion and rejects unauthenticated credential mutations', async () => {
@@ -821,9 +825,9 @@ describe('backend worker scaffold', () => {
       testExecutionContext,
     );
     expect(unauthenticatedWriteResponse.status).toBe(401);
-    await expect(unauthenticatedWriteResponse.json()).resolves.toEqual({
-      error: 'unauthorized',
-    });
+    await expect(unauthenticatedWriteResponse.json()).resolves.toEqual(
+      expectedErrorEnvelope('unauthorized', false),
+    );
 
     const unauthenticatedDeleteResponse = await app.fetch(
       new Request('https://example.com/v1/credentials/openai', {
@@ -833,9 +837,9 @@ describe('backend worker scaffold', () => {
       testExecutionContext,
     );
     expect(unauthenticatedDeleteResponse.status).toBe(401);
-    await expect(unauthenticatedDeleteResponse.json()).resolves.toEqual({
-      error: 'unauthorized',
-    });
+    await expect(unauthenticatedDeleteResponse.json()).resolves.toEqual(
+      expectedErrorEnvelope('unauthorized', false),
+    );
 
     const authenticatedDeleteResponse = await app.fetch(
       new Request('https://example.com/v1/credentials/openai', {
@@ -921,9 +925,9 @@ describe('backend worker scaffold', () => {
       testExecutionContext,
     );
     expect(forbiddenResponse.status).toBe(403);
-    await expect(forbiddenResponse.json()).resolves.toEqual({
-      error: 'forbidden',
-    });
+    await expect(forbiddenResponse.json()).resolves.toEqual(
+      expectedErrorEnvelope('forbidden', false),
+    );
 
     const conflictApp = createApp(
       createTestServices({
@@ -949,9 +953,9 @@ describe('backend worker scaffold', () => {
       testExecutionContext,
     );
     expect(conflictResponse.status).toBe(409);
-    await expect(conflictResponse.json()).resolves.toEqual({
-      error: 'conflict',
-    });
+    await expect(conflictResponse.json()).resolves.toEqual(
+      expectedErrorEnvelope('conflict', false),
+    );
 
     const serverErrorApp = createApp(
       createTestServices({
@@ -974,9 +978,9 @@ describe('backend worker scaffold', () => {
       testExecutionContext,
     );
     expect(serverErrorResponse.status).toBe(500);
-    await expect(serverErrorResponse.json()).resolves.toEqual({
-      error: 'server_error',
-    });
+    await expect(serverErrorResponse.json()).resolves.toEqual(
+      expectedErrorEnvelope('server_error', true),
+    );
   });
 
   it('maps unexpected failures to internal_server_error and logs the request failure', async () => {
@@ -1007,9 +1011,9 @@ describe('backend worker scaffold', () => {
     );
 
     expect(response.status).toBe(500);
-    await expect(response.json()).resolves.toEqual({
-      error: 'internal_server_error',
-    });
+    await expect(response.json()).resolves.toEqual(
+      expectedErrorEnvelope('internal_server_error', true),
+    );
     expect(logErrorSpy).toHaveBeenCalledWith(
       'backend_request_failed',
       expect.objectContaining({
@@ -1396,9 +1400,9 @@ describe('backend worker scaffold', () => {
       testExecutionContext,
     );
     expect(notFoundResponse.status).toBe(404);
-    await expect(notFoundResponse.json()).resolves.toEqual({
-      error: 'not_found',
-    });
+    await expect(notFoundResponse.json()).resolves.toEqual(
+      expectedErrorEnvelope('not_found', false),
+    );
 
     const logoutResponse = await app.fetch(
       new Request('https://example.com/v1/auth/logout', {
@@ -1436,9 +1440,7 @@ describe('backend worker scaffold', () => {
     );
 
     expect(response.status).toBe(400);
-    await expect(response.json()).resolves.toEqual({
-      error: 'invalid_request',
-    });
+    await expect(response.json()).resolves.toEqual(expectedErrorEnvelope('invalid_request', false));
   });
 
   it('requires authentication for run streaming', async () => {
@@ -1449,9 +1451,7 @@ describe('backend worker scaffold', () => {
     );
 
     expect(response.status).toBe(401);
-    await expect(response.json()).resolves.toEqual({
-      error: 'unauthorized',
-    });
+    await expect(response.json()).resolves.toEqual(expectedErrorEnvelope('unauthorized', false));
   });
 
   it('streams immediate done for terminal runs without touching durable objects', async () => {
@@ -1715,9 +1715,9 @@ describe('backend worker scaffold', () => {
     );
 
     expect(response.status).toBe(503);
-    await expect(response.json()).resolves.toEqual({
-      error: 'realtime_stream_unavailable',
-    });
+    await expect(response.json()).resolves.toEqual(
+      expectedErrorEnvelope('realtime_stream_unavailable', true),
+    );
   });
 
   it('logs relay failures and emits structured stream errors for the client', async () => {

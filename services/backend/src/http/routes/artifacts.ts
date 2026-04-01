@@ -1,3 +1,5 @@
+import { makeErrorResponse } from '@glassgpt/backend-contracts';
+
 import { requireAuthenticatedSession } from '../require-authenticated-session.js';
 import { asBackendRuntimeContext } from '../runtime-context.js';
 import type { BackendServices } from '../services.js';
@@ -13,7 +15,11 @@ export const installArtifactRoutes = (app: BackendApp, services: BackendServices
     const objectKey = `${session.userId}/${artifactId}`;
     const object = await bucket.head(objectKey);
     if (!object) {
-      return context.json({ error: 'artifact_not_found' }, 404);
+      const requestId = context.get('requestId');
+      return context.json(
+        makeErrorResponse('artifact_not_found', requestId, { code: 'not_found' }),
+        404,
+      );
     }
 
     const requestURL = new URL(context.req.url);

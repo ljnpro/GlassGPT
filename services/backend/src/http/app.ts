@@ -1,4 +1,4 @@
-import { errorResponseSchema } from '@glassgpt/backend-contracts';
+import { makeErrorResponse } from '@glassgpt/backend-contracts';
 import { Hono } from 'hono';
 import { bodyLimit } from 'hono/body-limit';
 import { cors } from 'hono/cors';
@@ -85,16 +85,19 @@ export const createApp = (services: BackendServices): BackendApp => {
   installFileRoutes(app, services, services.fileProxySupport);
 
   app.notFound((context) => {
-    return context.json(errorResponseSchema.parse({ error: 'not_found' }), 404);
+    const requestId = context.get('requestId') ?? 'unknown';
+    return context.json(makeErrorResponse('not_found', requestId), 404);
   });
 
   app.onError((error, context) => {
+    const requestId = context.get('requestId') ?? 'unknown';
+
     if (error instanceof ZodError) {
-      return context.json(errorResponseSchema.parse({ error: 'invalid_request' }), 400);
+      return context.json(makeErrorResponse('invalid_request', requestId), 400);
     }
 
     if (isApplicationError(error)) {
-      return context.json(errorResponseSchema.parse({ error: error.code }), {
+      return context.json(makeErrorResponse(error.code, requestId), {
         status: statusCodeForApplicationError(error.code),
       });
     }
@@ -102,9 +105,10 @@ export const createApp = (services: BackendServices): BackendApp => {
     logError('backend_request_failed', {
       errorName: error.name,
       errorMessage: sanitizeLogValue(error.message),
+      requestId,
     });
 
-    return context.json(errorResponseSchema.parse({ error: 'internal_server_error' }), 500);
+    return context.json(makeErrorResponse('internal_server_error', requestId), 500);
   });
 
   return app;

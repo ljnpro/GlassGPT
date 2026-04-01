@@ -1,3 +1,5 @@
+import { makeErrorResponse } from '@glassgpt/backend-contracts';
+
 import type { FileProxySupport } from '../../application/file-proxy-support.js';
 import { logError, sanitizeLogValue } from '../../observability/logger.js';
 import { requireAuthenticatedSession } from '../require-authenticated-session.js';
@@ -36,7 +38,11 @@ export const installFileRoutes = (
     const purpose = (formData.get('purpose') as string) ?? 'user_data';
 
     if (!file) {
-      return context.json({ error: 'file_required' }, 400);
+      const requestId = context.get('requestId');
+      return context.json(
+        makeErrorResponse('file_required', requestId, { code: 'invalid_request' }),
+        400,
+      );
     }
 
     const apiKey = await fileProxySupport.loadApiKey(env, session.userId);
@@ -53,11 +59,13 @@ export const installFileRoutes = (
 
     if (!openAIResponse.ok) {
       const errorText = await openAIResponse.text();
+      const requestId = context.get('requestId');
       logError('openai_file_upload_failed', {
         errorMessage: sanitizeLogValue(errorText),
+        requestId,
         userId: session.userId,
       });
-      return context.json({ error: 'openai_file_upload_failed' }, 502);
+      return context.json(makeErrorResponse('openai_file_upload_failed', requestId), 502);
     }
 
     const result = (await openAIResponse.json()) as {
@@ -101,13 +109,17 @@ export const installFileRoutes = (
           lastHardErrorResponse = openAIResponse;
         }
       } catch (error) {
+        const requestId = context.get('requestId');
         logError('openai_file_download_attempt_failed', {
           errorMessage: error instanceof Error ? sanitizeLogValue(error.message) : 'unknown_error',
           fileId,
+          requestId,
           url: sanitizeLogValue(url),
         });
       }
     }
+
+    const requestId = context.get('requestId');
 
     if (lastHardErrorResponse) {
       return new Response(lastHardErrorResponse.body, {
@@ -117,9 +129,12 @@ export const installFileRoutes = (
     }
 
     if (lastOpenAIResponse) {
-      return context.json({ error: 'file_not_found' }, 404);
+      return context.json(
+        makeErrorResponse('file_not_found', requestId, { code: 'not_found' }),
+        404,
+      );
     }
 
-    return context.json({ error: 'file_not_found' }, 404);
+    return context.json(makeErrorResponse('file_not_found', requestId, { code: 'not_found' }), 404);
   });
 };

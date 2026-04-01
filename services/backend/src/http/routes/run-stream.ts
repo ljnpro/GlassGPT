@@ -1,3 +1,4 @@
+import { makeErrorResponse } from '@glassgpt/backend-contracts';
 import { z } from 'zod';
 
 import { logError, sanitizeLogValue } from '../../observability/logger.js';
@@ -46,6 +47,7 @@ const appendInitialRunFrames = (
     readonly processSnapshotJSON: string | null | undefined;
   },
   eventID?: string | null,
+  requestId?: string,
 ): void => {
   enqueue(
     sseFrame(
@@ -84,6 +86,7 @@ const appendInitialRunFrames = (
     if (!result.success) {
       logError('run_stream_snapshot_decode_failed', {
         errorMessage: sanitizeLogValue(result.error.message),
+        requestId: requestId ?? 'unknown',
         runId: run.id,
         stage: run.stage ?? 'unknown',
       });
@@ -115,6 +118,7 @@ const appendInitialRunFrames = (
   } catch (error) {
     logError('run_stream_snapshot_decode_failed', {
       errorMessage: error instanceof Error ? sanitizeLogValue(error.message) : 'unknown_error',
+      requestId: requestId ?? 'unknown',
       runId: run.id,
       stage: run.stage ?? 'unknown',
     });
@@ -168,6 +172,7 @@ export const installRunStreamRoutes = (app: BackendApp, services: BackendService
   app.get('/v1/runs/:runId/stream', async (context) => {
     const session = await requireAuthenticatedSession(context, services);
     const env = asBackendRuntimeContext(context.env);
+    const requestId = context.get('requestId');
     const runId = context.req.param('runId');
     const lastEventID = context.req.header('Last-Event-ID') ?? null;
 
@@ -213,11 +218,11 @@ export const installRunStreamRoutes = (app: BackendApp, services: BackendService
       );
 
       if (!durableObjectResponse.ok) {
-        return context.json({ error: REALTIME_STREAM_UNAVAILABLE }, 503);
+        return context.json(makeErrorResponse(REALTIME_STREAM_UNAVAILABLE, requestId), 503);
       }
 
       if (!durableObjectResponse.body) {
-        return context.json({ error: REALTIME_STREAM_UNAVAILABLE }, 503);
+        return context.json(makeErrorResponse(REALTIME_STREAM_UNAVAILABLE, requestId), 503);
       }
     }
 
@@ -280,6 +285,7 @@ export const installRunStreamRoutes = (app: BackendApp, services: BackendService
               visibleSummary: initialRun.visibleSummary,
             },
             snapshotEventID,
+            requestId,
           );
 
           // If already terminal, send done immediately
@@ -374,6 +380,7 @@ export const installRunStreamRoutes = (app: BackendApp, services: BackendService
           logError('run_stream_relay_failed', {
             errorMessage:
               error instanceof Error ? sanitizeLogValue(error.message) : 'unknown_error',
+            requestId,
             runId,
           });
           enqueue(streamErrorFrame(runId, 'relay', snapshotEventID));

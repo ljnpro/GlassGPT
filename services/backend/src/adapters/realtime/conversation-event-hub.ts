@@ -53,7 +53,15 @@ export class ConversationEventHub extends DurableObject<Env> {
     if (request.method === 'POST' && url.pathname.endsWith('/events')) {
       const body = (await request.json()) as { cursor?: string };
       if (!body.cursor || typeof body.cursor !== 'string' || body.cursor.length > 64) {
-        return Response.json({ error: 'cursor is required' }, { status: 400 });
+        return Response.json(
+          {
+            error: 'cursor is required',
+            code: 'invalid_request',
+            requestId: 'internal',
+            retryable: false,
+          },
+          { status: 400 },
+        );
       }
 
       const snapshot: ConversationHubSnapshot = {
@@ -71,7 +79,15 @@ export class ConversationEventHub extends DurableObject<Env> {
       return Response.json({ ok: true }, { status: 202 });
     }
 
-    return Response.json({ error: 'method_not_allowed' }, { status: 405 });
+    return Response.json(
+      {
+        error: 'method_not_allowed',
+        code: 'method_not_allowed',
+        requestId: 'internal',
+        retryable: false,
+      },
+      { status: 405 },
+    );
   }
 
   private handleSSEConnection(runId: string, lastEventID: string | null): Response {

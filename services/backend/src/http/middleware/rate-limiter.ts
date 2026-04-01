@@ -1,4 +1,4 @@
-import { errorResponseSchema } from '@glassgpt/backend-contracts';
+import { makeErrorResponse } from '@glassgpt/backend-contracts';
 import type { Context, Next } from 'hono';
 
 import { readBearerToken } from '../authorization.js';
@@ -88,7 +88,8 @@ export const createRateLimiterMiddleware = (services: BackendServices) => {
       context.header('X-RateLimit-Limit', String(identity.maxRequests));
       context.header('X-RateLimit-Remaining', '0');
       context.header('X-RateLimit-Reset', String(rateLimitResult.resetAtMs));
-      return context.json(errorResponseSchema.parse({ error: 'rate_limited' }), 429);
+      const requestId = context.get('requestId');
+      return context.json(makeErrorResponse('rate_limited', requestId), 429);
     }
 
     context.header('X-RateLimit-Limit', String(identity.maxRequests));
