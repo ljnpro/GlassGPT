@@ -1,3 +1,4 @@
+import ChatPersistenceCore
 import Foundation
 
 @MainActor
@@ -9,9 +10,10 @@ public extension BackendClient {
         filename: String,
         mimeType: String
     ) async throws -> String {
+        let path = "/v1/files/upload"
         try await refreshSessionIfNeeded(for: .required)
 
-        let url = environment.baseURL.appendingPathComponent("/v1/files/upload")
+        let url = environment.baseURL.appendingPathComponent(path)
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.timeoutInterval = 120
@@ -39,10 +41,26 @@ public extension BackendClient {
         body.append(Data("\r\n--\(boundary)--\r\n".utf8))
         request.httpBody = body
 
-        let (responseData, response) = try await urlSession.data(for: request)
-        guard let httpResponse = response as? HTTPURLResponse,
-              (200 ..< 300).contains(httpResponse.statusCode)
-        else {
+        BackendNetworkLogger.logRequest(method: "POST", path: path)
+        let requestStart = ContinuousClock.now
+        let responseData: Data
+        let response: URLResponse
+        do {
+            (responseData, response) = try await urlSession.data(for: request)
+        } catch {
+            BackendNetworkLogger.logError(method: "POST", path: path, error: error)
+            throw error
+        }
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw BackendAPIError.invalidResponse
+        }
+        BackendNetworkLogger.logResponse(
+            method: "POST",
+            path: path,
+            statusCode: httpResponse.statusCode,
+            startTime: requestStart
+        )
+        guard (200 ..< 300).contains(httpResponse.statusCode) else {
             throw BackendAPIError.networkFailure(
                 String(data: responseData, encoding: .utf8) ?? "File upload failed"
             )
@@ -61,28 +79,16 @@ public extension BackendClient {
         fileId: String,
         containerId: String?
     ) async throws -> (data: Data, contentType: String?) {
-        try await refreshSessionIfNeeded(for: .required)
-
-        let url = try makeURL(
-            path: "/v1/files/\(fileId)/content",
-            queryItems: containerId.map { [URLQueryItem(name: "container_id", value: $0)] } ?? []
+        let path = "/v1/files/\(fileId)/content"
+        let queryItems = containerId.map { [URLQueryItem(name: "container_id", value: $0)] } ?? []
+        let (data, httpResponse) = try await execute(
+            path: path,
+            method: "GET",
+            body: Optional<Data>.none,
+            authorizationMode: .required,
+            queryItems: queryItems,
+            allowRefreshRetry: true
         )
-        var request = URLRequest(url: url)
-        request.httpMethod = "GET"
-        request.timeoutInterval = 60
-        if let auth = makeAuthorizationHeader(sessionStore: sessionStore) {
-            request.setValue(auth, forHTTPHeaderField: "Authorization")
-        }
-        if let appVersion = environment.appVersion as String? {
-            request.setValue(appVersion, forHTTPHeaderField: backendAppVersionHeaderField)
-        }
-
-        let (data, response) = try await urlSession.data(for: request)
-        guard let httpResponse = response as? HTTPURLResponse,
-              (200 ..< 300).contains(httpResponse.statusCode)
-        else {
-            throw BackendAPIError.networkFailure("File download failed")
-        }
         let contentType = httpResponse.value(forHTTPHeaderField: "Content-Type")
         return (data: data, contentType: contentType)
     }

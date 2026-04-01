@@ -1,4 +1,5 @@
 import BackendContracts
+import ChatPersistenceCore
 import Foundation
 
 extension BackendClient {
@@ -15,6 +16,7 @@ extension BackendClient {
         request.httpMethod = method
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         request.setValue(environment.appVersion, forHTTPHeaderField: backendAppVersionHeaderField)
+        request.setValue(UUID().uuidString, forHTTPHeaderField: "X-Request-ID")
 
         switch authorizationMode {
         case .required:
@@ -62,32 +64,57 @@ extension BackendClient {
         switch httpResponse.statusCode {
         case 200 ..< 300, 204:
             return httpResponse
-        case 400:
-            throw BackendAPIError.invalidRequest
-        case 401:
-            throw BackendAPIError.unauthorized
-        case 403:
-            throw BackendAPIError.forbidden
-        case 404:
-            throw BackendAPIError.notFound
-        case 409:
-            throw BackendAPIError.conflict
-        case 429:
-            throw BackendAPIError.rateLimited
-        case 500, 502:
-            throw BackendAPIError.serverError
-        case 503:
-            throw BackendAPIError.serviceUnavailable
-        case 504:
-            throw BackendAPIError.timeout
-        case 501, 505 ... 599:
-            throw BackendAPIError.serverError
         default:
-            if !data.isEmpty, let errorSummary = String(data: data, encoding: .utf8) {
-                throw BackendAPIError.networkFailure(errorSummary)
+            logErrorEnvelope(data: data, statusCode: httpResponse.statusCode)
+
+            switch httpResponse.statusCode {
+            case 400:
+                throw BackendAPIError.invalidRequest
+            case 401:
+                throw BackendAPIError.unauthorized
+            case 403:
+                throw BackendAPIError.forbidden
+            case 404:
+                throw BackendAPIError.notFound
+            case 409:
+                throw BackendAPIError.conflict
+            case 429:
+                throw BackendAPIError.rateLimited
+            case 500, 502:
+                throw BackendAPIError.serverError
+            case 503:
+                throw BackendAPIError.serviceUnavailable
+            case 504:
+                throw BackendAPIError.timeout
+            case 501, 505 ... 599:
+                throw BackendAPIError.serverError
+            default:
+                if !data.isEmpty, let errorSummary = String(data: data, encoding: .utf8) {
+                    throw BackendAPIError.networkFailure(errorSummary)
+                }
+                throw BackendAPIError.invalidResponse
             }
-            throw BackendAPIError.invalidResponse
         }
+    }
+
+    /// Attempt to decode a typed error envelope and log the requestId for debugging correlation.
+    private func logErrorEnvelope(data: Data, statusCode: Int) {
+        struct ErrorEnvelope: Decodable {
+            let error: String
+            let code: String?
+            let requestId: String?
+            let retryable: Bool?
+        }
+
+        guard !data.isEmpty,
+              let envelope = try? JSONDecoder.backend.decode(ErrorEnvelope.self, from: data)
+        else {
+            return
+        }
+
+        Loggers.network.error(
+            "[HTTP] error response status=\(statusCode) error=\(envelope.error) code=\(envelope.code ?? "unknown") requestId=\(envelope.requestId ?? "unknown") retryable=\(envelope.retryable.map(String.init) ?? "unknown")"
+        )
     }
 
     static func makeURLSession(timeoutInterval: TimeInterval) -> URLSession {
