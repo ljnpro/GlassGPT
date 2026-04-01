@@ -7,7 +7,7 @@ import UIKit
 package final class AppleSignInCoordinator: NSObject {
     private var continuation: CheckedContinuation<AppleSignInPayload, Error>?
     private var activeAuthorizationController: ASAuthorizationController?
-    private var resolvedPresentationAnchor: ASPresentationAnchor!
+    private var resolvedPresentationAnchor: ASPresentationAnchor?
 
     func signIn() async throws -> AppleSignInPayload {
         guard continuation == nil else {
@@ -150,7 +150,13 @@ extension AppleSignInCoordinator: ASAuthorizationControllerDelegate {
 
 extension AppleSignInCoordinator: ASAuthorizationControllerPresentationContextProviding {
     /// Returns the resolved presentation anchor for the active Apple sign-in flow.
+    ///
+    /// The anchor is always set in ``signIn()`` before the authorization controller
+    /// begins performing requests, so force-unwrapping here is safe.
     package func presentationAnchor(for _: ASAuthorizationController) -> ASPresentationAnchor {
-        resolvedPresentationAnchor
+        guard let anchor = resolvedPresentationAnchor else {
+            preconditionFailure("presentationAnchor(for:) called before signIn() resolved an anchor")
+        }
+        return anchor
     }
 }

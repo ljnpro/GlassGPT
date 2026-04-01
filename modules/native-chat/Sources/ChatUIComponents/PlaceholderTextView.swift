@@ -25,6 +25,8 @@ public final class PlaceholderTextView: UITextView {
         }
     }
 
+    // UITextView.text is declared as `String!` in UIKit; the override must
+    // match this implicitly-unwrapped optional signature for binary compatibility.
     override public var text: String! {
         didSet {
             updatePlaceholderVisibility()
