@@ -8,25 +8,29 @@ enum BackendNetworkLogger {
     private static let networkLogger = Logger(subsystem: "GlassGPT", category: "network")
     private static let authLogger = Logger(subsystem: "GlassGPT", category: "auth")
 
-    static func logRequest(method: String, path: String) {
-        networkLogger.debug("[HTTP] \(method, privacy: .public) \(path, privacy: .public)")
+    static func logRequest(method: String, path: String, requestId: String? = nil) {
+        let rid = requestId.map { " rid=\($0)" } ?? ""
+        networkLogger.debug("[HTTP] \(method, privacy: .public) \(path, privacy: .public)\(rid, privacy: .public)")
     }
 
     static func logResponse(
         method: String,
         path: String,
         statusCode: Int,
-        startTime: ContinuousClock.Instant
+        startTime: ContinuousClock.Instant,
+        requestId: String? = nil
     ) {
         let elapsed = ContinuousClock.now - startTime
         let elapsedMs = Int(elapsed.components.seconds * 1000
             + elapsed.components.attoseconds / 1_000_000_000_000_000)
-        networkLogger.debug("[HTTP] \(method, privacy: .public) \(path, privacy: .public) → \(statusCode, privacy: .public) (\(elapsedMs, privacy: .public)ms)")
+        let rid = requestId.map { " rid=\($0)" } ?? ""
+        networkLogger.debug("[HTTP] \(method, privacy: .public) \(path, privacy: .public) → \(statusCode, privacy: .public) (\(elapsedMs, privacy: .public)ms)\(rid, privacy: .public)")
     }
 
-    static func logError(method: String, path: String, error: any Error) {
+    static func logError(method: String, path: String, error: any Error, requestId: String? = nil) {
         let sanitized = sanitizeError(error)
-        networkLogger.error("[HTTP] \(method, privacy: .public) \(path, privacy: .public) failed: \(sanitized, privacy: .public)")
+        let rid = requestId.map { " rid=\($0)" } ?? ""
+        networkLogger.error("[HTTP] \(method, privacy: .public) \(path, privacy: .public) failed: \(sanitized, privacy: .public)\(rid, privacy: .public)")
     }
 
     // MARK: - SSE Lifecycle

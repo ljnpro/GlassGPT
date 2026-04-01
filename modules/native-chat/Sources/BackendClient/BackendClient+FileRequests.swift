@@ -41,14 +41,15 @@ public extension BackendClient {
         body.append(Data("\r\n--\(boundary)--\r\n".utf8))
         request.httpBody = body
 
-        BackendNetworkLogger.logRequest(method: "POST", path: path)
+        let requestId = request.value(forHTTPHeaderField: "X-Request-ID")
+        BackendNetworkLogger.logRequest(method: "POST", path: path, requestId: requestId)
         let requestStart = ContinuousClock.now
         let responseData: Data
         let response: URLResponse
         do {
             (responseData, response) = try await urlSession.data(for: request)
         } catch {
-            BackendNetworkLogger.logError(method: "POST", path: path, error: error)
+            BackendNetworkLogger.logError(method: "POST", path: path, error: error, requestId: requestId)
             throw error
         }
         guard let httpResponse = response as? HTTPURLResponse else {
@@ -58,7 +59,8 @@ public extension BackendClient {
             method: "POST",
             path: path,
             statusCode: httpResponse.statusCode,
-            startTime: requestStart
+            startTime: requestStart,
+            requestId: requestId
         )
         guard (200 ..< 300).contains(httpResponse.statusCode) else {
             throw BackendAPIError.networkFailure(

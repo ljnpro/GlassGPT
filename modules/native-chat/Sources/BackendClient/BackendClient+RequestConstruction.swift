@@ -55,68 +55,7 @@ extension BackendClient {
         return url
     }
 
-    func validate(response: URLResponse, data: Data) throws -> HTTPURLResponse {
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw BackendAPIError.invalidResponse
-        }
-
-        switch httpResponse.statusCode {
-        case 200 ..< 300, 204:
-            return httpResponse
-        default:
-            logErrorEnvelope(data: data, statusCode: httpResponse.statusCode)
-
-            switch httpResponse.statusCode {
-            case 400:
-                throw BackendAPIError.invalidRequest
-            case 401:
-                throw BackendAPIError.unauthorized
-            case 403:
-                throw BackendAPIError.forbidden
-            case 404:
-                throw BackendAPIError.notFound
-            case 409:
-                throw BackendAPIError.conflict
-            case 429:
-                throw BackendAPIError.rateLimited
-            case 500, 502:
-                throw BackendAPIError.serverError
-            case 503:
-                throw BackendAPIError.serviceUnavailable
-            case 504:
-                throw BackendAPIError.timeout
-            case 501, 505 ... 599:
-                throw BackendAPIError.serverError
-            default:
-                if !data.isEmpty, let errorSummary = String(data: data, encoding: .utf8) {
-                    throw BackendAPIError.networkFailure(errorSummary)
-                }
-                throw BackendAPIError.invalidResponse
-            }
-        }
-    }
-
-    /// Attempt to decode a typed error envelope and log the requestId for debugging correlation.
-    private func logErrorEnvelope(data: Data, statusCode: Int) {
-        struct ErrorEnvelope: Decodable {
-            let error: String
-            let code: String?
-            let requestId: String?
-            let retryable: Bool?
-        }
-
-        guard !data.isEmpty,
-              let envelope = try? JSONDecoder.backend.decode(ErrorEnvelope.self, from: data)
-        else {
-            return
-        }
-
-        BackendNetworkLogger.logNetworkError(
-            "[HTTP] error response status=\(statusCode) error=\(envelope.error) code=\(envelope.code ?? "unknown") requestId=\(envelope.requestId ?? "unknown") retryable=\(envelope.retryable.map(String.init) ?? "unknown")"
-        )
-    }
-
-    static func makeURLSession(timeoutInterval: TimeInterval) -> URLSession {
+static func makeURLSession(timeoutInterval: TimeInterval) -> URLSession {
         let configuration = URLSessionConfiguration.default
         configuration.timeoutIntervalForRequest = timeoutInterval
         configuration.timeoutIntervalForResource = timeoutInterval
@@ -136,44 +75,4 @@ extension BackendClient {
         ]
         return URLSession(configuration: configuration)
     }
-}
-
-enum AuthorizationMode {
-    case required
-    case ifAvailable
-    case none
-
-    var requiresAuthorization: Bool {
-        switch self {
-        case .required, .ifAvailable:
-            true
-        case .none:
-            false
-        }
-    }
-
-    var requiresSessionRefresh: Bool {
-        switch self {
-        case .required, .ifAvailable:
-            true
-        case .none:
-            false
-        }
-    }
-}
-
-extension JSONDecoder {
-    static let backend: JSONDecoder = {
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
-        return decoder
-    }()
-}
-
-extension JSONEncoder {
-    static let backend: JSONEncoder = {
-        let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
-        return encoder
-    }()
 }

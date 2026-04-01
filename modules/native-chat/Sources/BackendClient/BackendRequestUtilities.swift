@@ -20,3 +20,43 @@ func makeBackendStreamURL(
 func makeAuthorizationHeader(sessionStore: BackendSessionStore) -> String? {
     sessionStore.loadSession().map { "Bearer \($0.accessToken)" }
 }
+
+enum AuthorizationMode {
+    case required
+    case ifAvailable
+    case none
+
+    var requiresAuthorization: Bool {
+        switch self {
+        case .required, .ifAvailable:
+            true
+        case .none:
+            false
+        }
+    }
+
+    var requiresSessionRefresh: Bool {
+        switch self {
+        case .required, .ifAvailable:
+            true
+        case .none:
+            false
+        }
+    }
+}
+
+extension JSONDecoder {
+    static let backend: JSONDecoder = {
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        return decoder
+    }()
+}
+
+extension JSONEncoder {
+    static let backend: JSONEncoder = {
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        return encoder
+    }()
+}
