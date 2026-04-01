@@ -1,11 +1,13 @@
 import Foundation
 
+/// The type of tool invocation within a message.
 public enum ToolCallTypeDTO: String, Codable, Equatable, Sendable, CaseIterable {
     case webSearch = "web_search"
     case codeInterpreter = "code_interpreter"
     case fileSearch = "file_search"
 }
 
+/// The execution status of a tool call.
 public enum ToolCallStatusDTO: String, Codable, Equatable, Sendable, CaseIterable {
     case inProgress = "in_progress"
     case searching
@@ -14,6 +16,7 @@ public enum ToolCallStatusDTO: String, Codable, Equatable, Sendable, CaseIterabl
     case completed
 }
 
+/// Metadata about a tool call embedded in an assistant message.
 public struct ToolCallInfoDTO: Codable, Equatable, Sendable, Identifiable {
     public let id: String
     public let type: ToolCallTypeDTO
@@ -22,6 +25,7 @@ public struct ToolCallInfoDTO: Codable, Equatable, Sendable, Identifiable {
     public let results: [String]?
     public let queries: [String]?
 
+    /// Creates a tool call info DTO with the given fields.
     public init(
         id: String,
         type: ToolCallTypeDTO,
@@ -39,6 +43,7 @@ public struct ToolCallInfoDTO: Codable, Equatable, Sendable, Identifiable {
     }
 }
 
+/// A URL citation annotation attached to assistant message content.
 public struct URLCitationDTO: Codable, Equatable, Sendable, Identifiable {
     public var id: String {
         "\(startIndex)-\(endIndex)-\(url)"
@@ -49,6 +54,7 @@ public struct URLCitationDTO: Codable, Equatable, Sendable, Identifiable {
     public let startIndex: Int
     public let endIndex: Int
 
+    /// Creates a URL citation spanning the given character range.
     public init(
         url: String,
         title: String,
@@ -62,6 +68,7 @@ public struct URLCitationDTO: Codable, Equatable, Sendable, Identifiable {
     }
 }
 
+/// An annotation referencing a generated file within a code interpreter sandbox.
 public struct FilePathAnnotationDTO: Codable, Equatable, Sendable, Identifiable {
     public var id: String {
         "\(startIndex)-\(endIndex)-\(fileId)"
@@ -74,6 +81,7 @@ public struct FilePathAnnotationDTO: Codable, Equatable, Sendable, Identifiable 
     public let startIndex: Int
     public let endIndex: Int
 
+    /// Creates a file path annotation for the given sandbox file.
     public init(
         fileId: String,
         containerId: String?,

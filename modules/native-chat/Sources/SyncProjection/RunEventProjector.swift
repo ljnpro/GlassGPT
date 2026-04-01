@@ -1,18 +1,23 @@
 import BackendContracts
 import Foundation
 
+/// Errors that indicate an invalid event ordering during sync projection.
 public enum RunEventProjectionError: Error, Equatable, Sendable {
     case batchCursorRegressed(expectedAtLeast: SyncCursor, actual: SyncCursor)
     case eventCursorOutOfOrder(previous: SyncCursor, current: SyncCursor)
 }
 
+/// A projector that applies a batch of run events to produce an updated projection state.
 public protocol RunEventProjecting: Sendable {
     func apply(batch: SyncProjectionBatch, to state: SyncProjectionState) throws -> SyncProjectionState
 }
 
+/// A cursor-ordered projector that validates monotonically increasing event cursors.
 public struct DeterministicRunEventProjector: RunEventProjecting {
+    /// Creates a deterministic projector.
     public init() {}
 
+    /// Applies a batch of events to the given state, returning the updated projection.
     public func apply(
         batch: SyncProjectionBatch,
         to state: SyncProjectionState

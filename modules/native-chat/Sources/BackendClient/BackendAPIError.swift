@@ -1,5 +1,6 @@
 import Foundation
 
+/// HTTP-level errors returned by the backend API.
 public enum BackendAPIError: Error, Equatable, Hashable, Sendable {
     case invalidRequest
     case unauthorized

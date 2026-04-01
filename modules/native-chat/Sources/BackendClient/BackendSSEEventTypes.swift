@@ -1,10 +1,12 @@
 import Foundation
 
+/// Indicates which phase of the SSE connection encountered a failure.
 public enum BackendSSEFailurePhase: String, Equatable, Sendable {
     case connectionSetup
     case streamRead
 }
 
+/// Transport-level errors that can occur while consuming an SSE stream.
 public enum BackendSSEStreamError: Error, Equatable, Sendable {
     case invalidHTTPResponse
     case unacceptableStatusCode(Int)
@@ -17,6 +19,7 @@ public struct SSEEvent: Sendable {
     public let data: String
     public let id: String?
 
+    /// Creates an SSE event with the given type, data payload, and optional event ID.
     public init(event: String, data: String, id: String?) {
         self.event = event
         self.data = data

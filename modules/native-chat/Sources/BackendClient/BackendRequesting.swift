@@ -3,6 +3,7 @@ import BackendContracts
 import Foundation
 
 @MainActor
+/// Defines the full surface of backend API operations used by the app.
 public protocol BackendRequesting: AnyObject {
     func cancelRun(_ runID: String) async throws -> RunSummaryDTO
     func createConversation(

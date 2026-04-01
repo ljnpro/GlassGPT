@@ -2,6 +2,7 @@ import ChatDomain
 import ChatPersistenceCore
 
 extension ProjectionCacheRepository {
+    /// Deletes messages from the conversation that are not in the retained set.
     public func removeMessages(
         in conversation: Conversation,
         excludingServerIDs retainedServerIDs: Set<String>
@@ -17,6 +18,7 @@ extension ProjectionCacheRepository {
         }
     }
 
+    /// Deletes conversations for the account that are not in the retained set.
     public func removeConversations(
         for accountID: String,
         excludingServerIDs retainedServerIDs: Set<String>
@@ -33,6 +35,7 @@ extension ProjectionCacheRepository {
         }
     }
 
+    /// Removes all cached conversations and messages for the given account.
     public func purgeCache(accountID: String) throws(PersistenceError) {
         let conversations = try fetchConversations(accountID: accountID)
         for conversation in conversations {

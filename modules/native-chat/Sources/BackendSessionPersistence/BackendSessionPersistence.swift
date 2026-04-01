@@ -10,6 +10,7 @@ public final class BackendSessionPersistence: BackendSessionPersisting {
 
     private let store: PersistedAPIKeyStore
 
+    /// Creates a session persistence layer backed by the Keychain for the given bundle.
     public init(bundleIdentifier: String? = nil) {
         let serviceIdentifier = KeychainAPIKeyBackend.defaultServiceIdentifier(
             bundleIdentifier: bundleIdentifier ?? Self.defaultBundleIdentifier
@@ -22,10 +23,12 @@ public final class BackendSessionPersistence: BackendSessionPersisting {
         )
     }
 
+    /// Creates a session persistence layer with an injected key store, for testing.
     public init(store: PersistedAPIKeyStore) {
         self.store = store
     }
 
+    /// Loads and decodes the persisted session, returning `nil` if absent or corrupt.
     public func loadSession() -> SessionDTO? {
         guard let payload = store.loadAPIKey(),
               let data = payload.data(using: .utf8)
@@ -43,6 +46,7 @@ public final class BackendSessionPersistence: BackendSessionPersisting {
         }
     }
 
+    /// Encodes and persists the given session to the Keychain.
     public func saveSession(_ session: SessionDTO) throws {
         let snapshot = BackendSessionSnapshot(session: session)
         let data = try Self.encoder.encode(snapshot)
@@ -54,6 +58,7 @@ public final class BackendSessionPersistence: BackendSessionPersisting {
         try store.saveAPIKey(payload)
     }
 
+    /// Deletes the persisted session from the Keychain.
     public func clear() {
         store.deleteAPIKey()
     }

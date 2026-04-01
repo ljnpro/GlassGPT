@@ -1,5 +1,6 @@
 import Foundation
 
+/// The role of a message participant in a conversation.
 public enum MessageRoleDTO: String, Codable, Equatable, Sendable, CaseIterable {
     case system
     case user
@@ -7,6 +8,7 @@ public enum MessageRoleDTO: String, Codable, Equatable, Sendable, CaseIterable {
     case tool
 }
 
+/// A single message within a conversation, including any annotations and tool calls.
 public struct MessageDTO: Codable, Equatable, Sendable, Identifiable {
     public let id: String
     public let conversationID: String
@@ -38,6 +40,7 @@ public struct MessageDTO: Codable, Equatable, Sendable, Identifiable {
         case agentTraceJSON
     }
 
+    /// Creates a message DTO with the given fields.
     public init(
         id: String,
         conversationID: String,

@@ -1,5 +1,6 @@
 import Foundation
 
+/// The type of artifact generated during a run.
 public enum ArtifactKindDTO: String, Codable, Equatable, Sendable, CaseIterable {
     case image
     case document
@@ -7,6 +8,7 @@ public enum ArtifactKindDTO: String, Codable, Equatable, Sendable, CaseIterable 
     case data
 }
 
+/// A generated file artifact attached to a run.
 public struct ArtifactDTO: Codable, Equatable, Sendable, Identifiable {
     public let id: String
     public let conversationID: String
@@ -31,6 +33,7 @@ public struct ArtifactDTO: Codable, Equatable, Sendable, Identifiable {
     }
 }
 
+/// Pairs an artifact with its download URL.
 public struct ArtifactDownloadDTO: Codable, Equatable, Sendable {
     public let artifact: ArtifactDTO
     public let url: URL

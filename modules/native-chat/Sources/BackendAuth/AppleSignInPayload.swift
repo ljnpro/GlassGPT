@@ -1,5 +1,6 @@
 import Foundation
 
+/// Credentials returned from a successful Sign in with Apple authorization.
 public struct AppleSignInPayload: Equatable, Sendable {
     public let userIdentifier: String
     public let identityToken: String
@@ -8,6 +9,7 @@ public struct AppleSignInPayload: Equatable, Sendable {
     public let givenName: String?
     public let familyName: String?
 
+    /// Creates a payload from the raw Apple credential fields.
     public init(
         userIdentifier: String,
         identityToken: String,

@@ -16,6 +16,7 @@ public struct ConversationProjectionRecord: Equatable, Sendable {
     public let agentWorkerReasoningEffort: String?
     public let serviceTier: String?
 
+    /// Creates a conversation projection record with the given fields.
     public init(
         serverID: String,
         accountID: String,
@@ -61,6 +62,7 @@ public struct MessageProjectionRecord: Equatable, Sendable {
     public let filePathAnnotations: [FilePathAnnotation]
     public let agentTrace: AgentTurnTrace?
 
+    /// Creates a message projection record with the given fields.
     public init(
         serverID: String,
         accountID: String,

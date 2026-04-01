@@ -13,6 +13,7 @@ public final class BackendProjectionStore {
     let projector: any RunEventProjecting
     private var projectionStateByAccount: [String: SyncProjectionState] = [:]
 
+    /// Creates a projection store backed by the given repository and cursor store.
     public init(
         cacheRepository: ProjectionCacheRepository,
         cursorStore: SyncCursorStore,
@@ -23,6 +24,7 @@ public final class BackendProjectionStore {
         self.projector = projector
     }
 
+    /// Returns all cached conversations for the given account filtered by mode.
     public func loadCachedConversations(
         accountID: String,
         mode: ConversationMode
@@ -30,6 +32,7 @@ public final class BackendProjectionStore {
         try cacheRepository.fetchConversations(accountID: accountID, mode: mode)
     }
 
+    /// Returns a single cached conversation by server ID, or `nil` if not found.
     public func loadCachedConversation(
         serverID: String,
         accountID: String
@@ -37,6 +40,7 @@ public final class BackendProjectionStore {
         try cacheRepository.fetchConversation(serverID: serverID, accountID: accountID)
     }
 
+    /// Replaces the cached conversation index with the given list, removing stale entries.
     public func applyConversationIndex(
         _ conversations: [ConversationDTO],
         accountID: String
@@ -53,6 +57,7 @@ public final class BackendProjectionStore {
     }
 
     @discardableResult
+    /// Inserts or updates a single conversation in the local cache.
     public func upsertConversation(
         _ conversation: ConversationDTO,
         accountID: String
@@ -65,6 +70,7 @@ public final class BackendProjectionStore {
     }
 
     @discardableResult
+    /// Applies a full conversation detail snapshot to the local cache.
     public func applyConversationDetailSnapshot(
         _ detail: ConversationDetailDTO,
         accountID: String
@@ -86,6 +92,7 @@ public final class BackendProjectionStore {
         return conversation
     }
 
+    /// Projects a sync envelope into the local cache, advancing the cursor.
     public func applySyncEnvelope(
         _ envelope: SyncEnvelopeDTO,
         accountID: String
@@ -133,12 +140,14 @@ public final class BackendProjectionStore {
         projectionStateByAccount[accountID] = nextState
     }
 
+    /// Purges all cached data and resets the sync cursor for the given account.
     public func clearAccountCache(accountID: String) throws(PersistenceError) {
         try cacheRepository.purgeCache(accountID: accountID)
         cursorStore.clearCursor(for: accountID)
         projectionStateByAccount.removeValue(forKey: accountID)
     }
 
+    /// Returns the current projection state (including cursor) for the given account.
     public func projectionState(for accountID: String) -> SyncProjectionState {
         if let state = projectionStateByAccount[accountID] {
             return state

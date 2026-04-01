@@ -8,6 +8,7 @@ public final class BackendClient: BackendRequesting {
     let urlSession: URLSession
     let sseURLSession: URLSession
 
+    /// Creates a backend client configured with the given environment and session store.
     public init(
         environment: BackendEnvironment,
         sessionStore: BackendSessionStore,

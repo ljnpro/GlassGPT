@@ -11,6 +11,7 @@ public final class BackendSessionStore {
 
     public private(set) var currentSession: SessionDTO?
 
+    /// Creates a session store, optionally restoring a persisted session.
     public init(
         session: SessionDTO? = nil,
         persistence: (any BackendSessionPersisting)? = nil
@@ -27,15 +28,18 @@ public final class BackendSessionStore {
         currentSession?.user
     }
 
+    /// Replaces the current session with the given value and persists it.
     public func replace(session: SessionDTO?) {
         currentSession = session
         persistCurrentSession()
     }
 
+    /// Returns the in-memory session, if any.
     public func loadSession() -> SessionDTO? {
         currentSession
     }
 
+    /// Returns an immutable snapshot of the current session, or `nil` if signed out.
     public func snapshot() -> BackendSessionSnapshot? {
         guard let currentSession else {
             return nil
@@ -43,6 +47,7 @@ public final class BackendSessionStore {
         return BackendSessionSnapshot(session: currentSession)
     }
 
+    /// Clears the current session from memory and persistent storage.
     public func clear() {
         currentSession = nil
         persistence?.clear()

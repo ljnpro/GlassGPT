@@ -1,5 +1,6 @@
 import Foundation
 
+/// Request body for creating a new conversation on the backend.
 public struct CreateConversationRequestDTO: Codable, Equatable, Sendable {
     public let title: String
     public let mode: ConversationModeDTO
@@ -8,6 +9,7 @@ public struct CreateConversationRequestDTO: Codable, Equatable, Sendable {
     public let agentWorkerReasoningEffort: ReasoningEffortDTO?
     public let serviceTier: ServiceTierDTO?
 
+    /// Creates a conversation creation request with the given parameters.
     public init(
         title: String,
         mode: ConversationModeDTO,
@@ -25,11 +27,13 @@ public struct CreateConversationRequestDTO: Codable, Equatable, Sendable {
     }
 }
 
+/// Request body for sending a new message in a conversation.
 public struct CreateMessageRequestDTO: Codable, Equatable, Sendable {
     public let content: String
     public let fileIds: [String]?
     public let imageBase64: String?
 
+    /// Creates a message request with text content and optional attachments.
     public init(content: String, fileIds: [String]? = nil, imageBase64: String? = nil) {
         self.content = content
         self.fileIds = fileIds
@@ -37,12 +41,14 @@ public struct CreateMessageRequestDTO: Codable, Equatable, Sendable {
     }
 }
 
+/// Request body for updating a conversation's model and reasoning settings.
 public struct UpdateConversationConfigurationRequestDTO: Codable, Equatable, Sendable {
     public let model: ModelDTO?
     public let reasoningEffort: ReasoningEffortDTO?
     public let agentWorkerReasoningEffort: ReasoningEffortDTO?
     public let serviceTier: ServiceTierDTO?
 
+    /// Creates a configuration update request.
     public init(
         model: ModelDTO?,
         reasoningEffort: ReasoningEffortDTO?,

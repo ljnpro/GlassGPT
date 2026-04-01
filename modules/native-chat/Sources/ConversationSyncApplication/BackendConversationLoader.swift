@@ -19,6 +19,7 @@ public final class BackendConversationLoader {
     private let projectionStore: BackendProjectionStore
     private let sessionStore: BackendSessionStore
 
+    /// Creates a conversation loader backed by the given client and stores.
     public init(
         client: any BackendRequesting,
         projectionStore: BackendProjectionStore,
@@ -33,6 +34,7 @@ public final class BackendConversationLoader {
         sessionStore.currentUser?.id
     }
 
+    /// Fetches the conversation list from the backend and updates the local cache.
     public func refreshConversationIndex(
         mode: ConversationMode
     ) async throws -> [Conversation] {
@@ -43,6 +45,7 @@ public final class BackendConversationLoader {
     }
 
     @discardableResult
+    /// Fetches the full conversation detail from the backend and updates the cache.
     public func refreshConversationDetail(serverID: String) async throws -> Conversation {
         let accountID = try requireAccountID()
         let detail = try await client.fetchConversationDetail(serverID)
@@ -66,6 +69,7 @@ public final class BackendConversationLoader {
     }
 
     @discardableResult
+    /// Creates a new conversation on the backend and caches it locally.
     public func createConversation(
         title: String,
         mode: ConversationMode,
@@ -87,6 +91,7 @@ public final class BackendConversationLoader {
     }
 
     @discardableResult
+    /// Updates the conversation's model and reasoning configuration on the backend.
     public func updateConversationConfiguration(
         serverID: String,
         mode: ConversationMode,
@@ -108,6 +113,7 @@ public final class BackendConversationLoader {
         return try projectionStore.upsertConversation(dto, accountID: accountID)
     }
 
+    /// Applies incremental sync events from the backend to the local cache.
     public func applyIncrementalSync() async throws {
         let accountID = try requireAccountID()
         let cursor = projectionStore.projectionState(for: accountID).cursor?.rawValue
@@ -115,11 +121,13 @@ public final class BackendConversationLoader {
         try projectionStore.applySyncEnvelope(envelope, accountID: accountID)
     }
 
+    /// Returns a locally cached conversation by server ID, or `nil` if not found.
     public func loadCachedConversation(serverID: String) throws -> Conversation? {
         let accountID = try requireAccountID()
         return try projectionStore.loadCachedConversation(serverID: serverID, accountID: accountID)
     }
 
+    /// Clears the projection cache for the currently signed-in account.
     public func clearAccountCache() throws(PersistenceError) {
         guard let accountID = currentAccountID else {
             return
@@ -127,6 +135,7 @@ public final class BackendConversationLoader {
         try clearAccountCache(accountID: accountID)
     }
 
+    /// Clears the projection cache for the given account ID.
     public func clearAccountCache(accountID: String) throws(PersistenceError) {
         try projectionStore.clearAccountCache(accountID: accountID)
     }

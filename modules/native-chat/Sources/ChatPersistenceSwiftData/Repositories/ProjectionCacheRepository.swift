@@ -8,10 +8,12 @@ import SwiftData
 public final class ProjectionCacheRepository {
     let modelContext: ModelContext
 
+    /// Creates a repository operating on the given SwiftData model context.
     public init(modelContext: ModelContext) {
         self.modelContext = modelContext
     }
 
+    /// Persists all pending changes in the model context.
     public func save() throws(PersistenceError) {
         do {
             try modelContext.save()
@@ -21,6 +23,7 @@ public final class ProjectionCacheRepository {
     }
 
     @discardableResult
+    /// Inserts or updates a cached conversation from the given projection record.
     public func upsertConversation(
         _ record: ConversationProjectionRecord
     ) throws(PersistenceError) -> Conversation {
@@ -51,6 +54,7 @@ public final class ProjectionCacheRepository {
     }
 
     @discardableResult
+    /// Inserts or updates a cached message from the given projection record.
     public func upsertMessage(
         _ record: MessageProjectionRecord,
         in conversation: Conversation

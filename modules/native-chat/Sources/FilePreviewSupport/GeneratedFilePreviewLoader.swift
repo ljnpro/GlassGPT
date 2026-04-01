@@ -4,6 +4,7 @@ import OSLog
 import PDFKit
 import UIKit
 
+/// Utility for loading generated image and PDF previews from local file URLs.
 package enum GeneratedFilePreviewLoader {
     private static let logger = Logger(subsystem: "GlassGPT", category: "files")
 

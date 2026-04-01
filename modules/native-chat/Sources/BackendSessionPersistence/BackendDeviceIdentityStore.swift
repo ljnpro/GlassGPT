@@ -12,6 +12,7 @@ public final class BackendDeviceIdentityStore {
     private let defaults: UserDefaults
     private let store: PersistedAPIKeyStore
 
+    /// Creates a device identity store backed by the Keychain for the given bundle.
     public init(
         bundleIdentifier: String? = nil,
         defaults: UserDefaults = .standard
@@ -28,6 +29,7 @@ public final class BackendDeviceIdentityStore {
         )
     }
 
+    /// Creates a device identity store with an injected key store, for testing.
     public init(
         defaults: UserDefaults = .standard,
         store: PersistedAPIKeyStore

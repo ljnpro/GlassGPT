@@ -1,6 +1,7 @@
 import BackendContracts
 import Foundation
 
+/// An immutable value snapshot of the current backend session used for persistence.
 public struct BackendSessionSnapshot: Codable, Equatable, Sendable {
     public let accessToken: String
     public let refreshToken: String
@@ -22,6 +23,7 @@ public struct BackendSessionSnapshot: Codable, Equatable, Sendable {
         )
     }
 
+    /// Creates a snapshot from the given session DTO.
     public init(session: SessionDTO) {
         accessToken = session.accessToken
         refreshToken = session.refreshToken

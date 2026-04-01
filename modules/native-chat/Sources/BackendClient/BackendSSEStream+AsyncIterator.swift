@@ -99,6 +99,7 @@ public extension BackendSSEStream {
             var request = URLRequest(url: url)
             request.setValue("text/event-stream", forHTTPHeaderField: "Accept")
             request.setValue("no-cache", forHTTPHeaderField: "Cache-Control")
+            request.setValue(UUID().uuidString, forHTTPHeaderField: "X-Request-ID")
             if let appVersionHeader, !appVersionHeader.isEmpty {
                 request.setValue(appVersionHeader, forHTTPHeaderField: backendAppVersionHeaderField)
             }

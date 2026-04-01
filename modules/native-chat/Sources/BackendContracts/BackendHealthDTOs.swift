@@ -1,5 +1,6 @@
 import Foundation
 
+/// The health state of an individual backend subsystem.
 public enum HealthCheckStateDTO: String, Codable, Equatable, Sendable, CaseIterable {
     case healthy
     case degraded
@@ -9,11 +10,13 @@ public enum HealthCheckStateDTO: String, Codable, Equatable, Sendable, CaseItera
     case unauthorized
 }
 
+/// Whether the current app version is compatible with the backend.
 public enum AppCompatibilityDTO: String, Codable, Equatable, Sendable, CaseIterable {
     case compatible
     case updateRequired = "update_required"
 }
 
+/// Aggregated health check result for all backend subsystems.
 public struct ConnectionCheckDTO: Codable, Equatable, Sendable {
     public let backend: HealthCheckStateDTO
     public let auth: HealthCheckStateDTO
@@ -26,6 +29,7 @@ public struct ConnectionCheckDTO: Codable, Equatable, Sendable {
     public let minimumSupportedAppVersion: String
     public let appCompatibility: AppCompatibilityDTO
 
+    /// Creates a connection check result with the given subsystem states.
     public init(
         backend: HealthCheckStateDTO,
         auth: HealthCheckStateDTO,

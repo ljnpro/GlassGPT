@@ -9,6 +9,7 @@ public actor GeneratedFileCacheManager {
 
     private let cacheStore: GeneratedFileCacheStore
 
+    /// Creates a cache manager with the given file manager and optional cache root.
     public init(
         fileManager: FileManager = .default,
         cacheRootOverride: URL? = nil
@@ -19,22 +20,27 @@ public actor GeneratedFileCacheManager {
         )
     }
 
+    /// Returns the total size in bytes of the generated image cache.
     public func generatedImageCacheSize() -> Int64 {
         cacheStore.cacheSize(for: .image)
     }
 
+    /// Returns the total size in bytes of the generated document cache.
     public func generatedDocumentCacheSize() -> Int64 {
         cacheStore.cacheSize(for: .document)
     }
 
+    /// Deletes all files in the generated image cache.
     public func clearGeneratedImageCache() {
         cacheStore.clearCache(for: .image)
     }
 
+    /// Deletes all files in the generated document cache.
     public func clearGeneratedDocumentCache() {
         cacheStore.clearCache(for: .document)
     }
 
+    /// Returns the cached local resource for the given file descriptor, if available.
     public func cachedGeneratedFile(for descriptor: GeneratedFileDescriptor) -> GeneratedFileLocalResource? {
         let preferredBucket = GeneratedFilePolicy.cacheBucket(for: descriptor)
         let bucketsToSearch: [GeneratedFileCacheBucket] = preferredBucket == .image
@@ -69,6 +75,7 @@ public actor GeneratedFileCacheManager {
         return nil
     }
 
+    /// Writes the given data to the cache and returns a local resource handle.
     public func storeGeneratedFile(
         data: Data,
         descriptor: GeneratedFileDescriptor
@@ -111,6 +118,7 @@ public actor GeneratedFileCacheManager {
         Int64(Double(generatedDocumentCacheLimitBytes) * memoryPressureTrimRatio)
     }
 
+    /// Trims caches to the specified byte limits, used during memory pressure.
     package func trimCachesForMemoryPressure(
         imageLimitBytes: Int64,
         documentLimitBytes: Int64

@@ -1,10 +1,12 @@
 import Foundation
 
+/// Whether a run is a simple chat completion or an agent execution.
 public enum RunKindDTO: String, Codable, Equatable, Sendable, CaseIterable {
     case chat
     case agent
 }
 
+/// The lifecycle status of a run.
 public enum RunStatusDTO: String, Codable, Equatable, Sendable, CaseIterable {
     case queued
     case running
@@ -13,6 +15,7 @@ public enum RunStatusDTO: String, Codable, Equatable, Sendable, CaseIterable {
     case cancelled
 }
 
+/// The current execution stage of an agent run.
 public enum AgentStageDTO: String, Codable, Equatable, Sendable, CaseIterable {
     case leaderPlanning = "leader_planning"
     case workerWave = "worker_wave"
@@ -20,6 +23,7 @@ public enum AgentStageDTO: String, Codable, Equatable, Sendable, CaseIterable {
     case finalSynthesis = "final_synthesis"
 }
 
+/// A summary of a run's current state returned by the backend.
 public struct RunSummaryDTO: Codable, Equatable, Sendable, Identifiable {
     public let id: String
     public let conversationID: String
@@ -45,6 +49,7 @@ public struct RunSummaryDTO: Codable, Equatable, Sendable, Identifiable {
         case processSnapshotJSON
     }
 
+    /// Creates a run summary DTO with the given fields.
     public init(
         id: String,
         conversationID: String,
@@ -70,6 +75,7 @@ public struct RunSummaryDTO: Codable, Equatable, Sendable, Identifiable {
     }
 }
 
+/// The type of event emitted during a run's lifecycle.
 public enum RunEventKindDTO: String, Codable, Equatable, Sendable, CaseIterable {
     case messageCreated = "message_created"
     case runQueued = "run_queued"
@@ -84,6 +90,7 @@ public enum RunEventKindDTO: String, Codable, Equatable, Sendable, CaseIterable 
     case runCancelled = "run_cancelled"
 }
 
+/// A single event produced during a run, used for real-time streaming and sync.
 public struct RunEventDTO: Codable, Equatable, Sendable, Identifiable {
     public let id: String
     public let cursor: String
@@ -117,6 +124,7 @@ public struct RunEventDTO: Codable, Equatable, Sendable, Identifiable {
         case artifact
     }
 
+    /// Creates a run event DTO with the given fields.
     public init(
         id: String,
         cursor: String,
@@ -150,9 +158,11 @@ public struct RunEventDTO: Codable, Equatable, Sendable, Identifiable {
     }
 }
 
+/// Request body for starting an agent run within a conversation.
 public struct StartAgentRunRequestDTO: Codable, Equatable, Sendable {
     public let prompt: String?
 
+    /// Creates an agent run request with an optional prompt.
     public init(prompt: String?) {
         self.prompt = prompt
     }

@@ -1,5 +1,6 @@
 import Foundation
 
+/// Errors that can occur during the two-phase Apple-then-backend sign-in flow.
 public enum SignInFlowError: Error, Sendable {
     case appleAuthorization(underlying: Error)
     case backendAuthentication(underlying: Error)
