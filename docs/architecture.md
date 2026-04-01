@@ -19,8 +19,9 @@ governance instead of only describing one layer in isolation.
 - Backend infrastructure package: `packages/backend-infra`
   - backend infra build support
 - Backend service: `services/backend`
-  - Cloudflare Worker HTTP app, application services, adapters, D1/R2/DO
-    integrations, and Workflows orchestration
+  - `112` backend modules spanning the Cloudflare Worker HTTP app,
+    application services, adapters, observability, D1/R2/DO integrations,
+    and Workflows orchestration
 
 ## NativeChat Package Boundaries
 

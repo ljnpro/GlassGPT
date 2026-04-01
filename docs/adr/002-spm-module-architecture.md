@@ -47,16 +47,23 @@ unauthorized cross-module dependencies.
 
 ## Decision
 
-The codebase is decomposed into 16 SPM targets organized in a layered
+The codebase is decomposed into 23 Swift package targets organized in a layered
 dependency graph. The layers, from bottom to top, are:
 
-- **Foundation modules**: `GlassTypes`, `GlassNetworking`,
-  `GlassPersistence`
-- **Domain modules**: `ChatDomain`, `ConversationDomain`,
-  `SettingsDomain`
-- **Runtime modules**: `ChatRuntime`, `StreamingRuntime`
-- **UI modules**: `ChatUI`, `SettingsUI`, `SharedUI`
-- **Application shell**: `GlassApp`
+- **Domain and contract primitives**: `ChatDomain`, `AppRouting`,
+  `BackendContracts`
+- **Backend integration and sync modules**: `BackendAuth`,
+  `BackendSessionPersistence`, `BackendClient`, `SyncProjection`,
+  `ConversationSyncApplication`
+- **Persistence and generated-file foundations**: `ChatPersistenceCore`,
+  `ChatPersistenceModels`, `ChatPersistenceSwiftData`,
+  `ChatProjectionPersistence`, `GeneratedFilesCore`, `GeneratedFilesCache`,
+  `FilePreviewSupport`
+- **Presentation and surface modules**: `ChatPresentation`,
+  `ConversationSurfaceLogic`, `ChatUIComponents`, `NativeChatUI`
+- **Product composition**: `NativeChatBackendCore`,
+  `NativeChatBackendComposition`, `NativeChat`
+- **UI test support surface**: `NativeChatUITestSupport`
 
 Each layer may only import from layers below it, never from peers at the
 same layer or from layers above it.
@@ -98,7 +105,8 @@ with default implementations are preferred over exposing concrete types.
 
 ### Negative
 
-- The initial migration from a monolithic target to 16 modules required
+- The initial migration from a monolithic target to the current 23-target
+  package required
   significant refactoring effort, including changing access levels on
   hundreds of types and resolving circular dependencies that had formed
   in the monolith.
@@ -114,11 +122,13 @@ with default implementations are preferred over exposing concrete types.
 
 ### Neutral
 
-- The 16-module count represents the current decomposition. As the
+- The 23-target count represents the current decomposition. As the
   codebase grows, further decomposition may be warranted, particularly
-  splitting `ChatDomain` if tool call handling grows in complexity.
-- Test targets mirror the source targets (e.g., `ChatDomainTests` for
-  `ChatDomain`), maintaining the same modular structure in the test layer.
+  around backend composition or presentation seams if those ownership
+  boundaries expand again.
+- Three dedicated test targets mirror the package structure:
+  `NativeChatArchitectureTests`, `NativeChatSwiftTests`, and
+  `NativeChatTests`.
 
 ## Notes
 
