@@ -107,6 +107,11 @@ jobs:
         with:
           python-version: '3.14'
 
+      - name: Install osv-scanner
+        run: |
+          curl -fsSL https://github.com/google/osv-scanner/releases/latest/download/osv-scanner_linux_amd64 -o /usr/local/bin/osv-scanner
+          chmod +x /usr/local/bin/osv-scanner
+
       - name: Print toolchain versions
         run: |
           node --version
@@ -131,6 +136,9 @@ jobs:
         uses: actions/setup-python@v6
         with:
           python-version: '3.14'
+
+      - name: Install ruff
+        run: pip3 install ruff
 
       - name: Install CI shell tools
         run: |
@@ -205,6 +213,9 @@ jobs:
         uses: actions/setup-python@v6
         with:
           python-version: '3.14'
+
+      - name: Install ruff
+        run: pip3 install ruff
 
       - name: Install CI shell tools
         run: |
