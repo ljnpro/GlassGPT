@@ -57,8 +57,11 @@ extension BackendClient {
 
         do {
             let envelope = try JSONDecoder.backend.decode(ErrorEnvelope.self, from: data)
+            let code = envelope.code ?? "unknown"
+            let rid = envelope.requestId ?? "unknown"
+            let retry = envelope.retryable.map(String.init) ?? "unknown"
             BackendNetworkLogger.logNetworkError(
-                "[HTTP] error response status=\(statusCode) error=\(envelope.error) code=\(envelope.code ?? "unknown") requestId=\(envelope.requestId ?? "unknown") retryable=\(envelope.retryable.map(String.init) ?? "unknown")"
+                "[HTTP] error status=\(statusCode) error=\(envelope.error) code=\(code) rid=\(rid) retryable=\(retry)"
             )
         } catch {
             BackendNetworkLogger.logNetworkError(

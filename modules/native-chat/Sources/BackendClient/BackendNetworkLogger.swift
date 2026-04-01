@@ -24,13 +24,17 @@ enum BackendNetworkLogger {
         let elapsedMs = Int(elapsed.components.seconds * 1000
             + elapsed.components.attoseconds / 1_000_000_000_000_000)
         let rid = requestId.map { " rid=\($0)" } ?? ""
-        networkLogger.debug("[HTTP] \(method, privacy: .public) \(path, privacy: .public) → \(statusCode, privacy: .public) (\(elapsedMs, privacy: .public)ms)\(rid, privacy: .public)")
+        networkLogger.debug(
+            "[HTTP] \(method, privacy: .public) \(path, privacy: .public) → \(statusCode, privacy: .public) (\(elapsedMs, privacy: .public)ms)\(rid, privacy: .public)"
+        )
     }
 
     static func logError(method: String, path: String, error: any Error, requestId: String? = nil) {
         let sanitized = sanitizeError(error)
         let rid = requestId.map { " rid=\($0)" } ?? ""
-        networkLogger.error("[HTTP] \(method, privacy: .public) \(path, privacy: .public) failed: \(sanitized, privacy: .public)\(rid, privacy: .public)")
+        networkLogger.error(
+            "[HTTP] \(method, privacy: .public) \(path, privacy: .public) failed: \(sanitized, privacy: .public)\(rid, privacy: .public)"
+        )
     }
 
     // MARK: - SSE Lifecycle
