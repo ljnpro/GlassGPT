@@ -5,7 +5,7 @@
 - live execution tracker:
   [todo.md](/Applications/GlassGPT/todo.md)
 - full release plan:
-  [2026-03-31-glassgpt-5.6.0-perfect-score-design.md](/Applications/GlassGPT/docs/superpowers/specs/2026-03-31-glassgpt-5.6.0-perfect-score-design.md)
+  [2026-03-31-glassgpt-perfect-score-design.md](/Applications/GlassGPT/docs/superpowers/specs/2026-03-31-glassgpt-perfect-score-design.md)
 - evidence-backed release audit:
   [audit-5.7.0.md](/Applications/GlassGPT/docs/audit-5.7.0.md)
 - version/build source of truth:
