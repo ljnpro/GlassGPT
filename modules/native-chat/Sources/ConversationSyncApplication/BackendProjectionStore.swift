@@ -56,8 +56,8 @@ public final class BackendProjectionStore {
         try cacheRepository.save()
     }
 
-    @discardableResult
     /// Inserts or updates a single conversation in the local cache.
+    @discardableResult
     public func upsertConversation(
         _ conversation: ConversationDTO,
         accountID: String
@@ -69,8 +69,8 @@ public final class BackendProjectionStore {
         return cached
     }
 
-    @discardableResult
     /// Applies a full conversation detail snapshot to the local cache.
+    @discardableResult
     public func applyConversationDetailSnapshot(
         _ detail: ConversationDetailDTO,
         accountID: String

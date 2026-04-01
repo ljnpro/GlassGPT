@@ -55,7 +55,7 @@ extension BackendClient {
         return url
     }
 
-static func makeURLSession(timeoutInterval: TimeInterval) -> URLSession {
+    static func makeURLSession(timeoutInterval: TimeInterval) -> URLSession {
         let configuration = URLSessionConfiguration.default
         configuration.timeoutIntervalForRequest = timeoutInterval
         configuration.timeoutIntervalForResource = timeoutInterval

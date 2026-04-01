@@ -44,8 +44,8 @@ public final class BackendConversationLoader {
         return try projectionStore.loadCachedConversations(accountID: accountID, mode: mode)
     }
 
-    @discardableResult
     /// Fetches the full conversation detail from the backend and updates the cache.
+    @discardableResult
     public func refreshConversationDetail(serverID: String) async throws -> Conversation {
         let accountID = try requireAccountID()
         let detail = try await client.fetchConversationDetail(serverID)
@@ -68,8 +68,8 @@ public final class BackendConversationLoader {
         )
     }
 
-    @discardableResult
     /// Creates a new conversation on the backend and caches it locally.
+    @discardableResult
     public func createConversation(
         title: String,
         mode: ConversationMode,
@@ -90,8 +90,8 @@ public final class BackendConversationLoader {
         return try projectionStore.upsertConversation(dto, accountID: accountID)
     }
 
-    @discardableResult
     /// Updates the conversation's model and reasoning configuration on the backend.
+    @discardableResult
     public func updateConversationConfiguration(
         serverID: String,
         mode: ConversationMode,

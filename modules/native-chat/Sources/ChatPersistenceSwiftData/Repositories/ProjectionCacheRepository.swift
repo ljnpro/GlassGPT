@@ -22,8 +22,8 @@ public final class ProjectionCacheRepository {
         }
     }
 
-    @discardableResult
     /// Inserts or updates a cached conversation from the given projection record.
+    @discardableResult
     public func upsertConversation(
         _ record: ConversationProjectionRecord
     ) throws(PersistenceError) -> Conversation {
@@ -53,8 +53,8 @@ public final class ProjectionCacheRepository {
         return conversation
     }
 
-    @discardableResult
     /// Inserts or updates a cached message from the given projection record.
+    @discardableResult
     public func upsertMessage(
         _ record: MessageProjectionRecord,
         in conversation: Conversation

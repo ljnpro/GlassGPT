@@ -1,8 +1,8 @@
 import BackendContracts
 import Foundation
 
-extension SettingsAccountStore {
-    public var syncStatusState: HealthCheckStateDTO? {
+public extension SettingsAccountStore {
+    var syncStatusState: HealthCheckStateDTO? {
         guard isSignedIn else {
             return .missing
         }
@@ -32,7 +32,7 @@ extension SettingsAccountStore {
         return connectionStatus.auth
     }
 
-    public var syncStatusText: String {
+    var syncStatusText: String {
         guard isSignedIn else {
             return String(localized: "Not Available")
         }
@@ -66,7 +66,7 @@ extension SettingsAccountStore {
         return String(localized: "Needs Attention")
     }
 
-    public var syncStatusDetailText: String? {
+    var syncStatusDetailText: String? {
         guard isSignedIn else {
             return nil
         }
@@ -84,7 +84,7 @@ extension SettingsAccountStore {
         return lastCheckedText.map { String(localized: "Last checked \($0)") }
     }
 
-    public var compatibilityMessage: String? {
+    var compatibilityMessage: String? {
         guard let connectionStatus, connectionStatus.appCompatibility == .updateRequired else {
             return nil
         }
@@ -95,7 +95,7 @@ extension SettingsAccountStore {
         )
     }
 
-    public var lastCheckedText: String? {
+    var lastCheckedText: String? {
         guard let checkedAt = connectionStatus?.checkedAt else {
             return nil
         }

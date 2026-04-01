@@ -86,7 +86,7 @@ public extension BackendClient {
         let (data, httpResponse) = try await execute(
             path: path,
             method: "GET",
-            body: Optional<Data>.none,
+            body: Data?.none,
             authorizationMode: .required,
             queryItems: queryItems,
             allowRefreshRetry: true
