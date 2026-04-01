@@ -215,6 +215,7 @@ final class CoverageBackendURLProtocolState: @unchecked Sendable {
         let query: String?
         let method: String
         let authorizationHeader: String?
+        let requestIDHeader: String?
         let body: String?
     }
 
@@ -250,6 +251,7 @@ final class CoverageBackendURLProtocolState: @unchecked Sendable {
                 query: request.url?.query,
                 method: request.httpMethod ?? "GET",
                 authorizationHeader: request.value(forHTTPHeaderField: "Authorization"),
+                requestIDHeader: request.value(forHTTPHeaderField: "X-Request-ID"),
                 body: bodyData.flatMap { String(data: $0, encoding: .utf8) }
             )
         )
