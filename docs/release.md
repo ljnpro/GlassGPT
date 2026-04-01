@@ -5,7 +5,7 @@
 - live execution tracker:
   [todo.md](/Applications/GlassGPT/todo.md)
 - full release plan:
-  [2026-03-31-glassgpt-5.7.0-optimization.md](/Applications/GlassGPT/docs/superpowers/plans/2026-03-31-glassgpt-5.7.0-optimization.md)
+  [2026-03-31-glassgpt-5.6.0-perfect-score-design.md](/Applications/GlassGPT/docs/superpowers/specs/2026-03-31-glassgpt-5.6.0-perfect-score-design.md)
 - evidence-backed release audit:
   [audit-5.7.0.md](/Applications/GlassGPT/docs/audit-5.7.0.md)
 - version/build source of truth:
@@ -16,7 +16,7 @@
   [release_testflight.sh](/Applications/GlassGPT/scripts/release_testflight.sh)
 - frozen rollback line:
   `stable-4.12` and `codex/stable-4.12`
-- active 5.5 release line:
+- active 5.7 release line:
   `codex/stable-5.7`
 
 ## Canonical Release Command
