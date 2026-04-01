@@ -636,6 +636,17 @@ function run_checked_xcodebuild_impl() {
       return 0
     fi
 
+    # Xcode 26 sometimes exits 65 even when all tests pass due to
+    # DebuggerVersionStore.StoreError or other non-fatal runtime warnings.
+    # Accept exit 65 as success if the log confirms all tests passed.
+    if (( command_status == 65 )) && grep -q "Test run with .* tests .* passed" "$log_file" 2>/dev/null; then
+      echo "xcodebuild exited 65 but all tests passed (Xcode 26 runtime warning). Accepting as success." >&2
+      sanitize_successful_xcodebuild_log "$log_file"
+      ensure_successful_log_has_content "$log_file" "Completed ${label} successfully."
+      emit_completion_notice "$label" "$log_file"
+      return 0
+    fi
+
     if (( attempt < XCODEBUILD_RETRY_ATTEMPTS )) && {
       is_transient_xcodebuild_failure "$log_file" ||
       is_transient_xcresult_failure "$result_bundle_path" ||
