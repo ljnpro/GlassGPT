@@ -1,5 +1,4 @@
 import type { ConversationRecord } from '../domain/conversation-model.js';
-import type { MessageRecord } from '../domain/message-model.js';
 import type { RunRecord } from '../domain/run-model.js';
 import { logError, sanitizeLogValue } from '../observability/logger.js';
 import type {
@@ -7,7 +6,14 @@ import type {
   AgentRunServiceDependencies,
   PromptSource,
 } from './agent-run-types.js';
-import type { ProviderCredentialRecord } from './auth-records.js';
+import {
+  compareMessages,
+  isTerminalRun,
+  mergeLiveCitations,
+  mergeLiveFilePathAnnotations,
+  normalizePrompt,
+  requireValidCredential,
+} from './agent-run-utilities.js';
 import { ApplicationError } from './errors.js';
 import type { LiveCitation, LiveFilePathAnnotation } from './live-stream-model.js';
 import {
@@ -18,16 +24,6 @@ import {
   type WorkflowStarter,
 } from './run-projection.js';
 import type { BackendRuntimeContext } from './runtime-context.js';
-
-const requireValidCredential = (
-  credential: ProviderCredentialRecord | null,
-): ProviderCredentialRecord => {
-  if (!credential || credential.status !== 'valid') {
-    throw new ApplicationError('forbidden', 'openai_credential_unavailable');
-  }
-
-  return credential;
-};
 
 export const requireAgentConversation = (conversation: ConversationRecord): ConversationRecord => {
   if (conversation.mode !== 'agent') {
@@ -43,63 +39,6 @@ export const requireAgentRun = (run: RunRecord): RunRecord => {
   }
 
   return run;
-};
-
-const isTerminalRun = (run: RunRecord): boolean => {
-  return run.status === 'completed' || run.status === 'failed' || run.status === 'cancelled';
-};
-
-const normalizePrompt = (prompt: string | undefined): string | null => {
-  const trimmed = prompt?.trim() ?? '';
-  return trimmed.length > 0 ? trimmed : null;
-};
-
-const compareMessages = (left: MessageRecord, right: MessageRecord): number => {
-  if (left.createdAt !== right.createdAt) {
-    return left.createdAt.localeCompare(right.createdAt);
-  }
-
-  return left.id.localeCompare(right.id);
-};
-
-const mergeLiveCitations = (
-  citations: readonly LiveCitation[],
-  nextCitation: LiveCitation,
-): LiveCitation[] => {
-  if (
-    citations.some(
-      (candidate) =>
-        candidate.url === nextCitation.url &&
-        candidate.title === nextCitation.title &&
-        candidate.startIndex === nextCitation.startIndex &&
-        candidate.endIndex === nextCitation.endIndex,
-    )
-  ) {
-    return [...citations];
-  }
-
-  return [...citations, nextCitation];
-};
-
-const mergeLiveFilePathAnnotations = (
-  annotations: readonly LiveFilePathAnnotation[],
-  nextAnnotation: LiveFilePathAnnotation,
-): LiveFilePathAnnotation[] => {
-  if (
-    annotations.some(
-      (candidate) =>
-        candidate.fileId === nextAnnotation.fileId &&
-        candidate.containerId === nextAnnotation.containerId &&
-        candidate.sandboxPath === nextAnnotation.sandboxPath &&
-        candidate.filename === nextAnnotation.filename &&
-        candidate.startIndex === nextAnnotation.startIndex &&
-        candidate.endIndex === nextAnnotation.endIndex,
-    )
-  ) {
-    return [...annotations];
-  }
-
-  return [...annotations, nextAnnotation];
 };
 
 export const createAgentRunSupport = (deps: AgentRunServiceDependencies) => {
