@@ -122,10 +122,12 @@ export const installFileRoutes = (
     const requestId = context.get('requestId');
 
     if (lastHardErrorResponse) {
-      return new Response(lastHardErrorResponse.body, {
-        headers: new Headers(lastHardErrorResponse.headers),
-        status: lastHardErrorResponse.status,
+      logError('openai_file_download_failed', {
+        requestId,
+        statusCode: lastHardErrorResponse.status,
+        userId: session.userId,
       });
+      return context.json(makeErrorResponse('server_error', requestId), 502);
     }
 
     if (lastOpenAIResponse) {
