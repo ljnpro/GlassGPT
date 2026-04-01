@@ -15,22 +15,26 @@ python3 ./scripts/check_forbidden_legacy_symbols.py services/backend packages/ba
 "${PNPM_CMD[@]}" --filter @glassgpt/backend run ci
 rm -rf services/backend/coverage
 
-# Bundle size gate: fail if gzipped worker bundle exceeds budget
-BUNDLE_META="$ROOT_DIR/services/backend/.wrangler/bundle-meta.json"
-if [[ -f "$BUNDLE_META" ]]; then
+# Bundle size gate: fail if the actual gzipped worker.js exceeds budget.
+# The bundle-meta.json 'bytes' field reports raw (uncompressed) sizes.
+# We measure the real gzip size of the emitted worker.js for accuracy.
+DRY_RUN_DIR="$ROOT_DIR/services/backend/.wrangler/dry-run"
+WORKER_JS="$(find "$DRY_RUN_DIR" -name '*.js' ! -name '*.js.map' -type f 2>/dev/null | head -1)"
+if [[ -n "$WORKER_JS" && -f "$WORKER_JS" ]]; then
+  RAW_SIZE_KB=$(python3 -c "import pathlib; print(f'{pathlib.Path(\"$WORKER_JS\").stat().st_size / 1024:.1f}')")
   GZIP_SIZE_KB=$(python3 -c "
-import json, pathlib
-meta = json.loads(pathlib.Path('$BUNDLE_META').read_text())
-total = sum(o.get('bytes', 0) for o in meta.get('outputs', {}).values())
-print(f'{total / 1024:.1f}')
+import gzip, pathlib
+raw = pathlib.Path('$WORKER_JS').read_bytes()
+compressed = gzip.compress(raw, compresslevel=9)
+print(f'{len(compressed) / 1024:.1f}')
 ")
   BUDGET_KB=200
-  echo "Worker bundle size: ${GZIP_SIZE_KB} KB (budget: ${BUDGET_KB} KB)"
+  echo "Worker bundle: ${RAW_SIZE_KB} KB raw, ${GZIP_SIZE_KB} KB gzipped (budget: ${BUDGET_KB} KB gzipped)"
   python3 -c "
 budget = $BUDGET_KB
 actual = float('$GZIP_SIZE_KB')
 if actual > budget:
-    raise SystemExit(f'Worker bundle size {actual:.1f} KB exceeds budget {budget} KB')
+    raise SystemExit(f'Worker gzipped bundle {actual:.1f} KB exceeds budget {budget} KB')
 "
 fi
 "${PNPM_CMD[@]}" exec biome check --error-on-warnings package.json pnpm-workspace.yaml tsconfig.base.json biome.json dependency-cruiser.cjs services packages
