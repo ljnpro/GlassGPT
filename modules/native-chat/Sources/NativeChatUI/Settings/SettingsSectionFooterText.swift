@@ -26,6 +26,7 @@ struct SettingsSectionFooterText: View {
             .textCase(nil)
             .multilineTextAlignment(.leading)
             .lineLimit(nil)
+            .minimumScaleFactor(0.7)
             .fixedSize(horizontal: false, vertical: true)
             .frame(maxWidth: .infinity, alignment: .leading)
     }

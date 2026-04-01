@@ -92,6 +92,8 @@ struct SettingsAPIConfigurationSection: View {
                 )
                 .font(.body)
                 .foregroundStyle(Color.primary.opacity(0.84))
+                .lineLimit(nil)
+                .minimumScaleFactor(0.7)
                 .fixedSize(horizontal: false, vertical: true)
             }
         } header: {
