@@ -79,7 +79,7 @@ final class GlassGPTUISettingsFlowTests: GlassGPTUITests {
         XCTAssertTrue(waitForSelection(of: darkSegment, timeout: 5))
 
         app.tabBars.buttons["Chat"].tap()
-        XCTAssertTrue(app.buttons["backendChat.newConversation"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["glassgpt.chat.newConversation"].waitForExistence(timeout: 5))
 
         app.tabBars.buttons["Settings"].tap()
         let refreshedThemePicker = app.segmentedControls["settings.themePicker"]

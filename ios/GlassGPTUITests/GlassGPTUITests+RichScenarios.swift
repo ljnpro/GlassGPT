@@ -140,7 +140,7 @@ final class GlassGPTUIRichScenarioTests: GlassGPTUITests {
         let app = launchApp(scenario: "richAgentSelector")
         let doneButton = app.buttons["backendAgentSelector.done"]
         if !doneButton.waitForExistence(timeout: 5) {
-            let selectorButton = app.buttons["backendAgent.selector"]
+            let selectorButton = app.buttons["glassgpt.agent.modelSelector"]
             XCTAssertTrue(selectorButton.waitForExistence(timeout: 5))
             selectorButton.tap()
             if !doneButton.waitForExistence(timeout: 2) {
@@ -159,7 +159,7 @@ final class GlassGPTUIRichScenarioTests: GlassGPTUITests {
         XCTAssertTrue(app.sliders["backendAgentSelector.leaderReasoning.slider"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.sliders["backendAgentSelector.workerReasoning.slider"].waitForExistence(timeout: 5))
         doneButton.tap()
-        XCTAssertTrue(app.buttons["backendAgent.selector"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["glassgpt.agent.modelSelector"].waitForExistence(timeout: 5))
     }
 
     @MainActor

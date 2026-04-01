@@ -29,10 +29,10 @@ class GlassGPTUITests: XCTestCase {
         let app = launchApp()
 
         XCTAssertTrue(app.tabBars.buttons["Chat"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.buttons["backendChat.newConversation"].exists)
+        XCTAssertTrue(app.buttons["glassgpt.chat.newConversation"].exists)
 
         app.tabBars.buttons["Agent"].tap()
-        XCTAssertTrue(app.buttons["backendAgent.newConversation"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["glassgpt.agent.newConversation"].waitForExistence(timeout: 5))
 
         app.tabBars.buttons["History"].tap()
         XCTAssertTrue(app.navigationBars["History"].waitForExistence(timeout: 5))
@@ -98,7 +98,7 @@ class GlassGPTUITests: XCTestCase {
         XCTAssertTrue(app.navigationBars["History"].waitForExistence(timeout: 5))
 
         app.tabBars.buttons["Agent"].tap()
-        XCTAssertTrue(app.buttons["backendAgent.newConversation"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["glassgpt.agent.newConversation"].waitForExistence(timeout: 5))
 
         app.tabBars.buttons["Settings"].tap()
         XCTAssertTrue(app.buttons["settings.account.signIn"].waitForExistence(timeout: 5))
