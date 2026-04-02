@@ -203,7 +203,7 @@ let package = Package(
     dependencies: [
         .package(
             url: "https://github.com/pointfreeco/swift-snapshot-testing",
-            from: "1.17.0"
+            from: "1.19.0"
         )
     ],
     targets: boundaryTargets + [
