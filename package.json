@@ -25,13 +25,13 @@
     ]
   },
   "devDependencies": {
-    "@biomejs/biome": "2.4.9",
+    "@biomejs/biome": "2.4.10",
     "@types/node": "25.5.0",
     "@vitest/coverage-v8": "4.1.2",
     "dependency-cruiser": "17.3.10",
     "tsx": "4.21.0",
     "typescript": "6.0.2",
     "vitest": "4.1.2",
-    "wrangler": "4.78.0"
+    "wrangler": "4.79.0"
   }
 }
