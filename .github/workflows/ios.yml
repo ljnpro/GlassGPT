@@ -129,8 +129,18 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
-      - name: Select Xcode
-        run: sudo xcode-select -s /Applications/Xcode_26.3.app
+      - name: Select Xcode 26.4
+        run: |
+          sudo xcode-select -s /Applications/Xcode_26.4.app || sudo xcode-select -s /Applications/Xcode_26.4_Release_Candidate.app
+          xcodebuild -version
+
+      - name: Ensure iOS simulator runtime
+        run: |
+          if ! xcrun simctl list runtimes | grep -q "iOS 26.4"; then
+            echo "Downloading iOS 26.4 simulator runtime..."
+            xcodebuild -downloadPlatform iOS
+          fi
+          xcrun simctl list runtimes | grep iOS
 
       - name: Set up Python
         uses: actions/setup-python@v6
@@ -206,8 +216,18 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
-      - name: Select Xcode
-        run: sudo xcode-select -s /Applications/Xcode_26.3.app
+      - name: Select Xcode 26.4
+        run: |
+          sudo xcode-select -s /Applications/Xcode_26.4.app || sudo xcode-select -s /Applications/Xcode_26.4_Release_Candidate.app
+          xcodebuild -version
+
+      - name: Ensure iOS simulator runtime
+        run: |
+          if ! xcrun simctl list runtimes | grep -q "iOS 26.4"; then
+            echo "Downloading iOS 26.4 simulator runtime..."
+            xcodebuild -downloadPlatform iOS
+          fi
+          xcrun simctl list runtimes | grep iOS
 
       - name: Set up Python
         uses: actions/setup-python@v6
