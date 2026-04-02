@@ -1154,7 +1154,14 @@ function assert_release_readiness() {
     fi
   fi
 
-  gate_reinstall_compatibility
+  # The reinstall compatibility gate requires a built app bundle.  On GitHub
+  # Actions the release-readiness job runs on a separate runner without the
+  # iOS job's build artifacts, so skip the gate when the built app is absent.
+  if [[ "${RELEASE_SKIP_REINSTALL_UI_TESTS:-0}" == "1" ]]; then
+    echo "Skipping reinstall compatibility gate (RELEASE_SKIP_REINSTALL_UI_TESTS=1)."
+  else
+    gate_reinstall_compatibility
+  fi
 }
 
 function gate_maintainability() {

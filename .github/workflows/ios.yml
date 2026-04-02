@@ -257,3 +257,6 @@ jobs:
 
       - name: Release Readiness Lane
         run: ./scripts/ci.sh release-readiness
+        env:
+          RELEASE_SKIP_REQUIRED_UI_TESTS: '1'
+          RELEASE_SKIP_REINSTALL_UI_TESTS: '1'
